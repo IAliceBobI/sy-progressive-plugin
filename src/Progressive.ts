@@ -540,18 +540,32 @@ class HeadingGroup {
 }
 
 async function getDocWordCount(docID: string): Promise<WordCountType[]> {
+    await siyuan.pushMsg("获取所有子块……");
+    const allBlocks: any[] = await siyuan.getChildBlocks(docID);
+
+    const size = 300
+    const groups = [];
+    while (allBlocks.length > 0) {
+        groups.push(allBlocks.splice(0, size));
+    }
+
     await siyuan.pushMsg("开始统计字数……");
     let iter = 0;
     const content = [];
-    for (const { id, type } of await siyuan.getChildBlocks(docID)) {
-        // TODO: batch get counts
-        const { wordCount } = await siyuan.getBlocksWordCount([id]);
-        const count = wordCount;
-        content.push({ id, count, type });
-        ++iter;
-        if (iter % 200 == 0) {
-            await siyuan.pushMsg(`已经统计了${iter}个块……`, 3000);
+    for (const group of groups) {
+        const tasks = [];
+        for (const { id } of group) {
+            tasks.push(siyuan.getBlocksWordCount([id]));
         }
+        const rets = await Promise.all(tasks);
+        let i = 0;
+        for (const { id, type } of group) {
+            const { wordCount } = rets[i++];
+            const count = wordCount;
+            content.push({ id, count, type });
+        }
+        iter += size;
+        await siyuan.pushMsg(`已经统计了${iter}个块……`, 3000);
     }
     await siyuan.pushMsg("统计字数结束……");
     return content;
