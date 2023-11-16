@@ -1,0 +1,41 @@
+{
+  "name": "sy-progressive-plugin",
+  "author": "IAliceBobI",
+  "url": "https://github.com/IAliceBobI/sy-progressive-plugin",
+  "version": "0.0.1",
+  "minAppVersion": "2.10.13",
+  "backends": [
+    "windows",
+    "linux",
+    "darwin"
+  ],
+  "frontends": [
+    "desktop",
+    "desktop-window"
+  ],
+  "displayName": {
+    "default": "Progressive Learning",
+    "zh_CN": "渐进学习"
+  },
+  "description": {
+    "default": "Split the long document into small chunks and read gradually!",
+    "zh_CN": "把长文档拆分为小块，徐徐图之！"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh_CN": "README_zh_CN.md"
+  },
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": "",
+    "custom": [
+      "https://afdian.net/a/playerv5"
+    ]
+  },
+  "keywords": [
+    "Learning",
+    "Progressive",
+    "Progressive Learning"
+  ]
+}

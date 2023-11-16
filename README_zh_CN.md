@@ -1,0 +1,34 @@
+[English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
+
+# 渐进学习
+
+> [我猜下面的图九成九是裂开了😢，看这里吧！](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
+
+对于较长的文档、导入的电子书籍，我总没能坚持看完。
+
+偶然得知渐进学习的基本方法、一些皮毛，想尝试一下，于是开发了此插件。
+
+此插件的功能就是，把一个思源文档，划分为一个个小片段，挨个片段去阅读。阅读过程可以做笔记、做闪卡日后复习。
+
+目前的状态比较初级，我自己也没用过几次，我没发现的BUG还是有不少的。
+
+另外，插件的功能可能与你心目中的差距甚大……
+
+至于用了是否能提升学习效率，且容我先用几个月……加点功能……顺便改改BUG……
+
+
+
+
+# BUG反馈、建议
+
+QQ群: 263961482
+
+[或者到 Github 提交问题](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
+
+[或者到官方论坛提交问题](https://ld246.com/tag/siyuan)
+
+# 更新日志
+
+## 2023-11-17
+
+* 第一版
