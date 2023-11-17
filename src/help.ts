@@ -1,6 +1,94 @@
 import { siyuan } from "./utils";
+import * as utils from "./utils";
 
-type WordCountType = { id: string; count: number; type: string; };
+export type WordCountType = { id: string; count: number; type: string; };
+
+export enum HtmlCBType {
+    previous,
+    skip,
+    docCard,
+    saveDoc,
+    quit,
+    nextBook,
+}
+
+export function getBtns(bookID: string, noteID: string, startID: string, endID: string, point: number) {
+    const btnStopID = utils.newID();
+    const btnNextBookID = utils.newID();
+    const btnSkipID = utils.newID();
+    const btnPreviousID = utils.newID();
+    const btnSaveID = utils.newID();
+    const btnSaveCardID = utils.newID();
+    return `{{{col
+[${point}]
+
+<div>
+    <div>
+        <button onclick="${btnPreviousID}()">保留，回退</button>
+    </div>
+    <script>
+        function ${btnPreviousID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.previous},"${startID}","${endID}",${point})
+        }
+    </script>
+</div>
+
+<div>
+    <div>
+        <button onclick="${btnSkipID}()">删除，继续</button>
+    </div>
+    <script>
+        function ${btnSkipID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},"${startID}","${endID}",${point})
+        }
+    </script>
+</div>
+
+<div>
+    <div>
+        <button onclick="${btnSaveCardID}()">制卡，继续</button>
+    </div>
+    <script>
+        function ${btnSaveCardID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.docCard},"${startID}","${endID}",${point})
+        }
+    </script>
+</div>
+
+<div>
+    <div>
+        <button onclick="${btnSaveID}()">保留，继续</button>
+    </div>
+    <script>
+        function ${btnSaveID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.saveDoc},"${startID}","${endID}",${point})
+        }
+    </script>
+</div>
+
+<div>
+    <div>
+        <button onclick="${btnStopID}()">删除，退出</button>
+    </div>
+    <script>
+        function ${btnStopID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.quit},"${startID}","${endID}",${point})
+        }
+    </script>
+</div>
+
+<div>
+    <div>
+        <button onclick="${btnNextBookID}()">删除，换书</button>
+    </div>
+    <script>
+        function ${btnNextBookID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.nextBook},"${startID}","${endID}",${point})
+        }
+    </script>
+</div>
+}}}`;
+}
 
 export function afterLoad(data: any) {
     data = data?.data ?? "";
@@ -120,7 +208,7 @@ export async function getDocWordCount(docID: string): Promise<WordCountType[]> {
     await siyuan.pushMsg("获取所有子块……");
     const allBlocks: any[] = await siyuan.getChildBlocks(docID);
 
-    const size = 300
+    const size = 300;
     const groups = [];
     while (allBlocks.length > 0) {
         groups.push(allBlocks.splice(0, size));

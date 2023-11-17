@@ -2,6 +2,7 @@ import { Dialog, Menu, Plugin, openTab } from "siyuan";
 import "./index.scss";
 import { events } from "./Events";
 import { siyuan, timeUtil } from "./utils";
+import { HtmlCBType } from "./help";
 import * as utils from "./utils";
 import * as help from "./help";
 
@@ -13,15 +14,6 @@ const ViewAllProgressiveBookLock = "ViewAllProgressiveBookLock";
 const AddProgressiveReadingLock = "AddProgressiveReadingLock";
 const StartToLearnLock = "StartToLearnLock";
 const TEMP_CONTENT = "插件管理勿改managedByPluginDoNotModify";
-
-enum HtmlCBType {
-    previous,
-    skip,
-    docCard,
-    saveDoc,
-    quit,
-    nextBook,
-}
 
 class Progressive {
     private static readonly GLOBAL_THIS: Record<string, any> = globalThis;
@@ -301,7 +293,7 @@ class Progressive {
         this.updateBookInfo(bookID, {});
         piece.reverse();
         await siyuan.insertBlockAsChildOf(this.tempContent("================================="), noteID);
-        await siyuan.insertBlockAsChildOf(this.tempContent(getBtns(bookID, noteID, startID, endID, point)), noteID);
+        await siyuan.insertBlockAsChildOf(this.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
         for (const id of piece) {
             const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${TEMP_CONTENT}"`]);
             await siyuan.insertBlockAsChildOf(content, noteID);
@@ -345,84 +337,6 @@ class Progressive {
     onLayoutReady() {
         this.plugin.loadData(STORAGE_BOOKS);
     }
-}
-
-function getBtns(bookID: string, noteID: string, startID: string, endID: string, point: number) {
-    const btnStopID = utils.newID();
-    const btnNextBookID = utils.newID();
-    const btnSkipID = utils.newID();
-    const btnPreviousID = utils.newID();
-    const btnSaveID = utils.newID();
-    const btnSaveCardID = utils.newID();
-    return `{{{col
-当前第${point}段
-
-<div>
-    <div>
-        <button onclick="${btnPreviousID}()">保留，回退</button>
-    </div>
-    <script>
-        function ${btnPreviousID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.previous},"${startID}","${endID}",${point})
-        }
-    </script>
-</div>
-
-<div>
-    <div>
-        <button onclick="${btnSkipID}()">删除，继续</button>
-    </div>
-    <script>
-        function ${btnSkipID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},"${startID}","${endID}",${point})
-        }
-    </script>
-</div>
-
-<div>
-    <div>
-        <button onclick="${btnSaveCardID}()">制卡，继续</button>
-    </div>
-    <script>
-        function ${btnSaveCardID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.docCard},"${startID}","${endID}",${point})
-        }
-    </script>
-</div>
-
-<div>
-    <div>
-        <button onclick="${btnSaveID}()">保留，继续</button>
-    </div>
-    <script>
-        function ${btnSaveID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.saveDoc},"${startID}","${endID}",${point})
-        }
-    </script>
-</div>
-
-<div>
-    <div>
-        <button onclick="${btnStopID}()">删除，退出</button>
-    </div>
-    <script>
-        function ${btnStopID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.quit},"${startID}","${endID}",${point})
-        }
-    </script>
-</div>
-
-<div>
-    <div>
-        <button onclick="${btnNextBookID}()">删除，换书</button>
-    </div>
-    <script>
-        function ${btnNextBookID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.nextBook},"${startID}","${endID}",${point})
-        }
-    </script>
-</div>
-}}}`;
 }
 
 export const prog = new Progressive();
