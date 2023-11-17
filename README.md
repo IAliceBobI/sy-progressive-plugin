@@ -2,50 +2,58 @@
 
 # Progressive Learning
 
-I have always struggled to finish reading long documents and imported e-books.
+I often struggle to finish reading long documents or imported e-books.
 
-By chance, I learned about the basic methods and some basics of progressive learning, and wanted to give it a try, so I developed this plugin.
+There are also many imported books in the SY knowledge base. I wanted to make use of fragmented time to read some books, but choosing which book to read became a problem.
 
-The functionality of this plugin is to divide a document into small segments and read them one by one. During the reading process, you can take notes and create flashcards for future review.
+By chance, I learned about the basic methods and some superficial information about progressive learning and decided to give it a try. That's why I developed this plugin.
 
-The current state of the plugin is quite basic, and I haven't used it much myself, so there are still quite a few bugs that I haven't discovered.
+The purpose of this plugin is to divide a document in SY into small segments and read them one by one. During the reading process, you can take notes and create flashcards for future review.
 
-Also, the functionality of the plugin may differ greatly from what you have in mind...
+The current implementation of the plugin is relatively basic.
 
-As for whether using it can improve learning efficiency, let me use it for a few months first... add some features... and fix some bugs...
+As for whether using it can improve learning efficiency, let me use it for a few months first... add some features... fix some bugs... and then we'll see!
 
-Below is a brief explanation of how to use it.
+Now let's briefly explain how to use it.
 
-## Add Document
+## Adding a Document
 
-**Open the plugin menu, click on "Add Current Document," then click "Start Learning."**
+**Open the plugin menu and click on `Add Current Document`.**
 
-After adding a document, the plugin will perform segmentation.
+After adding a document, the plugin will perform the segmentation operation.
 
-If the document is large, like the one in the picture, with millions of words, the segmentation process may take a while, so please be patient.
+If the document is large, like the one shown in the image, with millions of words, the segmentation process may take a while. Please be patient.
 
-The segmentation process of the plugin does not modify the original text or create new documents. It only reads, counts, and builds an index.
+The segmentation operation of the plugin does not modify the original text or create new documents. It only reads, counts, and builds indexes.
 
-![Alt text](assets/addDoc.png)
+![Alt text](assets/addDoc1.png)
 
 ## Start Learning
 
-![Alt text](assets/reading.png)
+**Open the plugin menu and click on `Start Learning`.**
 
-* `Equal sign (=)`: Below the equal sign is the note area, which can be preserved. Above the equal sign is the original text with remarks added by the plugin, please do not modify.
-* `Current Segment 0`: Segments are numbered starting from 0, and 0 represents the beginning of a book.
-* `Delete, Continue`: The notes for the current segment will not be preserved.
-* `Create Flashcard, Continue`: The notes for the current segment will be preserved, and the current document will be turned into a flashcard. Finally, the original text will be deleted and a link to the original text will be added.
+> The shortcut for `Start Learning` is `Alt+-`, which is right after `Flashcards` `Alt+0`. Two shortcuts, one for learning and one for reviewing.
+
+![Alt text](assets/reading1.png)
+
+* `=== Separator` - The notes area is below the separator and can be preserved. The text above the separator is the original text with remarks added by the plugin, please do not modify it.
+* `[0]` - Segments are numbered starting from 0, where 0 represents the beginning of a book. The second segment is `[1]`.
+* `Keep and Go Back` - Keep the notes for the current segment and go back to the previous segment.
+* `Delete and Continue` - Discard the notes for the current segment and continue to the next segment.
+* `Create Flashcard and Continue` - Keep the notes for the current segment and turn the current document into a flashcard. The original text will be deleted, and a link to the original text will be added. Continue to the next segment.
+* `Keep and Continue` - Keep the notes for the current segment and delete the original text. Continue to the next segment.
+* `Delete and Exit` - Discard the notes for the current segment. Exit the learning process.
+* `Delete and Switch Book` - Discard the notes for the current segment. Choose another document that has been added to the "Progressive Learning" plugin.
 
 ## Future Plans
 
-Let me use it first, then make improvements...
+I will use it first and make some improvements...
 
 # Bug Reports, Suggestions
 
 QQ Group: 263961482
 
-[Or submit issues on GitHub](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
+[Or submit issues on Github](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
 
 [Or submit issues on the official forum](https://ld246.com/tag/siyuan)
 
