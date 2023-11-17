@@ -49,9 +49,13 @@ The segmentation operation of the plugin does not modify the original text or cr
 
 > **Reminder:** The titles of each snippet in the document can be modified. However, please do not modify the document's notes, as the plugin may not be able to find the document in the future.
 
-## Future Plans
+## Read the current paragraph
 
-I will use it first and make some improvements...
+Open a document that has been annotated with incremental learning. Scroll to a specific position and place the cursor there. Then, select the option "Read the current paragraph" from the plugin menu to open the fragment that contains the current block.
+
+Alternatively, you can use the right-click menu: `Plugin` -> `Read the current paragraph`
+
+![Alt text](assets/rightClickMenu.png)
 
 # Bug Reports, Suggestions
 

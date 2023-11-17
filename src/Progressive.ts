@@ -49,6 +49,19 @@ class Progressive {
                 this.startToLearnWithLock();
             },
         });
+        this.plugin.eventBus.on("open-menu-content", async ({ detail }) => {
+            const menu = detail.menu;
+            menu.addItem({
+                label: this.plugin.i18n.readThisPiece,
+                icon: "iconCursor",
+                click: () => {
+                    const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
+                    if (blockID) {
+                        this.readThisPiece();
+                    }
+                },
+            });
+        });
     }
 
     private async addProgressiveReading() {
@@ -158,8 +171,10 @@ class Progressive {
         }
     }
 
-    private async readThisPiece() {
-        const blockID = events.lastBlockID;
+    private async readThisPiece(blockID?: string) {
+        if (!blockID) {
+            blockID = events.lastBlockID;
+        }
         const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
         if (row) {
             const bookID = row['root_id'];
