@@ -330,7 +330,7 @@ class Progressive {
     private async viewAllProgressiveBooks() {
         const id = utils.newID();
         const dialog = new Dialog({
-            title: this.plugin.i18n.viewAllProgressiveBooks,
+            title: this.plugin.i18n.viewAllProgressiveBooks + "【开发中……】",
             content: `<div class="b3-dialog__content">
                 <div id='${id}'></div>
             </div>`,
