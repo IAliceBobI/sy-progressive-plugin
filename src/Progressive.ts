@@ -137,7 +137,7 @@ class Progressive {
             click: async () => {
                 // TODO
                 const blockID = events.lastBlockID;
-                
+
                 await siyuan.pushMsg("还没开发此功能");
             }
         });
@@ -314,6 +314,7 @@ class Progressive {
         piece.reverse();
         await siyuan.insertBlockAsChildOf(this.tempContent("==============================="), noteID);
         await siyuan.insertBlockAsChildOf(this.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
+        await this.AddRef(noteID, startID, endID);
         for (const id of piece) {
             const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${TEMP_CONTENT}"`]);
             await siyuan.insertBlockAsChildOf(content, noteID);
