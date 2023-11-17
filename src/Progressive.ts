@@ -160,6 +160,7 @@ class Progressive {
     private startToLearnWithLock() {
         navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
+                await siyuan.pushMsg(this.plugin.i18n.openingDocPieceForYou);
                 await this.startToLearn();
                 await utils.sleep(IndexTime2Wait);
             } else {

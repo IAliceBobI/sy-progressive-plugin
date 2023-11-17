@@ -1,9 +1,11 @@
 {
-  "openAdocFirst": "Please open a document first",
+  "openingDocPieceForYou": "Opening document fragment for you, please wait patiently...",
+  "cannotFindTheBox": "Cannot find the notebook corresponding to the document:",
+  "openAdocFirst": "Please open a document first.",
   "progressiveReadingMenu": "Progressive Reading Menu",
-  "addProgressiveReading": "Add Current Document",
-  "viewAllProgressiveBooks": "View All Progressive Reading Documents",
-  "startToLearn": "Start Learning",
-  "readThisPiece": "Read the Paragraph at the Cursor",
-  "slowDownALittleBit": "⏳Please wait for the index to be built... Then proceed with the operation..."
+  "addProgressiveReading": "Add current document",
+  "viewAllProgressiveBooks": "View all progressive reading documents",
+  "startToLearn": "Start learning",
+  "readThisPiece": "Read the paragraph at the cursor",
+  "slowDownALittleBit": "⏳Please wait for the index to be built... Then continue the operation..."
 }
