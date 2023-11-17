@@ -28,24 +28,27 @@ The segmentation operation of the plugin does not modify the original text or cr
 
 > **Note:** After creating an index, please do not modify the original document, such as deleting certain sections, as it may cause the learning plugin to be unable to locate those sections.
 
-![Alt text](assets/addDoc1.png)
+![Alt text](assets/addDoc.png)
 
 ## Start Learning
 
-**Open the plugin menu and click on `Start Learning`.**
+**Open the plugin menu and click on `Start Learning`**
 
-> The shortcut for `Start Learning` is `Alt+-`, which is right after `Flashcards` `Alt+0`. Two shortcuts, one for learning and one for reviewing.
+> The shortcut for `Start Learning` is `Alt+-`, located right after the `Flashcards` shortcut `Alt+0`. Two shortcuts, one for learning and one for reviewing.
 
-![Alt text](assets/reading1.png)
+![Alt text](assets/reading.png)
 
-* `=== Separator` - The notes area is below the separator and can be preserved. The text above the separator is the original text with remarks added by the plugin, please do not modify it.
-* `[0]` - Segments are numbered starting from 0, where 0 represents the beginning of a book. The second segment is `[1]`.
-* `Keep and Go Back` - Keep the notes for the current segment and go back to the previous segment.
-* `Delete and Continue` - Discard the notes for the current segment and continue to the next segment.
-* `Create Flashcard and Continue` - Keep the notes for the current segment and turn the current document into a flashcard. The original text will be deleted, and a link to the original text will be added. Continue to the next segment.
-* `Keep and Continue` - Keep the notes for the current segment and delete the original text. Continue to the next segment.
-* `Delete and Exit` - Discard the notes for the current segment. Exit the learning process.
-* `Delete and Switch Book` - Discard the notes for the current segment. Choose another document that has been added to the "Progressive Learning" plugin.
+![Alt text](assets/buttons.png)
+
+* `Two [..]`: On the left is the starting position of the excerpt in the original text, and on the right is the ending position.
+* `[514]`: Excerpts are counted starting from 0, where `[0]` represents the beginning of a book. The second excerpt would be `[1]`.
+* `Keep, Go Back`: Keep the notes for the current segment and go back to the previous excerpt.
+* `Delete, Continue`: Discard the notes for the current segment and continue to the next excerpt.
+* `Create Card, Continue`: Keep the notes for the current segment and turn the current document into a flashcard. Finally, remove the original text and add a link to the original text. Continue to the next excerpt.
+* `Keep, Continue`: Keep the notes for the current segment and remove the original text. Continue to the next excerpt.
+* `Delete, Exit`: Discard the notes for the current segment. Exit the learning process.
+* `Delete, Switch Book`: Discard the notes for the current segment. Choose another document to add to the Progressive Learning plugin.
+* `Separator`: Below the separator is the note area, which can be kept. Above the separator is the original text with the plugin's annotations. Do not modify it.
 
 > **Reminder:** The titles of each snippet in the document can be modified. However, please do not modify the document's notes, as the plugin may not be able to find the document in the future.
 

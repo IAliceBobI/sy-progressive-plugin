@@ -177,7 +177,7 @@ class Progressive {
         }
         const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
         if (row) {
-            const bookID = row['root_id'];
+            const bookID = row["root_id"];
             const idx = await this.loadBookIndexIfNeeded(bookID);
             if (!idx.length) {
                 await siyuan.pushMsg("请先将此文档加入渐进学习列表");
@@ -185,7 +185,7 @@ class Progressive {
                 for (let i = 0; i < idx.length; i++) {
                     for (let j = 0; j < idx[i].length; j++) {
                         if (blockID === idx[i][j]) {
-                            await this.updateBookInfo(bookID, { point: i })
+                            await this.updateBookInfo(bookID, { point: i });
                             this.startToLearnWithLock(bookID);
                             return;
                         }
@@ -251,7 +251,11 @@ class Progressive {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
         const bookIndex = await this.loadBookIndexIfNeeded(bookInfo.bookID);
-        const point = this.getBookReadPoint(bookInfo.bookID);
+        let point = this.getBookReadPoint(bookInfo.bookID);
+        if (point >= bookIndex.length) {
+            await siyuan.pushMsg("已经是最后一页了！即将从头开始……");
+            point = 0;
+        }
         const piece = bookIndex[point];
         noteID = await this.findDoc(bookInfo.bookID, point);
         if (noteID) {
@@ -260,16 +264,12 @@ class Progressive {
             openTab({ app: this.plugin.app, doc: { id: noteID } });
             return;
         }
-        if (point < bookIndex.length) {
-            noteID = await this.createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
-            if (noteID) {
-                await this.fullfilContent(bookInfo.bookID, piece, noteID, point);
-                openTab({ app: this.plugin.app, doc: { id: noteID } });
-            } else {
-                await siyuan.pushMsg("fail to create a new doc");
-            }
+        noteID = await this.createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
+        if (noteID) {
+            await this.fullfilContent(bookInfo.bookID, piece, noteID, point);
+            openTab({ app: this.plugin.app, doc: { id: noteID } });
         } else {
-            await siyuan.pushMsg("已经是最后一页了！");
+            await siyuan.pushMsg("fail to create a new doc");
         }
     }
 
@@ -356,7 +356,7 @@ class Progressive {
         const endID = piece[piece.length - 1];
         this.updateBookInfo(bookID, {});
         piece.reverse();
-        await siyuan.insertBlockAsChildOf(this.tempContent("==============================="), noteID);
+        await siyuan.insertBlockAsChildOf(this.tempContent("---"), noteID);
         await siyuan.insertBlockAsChildOf(this.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
         await this.AddRef(noteID, startID, endID);
         for (const id of piece) {
