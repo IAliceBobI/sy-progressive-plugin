@@ -23,7 +23,6 @@ class Progressive {
     onload(plugin: Plugin) {
         Progressive.GLOBAL_THIS["progressive_zZmqus5PtYRi"] = { progressive: this, utils, siyuan, timeUtil, events };
         this.plugin = plugin;
-        this.plugin.data[STORAGE_BOOKS] = {};
         const topBarElement = this.plugin.addTopBar({
             icon: "iconABook",
             title: this.plugin.i18n.progressiveReadingMenu,
@@ -67,8 +66,8 @@ class Progressive {
         const wordCount = await help.getDocWordCount(bookID);
         let groups = new help.HeadingGroup(wordCount, 300).split();
         groups = new help.ContentLenGroup(groups, 500).split();
-        await this.plugin.saveData(bookID, { data: help.preSave(groups) });
-        await this.updateBookInfo(bookID, { boxID, bookID });
+        await this.plugin.saveData(bookID, { data: help.preSave(groups) }); // save index
+        await this.updateBookInfo(bookID, { boxID, bookID, point: 0 });
         await this.saveBooksInfos();
         await this.viewAllProgressiveBooks();
     }
@@ -95,6 +94,8 @@ class Progressive {
     }
 
     private booksInfos(): BookInfos {
+        if (!this.plugin.data[STORAGE_BOOKS])
+            this.plugin.data[STORAGE_BOOKS] = {};
         return this.plugin.data[STORAGE_BOOKS];
     }
 
@@ -135,7 +136,6 @@ class Progressive {
             label: this.plugin.i18n.readThisPiece,
             accelerator: "",
             click: async () => {
-                // TODO
                 const blockID = events.lastBlockID;
 
                 await siyuan.pushMsg("还没开发此功能");
@@ -203,10 +203,16 @@ class Progressive {
         return "";
     }
 
+    private async loadBookIndexIfNeed(bookID: string) {
+        let idx = this.plugin.data[bookID];
+        if (!idx) idx = await this.plugin.loadData(bookID);
+        return help.afterLoad(idx);
+    }
+
     private async startToLearn(bookID?: string) {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
-        const bookIndex = help.afterLoad(await this.plugin.loadData(bookInfo.bookID));
+        const bookIndex = await this.loadBookIndexIfNeed(bookInfo.bookID);
         const point = this.getBookReadPoint(bookInfo.bookID);
         const piece = bookIndex[point];
         noteID = await this.findDoc(bookInfo.bookID, point);
@@ -357,6 +363,7 @@ class Progressive {
     }
 
     onLayoutReady() {
+        // load only need once, save many
         this.plugin.loadData(STORAGE_BOOKS);
     }
 }
