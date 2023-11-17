@@ -57,8 +57,8 @@ class Progressive {
         }
         const boxID = row["box"];
         const wordCount = await help.getDocWordCount(bookID);
-        let groups = new help.HeadingGroup(wordCount, 300).split();
-        groups = new help.ContentLenGroup(groups, 600).split();
+        let groups = new help.HeadingGroup(wordCount, 200).split();
+        groups = new help.ContentLenGroup(groups, 400).split();
         await this.plugin.saveData(bookID, { data: help.preSave(groups) });
         await this.updateBookInfo(bookID, { boxID, bookID });
         await this.saveBooksInfos();
