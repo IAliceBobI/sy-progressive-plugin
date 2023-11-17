@@ -58,7 +58,7 @@ class Progressive {
         const boxID = row["box"];
         const wordCount = await help.getDocWordCount(bookID);
         let groups = new help.HeadingGroup(wordCount, 200).split();
-        groups = new help.ContentLenGroup(groups, 400).split();
+        groups = new help.ContentLenGroup(groups, 300).split();
         await this.plugin.saveData(bookID, { data: help.preSave(groups) });
         await this.updateBookInfo(bookID, { boxID, bookID });
         await this.saveBooksInfos();
@@ -157,9 +157,14 @@ class Progressive {
         }
     }
 
-    private async createNote(boxID: string, bookID: string, firstBlockID: string, point: number) {
-        let { content } = await siyuan.getBlockMarkdownAndContent(firstBlockID);
-        content = content.slice(0, 15).replace(/\//g, "");
+    private async createNote(boxID: string, bookID: string, piece: string[], point: number) {
+        let content: string;
+        for (const blockID of piece) {
+            content = (await siyuan.getBlockMarkdownAndContent(blockID))?.content ?? "";
+            content = content.slice(0, 15).replace(/\//g, "").trim();
+            if (content) break;
+        }
+        if (!content) content = `[${point}]`;
         const row = await siyuan.sqlOne(`select hpath from blocks where id='${bookID}'`);
         let dir = row?.hpath ?? "";
         if (dir) {
@@ -197,7 +202,7 @@ class Progressive {
             return;
         }
         if (point < bookIndex.length) {
-            noteID = await this.createNote(bookInfo.boxID, bookInfo.bookID, piece[0], point);
+            noteID = await this.createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
             if (noteID) {
                 await this.fullfilContent(bookInfo.bookID, piece, noteID, point);
                 openTab({ app: this.plugin.app, doc: { id: noteID } });
