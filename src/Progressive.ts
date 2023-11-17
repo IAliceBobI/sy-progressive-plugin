@@ -136,9 +136,7 @@ class Progressive {
             label: this.plugin.i18n.readThisPiece,
             accelerator: "",
             click: async () => {
-                const blockID = events.lastBlockID;
-
-                await siyuan.pushMsg("还没开发此功能");
+                await this.readThisPiece();
             }
         });
         menu.addItem({
@@ -160,11 +158,36 @@ class Progressive {
         }
     }
 
-    private startToLearnWithLock() {
+    private async readThisPiece() {
+        const blockID = events.lastBlockID;
+        const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
+        if (row) {
+            const bookID = row['root_id'];
+            const idx = await this.loadBookIndexIfNeeded(bookID);
+            if (!idx.length) {
+                await siyuan.pushMsg("请先将此文档加入渐进学习列表");
+            } else {
+                for (let i = 0; i < idx.length; i++) {
+                    for (let j = 0; j < idx[i].length; j++) {
+                        if (blockID === idx[i][j]) {
+                            await this.updateBookInfo(bookID, { point: i })
+                            this.startToLearnWithLock(bookID);
+                            return;
+                        }
+                    }
+                }
+                await siyuan.pushMsg("找不到此块，可尝试重新对此文档进行分片");
+            }
+        } else {
+            await siyuan.pushMsg("未找到文档，请重新建立索引或者等待索引建立完成");
+        }
+    }
+
+    private startToLearnWithLock(bookID?: string) {
         navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
                 await siyuan.pushMsg(this.plugin.i18n.openingDocPieceForYou);
-                await this.startToLearn();
+                await this.startToLearn(bookID);
                 await utils.sleep(IndexTime2Wait);
             } else {
                 siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
@@ -203,7 +226,7 @@ class Progressive {
         return "";
     }
 
-    private async loadBookIndexIfNeed(bookID: string) {
+    private async loadBookIndexIfNeeded(bookID: string) {
         let idx = this.plugin.data[bookID];
         if (!idx) idx = await this.plugin.loadData(bookID);
         return help.afterLoad(idx);
@@ -212,7 +235,7 @@ class Progressive {
     private async startToLearn(bookID?: string) {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
-        const bookIndex = await this.loadBookIndexIfNeed(bookInfo.bookID);
+        const bookIndex = await this.loadBookIndexIfNeeded(bookInfo.bookID);
         const point = this.getBookReadPoint(bookInfo.bookID);
         const piece = bookIndex[point];
         noteID = await this.findDoc(bookInfo.bookID, point);
@@ -242,7 +265,7 @@ class Progressive {
     async htmlBlockReadNextPeice(bookID: string, noteID: string, cbType: HtmlCBType, startID: string, endID: string, point: number) {
         navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
-                await this._htmlBlockReadNextPeice(bookID, noteID, cbType, startID, endID, point);
+                await this.htmlBlockReadNextPeiceInLock(bookID, noteID, cbType, startID, endID, point);
                 await utils.sleep(IndexTime2Wait);
             } else {
                 siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
@@ -250,7 +273,7 @@ class Progressive {
         });
     }
 
-    private async _htmlBlockReadNextPeice(bookID: string, noteID: string, cbType: HtmlCBType, startID: string, endID: string, point: number) {
+    private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, startID: string, endID: string, point: number) {
         switch (cbType) {
             case HtmlCBType.previous:
                 if (point > 0) {

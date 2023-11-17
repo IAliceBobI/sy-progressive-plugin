@@ -90,7 +90,7 @@ export function getBtns(bookID: string, noteID: string, startID: string, endID: 
 }}}`;
 }
 
-export function afterLoad(data: any) {
+export function afterLoad(data: any): string[][] {
     data = data?.data ?? "";
     const group = [];
     for (const piece of data.split("#")) {
