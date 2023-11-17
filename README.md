@@ -47,6 +47,8 @@ The segmentation operation of the plugin does not modify the original text or cr
 * `Delete and Exit` - Discard the notes for the current segment. Exit the learning process.
 * `Delete and Switch Book` - Discard the notes for the current segment. Choose another document that has been added to the "Progressive Learning" plugin.
 
+> **Reminder:** The titles of each snippet in the document can be modified. However, please do not modify the document's notes, as the plugin may not be able to find the document in the future.
+
 ## Future Plans
 
 I will use it first and make some improvements...
