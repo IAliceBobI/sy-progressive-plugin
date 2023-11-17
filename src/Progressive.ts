@@ -161,7 +161,7 @@ class Progressive {
         let content: string;
         for (const blockID of piece) {
             content = (await siyuan.getBlockMarkdownAndContent(blockID))?.content ?? "";
-            content = content.slice(0, 15).replace(/\//g, "").trim();
+            content = content.slice(0, 15).replace(/[　\/ ​ ​]+/g, "").trim();
             if (content) break;
         }
         if (!content) content = `[${point}]`;

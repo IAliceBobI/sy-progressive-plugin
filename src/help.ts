@@ -229,7 +229,7 @@ export async function getDocWordCount(docID: string): Promise<WordCountType[]> {
             const count = wordCount;
             content.push({ id, count, type });
         }
-        iter += size;
+        iter += i;
         await siyuan.pushMsg(`已经统计了${iter}个块……`, 3000);
     }
     await siyuan.pushMsg("统计字数结束……");
