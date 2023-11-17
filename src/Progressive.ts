@@ -15,6 +15,7 @@ const AddProgressiveReadingLock = "AddProgressiveReadingLock";
 const StartToLearnLock = "StartToLearnLock";
 const TEMP_CONTENT = "插件管理勿改managedByPluginDoNotModify";
 
+const IndexTime2Wait = 1000;
 class Progressive {
     private static readonly GLOBAL_THIS: Record<string, any> = globalThis;
     private plugin: Plugin;
@@ -42,6 +43,13 @@ class Progressive {
                 }
             }
         });
+        this.plugin.addCommand({
+            langKey: "startToLearn",
+            hotkey: "⌥-",
+            globalCallback: () => {
+                this.startToLearnWithLock();
+            },
+        });
     }
 
     private async addProgressiveReading() {
@@ -57,8 +65,8 @@ class Progressive {
         }
         const boxID = row["box"];
         const wordCount = await help.getDocWordCount(bookID);
-        let groups = new help.HeadingGroup(wordCount, 200).split();
-        groups = new help.ContentLenGroup(groups, 300).split();
+        let groups = new help.HeadingGroup(wordCount, 300).split();
+        groups = new help.ContentLenGroup(groups, 500).split();
         await this.plugin.saveData(bookID, { data: help.preSave(groups) });
         await this.updateBookInfo(bookID, { boxID, bookID });
         await this.saveBooksInfos();
@@ -74,8 +82,7 @@ class Progressive {
         info["time"] = await siyuan.currentTimeMs();
         if (opt.boxID) info["boxID"] = opt.boxID;
         if (opt.bookID) info["bookID"] = opt.bookID;
-        if (opt.point) info["point"] = opt.point;
-        if (opt.point === 0) info["point"] = opt.point;
+        if (opt.point || opt.point === 0) info["point"] = opt.point;
         this.booksInfos()[docID] = info;
     }
 
@@ -101,7 +108,7 @@ class Progressive {
                 navigator.locks.request(AddProgressiveReadingLock, { ifAvailable: true }, async (lock) => {
                     if (lock) {
                         await this.addProgressiveReading();
-                        await utils.sleep(3000);
+                        await utils.sleep(IndexTime2Wait);
                     } else {
                         siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
                     }
@@ -116,7 +123,7 @@ class Progressive {
                 navigator.locks.request(ViewAllProgressiveBookLock, { ifAvailable: true }, async (lock) => {
                     if (lock) {
                         await this.viewAllProgressiveBooks();
-                        await utils.sleep(3000);
+                        await utils.sleep(IndexTime2Wait);
                     } else {
                         siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
                     }
@@ -134,16 +141,9 @@ class Progressive {
         menu.addItem({
             icon: "iconLearn",
             label: this.plugin.i18n.startToLearn,
-            accelerator: "",
-            click: async () => {
-                navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
-                    if (lock) {
-                        await this.startToLearn();
-                        await utils.sleep(3000);
-                    } else {
-                        siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
-                    }
-                });
+            accelerator: "⌥-",
+            click: () => {
+                this.startToLearnWithLock();
             }
         });
         if (events.isMobile) {
@@ -155,6 +155,17 @@ class Progressive {
                 isLeft: true,
             });
         }
+    }
+
+    private startToLearnWithLock() {
+        navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
+            if (lock) {
+                await this.startToLearn();
+                await utils.sleep(IndexTime2Wait);
+            } else {
+                siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
+            }
+        });
     }
 
     private async createNote(boxID: string, bookID: string, piece: string[], point: number) {
@@ -222,7 +233,7 @@ class Progressive {
         navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
                 await this._htmlBlockReadNextPeice(bookID, noteID, cbType, startID, endID, point);
-                await utils.sleep(3000);
+                await utils.sleep(IndexTime2Wait);
             } else {
                 siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
             }
@@ -297,7 +308,7 @@ class Progressive {
         const endID = piece[piece.length - 1];
         this.updateBookInfo(bookID, {});
         piece.reverse();
-        await siyuan.insertBlockAsChildOf(this.tempContent("================================="), noteID);
+        await siyuan.insertBlockAsChildOf(this.tempContent("==============================="), noteID);
         await siyuan.insertBlockAsChildOf(this.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
         for (const id of piece) {
             const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${TEMP_CONTENT}"`]);
