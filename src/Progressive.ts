@@ -135,6 +135,9 @@ class Progressive {
             label: this.plugin.i18n.readThisPiece,
             accelerator: "",
             click: async () => {
+                // TODO
+                const blockID = events.lastBlockID;
+                
                 await siyuan.pushMsg("还没开发此功能");
             }
         });
@@ -173,7 +176,7 @@ class Progressive {
         let content: string;
         for (const blockID of piece) {
             content = (await siyuan.getBlockMarkdownAndContent(blockID))?.content ?? "";
-            content = content.slice(0, 15).replace(/[　\/ ​ ​]+/g, "").trim();
+            content = content.slice(0, 15).replace(/[　\/ ​]+/g, "").trim();
             if (content) break;
         }
         if (!content) content = `[${point}]`;

@@ -26,6 +26,8 @@ If the document is large, like the one shown in the image, with millions of word
 
 The segmentation operation of the plugin does not modify the original text or create new documents. It only reads, counts, and builds indexes.
 
+> **Note:** After creating an index, please do not modify the original document, such as deleting certain sections, as it may cause the learning plugin to be unable to locate those sections.
+
 ![Alt text](assets/addDoc1.png)
 
 ## Start Learning
