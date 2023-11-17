@@ -326,6 +326,7 @@ class Progressive {
     }
 
     // TODO: impl this dialog
+    // list all books, remove it or read it, event or rebuild the index
     private async viewAllProgressiveBooks() {
         const id = utils.newID();
         const dialog = new Dialog({
