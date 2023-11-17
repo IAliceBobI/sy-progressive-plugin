@@ -52,7 +52,7 @@ class Progressive {
         }
         const row = await siyuan.sqlOne(`select box from blocks where id="${bookID}"`);
         if (!row) {
-            console.log("cannot find the box of doc " + bookID);
+            siyuan.pushMsg(this.plugin.i18n.cannotFindTheBoxs + bookID);
             return;
         }
         const boxID = row["box"];

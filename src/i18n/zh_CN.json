@@ -1,4 +1,5 @@
 {
+  "cannotFindTheBox": "找不到文档对应的笔记本：",
   "openAdocFirst": "请先打开一个文档",
   "progressiveReadingMenu": "渐进学习菜单",
   "addProgressiveReading": "添加当前文档",
