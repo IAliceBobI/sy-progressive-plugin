@@ -1,4 +1,24 @@
-.tomato-style {
+.prog-style {
+  &__p {
+    margin: 0;
+  }
+
+  &__checkbox {
+    top: 0;
+    left: 0;
+    height: 18px;
+    width: 18px;
+    background-color: #eee;
+    border-radius: 3px;
+  }
+
+  &__container_div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
   &__container {
     display: flex;
     justify-content: center;
@@ -10,9 +30,7 @@
     text-align: center;
     font-size: 40px;
   }
-}
 
-.schedule-style {
   &__id {
     background: var(--b3-card-info-background);
     border-radius: 4px;
@@ -51,7 +69,7 @@
     font-size: 14px;
   }
 
-  &__input-field {
+  &__input {
     padding: 10px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -59,11 +77,11 @@
     width: 300px;
   }
 
-  &__input-field::placeholder {
+  &__input::placeholder {
     color: #999;
   }
 
-  &__input-field:focus {
+  &__input:focus {
     border-color: #4CAF50;
     box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
   }

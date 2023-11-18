@@ -1,28 +1,21 @@
-import { Dialog, Menu, Plugin, openTab } from "siyuan";
+import { Dialog, Menu, Plugin, openTab, confirm } from "siyuan";
 import "./index.scss";
 import { events } from "./Events";
 import { siyuan, timeUtil } from "./utils";
-import { HtmlCBType } from "./help";
+import { HtmlCBType } from "./helper";
 import * as utils from "./utils";
-import * as help from "./help";
+import * as help from "./helper";
+import * as constants from "./constants";
 
-type BookInfo = { time?: number, boxID?: string, point?: number, bookID?: string };
-type BookInfos = { [key: string]: BookInfo };
-
-const STORAGE_BOOKS = "books.json";
-const ViewAllProgressiveBookLock = "ViewAllProgressiveBookLock";
-const AddProgressiveReadingLock = "AddProgressiveReadingLock";
-const StartToLearnLock = "StartToLearnLock";
-const TEMP_CONTENT = "插件管理勿改managedByPluginDoNotModify";
-
-const IndexTime2Wait = 1000;
 class Progressive {
     private static readonly GLOBAL_THIS: Record<string, any> = globalThis;
     private plugin: Plugin;
+    private storage: help.Storage;
 
     onload(plugin: Plugin) {
         Progressive.GLOBAL_THIS["progressive_zZmqus5PtYRi"] = { progressive: this, utils, siyuan, timeUtil, events };
         this.plugin = plugin;
+        this.storage = new help.Storage(plugin);
         const topBarElement = this.plugin.addTopBar({
             icon: "iconABook",
             title: this.plugin.i18n.progressiveReadingMenu,
@@ -57,59 +50,20 @@ class Progressive {
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     if (blockID) {
-                        this.readThisPiece();
+                        this.readThisPiece(blockID);
                     }
                 },
             });
         });
-    }
-
-    private async addProgressiveReading() {
-        const bookID = events.docID;
-        if (!bookID) {
-            siyuan.pushMsg(this.plugin.i18n.openAdocFirst);
-            return;
-        }
-        const row = await siyuan.sqlOne(`select box from blocks where id="${bookID}"`);
-        if (!row) {
-            siyuan.pushMsg(this.plugin.i18n.cannotFindTheBoxs + bookID);
-            return;
-        }
-        const boxID = row["box"];
-        const wordCount = await help.getDocWordCount(bookID);
-        let groups = new help.HeadingGroup(wordCount, 300).split();
-        groups = new help.ContentLenGroup(groups, 500).split();
-        await this.plugin.saveData(bookID, { data: help.preSave(groups) }); // save index
-        await this.updateBookInfo(bookID, { boxID, bookID, point: 0 });
-        await this.saveBooksInfos();
-        await this.viewAllProgressiveBooks();
-    }
-
-    private getBookReadPoint(docID: string) {
-        return this.booksInfo(docID)?.point ?? 0;
-    }
-
-    private async updateBookInfo(docID: string, opt: BookInfo) {
-        const info = this.booksInfo(docID);
-        info["time"] = await siyuan.currentTimeMs();
-        if (opt.boxID) info["boxID"] = opt.boxID;
-        if (opt.bookID) info["bookID"] = opt.bookID;
-        if (opt.point || opt.point === 0) info["point"] = opt.point;
-        this.booksInfos()[docID] = info;
-    }
-
-    private async saveBooksInfos() {
-        return this.plugin.saveData(STORAGE_BOOKS, this.booksInfos());
-    }
-
-    private booksInfo(docID: string): BookInfo {
-        return this.booksInfos()[docID] ?? {};
-    }
-
-    private booksInfos(): BookInfos {
-        if (!this.plugin.data[STORAGE_BOOKS])
-            this.plugin.data[STORAGE_BOOKS] = {};
-        return this.plugin.data[STORAGE_BOOKS];
+        // TODO: only for dev
+        this.plugin.addTopBar({
+            icon: "iconSparkles",
+            title: "reload",
+            position: "right",
+            callback: () => {
+                window.location.reload();
+            }
+        });
     }
 
     private addMenu(rect?: DOMRect) {
@@ -119,10 +73,10 @@ class Progressive {
             label: this.plugin.i18n.addProgressiveReading,
             accelerator: "",
             click: async () => {
-                navigator.locks.request(AddProgressiveReadingLock, { ifAvailable: true }, async (lock) => {
+                navigator.locks.request(constants.AddProgressiveReadingLock, { ifAvailable: true }, async (lock) => {
                     if (lock) {
                         await this.addProgressiveReading();
-                        await utils.sleep(IndexTime2Wait);
+                        await utils.sleep(constants.IndexTime2Wait);
                     } else {
                         siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
                     }
@@ -134,10 +88,10 @@ class Progressive {
             label: this.plugin.i18n.viewAllProgressiveBooks,
             accelerator: "",
             click: async () => {
-                navigator.locks.request(ViewAllProgressiveBookLock, { ifAvailable: true }, async (lock) => {
+                navigator.locks.request(constants.ViewAllProgressiveBookLock, { ifAvailable: true }, async (lock) => {
                     if (lock) {
                         await this.viewAllProgressiveBooks();
-                        await utils.sleep(IndexTime2Wait);
+                        await utils.sleep(constants.IndexTime2Wait);
                     } else {
                         siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
                     }
@@ -171,6 +125,83 @@ class Progressive {
         }
     }
 
+    private async addProgressiveReading(bookID?: string) {
+        if (!bookID) {
+            bookID = events.docID;
+        }
+        if (!bookID) {
+            await siyuan.pushMsg(this.plugin.i18n.openAdocFirst);
+            return;
+        }
+        const row = await siyuan.sqlOne(`select content from blocks where type='d' and id='${bookID}'`);
+        if (!row) {
+            siyuan.pushMsg(`似乎${bookID}已经被删除`);
+            return;
+        }
+        await this.addProgressiveReadingDialog(bookID, row["content"]);
+    }
+
+    private async addProgressiveReadingDialog(bookID: string, bookName: string) {
+        const titleSplitID = utils.newID();
+        const LengthSplitID = utils.newID();
+        const btnSplitID = utils.newID();
+        const dialog = new Dialog({
+            title: this.plugin.i18n.addProgressiveReading,
+            content: `<div class="b3-dialog__content">
+                <div class="prog-style__id">${bookName}</div>
+                <div class="fn__hr"></div>
+                <span class="prog-style__id">是否根据标题拆分</span>
+                <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
+                <div class="fn__hr"></div>
+                <div class="prog-style__id">根据字数拆分(0为不根据字数拆分)</div>
+                <input type="text" id="${LengthSplitID}" class="prog-style__input"/>
+                <div class="fn__hr"></div>
+                <button id="${btnSplitID}" class="prog-style__button">添加文档/重新添加文档</button>
+            </div>`,
+            width: events.isMobile ? "92vw" : "560px",
+            height: "540px",
+        });
+
+        const titleCheckBox = dialog.element.querySelector("#" + titleSplitID) as HTMLInputElement;
+        titleCheckBox.checked = true;
+        titleCheckBox.addEventListener("change", () => {
+            if (titleCheckBox.checked) {
+                titleCheckBox.checked = true;
+            } else {
+                titleCheckBox.checked = false;
+            }
+        });
+        const LengthSplitInput = dialog.element.querySelector("#" + LengthSplitID) as HTMLInputElement;
+        LengthSplitInput.value = String(constants.PieceLen);
+
+        const btn = dialog.element.querySelector("#" + btnSplitID) as HTMLButtonElement;
+        btn.addEventListener("click", async () => {
+            const splitLen = Number(LengthSplitInput.value.trim());
+            if (!LengthSplitInput.value.trim() || (!splitLen && splitLen !== 0)) {
+                LengthSplitInput.value = String(constants.PieceLen);
+            } else {
+                dialog.destroy();
+                const wordCount = await help.getDocWordCount(bookID);
+                let groups: help.WordCountType[][];
+                if (titleCheckBox.checked) {
+                    await siyuan.pushMsg("根据标题拆分……");
+                    groups = new help.HeadingGroup(wordCount, constants.MiniContentLen).split();
+                } else {
+                    groups = [wordCount];
+                }
+                if (splitLen > 0) {
+                    await siyuan.pushMsg("根据内容长度拆分:" + splitLen);
+                    groups = new help.ContentLenGroup(groups, splitLen).split();
+                }
+                await this.storage.saveIndex(bookID, groups);
+                await this.storage.resetBookReadingPoint(bookID);
+                setTimeout(async () => {
+                    await this.viewAllProgressiveBooks();
+                }, constants.IndexTime2Wait);
+            }
+        });
+    }
+
     private async readThisPiece(blockID?: string) {
         if (!blockID) {
             blockID = events.lastBlockID;
@@ -178,14 +209,14 @@ class Progressive {
         const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
         if (row) {
             const bookID = row["root_id"];
-            const idx = await this.loadBookIndexIfNeeded(bookID);
+            const idx = await this.storage.loadBookIndexIfNeeded(bookID);
             if (!idx.length) {
                 await siyuan.pushMsg("请先将此文档加入渐进学习列表");
             } else {
                 for (let i = 0; i < idx.length; i++) {
                     for (let j = 0; j < idx[i].length; j++) {
                         if (blockID === idx[i][j]) {
-                            await this.updateBookInfo(bookID, { point: i });
+                            await this.storage.gotoBlock(bookID, i);
                             this.startToLearnWithLock(bookID);
                             return;
                         }
@@ -199,11 +230,11 @@ class Progressive {
     }
 
     private startToLearnWithLock(bookID?: string) {
-        navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
+        navigator.locks.request(constants.StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
                 await siyuan.pushMsg(this.plugin.i18n.openingDocPieceForYou);
                 await this.startToLearn(bookID);
-                await utils.sleep(IndexTime2Wait);
+                await utils.sleep(constants.IndexTime2Wait);
             } else {
                 siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
             }
@@ -223,35 +254,25 @@ class Progressive {
         if (dir) {
             dir = dir + "/" + content;
             const docID = await siyuan.createDocWithMd(boxID, dir, "");
-            await siyuan.setBlockAttrs(docID, { memo: this.getDocMemo(bookID, point) });
+            await siyuan.setBlockAttrs(docID, { memo: help.getDocMemo(bookID, point) });
             return docID;
         }
         return "";
     }
 
-    private getDocMemo(bookID: string, point: number) {
-        return `${TEMP_CONTENT}#${bookID},${point}`;
-    }
-
     private async findDoc(bookID: string, point: number) {
-        const row = await siyuan.sqlOne(`select id from blocks where type='d' and memo='${this.getDocMemo(bookID, point)}'`);
+        const row = await siyuan.sqlOne(`select id from blocks where type='d' and memo='${help.getDocMemo(bookID, point)}'`);
         if (row) {
             return row["id"];
         }
         return "";
     }
 
-    private async loadBookIndexIfNeeded(bookID: string) {
-        let idx = this.plugin.data[bookID];
-        if (!idx) idx = await this.plugin.loadData(bookID);
-        return help.afterLoad(idx);
-    }
-
     private async startToLearn(bookID?: string) {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
-        const bookIndex = await this.loadBookIndexIfNeeded(bookInfo.bookID);
-        let point = this.getBookReadPoint(bookInfo.bookID);
+        const bookIndex = await this.storage.loadBookIndexIfNeeded(bookInfo.bookID);
+        let point = (await this.storage.booksInfo(bookInfo.bookID)).point;
         if (point >= bookIndex.length) {
             await siyuan.pushMsg("已经是最后一页了！即将从头开始……");
             point = 0;
@@ -273,15 +294,11 @@ class Progressive {
         }
     }
 
-    private tempContent(content: string) {
-        return content + `\n{: memo="${TEMP_CONTENT}"}`;
-    }
-
     async htmlBlockReadNextPeice(bookID: string, noteID: string, cbType: HtmlCBType, startID: string, endID: string, point: number) {
-        navigator.locks.request(StartToLearnLock, { ifAvailable: true }, async (lock) => {
+        navigator.locks.request(constants.StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
                 await this.htmlBlockReadNextPeiceInLock(bookID, noteID, cbType, startID, endID, point);
-                await utils.sleep(IndexTime2Wait);
+                await utils.sleep(constants.IndexTime2Wait);
             } else {
                 siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
             }
@@ -292,13 +309,13 @@ class Progressive {
         switch (cbType) {
             case HtmlCBType.previous:
                 if (point > 0) {
-                    await this.gotoBlock(bookID, point - 1);
+                    await this.storage.gotoBlock(bookID, point - 1);
                     await this.startToLearn(bookID);
                 }
                 break;
             case HtmlCBType.skip:
                 await siyuan.removeDocByID(noteID);
-                await this.gotoBlock(bookID, point + 1);
+                await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.nextBook:
@@ -312,13 +329,13 @@ class Progressive {
                 await siyuan.addRiffCards([noteID]);
                 await this.cleanNote(noteID);
                 await this.AddRef(noteID, startID, endID);
-                await this.gotoBlock(bookID, point + 1);
+                await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
                 await this.AddRef(noteID, startID, endID);
-                await this.gotoBlock(bookID, point + 1);
+                await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
             default:
@@ -327,15 +344,16 @@ class Progressive {
     }
 
     private async cleanNote(noteID: string) {
-        const rows = await siyuan.sql(`select id from blocks where root_id='${noteID}' and memo='${TEMP_CONTENT}'`);
+        const rows = await siyuan.sql(`select id from blocks where root_id='${noteID}' and memo='${constants.TEMP_CONTENT}'`);
         for (const row of rows) {
             await siyuan.deleteBlock(row["id"]);
         }
     }
+
     private async AddRef(noteID: string, startID: string, endID: string) {
         // ((${startID} "[..]"))
         // \{\{select \* from blocks where id\='${startID}'\}\}
-        await siyuan.insertBlockAsChildOf(this.tempContent(`{{{col
+        await siyuan.insertBlockAsChildOf(help.tempContent(`{{{col
 ((${startID} "[..]"))
 
 ...
@@ -344,32 +362,25 @@ class Progressive {
 }}}`), noteID);
     }
 
-    private async gotoBlock(bookID: string, point: number) {
-        if (point >= 0) {
-            await this.updateBookInfo(bookID, { point });
-            await this.saveBooksInfos();
-        }
-    }
-
     private async fullfilContent(bookID: string, piece: string[], noteID: string, point: number) {
         const startID = piece[0];
         const endID = piece[piece.length - 1];
-        this.updateBookInfo(bookID, {});
+        this.storage.updateBookInfoTime(bookID);
         piece.reverse();
-        await siyuan.insertBlockAsChildOf(this.tempContent("---"), noteID);
-        await siyuan.insertBlockAsChildOf(this.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
+        await siyuan.insertBlockAsChildOf(help.tempContent("---"), noteID);
+        await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
         await this.AddRef(noteID, startID, endID);
         for (const id of piece) {
-            const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${TEMP_CONTENT}"`]);
+            const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${constants.TEMP_CONTENT}"`]);
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
     }
 
-    private async getBook2Learn(bookID?: string): Promise<BookInfo> {
+    private async getBook2Learn(bookID?: string): Promise<help.BookInfo> {
         if (bookID) {
-            return this.booksInfo(bookID);
+            return this.storage.booksInfo(bookID);
         }
-        const infos = this.booksInfos();
+        const infos = this.storage.booksInfos();
         let miniTime = Number.MAX_SAFE_INTEGER;
         let miniID = "";
         for (const id in infos) {
@@ -380,30 +391,50 @@ class Progressive {
             }
         }
         if (miniID) {
-            return this.booksInfo(miniID);
+            return this.storage.booksInfo(miniID);
         }
-        return {} as BookInfo;
+        return {};
     }
 
-    // TODO: impl this dialog
-    // list all books, remove it or read it, event or rebuild the index
     private async viewAllProgressiveBooks() {
         const id = utils.newID();
         const dialog = new Dialog({
-            title: this.plugin.i18n.viewAllProgressiveBooks + "【开发中……】",
+            title: this.plugin.i18n.viewAllProgressiveBooks,
             content: `<div class="b3-dialog__content">
                 <div id='${id}'></div>
             </div>`,
             width: events.isMobile ? "92vw" : "560px",
             height: "540px",
         });
-        dialog.element.querySelector("#" + id).innerHTML = JSON.stringify(this.booksInfos(), null, "<br>");
+        const div = dialog.element.querySelector("#" + id) as HTMLElement;
+        for (const bookID in this.storage.booksInfos()) {
+            const subDiv = help.appendChild(div, "div", "", ["prog-style__container_div"]);
+            const bookInfo = await this.storage.booksInfo(bookID);
+            const idx = await this.storage.loadBookIndexIfNeeded(bookID);
+            const row = await siyuan.sqlOne(`select content from blocks where type='d' and id="${bookInfo.bookID}"`);
+            let name = bookInfo.bookID;
+            if (row) name = row["content"];
+            const progress = `${Math.ceil(bookInfo.point / idx.length * 100)}%`;
+            help.appendChild(subDiv, "p", name, ["prog-style__id"]);
+            help.appendChild(subDiv, "p", progress, ["prog-style__id"]);
+            help.appendChild(subDiv, "button", "阅读", ["prog-style__button"], () => {
+                this.startToLearnWithLock(bookID);
+                dialog.destroy();
+            });
+            help.appendChild(subDiv, "button", "重建索引", ["prog-style__button"], async () => {
+                await this.addProgressiveReading(bookID);
+                dialog.destroy();
+            });
+            help.appendChild(subDiv, "button", "删除", ["prog-style__button"], () => {
+                confirm("⚠️", "删除", async () => {
+                    await this.storage.removeIndex(bookID);
+                    div.removeChild(subDiv);
+                });
+            });
+        }
     }
 
-    onLayoutReady() {
-        // load only need once, save many
-        this.plugin.loadData(STORAGE_BOOKS);
-    }
+    onLayoutReady() { this.storage.onLayoutReady(); }
 }
 
 export const prog = new Progressive();
