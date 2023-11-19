@@ -60,8 +60,8 @@ Open a raw document that has been added to progressive learning, browse to a cer
 
 # Plan
 
-- [] Improve the existing note-taking method and flashcard creation method.
-- [] Enhance i18n.
+- [ ] Improve the existing note-taking method and flashcard creation method.
+- [ ] Enhance i18n.
 
 # Bug Reports and Suggestions
 
