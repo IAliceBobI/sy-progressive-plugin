@@ -56,14 +56,14 @@ class Progressive {
             });
         });
         // TODO: only for dev
-        this.plugin.addTopBar({
-            icon: "iconSparkles",
-            title: "reload",
-            position: "right",
-            callback: () => {
-                window.location.reload();
-            }
-        });
+        // this.plugin.addTopBar({
+        //     icon: "iconSparkles",
+        //     title: "reload",
+        //     position: "right",
+        //     callback: () => {
+        //         window.location.reload();
+        //     }
+        // });
     }
 
     private addMenu(rect?: DOMRect) {
@@ -279,6 +279,10 @@ class Progressive {
     private async startToLearn(bookID?: string) {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
+        if (!bookInfo.bookID) {
+            siyuan.pushMsg("您还没添加任何文档。");
+            return;
+        }
         const bookIndex = await this.storage.loadBookIndexIfNeeded(bookInfo.bookID);
         let point = (await this.storage.booksInfo(bookInfo.bookID)).point;
         if (point >= bookIndex.length) {
@@ -375,12 +379,14 @@ class Progressive {
         const endID = piece[piece.length - 1];
         this.storage.updateBookInfoTime(bookID);
         piece.reverse();
+        await siyuan.insertBlockAsChildOf(help.tempContent("---"), noteID);
         await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
         await this.AddRef(noteID, startID, endID);
         for (const id of piece) {
             const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${constants.TEMP_CONTENT}"`]);
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
+        await this.AddRef(noteID, startID, endID);
         await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
     }
 
