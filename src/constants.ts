@@ -1,5 +1,4 @@
 export const STORAGE_BOOKS = "books.json";
-export const ViewAllProgressiveBookLock = "ViewAllProgressiveBookLock";
 export const AddProgressiveReadingLock = "AddProgressiveReadingLock";
 export const StartToLearnLock = "StartToLearnLock";
 export const TEMP_CONTENT = "插件管理勿改managedByPluginDoNotModify";

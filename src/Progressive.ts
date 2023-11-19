@@ -73,14 +73,7 @@ class Progressive {
             label: this.plugin.i18n.addProgressiveReading,
             accelerator: "",
             click: async () => {
-                navigator.locks.request(constants.AddProgressiveReadingLock, { ifAvailable: true }, async (lock) => {
-                    if (lock) {
-                        await this.addProgressiveReading();
-                        await utils.sleep(constants.IndexTime2Wait);
-                    } else {
-                        siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
-                    }
-                });
+                this.addProgressiveReadingWithLock();
             }
         });
         menu.addItem({
@@ -88,14 +81,7 @@ class Progressive {
             label: this.plugin.i18n.viewAllProgressiveBooks,
             accelerator: "",
             click: async () => {
-                navigator.locks.request(constants.ViewAllProgressiveBookLock, { ifAvailable: true }, async (lock) => {
-                    if (lock) {
-                        await this.viewAllProgressiveBooks();
-                        await utils.sleep(constants.IndexTime2Wait);
-                    } else {
-                        siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
-                    }
-                });
+                await this.viewAllProgressiveBooks();
             }
         });
         menu.addItem({
@@ -123,6 +109,17 @@ class Progressive {
                 isLeft: true,
             });
         }
+    }
+
+    private addProgressiveReadingWithLock(bookID?: string) {
+        navigator.locks.request(constants.AddProgressiveReadingLock, { ifAvailable: true }, async (lock) => {
+            if (lock) {
+                await this.addProgressiveReading(bookID);
+                await utils.sleep(constants.IndexTime2Wait);
+            } else {
+                siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
+            }
+        });
     }
 
     private async addProgressiveReading(bookID?: string) {
@@ -222,7 +219,7 @@ class Progressive {
                         }
                     }
                 }
-                await siyuan.pushMsg("找不到此内容，可尝试添加此文档到渐进学习插件。");
+                await siyuan.pushMsg("请在原始文章中操作，如果还找不到此内容，可尝试添加此文档到渐进学习插件。");
             }
         } else {
             await siyuan.pushMsg("未找到文档，请重新建立索引或者等待索引建立完成");
@@ -239,6 +236,12 @@ class Progressive {
                 siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
             }
         });
+    }
+
+    private async isPiece(id: string) {
+        const row = await siyuan.sqlOne(`select memo from blocks where id="${id}"`);
+        const memo: string = row?.memo ?? "";
+        return memo.startsWith(constants.TEMP_CONTENT);
     }
 
     private async createNote(boxID: string, bookID: string, piece: string[], point: number) {
@@ -436,11 +439,11 @@ class Progressive {
                 dialog.destroy();
             });
             help.appendChild(subDiv, "button", "重建索引", ["prog-style__button"], async () => {
-                await this.addProgressiveReading(bookID);
+                await this.addProgressiveReadingWithLock(bookID);
                 dialog.destroy();
             });
             help.appendChild(subDiv, "button", "删除", ["prog-style__button"], () => {
-                confirm("⚠️", "删除", async () => {
+                confirm("⚠️", "删除：" + name, async () => {
                     await this.storage.removeIndex(bookID);
                     div.removeChild(subDiv);
                 });
