@@ -135,6 +135,10 @@ class Progressive {
             siyuan.pushMsg(`似乎${bookID}已经被删除`);
             return;
         }
+        if (await this.isPiece(bookID)) {
+            siyuan.pushMsg(`你发现了一个阅读分片！`);
+            return;
+        }
         await this.addProgressiveReadingDialog(bookID, row["content"]);
     }
 
@@ -202,6 +206,10 @@ class Progressive {
     private async readThisPiece(blockID?: string) {
         if (!blockID) {
             blockID = events.lastBlockID;
+        }
+        if (await this.isPiece(blockID)) {
+            await siyuan.pushMsg("请在原始文章中操作，这只是一个阅读分片！");
+            return;
         }
         const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
         if (row) {
