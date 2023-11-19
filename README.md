@@ -52,23 +52,31 @@ The segmentation operation of the plugin does not modify the original text or cr
 
 > **Reminder:** The titles of each snippet in the document can be modified. However, please do not modify the document's notes, as the plugin may not be able to find the document in the future.
 
-## Read the current paragraph
+## Read the Paragraph at the Cursor
 
-Open a document that has been annotated with incremental learning. Scroll to a specific position and place the cursor there. Then, select the option "Read the current paragraph" from the plugin menu to open the fragment that contains the current block.
-
-Alternatively, you can use the right-click menu: `Plugin` -> `Read the current paragraph`
+Open a raw document that has been added to progressive learning, browse to a certain position, right-click menu: `Plugins`->`Read the Paragraph at the Cursor`
 
 ![Alt text](assets/rightClickMenu.png)
 
-# Bug Reports, Suggestions
+# Plan
+
+- [] Improve the existing note-taking method and flashcard creation method.
+- [] Enhance i18n.
+
+# Bug Reports and Suggestions
 
 QQ Group: 263961482
 
-[Or submit issues on Github](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
+[Or submit issues on GitHub](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
 
 [Or submit issues on the official forum](https://ld246.com/tag/siyuan)
 
-# Changelog
+# Update Log
+
+## 2023-11-19
+
+* Improve existing functionality.
+* Fix some bugs.
 
 ## 2023-11-17
 
