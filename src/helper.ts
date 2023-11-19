@@ -362,6 +362,18 @@ export function appendChild(parent: HTMLElement, type: string, textContent: stri
 
 //-----------------------------------------------------------------------------------------
 
+export async function AddRef(noteID: string, startID: string, endID: string) {
+    // ((${startID} "[..]"))
+    // \{\{select \* from blocks where id\='${startID}'\}\}
+    await siyuan.insertBlockAsChildOf(tempContent(`{{{col
+((${startID} "[..]"))
+
+...
+
+((${endID} "[..]"))
+}}}`), noteID);
+}
+
 export function setBtnsSetStyleLoop() {
     const interval = setInterval(setBtnsSetStyle, 1000);
     setTimeout(() => {

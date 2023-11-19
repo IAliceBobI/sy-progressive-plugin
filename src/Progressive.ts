@@ -136,7 +136,7 @@ class Progressive {
             return;
         }
         if (await this.isPiece(bookID)) {
-            siyuan.pushMsg(`你发现了一个阅读分片！`);
+            siyuan.pushMsg("你发现了一个阅读分片！");
             return;
         }
         await this.addProgressiveReadingDialog(bookID, row["content"]);
@@ -351,13 +351,11 @@ class Progressive {
             case HtmlCBType.docCard:
                 await siyuan.addRiffCards([noteID]);
                 await this.cleanNote(noteID);
-                await this.AddRef(noteID, startID, endID);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
-                await this.AddRef(noteID, startID, endID);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
@@ -373,18 +371,6 @@ class Progressive {
         }
     }
 
-    private async AddRef(noteID: string, startID: string, endID: string) {
-        // ((${startID} "[..]"))
-        // \{\{select \* from blocks where id\='${startID}'\}\}
-        await siyuan.insertBlockAsChildOf(help.tempContent(`{{{col
-((${startID} "[..]"))
-
-...
-
-((${endID} "[..]"))
-}}}`), noteID);
-    }
-
     private async fullfilContent(bookID: string, piece: string[], noteID: string, point: number) {
         const startID = piece[0];
         const endID = piece[piece.length - 1];
@@ -392,12 +378,10 @@ class Progressive {
         piece.reverse();
         await siyuan.insertBlockAsChildOf(help.tempContent("---"), noteID);
         await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
-        await this.AddRef(noteID, startID, endID);
         for (const id of piece) {
-            const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${constants.TEMP_CONTENT}"`]);
+            const content = await siyuan.getBlockKramdownWithoutID(id, [`custom-progref="${id}"`], `((${id} "*"))`, "");
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
-        await this.AddRef(noteID, startID, endID);
         await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
     }
 
