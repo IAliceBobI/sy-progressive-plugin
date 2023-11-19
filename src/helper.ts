@@ -119,7 +119,7 @@ function styleColor(bgcolor: string, color: string) {
     return `<style>button{display: inline-block; padding: 10px 20px; background-color: ${bgcolor}; color: ${color}; text-align: center; text-decoration: none; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;}button.large { padding: 12px 24px; font-size: 24px; }button.small { padding: 8px 16px; font-size: 14px; }</style>`;
 }
 
-export function getBtns(bookID: string, noteID: string, startID: string, endID: string, point: number) {
+export function getBtns(bookID: string, noteID: string,  point: number) {
     const btnPreviousID = utils.newID().slice(0, constants.IDLen);
     const btnSkipID = utils.newID().slice(0, constants.IDLen);
     const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
@@ -136,7 +136,7 @@ export function getBtns(bookID: string, noteID: string, startID: string, endID: 
     </div>
     <script>
         function ${btnPreviousID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.previous},"${startID}","${endID}",${point})
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.previous},${point})
         }
     </script>
 </div>
@@ -148,7 +148,7 @@ export function getBtns(bookID: string, noteID: string, startID: string, endID: 
     </div>
     <script>
         function ${btnSkipID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},"${startID}","${endID}",${point})
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},${point})
         }
     </script>
 </div>
@@ -160,7 +160,7 @@ export function getBtns(bookID: string, noteID: string, startID: string, endID: 
 </div>
 <script>
 function ${btnSaveCardID}() {
-    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.docCard},"${startID}","${endID}",${point})
+    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.docCard},${point})
 }
 </script>
 </div>
@@ -172,7 +172,7 @@ function ${btnSaveCardID}() {
     </div>
     <script>
         function ${btnSaveID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.saveDoc},"${startID}","${endID}",${point})
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.saveDoc},${point})
         }
     </script>
 </div>
@@ -184,7 +184,7 @@ function ${btnSaveCardID}() {
     </div>
     <script>
         function ${btnStopID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.quit},"${startID}","${endID}",${point})
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.quit},${point})
         }
     </script>
 </div>
@@ -196,7 +196,7 @@ function ${btnSaveCardID}() {
     </div>
     <script>
         function ${btnNextBookID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.nextBook},"${startID}","${endID}",${point})
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.nextBook},${point})
         }
     </script>
 </div>

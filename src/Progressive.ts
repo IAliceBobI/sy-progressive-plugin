@@ -317,10 +317,10 @@ class Progressive {
         }
     }
 
-    async htmlBlockReadNextPeice(bookID: string, noteID: string, cbType: HtmlCBType, startID: string, endID: string, point: number) {
+    async htmlBlockReadNextPeice(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         navigator.locks.request(constants.StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
-                await this.htmlBlockReadNextPeiceInLock(bookID, noteID, cbType, startID, endID, point);
+                await this.htmlBlockReadNextPeiceInLock(bookID, noteID, cbType, point);
                 await utils.sleep(constants.IndexTime2Wait);
             } else {
                 siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit);
@@ -328,7 +328,7 @@ class Progressive {
         });
     }
 
-    private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, startID: string, endID: string, point: number) {
+    private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         switch (cbType) {
             case HtmlCBType.previous:
                 if (point > 0) {
@@ -351,11 +351,13 @@ class Progressive {
             case HtmlCBType.docCard:
                 await siyuan.addRiffCards([noteID]);
                 await this.cleanNote(noteID);
+                await this.addBtnLine(bookID, noteID, point);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
+                await this.addBtnLine(bookID, noteID, point);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
@@ -364,25 +366,53 @@ class Progressive {
         }
     }
 
+    private rmBadThings(s: string) {
+        return s.replace(/[​]+/g, "").trim();
+    }
+
     private async cleanNote(noteID: string) {
-        const rows = await siyuan.sql(`select id from blocks where root_id='${noteID}' and memo='${constants.TEMP_CONTENT}'`);
-        for (const row of rows) {
-            await siyuan.deleteBlock(row["id"]);
+        const blocks = await siyuan.getChildBlocks(noteID) ?? [];
+        for (const child of blocks) {
+            const row = await siyuan.sqlOne(`select memo, ial, markdown from blocks where id="${child.id}"`);
+            const memo: string = row?.memo ?? "";
+            const ial: string = row?.ial ?? "";
+            const markdown: string = row?.markdown ?? "";
+            if (memo === constants.TEMP_CONTENT) {
+                await siyuan.deleteBlock(child.id);
+            } else if (ial.includes(constants.RefIDKey)) {
+                for (const attr of ial.split(" ")) {
+                    if (attr.includes(constants.RefIDKey)) {
+                        const originalID = attr.split(`"`)[1]; // custom-progref="20231119150726-2xxypwa"
+                        const origin = await siyuan.sqlOne(`select markdown from blocks where id="${originalID}"`);
+                        const oriMarkdown = origin?.markdown ?? "";
+                        const markdownWithoutStar = markdown.replace(`((${originalID} "*"))`, "");
+                        if (this.rmBadThings(oriMarkdown) == this.rmBadThings(markdownWithoutStar)) {
+                            await siyuan.deleteBlock(child.id);
+                        } else {
+                            const attrs: { [key: string]: string } = {};
+                            attrs[constants.RefIDKey] = "";
+                            await siyuan.setBlockAttrs(child.id, attrs);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 
+    private addBtnLine(bookID: string, noteID: string, point: number) {
+        return siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, point)), noteID);
+    }
+
     private async fullfilContent(bookID: string, piece: string[], noteID: string, point: number) {
-        const startID = piece[0];
-        const endID = piece[piece.length - 1];
         this.storage.updateBookInfoTime(bookID);
         piece.reverse();
-        await siyuan.insertBlockAsChildOf(help.tempContent("---"), noteID);
-        await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
+        await this.addBtnLine(bookID, noteID, point);
         for (const id of piece) {
-            const content = await siyuan.getBlockKramdownWithoutID(id, [`custom-progref="${id}"`], `((${id} "*"))`, "");
+            const content = await siyuan.getBlockKramdownWithoutID(id, [`${constants.RefIDKey}="${id}"`], `((${id} "*"))`, "");
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
-        await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
+        await this.addBtnLine(bookID, noteID, point);
     }
 
     private async getBook2Learn(bookID?: string): Promise<help.BookInfo> {
