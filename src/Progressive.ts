@@ -351,13 +351,13 @@ class Progressive {
             case HtmlCBType.docCard:
                 await siyuan.addRiffCards([noteID]);
                 await this.cleanNote(noteID);
-                await this.addBtnLine(bookID, noteID, point);
+                await this.addTwoBtns(bookID, noteID, point);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
-                await this.addBtnLine(bookID, noteID, point);
+                await this.addTwoBtns(bookID, noteID, point);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
@@ -382,7 +382,7 @@ class Progressive {
             } else if (ial.includes(constants.RefIDKey)) {
                 for (const attr of ial.split(" ")) {
                     if (attr.includes(constants.RefIDKey)) {
-                        const originalID = attr.split(`"`)[1]; // custom-progref="20231119150726-2xxypwa"
+                        const originalID = attr.split("\"")[1]; // custom-progref="20231119150726-2xxypwa"
                         const origin = await siyuan.sqlOne(`select markdown from blocks where id="${originalID}"`);
                         const oriMarkdown = origin?.markdown ?? "";
                         const markdownWithoutStar = markdown.replace(`((${originalID} "*"))`, "");
@@ -402,6 +402,10 @@ class Progressive {
 
     private addBtnLine(bookID: string, noteID: string, point: number) {
         return siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, point)), noteID);
+    }
+
+    private addTwoBtns(bookID: string, noteID: string, point: number) {
+        return siyuan.insertBlockAsChildOf(help.tempContent(help.getTwoBtns(bookID, noteID, point)), noteID);
     }
 
     private async fullfilContent(bookID: string, piece: string[], noteID: string, point: number) {

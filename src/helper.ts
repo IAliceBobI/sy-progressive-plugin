@@ -119,27 +119,56 @@ function styleColor(bgcolor: string, color: string) {
     return `<style>button{display: inline-block; padding: 10px 20px; background-color: ${bgcolor}; color: ${color}; text-align: center; text-decoration: none; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;}button.large { padding: 12px 24px; font-size: 24px; }button.small { padding: 8px 16px; font-size: 14px; }</style>`;
 }
 
-export function getBtns(bookID: string, noteID: string,  point: number) {
+function btnPrevious(bookID: string, noteID: string, point: number) {
     const btnPreviousID = utils.newID().slice(0, constants.IDLen);
+    return `<div>
+            ${styleColor("#00FF00", "#000000")}
+            <div>
+                <button onclick="${btnPreviousID}()" id="btn${btnPreviousID}">保留，回退</button>
+            </div>
+            <script>
+                function ${btnPreviousID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.previous},${point})
+                }
+            </script>
+        </div>`;
+}
+
+function btnSaveDoc(bookID: string, noteID: string, point: number) {
+    const btnSaveID = utils.newID().slice(0, constants.IDLen);
+    return `<div>
+            ${styleColor("#0000FF", "#FFFFFF")}
+            <div>
+                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">保留，继续</button>
+            </div>
+            <script>
+                function ${btnSaveID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.saveDoc},${point})
+                }
+            </script>
+        </div>`;
+}
+
+
+export function getTwoBtns(bookID: string, noteID: string, point: number) {
+    return `{{{col
+[${point}]
+
+${btnPrevious(bookID,noteID,point)}
+
+${btnSaveDoc(bookID,noteID,point)}
+}}}`;
+}
+
+export function getBtns(bookID: string, noteID: string, point: number) {
     const btnSkipID = utils.newID().slice(0, constants.IDLen);
     const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
-    const btnSaveID = utils.newID().slice(0, constants.IDLen);
     const btnStopID = utils.newID().slice(0, constants.IDLen);
     const btnNextBookID = utils.newID().slice(0, constants.IDLen);
     return `{{{col
 [${point}]
 
-<div>
-    ${styleColor("#00FF00", "#000000")}
-    <div>
-        <button onclick="${btnPreviousID}()" id="btn${btnPreviousID}">保留，回退</button>
-    </div>
-    <script>
-        function ${btnPreviousID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.previous},${point})
-        }
-    </script>
-</div>
+${btnPrevious(bookID,noteID,point)}
 
 <div>
     ${styleColor("#FF0000", "#FFFFFF")}
@@ -165,17 +194,7 @@ function ${btnSaveCardID}() {
 </script>
 </div>
 
-<div>
-    ${styleColor("#0000FF", "#FFFFFF")}
-    <div>
-        <button onclick="${btnSaveID}()" id="btn${btnSaveID}">保留，继续</button>
-    </div>
-    <script>
-        function ${btnSaveID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.saveDoc},${point})
-        }
-    </script>
-</div>
+${btnSaveDoc(bookID,noteID,point)}
 
 <div>
     ${styleColor("#FF00FF", "#FFFFFF")}
