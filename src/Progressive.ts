@@ -222,7 +222,7 @@ class Progressive {
                         }
                     }
                 }
-                await siyuan.pushMsg("找不到此块，可尝试重新对此文档进行分片");
+                await siyuan.pushMsg("找不到此内容，可尝试添加此文档到渐进学习插件。");
             }
         } else {
             await siyuan.pushMsg("未找到文档，请重新建立索引或者等待索引建立完成");
