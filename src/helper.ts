@@ -251,7 +251,7 @@ export class ContentLenGroup {
     }
     private add(wc: WordCountType) {
         this.list.push(wc);
-        this.accCount += wc.count;
+        if (wc.type !== 'h') this.accCount += wc.count;
         if (this.accCount >= this.maxCount) {
             this.newList();
             this.accCount = 0;
@@ -289,7 +289,7 @@ export class HeadingGroup {
     }
     private add(wc: WordCountType) {
         this.getList(wc).push(wc);
-        this.count += wc.count;
+        if (wc.type !== 'h') this.count += wc.count;
     }
     private next() {
         if (this.list.length > 0) {
