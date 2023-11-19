@@ -50,6 +50,12 @@ export function newID() {
     return "ID" + uuid().replace(/-/g, "");
 }
 
+export function dir(path: string) {
+    const parts = path.split("/");
+    const file = parts.pop();
+    return [parts.join("/"), file];
+}
+
 export const timeUtil = {
     dateFormat(date: Date) {
         const year: any = date.getFullYear();
@@ -101,6 +107,15 @@ export const siyuan = {
     async currentTimeMs(secs = 0) {
         const response = await fetchSyncPost("/api/system/currentTime", {});
         return response.data + secs * 1000;
+    },
+    async readDir(path: string) {
+        // [      {
+        //         "isDir": false,
+        //         "isSymlink": false,
+        //         "name": "20231119160703-oelb6pi.sy",
+        //         "updated": 1700381318
+        //     }  ]
+        return siyuan.call("/api/file/readDir", { path });
     },
     async getFile(path: string) {
         const method = "POST";

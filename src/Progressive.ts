@@ -261,9 +261,17 @@ class Progressive {
     }
 
     private async findDoc(bookID: string, point: number) {
-        const row = await siyuan.sqlOne(`select id from blocks where type='d' and memo='${help.getDocMemo(bookID, point)}'`);
-        if (row) {
-            return row["id"];
+        const row = await siyuan.sqlOne(`select id, path, box from blocks where type='d' and memo='${help.getDocMemo(bookID, point)}'`);
+        if (row && row.id && row.path) {
+            const [dirStr, file] = utils.dir(row["path"]);
+            const dir = await siyuan.readDir(`/data/${row["box"]}${dirStr}`);
+            if (dir) {
+                for (const f of dir) {
+                    if (f.name === file) {
+                        return row["id"];
+                    }
+                }
+            }
         }
         return "";
     }
@@ -277,7 +285,7 @@ class Progressive {
             await siyuan.pushMsg("已经是最后一页了！即将从头开始……");
             point = 0;
         }
-        const piece = bookIndex[point];
+        const piece = structuredClone(bookIndex[point]);
         noteID = await this.findDoc(bookInfo.bookID, point);
         if (noteID) {
             await this.cleanNote(noteID);
@@ -367,13 +375,13 @@ class Progressive {
         const endID = piece[piece.length - 1];
         this.storage.updateBookInfoTime(bookID);
         piece.reverse();
-        await siyuan.insertBlockAsChildOf(help.tempContent("---"), noteID);
         await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
         await this.AddRef(noteID, startID, endID);
         for (const id of piece) {
             const content = await siyuan.getBlockKramdownWithoutID(id, [`memo="${constants.TEMP_CONTENT}"`]);
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
+        await siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, startID, endID, point)), noteID);
     }
 
     private async getBook2Learn(bookID?: string): Promise<help.BookInfo> {
