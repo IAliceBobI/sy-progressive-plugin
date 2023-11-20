@@ -464,8 +464,8 @@ class Progressive {
                 this.startToLearnWithLock(bookID);
                 dialog.destroy();
             });
-            help.appendChild(subDiv, "button", "重建索引", ["prog-style__button"], async () => {
-                await this.addProgressiveReadingWithLock(bookID);
+            help.appendChild(subDiv, "button", "重建索引", ["prog-style__button"], () => {
+                this.addProgressiveReadingWithLock(bookID);
                 dialog.destroy();
             });
             help.appendChild(subDiv, "button", "删除", ["prog-style__button"], () => {
