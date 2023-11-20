@@ -14,6 +14,7 @@ export enum HtmlCBType {
     saveDoc,
     quit,
     nextBook,
+    next,
 }
 
 export class Storage {
@@ -40,7 +41,7 @@ export class Storage {
         const info = await this.booksInfo(docID);
         info.time = await siyuan.currentTimeMs();
         if (opt.bookID) info.bookID = opt.bookID;
-        if (opt.point || opt.point === 0) info.point = opt.point;
+        if (utils.isValidNumber(opt.point)) info.point = opt.point;
         this.booksInfos()[docID] = info;
         return this.saveBookInfos();
     }
@@ -124,7 +125,7 @@ function btnPrevious(bookID: string, noteID: string, point: number) {
     return `<div>
             ${styleColor("#00FF00", "#000000")}
             <div>
-                <button onclick="${btnPreviousID}()" id="btn${btnPreviousID}">保留，回退</button>
+                <button onclick="${btnPreviousID}()" id="btn${btnPreviousID}">上一分片</button>
             </div>
             <script>
                 function ${btnPreviousID}() {
@@ -149,14 +150,28 @@ function btnSaveDoc(bookID: string, noteID: string, point: number) {
         </div>`;
 }
 
+function btnNext(bookID: string, noteID: string, point: number) {
+    const btnSaveID = utils.newID().slice(0, constants.IDLen);
+    return `<div>
+            ${styleColor("#00FFFF", "#000000")}
+            <div>
+                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">下一分片</button>
+            </div>
+            <script>
+                function ${btnSaveID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.next},${point})
+                }
+            </script>
+        </div>`;
+}
 
 export function getTwoBtns(bookID: string, noteID: string, point: number) {
     return `{{{col
 [${point}]
 
-${btnPrevious(bookID,noteID,point)}
+${btnPrevious(bookID, noteID, point)}
 
-${btnSaveDoc(bookID,noteID,point)}
+${btnNext(bookID, noteID, point)}
 }}}`;
 }
 
@@ -168,7 +183,7 @@ export function getBtns(bookID: string, noteID: string, point: number) {
     return `{{{col
 [${point}]
 
-${btnPrevious(bookID,noteID,point)}
+${btnPrevious(bookID, noteID, point)}
 
 <div>
     ${styleColor("#FF0000", "#FFFFFF")}
@@ -194,7 +209,7 @@ function ${btnSaveCardID}() {
 </script>
 </div>
 
-${btnSaveDoc(bookID,noteID,point)}
+${btnSaveDoc(bookID, noteID, point)}
 
 <div>
     ${styleColor("#FF00FF", "#FFFFFF")}

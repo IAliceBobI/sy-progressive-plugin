@@ -151,10 +151,10 @@ class Progressive {
             content: `<div class="b3-dialog__content">
                 <div class="prog-style__id">${bookName}</div>
                 <div class="fn__hr"></div>
-                <span class="prog-style__id">是否根据标题拆分</span>
+                <span class="prog-style__id">拆分各级标题</span>
                 <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
                 <div class="fn__hr"></div>
-                <div class="prog-style__id">根据字数拆分(0为不根据字数拆分)</div>
+                <div class="prog-style__id">字数拆分(0为不根据字数拆分)</div>
                 <input type="text" id="${LengthSplitID}" class="prog-style__input"/>
                 <div class="fn__hr"></div>
                 <button id="${btnSplitID}" class="prog-style__button">添加文档/重新添加文档</button>
@@ -273,7 +273,7 @@ class Progressive {
 
     private async findDoc(bookID: string, point: number) {
         const row = await siyuan.sqlOne(`select id, path, box from blocks where type='d' and memo='${help.getDocMemo(bookID, point)}'`);
-        if (row && row.id && row.path) {
+        if (row?.id && row?.path) {
             const [dirStr, file] = utils.dir(row["path"]);
             const dir = await siyuan.readDir(`/data/${row["box"]}${dirStr}`);
             if (dir) {
@@ -287,7 +287,7 @@ class Progressive {
         return "";
     }
 
-    private async startToLearn(bookID?: string) {
+    private async startToLearn(bookID?: string, point?: number) {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
         if (!bookInfo.bookID) {
@@ -295,16 +295,19 @@ class Progressive {
             return;
         }
         const bookIndex = await this.storage.loadBookIndexIfNeeded(bookInfo.bookID);
-        let point = (await this.storage.booksInfo(bookInfo.bookID)).point;
+        if (!utils.isValidNumber(point)) {
+            point = (await this.storage.booksInfo(bookInfo.bookID)).point;
+        }
         if (point >= bookIndex.length) {
-            await siyuan.pushMsg("已经是最后一页了！即将从头开始……");
-            point = 0;
+            await siyuan.pushMsg("已经是最后一页了");
+            return;
+        } else if (point < 0) {
+            await siyuan.pushMsg("已经是第一页了");
+            return;
         }
         const piece = structuredClone(bookIndex[point]);
         noteID = await this.findDoc(bookInfo.bookID, point);
         if (noteID) {
-            await this.cleanNote(noteID);
-            await this.fullfilContent(bookInfo.bookID, piece, noteID, point);
             openTab({ app: this.plugin.app, doc: { id: noteID } });
             return;
         }
@@ -313,7 +316,7 @@ class Progressive {
             await this.fullfilContent(bookInfo.bookID, piece, noteID, point);
             openTab({ app: this.plugin.app, doc: { id: noteID } });
         } else {
-            await siyuan.pushMsg("fail to create a new doc");
+            await siyuan.pushMsg("新建文件失败，请稍后再试试……");
         }
     }
 
@@ -331,10 +334,10 @@ class Progressive {
     private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         switch (cbType) {
             case HtmlCBType.previous:
-                if (point > 0) {
-                    await this.storage.gotoBlock(bookID, point - 1);
-                    await this.startToLearn(bookID);
-                }
+                await this.startToLearn(bookID, point - 1);
+                break;
+            case HtmlCBType.next:
+                await this.startToLearn(bookID, point + 1);
                 break;
             case HtmlCBType.skip:
                 await siyuan.removeDocByID(noteID);
