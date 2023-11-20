@@ -32,7 +32,7 @@ The "fragmentation" operation does not modify the original document or create ne
 
 ![Alt text](assets/reading.png)
 
-**Within each "fragment," each segment of text starts with an asterisk (*) that links back to the original document.**
+**"In each `segment`, there is a `*` at the end of each text paragraph, linking to the original document."**
 
 **You can freely modify the content within the "fragment," add paragraphs, create flashcards, etc. If you choose to keep this fragment, any modified content within the fragment will be preserved, while the unchanged content will be deleted to maintain simplicity.**
 
@@ -58,9 +58,24 @@ Open an original document that has already been added to the progressive learnin
 
 ![Alt text](assets/rightClickMenu.png)
 
+## Fill-in-the-Blank Flashcards
+
+To create a fill-in-the-blank flashcard, select the portion of the content you want to hide, such as the "story" in the image:
+
+![Alt text](assets/selected.png)
+
+When generating the flashcard, include an input box to provide a space for writing.
+
+Writing the answer on the flashcard will enhance the effectiveness, as you can review the previous thoughts/answers during the next revision.
+
+If you are writing an article, you can create ambiguous blanks to continuously think and write using the flashcard mechanism - progressive writing.
+
+![Alt text](assets/card.png)
+
+> **Note:** Flashcard type B represents a quoted block in the writing section, while C represents a code block.
+
 # Plans
 
-- [ ] Continuously improve the plugin in various ways.
 - [ ] Improve i18n (internationalization).
 - [ ] Merge a large number of saved fragments into a single document?
 
@@ -75,6 +90,11 @@ QQ Group: 263961482
 [Or submit issues on the official forum](https://ld246.com/tag/siyuan)
 
 # Changelog
+
+## 2023-11-21
+
+* Greatly improve the speed of `segmentation` based only on the title.
+* Move the `*` at the beginning of each sentence within the `segment` to the end.
 
 ## 2023-11-20
 

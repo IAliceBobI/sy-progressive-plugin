@@ -13,7 +13,7 @@ class FlashBox {
         this.plugin.eventBus.on("open-menu-content", async ({ detail }) => {
             const menu = detail.menu;
             menu.addItem({
-                label: "插入填空闪卡" + CardType.B.toString(),
+                label: "插入填空题闪卡" + CardType.B.toString(),
                 icon: "iconFlashcard",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
@@ -24,7 +24,7 @@ class FlashBox {
                 },
             });
             menu.addItem({
-                label: "插入填空闪卡" + CardType.C.toString(),
+                label: "插入填空题闪卡" + CardType.C.toString(),
                 icon: "iconFlashcard",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
@@ -39,7 +39,10 @@ class FlashBox {
 
     private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
         const { content } = await siyuan.getBlockMarkdownAndContent(blockID);
-        let cardContent = content.replace(new RegExp(selected, "g"), `==${selected}==`);
+        let cardContent = content;
+        if (selected) {
+            cardContent = content.replace(new RegExp(selected, "g"), `==${selected}==`);
+        }
         if (cardContent.endsWith("*")) {
             cardContent = cardContent.slice(0, -1);
         }
