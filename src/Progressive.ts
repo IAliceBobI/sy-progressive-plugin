@@ -178,17 +178,22 @@ class Progressive {
         const btn = dialog.element.querySelector("#" + btnSplitID) as HTMLButtonElement;
         btn.addEventListener("click", async () => {
             const splitLen = Number(LengthSplitInput.value.trim());
-            if (!LengthSplitInput.value.trim() || (!splitLen && splitLen !== 0)) {
+            if (!utils.isValidNumber(splitLen)) {
                 LengthSplitInput.value = String(constants.PieceLen);
             } else {
                 dialog.destroy();
-                const wordCount = await help.getDocWordCount(bookID);
+                let contentBlocks;
+                if (splitLen > 0) {
+                    contentBlocks = await help.getDocWordCount(bookID);
+                } else {
+                    contentBlocks = await siyuan.getChildBlocks(bookID);
+                }
                 let groups: help.WordCountType[][];
                 if (titleCheckBox.checked) {
                     await siyuan.pushMsg("根据标题拆分……");
-                    groups = new help.HeadingGroup(wordCount, constants.MiniContentLen).split();
+                    groups = new help.HeadingGroup(contentBlocks).split();
                 } else {
-                    groups = [wordCount];
+                    groups = [contentBlocks];
                 }
                 if (splitLen > 0) {
                     await siyuan.pushMsg("根据内容长度拆分:" + splitLen);

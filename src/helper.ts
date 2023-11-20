@@ -312,28 +312,24 @@ export class HeadingGroup {
     private wordCount: WordCountType[];
     private group: WordCountType[][];
     private list: WordCountType[];
-    private miniCount: number;
-    private count: number;
-    constructor(wordCount: WordCountType[], miniCount: number) {
+    private lastType: string;
+    constructor(wordCount: WordCountType[]) {
         this.wordCount = wordCount;
         this.group = [];
         this.list = [];
-        this.miniCount = miniCount;
-        this.count = 0;
     }
     private add(wc: WordCountType) {
         this.getList(wc).push(wc);
-        if (wc.type !== "h") this.count += wc.count;
+        this.lastType = wc.type;
     }
     private next() {
         if (this.list.length > 0) {
             this.group.push(this.list);
             this.list = [];
-            this.count = 0;
         }
     }
     private shouldNext(wc: WordCountType) {
-        if (wc.type === "h" && this.count >= this.miniCount) {
+        if (wc.type === "h" && this.lastType != "h") {
             return true;
         }
         return false;
