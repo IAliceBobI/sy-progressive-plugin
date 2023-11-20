@@ -1,3 +1,5 @@
 # Changelog
 
-[English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
+[English](./README.md#Changelog)
+
+[zh_CN](./README_zh_CN.md#更新日志)
