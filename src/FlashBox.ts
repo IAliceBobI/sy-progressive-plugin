@@ -1,4 +1,5 @@
 import { Plugin } from "siyuan";
+import { newNodeID, siyuan } from "./utils";
 
 enum CardType {
     B = "B", C = "C"
@@ -36,8 +37,28 @@ class FlashBox {
         });
     }
 
-    private async blankSpaceCard(blockID: string, cardType: string, t: CardType) {
-
+    private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
+        const { content } = await siyuan.getBlockMarkdownAndContent(blockID);
+        let cardContent = content.replace(new RegExp(selected, "g"), `==${selected}==`);
+        if (cardContent.endsWith("*")) {
+            cardContent = cardContent.slice(0, -1);
+        }
+        cardContent += `((${blockID} "*"))`;
+        await siyuan.insertBlockAfter("", blockID);
+        const cardID = newNodeID();
+        if (cardType === CardType.B) {
+            await siyuan.insertBlockAfter(`* ${cardContent}
+* >
+{: id="${cardID}"}
+`, blockID);
+        } else {
+            await siyuan.insertBlockAfter(`* ${cardContent}
+* \`\`\`
+{: id="${cardID}"}
+`, blockID);
+        }
+        await siyuan.insertBlockAfter("", blockID);
+        await siyuan.addRiffCards([cardID]);
     }
 }
 
