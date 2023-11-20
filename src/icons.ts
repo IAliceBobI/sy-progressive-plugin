@@ -4,6 +4,10 @@ export const ICONS = `
 <path d="M9 4h14v2H9zm0 4h14v2H9zm0 4h14v2H9zm0 4h14v2H9z"/>
 </svg></symbol>
 
+<symbol id="iconFlashcard" viewBox="0 0 32 32"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+<path d="M29 6h-26c-1.1 0-2 0.9-2 2v16c0 1.1 0.9 2 2 2h26c1.1 0 2-0.9 2-2v-16c0-1.1-0.9-2-2-2zm0 18h-26v-16h26v16zm-12-9h-4v-2h4v2zm4 0v-2h4v2h-4zm0 4h-4v-2h4v2zm0 4h-4v-2h4v2zm4-8h-12v-2h12v2z"/>
+</svg></symbol>
+
 <symbol id="iconAddingBook" viewBox="0 0 32 32"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
 <path d="M16 6a1 1 0 0 1 1 1v8h8a1 1 0 0 1 0 2h-8v8a1 1 0 0 1-2 0v-8h-8a1 1 0 0 1 0-2h8v-8a1 1 0 0 1 1-1z"/>
 </svg></symbol>
