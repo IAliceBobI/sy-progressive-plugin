@@ -57,7 +57,7 @@ export function dir(path: string) {
 }
 
 export function isValidNumber(num: number) {
-    return typeof num === 'number' && !isNaN(num);
+    return typeof num === "number" && !isNaN(num);
 }
 
 export const timeUtil = {
