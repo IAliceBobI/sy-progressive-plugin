@@ -421,7 +421,7 @@ class Progressive {
         piece.reverse();
         await this.addBtnLine(bookID, noteID, point);
         for (const id of piece) {
-            const content = await siyuan.getBlockKramdownWithoutID(id, [`${constants.RefIDKey}="${id}"`], `((${id} "*"))`, "");
+            const content = await siyuan.getBlockKramdownWithoutID(id, [`${constants.RefIDKey}="${id}"`], "", `((${id} "*"))`);
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
         await this.addBtnLine(bookID, noteID, point);
