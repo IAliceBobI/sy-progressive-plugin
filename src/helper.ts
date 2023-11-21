@@ -4,7 +4,7 @@ import * as constants from "./constants";
 import { Plugin } from "siyuan";
 
 export type WordCountType = { id: string; count: number; type: string; };
-export type BookInfo = { time?: number, boxID?: string, point?: number, bookID?: string };
+export type BookInfo = { time?: number, boxID?: string, point?: number, bookID?: string, ignored?: string };
 export type BookInfos = { [key: string]: BookInfo };
 
 export enum HtmlCBType {
@@ -15,6 +15,7 @@ export enum HtmlCBType {
     quit,
     nextBook,
     next,
+    ignoreBook,
 }
 
 export class Storage {
@@ -37,9 +38,17 @@ export class Storage {
         this.updateBookInfo(docID, { point: 0 });
     }
 
+    async ignoreBook(bookID: string, i: boolean = true) {
+        if (i)
+            this.updateBookInfo(bookID, { ignored: "yes" });
+        else
+            this.updateBookInfo(bookID, { ignored: "no" });
+    }
+
     private async updateBookInfo(docID: string, opt: BookInfo) {
         const info = await this.booksInfo(docID);
         info.time = await siyuan.currentTimeMs();
+        if (opt.ignored) info.ignored = opt.ignored;
         if (opt.bookID) info.bookID = opt.bookID;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
         this.booksInfos()[docID] = info;
@@ -49,7 +58,7 @@ export class Storage {
     async booksInfo(docID: string) {
         let info = this.booksInfos()[docID];
         if (!info) {
-            info = { point: 0, bookID: docID, time: await siyuan.currentTimeMs() };
+            info = { point: 0, bookID: docID, time: await siyuan.currentTimeMs(), ignored: "no" };
             this.booksInfos()[docID] = info;
         }
         if (!info.boxID) {
@@ -153,7 +162,7 @@ function btnSaveDoc(bookID: string, noteID: string, point: number) {
 function btnNext(bookID: string, noteID: string, point: number) {
     const btnSaveID = utils.newID().slice(0, constants.IDLen);
     return `<div>
-            ${styleColor("#00FFFF", "#000000")}
+            ${styleColor("rgb(18, 59, 94)", "#FFFFFF")}
             <div>
                 <button onclick="${btnSaveID}()" id="btn${btnSaveID}">下一分片</button>
             </div>
@@ -180,6 +189,7 @@ export function getBtns(bookID: string, noteID: string, point: number) {
     const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
     const btnStopID = utils.newID().slice(0, constants.IDLen);
     const btnNextBookID = utils.newID().slice(0, constants.IDLen);
+    const btnIgnoreBookID = utils.newID().slice(0, constants.IDLen);
     return `{{{col
 [${point}]
 
@@ -188,7 +198,7 @@ ${btnPrevious(bookID, noteID, point)}
 <div>
     ${styleColor("#FF0000", "#FFFFFF")}
     <div>
-        <button onclick="${btnSkipID}()" id="btn${btnSkipID}">删除，继续</button>
+        <button onclick="${btnSkipID}()" id="btn${btnSkipID}">删除</button>
     </div>
     <script>
         function ${btnSkipID}() {
@@ -200,7 +210,7 @@ ${btnPrevious(bookID, noteID, point)}
 <div>
     ${styleColor("#FFFF00", "#000000")}
 <div>
-<button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">制卡，继续</button>
+<button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">制卡</button>
 </div>
 <script>
 function ${btnSaveCardID}() {
@@ -214,7 +224,7 @@ ${btnSaveDoc(bookID, noteID, point)}
 <div>
     ${styleColor("#FF00FF", "#FFFFFF")}
     <div>
-        <button onclick="${btnStopID}()" id="btn${btnStopID}">删除，退出</button>
+        <button onclick="${btnStopID}()" id="btn${btnStopID}">退出</button>
     </div>
     <script>
         function ${btnStopID}() {
@@ -226,11 +236,23 @@ ${btnSaveDoc(bookID, noteID, point)}
 <div>
     ${styleColor("#00FFFF", "#000000")}
     <div>
-        <button onclick="${btnNextBookID}()" id="btn${btnNextBookID}">删除，换书</button>
+        <button onclick="${btnNextBookID}()" id="btn${btnNextBookID}">换书</button>
     </div>
     <script>
         function ${btnNextBookID}() {
             globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.nextBook},${point})
+        }
+    </script>
+</div>
+
+<div>
+    ${styleColor("rgb(76, 108, 136)", "#FFFFFF")}
+    <div>
+        <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">忽略本书</button>
+    </div>
+    <script>
+        function ${btnIgnoreBookID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.ignoreBook},${point})
         }
     </script>
 </div>

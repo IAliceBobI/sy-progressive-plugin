@@ -358,16 +358,17 @@ class Progressive {
                 break;
             case HtmlCBType.docCard:
                 await siyuan.addRiffCards([noteID]);
-                await this.cleanNote(noteID);
-                await this.addTwoBtns(bookID, noteID, point);
-                await this.storage.gotoBlock(bookID, point + 1);
-                await this.startToLearn(bookID);
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
                 await this.addTwoBtns(bookID, noteID, point);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
+                break;
+            case HtmlCBType.ignoreBook:
+                await this.storage.ignoreBook(bookID);
+                await siyuan.removeDocByID(noteID);
+                await this.startToLearn();
                 break;
             default:
                 throw "Invalid HtmlCBType " + cbType;
@@ -435,7 +436,8 @@ class Progressive {
         let miniTime = Number.MAX_SAFE_INTEGER;
         let miniID = "";
         for (const id in infos) {
-            const { time } = infos[id];
+            const { time, ignored } = infos[id];
+            if (ignored == "yes") continue;
             if (time < miniTime) {
                 miniTime = time;
                 miniID = id;
@@ -472,6 +474,17 @@ class Progressive {
                 this.startToLearnWithLock(bookID);
                 dialog.destroy();
             });
+            if (bookInfo.ignored == "yes") {
+                help.appendChild(subDiv, "button", "取消忽略", ["prog-style__button"], () => {
+                    this.storage.ignoreBook(bookID, false);
+                    dialog.destroy();
+                });
+            } else {
+                help.appendChild(subDiv, "button", "忽略", ["prog-style__button"], () => {
+                    this.storage.ignoreBook(bookID, true);
+                    dialog.destroy();
+                });
+            }
             help.appendChild(subDiv, "button", "重建索引", ["prog-style__button"], () => {
                 this.addProgressiveReadingWithLock(bookID);
                 dialog.destroy();
