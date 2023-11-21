@@ -61,7 +61,8 @@ export class Storage {
         return this.saveBookInfos();
     }
 
-    async booksInfo(docID: string) {
+    async booksInfo(docID: string): Promise<BookInfo> {
+        if (!docID) return {};
         let info = this.booksInfos()[docID];
         if (!info) {
             info = { point: 0, bookID: docID, time: await siyuan.currentTimeMs(), ignored: "no" };
