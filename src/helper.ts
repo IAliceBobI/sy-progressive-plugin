@@ -233,6 +233,21 @@ export class Helper {
         </div>`;
     }
 
+    btnDelCard(bookID: string, noteID: string, point: number) {
+        const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("#FFFF00", "#000000")}
+            <div>
+                <button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.delDocCard}</button>
+            </div>
+            <script>
+                function ${btnSaveCardID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.DelDocCard},${point})
+                }
+            </script>
+        </div>`;
+    }
+
     btnStop(bookID: string, noteID: string, point: number) {
         const btnStopID = utils.newID().slice(0, constants.IDLen);
         return `<div>
@@ -293,6 +308,8 @@ ${this.btnCleanUnchanged(bookID, noteID, point)}
 ${this.btnSkip(bookID, noteID, point)}
 
 ${this.btnSaveCard(bookID, noteID, point)}
+
+${this.btnDelCard(bookID, noteID, point)}
 
 ${this.btnStop(bookID, noteID, point)}
 
