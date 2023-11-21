@@ -59,14 +59,18 @@ export class Storage {
         }
     }
 
-    async toggleAutoCard(bookID: string) {
+    async toggleAutoCard(bookID: string, opt?: string) {
         const info = await this.booksInfo(bookID);
-        if (info.autoCard == "no") {
-            await this.updateBookInfo(bookID, { autoCard: "yes" });
-            await siyuan.pushMsg("自动文档制卡");
+        if (opt) {
+            await this.updateBookInfo(bookID, { autoCard: opt });
         } else {
-            await this.updateBookInfo(bookID, { autoCard: "no" });
-            await siyuan.pushMsg("取消自动文档制卡");
+            if (info.autoCard == "no") {
+                await this.updateBookInfo(bookID, { autoCard: "yes" });
+                await siyuan.pushMsg("自动文档制卡");
+            } else {
+                await this.updateBookInfo(bookID, { autoCard: "no" });
+                await siyuan.pushMsg("取消自动文档制卡");
+            }
         }
     }
 

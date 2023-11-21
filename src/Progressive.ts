@@ -136,6 +136,7 @@ class Progressive {
     }
 
     private async addProgressiveReadingDialog(bookID: string, bookName: string) {
+        const autoCardID = utils.newID();
         const titleSplitID = utils.newID();
         const LengthSplitID = utils.newID();
         const btnSplitID = utils.newID();
@@ -146,6 +147,9 @@ class Progressive {
                 <div class="fn__hr"></div>
                 <span class="prog-style__id">${this.plugin.i18n.splitByHeadings}</span>
                 <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
+                <div class="fn__hr"></div>
+                <span class="prog-style__id">${this.plugin.i18n.autoCard}</span>
+                <input type="checkbox" id="${autoCardID}" class="prog-style__checkbox"/>
                 <div class="fn__hr"></div>
                 <div class="prog-style__id">${this.plugin.i18n.splitByWordCount}</div>
                 <input type="text" id="${LengthSplitID}" class="prog-style__input"/>
@@ -165,6 +169,17 @@ class Progressive {
                 titleCheckBox.checked = false;
             }
         });
+
+        const autoCardBox = dialog.element.querySelector("#" + autoCardID) as HTMLInputElement;
+        autoCardBox.checked = true;
+        autoCardBox.addEventListener("change", () => {
+            if (autoCardBox.checked) {
+                autoCardBox.checked = true;
+            } else {
+                autoCardBox.checked = false;
+            }
+        });
+
         const LengthSplitInput = dialog.element.querySelector("#" + LengthSplitID) as HTMLInputElement;
         LengthSplitInput.value = String(constants.PieceLen);
 
@@ -194,6 +209,11 @@ class Progressive {
                 }
                 await this.storage.saveIndex(bookID, groups);
                 await this.storage.resetBookReadingPoint(bookID);
+                if (!autoCardBox.checked) {
+                    await this.storage.toggleAutoCard(bookID, "no");
+                } else {
+                    await this.storage.toggleAutoCard(bookID, "yes");
+                }
                 setTimeout(async () => {
                     await this.viewAllProgressiveBooks();
                 }, constants.IndexTime2Wait);
@@ -482,11 +502,15 @@ class Progressive {
                 this.startToLearnWithLock(bookID);
                 dialog.destroy();
             });
-            help.appendChild(subDiv, "button", this.plugin.i18n.ignore, ["prog-style__button"], () => {
+            help.appendChild(subDiv, "button", this.plugin.i18n.ignore + ` ${bookInfo.ignored}`, ["prog-style__button"], () => {
                 this.storage.toggleIgnoreBook(bookID);
+                dialog.destroy();
+                this.viewAllProgressiveBooks();
             });
-            help.appendChild(subDiv, "button", this.plugin.i18n.autoCard, ["prog-style__button"], () => {
+            help.appendChild(subDiv, "button", this.plugin.i18n.autoCard + ` ${bookInfo.autoCard}`, ["prog-style__button"], () => {
                 this.storage.toggleAutoCard(bookID);
+                dialog.destroy();
+                this.viewAllProgressiveBooks();
             });
             help.appendChild(subDiv, "button", this.plugin.i18n.Repiece, ["prog-style__button"], () => {
                 this.addProgressiveReadingWithLock(bookID);
