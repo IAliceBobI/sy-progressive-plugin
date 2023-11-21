@@ -4,20 +4,28 @@ import * as constants from "./constants";
 import { Plugin } from "siyuan";
 
 export type WordCountType = { id: string; count: number; type: string; };
-export type BookInfo = { time?: number, boxID?: string, point?: number, bookID?: string, ignored?: string };
+export type BookInfo = {
+    time?: number,
+    boxID?: string,
+    point?: number,
+    bookID?: string,
+    ignored?: string,
+    autoCard?: string,
+};
 export type BookInfos = { [key: string]: BookInfo };
 
 export enum HtmlCBType {
-    previous,
-    skip,
-    AddDocCard,
-    DelDocCard,
-    quit,
-    nextBook,
-    next,
-    ignoreBook,
-    fullfilContent,
-    cleanUnchanged,
+    previous = 0,
+    skip = 1,
+    AddDocCard = 2,
+    // saveDoc = 3,
+    quit = 4,
+    nextBook = 5,
+    next = 6,
+    ignoreBook = 7,
+    fullfilContent = 8,
+    cleanUnchanged = 9,
+    DelDocCard = 10,
 }
 
 export class Storage {
@@ -51,9 +59,21 @@ export class Storage {
         }
     }
 
+    async toggleAutoCard(bookID: string) {
+        const info = await this.booksInfo(bookID);
+        if (info.autoCard == "no") {
+            await this.updateBookInfo(bookID, { autoCard: "yes" });
+            await siyuan.pushMsg("自动文档制卡");
+        } else {
+            await this.updateBookInfo(bookID, { autoCard: "no" });
+            await siyuan.pushMsg("取消自动文档制卡");
+        }
+    }
+
     private async updateBookInfo(docID: string, opt: BookInfo) {
         const info = await this.booksInfo(docID);
         info.time = await siyuan.currentTimeMs();
+        if (opt.autoCard) info.autoCard = opt.autoCard;
         if (opt.ignored) info.ignored = opt.ignored;
         if (opt.bookID) info.bookID = opt.bookID;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
@@ -65,7 +85,7 @@ export class Storage {
         if (!docID) return {};
         let info = this.booksInfos()[docID];
         if (!info) {
-            info = { point: 0, bookID: docID, time: await siyuan.currentTimeMs(), ignored: "no" };
+            info = { point: 0, bookID: docID, time: await siyuan.currentTimeMs(), ignored: "no", autoCard: "yes" };
             this.booksInfos()[docID] = info;
         }
         if (!info.boxID) {

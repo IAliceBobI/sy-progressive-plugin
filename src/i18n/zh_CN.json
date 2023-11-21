@@ -12,6 +12,7 @@
   "cleanUnchangedOriginDoc": "清理未改原文",
   "insertOriginDoc": "插入原文",
   "insertBlankSpaceCard": "插入填空式闪卡",
+  "autoCard": "自动制卡",
   "ignore": "切换忽略",
   "Repiece": "重新分片",
   "DeleteAndNext": "删除，下一分片",

@@ -316,7 +316,16 @@ class Progressive {
             await this.addReadingBtns(bookID, noteID, point);
             await this.fullfilContent(bookInfo.bookID, piece, noteID);
             await this.addReadingBtns(bookID, noteID, point);
-            openTab({ app: this.plugin.app, doc: { id: noteID } });
+            openTab({
+                app: this.plugin.app, doc: { id: noteID },
+                afterOpen: () => {
+                    if (bookInfo.autoCard == "yes") {
+                        setTimeout(() => {
+                            siyuan.addRiffCards([noteID]);
+                        }, 1200);
+                    }
+                }
+            });
         } else {
             await siyuan.pushMsg(this.plugin.i18n.FailToNewDoc);
         }
@@ -455,8 +464,8 @@ class Progressive {
             content: `<div class="b3-dialog__content">
                 <div id='${id}'></div>
             </div>`,
-            width: events.isMobile ? "92vw" : "560px",
-            height: "540px",
+            width: events.isMobile ? "92vw" : "860px",
+            height: "660px",
         });
         const div = dialog.element.querySelector("#" + id) as HTMLElement;
         for (const bookID in this.storage.booksInfos()) {
@@ -475,6 +484,9 @@ class Progressive {
             });
             help.appendChild(subDiv, "button", this.plugin.i18n.ignore, ["prog-style__button"], () => {
                 this.storage.toggleIgnoreBook(bookID);
+            });
+            help.appendChild(subDiv, "button", this.plugin.i18n.autoCard, ["prog-style__button"], () => {
+                this.storage.toggleAutoCard(bookID);
             });
             help.appendChild(subDiv, "button", this.plugin.i18n.Repiece, ["prog-style__button"], () => {
                 this.addProgressiveReadingWithLock(bookID);
