@@ -76,7 +76,6 @@ If you are writing an article, you can create ambiguous blanks to continuously t
 
 # Plans
 
-- [ ] Improve i18n (internationalization).
 - [ ] Merge a large number of saved fragments into a single document?
 
 # Bug Reports and Suggestions
@@ -93,8 +92,11 @@ QQ Group: 263961482
 
 ## 2023-11-21
 
-* Greatly improve the speed of `segmentation` based only on the title.
-* Move the `*` at the beginning of each sentence within the `segment` to the end.
+* Greatly improve the speed of "slicing" based solely on the title.
+* Move the `*` at the beginning of each sentence within the "slice" to the end.
+* Add flashcard functionality for fill-in-the-blanks.
+* Add ignore book feature.
+* i18n (internationalization).
 
 ## 2023-11-20
 
