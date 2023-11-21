@@ -258,6 +258,7 @@ class Progressive {
             if (content) break;
         }
         if (!content) content = `[${point}]`;
+        else content = `[${point}]` + content;
         const row = await siyuan.sqlOne(`select hpath from blocks where id='${bookID}'`);
         let dir = row?.hpath ?? "";
         if (dir) {
