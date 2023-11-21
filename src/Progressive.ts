@@ -11,11 +11,13 @@ class Progressive {
     private static readonly GLOBAL_THIS: Record<string, any> = globalThis;
     private plugin: Plugin;
     private storage: help.Storage;
+    private helper: help.Helper;
 
     onload(plugin: Plugin) {
         Progressive.GLOBAL_THIS["progressive_zZmqus5PtYRi"] = { progressive: this, utils, siyuan, timeUtil, events };
         this.plugin = plugin;
         this.storage = new help.Storage(plugin);
+        this.helper = new help.Helper(plugin);
         const topBarElement = this.plugin.addTopBar({
             icon: "iconABook",
             title: this.plugin.i18n.progressiveReadingMenu,
@@ -175,7 +177,7 @@ class Progressive {
                 dialog.destroy();
                 let contentBlocks;
                 if (splitLen > 0) {
-                    contentBlocks = await help.getDocWordCount(bookID);
+                    contentBlocks = await this.helper.getDocWordCount(bookID);
                 } else {
                     contentBlocks = await siyuan.getChildBlocks(bookID);
                 }
@@ -415,11 +417,11 @@ class Progressive {
     }
 
     private addReadingBtns(bookID: string, noteID: string, point: number) {
-        return siyuan.insertBlockAsChildOf(help.tempContent(help.getReadingBtns(bookID, noteID, point)), noteID);
+        return siyuan.insertBlockAsChildOf(help.tempContent(this.helper.getReadingBtns(bookID, noteID, point)), noteID);
     }
 
     private addReviewBtns(bookID: string, noteID: string, point: number) {
-        return siyuan.insertBlockAsChildOf(help.tempContent(help.getReviewBtns(bookID, noteID, point)), noteID);
+        return siyuan.insertBlockAsChildOf(help.tempContent(this.helper.getReviewBtns(bookID, noteID, point)), noteID);
     }
 
     private async fullfilContent(bookID: string, piece: string[], noteID: string) {

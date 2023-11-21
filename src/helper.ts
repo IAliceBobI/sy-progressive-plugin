@@ -131,27 +131,32 @@ function styleColor(bgcolor: string, color: string) {
     return `<style>button{display: inline-block; padding: 10px 20px; background-color: ${bgcolor}; color: ${color}; text-align: center; text-decoration: none; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;}button.large { padding: 12px 24px; font-size: 24px; }button.small { padding: 8px 16px; font-size: 14px; }</style>`;
 }
 
-function btnFullfilContent(bookID: string, noteID: string, point: number) {
-    const btnFullfilContentID = utils.newID().slice(0, constants.IDLen);
-    return `<div>
-            ${styleColor("rgb(95, 99, 102)", "#000000")}
-            <div>
-                <button onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">插入原文</button>
-            </div>
-            <script>
-                function ${btnFullfilContentID}() {
-                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.fullfilContent},${point})
-                }
-            </script>
-        </div>`;
-}
+export class Helper {
+    private plugin: Plugin;
+    constructor(plugin: Plugin) {
+        this.plugin = plugin;
+    }
+    btnFullfilContent(bookID: string, noteID: string, point: number) {
+        const btnFullfilContentID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+                ${styleColor("rgb(95, 99, 102)", "#000000")}
+                <div>
+                    <button onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">${this.plugin.i18n.insertOriginDoc}</button>
+                </div>
+                <script>
+                    function ${btnFullfilContentID}() {
+                        globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.fullfilContent},${point})
+                    }
+                </script>
+            </div>`;
+    }
 
-function btnCleanUnchanged(bookID: string, noteID: string, point: number) {
-    const btnCleanUnchangedID = utils.newID().slice(0, constants.IDLen);
-    return `<div>
+    btnCleanUnchanged(bookID: string, noteID: string, point: number) {
+        const btnCleanUnchangedID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
             ${styleColor("rbg(13, 101, 178)", "#000000")}
             <div>
-                <button onclick="${btnCleanUnchangedID}()" id="btn${btnCleanUnchangedID}">清理未改原文</button>
+                <button onclick="${btnCleanUnchangedID}()" id="btn${btnCleanUnchangedID}">${this.plugin.i18n.cleanUnchangedOriginDoc}</button>
             </div>
             <script>
                 function ${btnCleanUnchangedID}() {
@@ -159,14 +164,14 @@ function btnCleanUnchanged(bookID: string, noteID: string, point: number) {
                 }
             </script>
         </div>`;
-}
+    }
 
-function btnPrevious(bookID: string, noteID: string, point: number) {
-    const btnPreviousID = utils.newID().slice(0, constants.IDLen);
-    return `<div>
+    btnPrevious(bookID: string, noteID: string, point: number) {
+        const btnPreviousID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
             ${styleColor("#00FF00", "#000000")}
             <div>
-                <button onclick="${btnPreviousID}()" id="btn${btnPreviousID}">上一分片</button>
+                <button onclick="${btnPreviousID}()" id="btn${btnPreviousID}">${this.plugin.i18n.previousPiece}</button>
             </div>
             <script>
                 function ${btnPreviousID}() {
@@ -174,14 +179,14 @@ function btnPrevious(bookID: string, noteID: string, point: number) {
                 }
             </script>
         </div>`;
-}
+    }
 
-function btnSaveDoc(bookID: string, noteID: string, point: number) {
-    const btnSaveID = utils.newID().slice(0, constants.IDLen);
-    return `<div>
+    btnSaveDoc(bookID: string, noteID: string, point: number) {
+        const btnSaveID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
             ${styleColor("#0000FF", "#FFFFFF")}
             <div>
-                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">保存继续</button>
+                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">${this.plugin.i18n.saveAndAdvance}</button>
             </div>
             <script>
                 function ${btnSaveID}() {
@@ -189,14 +194,14 @@ function btnSaveDoc(bookID: string, noteID: string, point: number) {
                 }
             </script>
         </div>`;
-}
+    }
 
-function btnNext(bookID: string, noteID: string, point: number) {
-    const btnNextID = utils.newID().slice(0, constants.IDLen);
-    return `<div>
+    btnNext(bookID: string, noteID: string, point: number) {
+        const btnNextID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
             ${styleColor("rgb(18, 59, 94)", "#FFFFFF")}
             <div>
-                <button onclick="${btnNextID}()" id="btn${btnNextID}">下一分片</button>
+                <button onclick="${btnNextID}()" id="btn${btnNextID}">${this.plugin.i18n.nextPiece}</button>
             </div>
             <script>
                 function ${btnNextID}() {
@@ -204,37 +209,67 @@ function btnNext(bookID: string, noteID: string, point: number) {
                 }
             </script>
         </div>`;
-}
+    }
 
-export function getReviewBtns(bookID: string, noteID: string, point: number) {
-    return `{{{col
+    getReviewBtns(bookID: string, noteID: string, point: number) {
+        return `{{{col
 [${point}]
 
-${btnPrevious(bookID, noteID, point)}
+${this.btnPrevious(bookID, noteID, point)}
 
-${btnFullfilContent(bookID, noteID, point)}
+${this.btnFullfilContent(bookID, noteID, point)}
 
-${btnCleanUnchanged(bookID, noteID, point)}
+${this.btnCleanUnchanged(bookID, noteID, point)}
 
-${btnNext(bookID, noteID, point)}
+${this.btnNext(bookID, noteID, point)}
 }}}`;
-}
+    }
+    async getDocWordCount(docID: string): Promise<WordCountType[]> {
+        await siyuan.pushMsg(this.plugin.i18n.getAllChildren, 3000);
+        const allBlocks: any[] = await siyuan.getChildBlocks(docID);
 
-export function getReadingBtns(bookID: string, noteID: string, point: number) {
-    const btnSkipID = utils.newID().slice(0, constants.IDLen);
-    const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
-    const btnStopID = utils.newID().slice(0, constants.IDLen);
-    const btnNextBookID = utils.newID().slice(0, constants.IDLen);
-    const btnIgnoreBookID = utils.newID().slice(0, constants.IDLen);
-    return `{{{col
+        const size = 300;
+        const groups = [];
+        while (allBlocks.length > 0) {
+            groups.push(allBlocks.splice(0, size));
+        }
+
+        await siyuan.pushMsg(this.plugin.i18n.start2count, 3000);
+        let iter = 0;
+        const content = [];
+        for (const group of groups) {
+            const tasks = [];
+            for (const { id } of group) {
+                tasks.push(siyuan.getBlocksWordCount([id]));
+            }
+            const rets = await Promise.all(tasks);
+            let i = 0;
+            for (const { id, type } of group) {
+                const { wordCount } = rets[i++];
+                const count = wordCount;
+                content.push({ id, count, type });
+            }
+            iter += i;
+            await siyuan.pushMsg(this.plugin.i18n.countBlocks.replace("{iter}", iter), 3000);
+        }
+        await siyuan.pushMsg(this.plugin.i18n.countingFinished, 3000);
+        return content;
+    }
+    getReadingBtns(bookID: string, noteID: string, point: number) {
+        const btnSkipID = utils.newID().slice(0, constants.IDLen);
+        const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
+        const btnStopID = utils.newID().slice(0, constants.IDLen);
+        const btnNextBookID = utils.newID().slice(0, constants.IDLen);
+        const btnIgnoreBookID = utils.newID().slice(0, constants.IDLen);
+        return `{{{col
 [${point}]
 
-${btnPrevious(bookID, noteID, point)}
+${this.btnPrevious(bookID, noteID, point)}
 
 <div>
     ${styleColor("#FF0000", "#FFFFFF")}
     <div>
-        <button onclick="${btnSkipID}()" id="btn${btnSkipID}">删除</button>
+        <button onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.Delete}</button>
     </div>
     <script>
         function ${btnSkipID}() {
@@ -245,22 +280,22 @@ ${btnPrevious(bookID, noteID, point)}
 
 <div>
     ${styleColor("#FFFF00", "#000000")}
-<div>
-<button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">文档制卡</button>
-</div>
-<script>
-function ${btnSaveCardID}() {
-    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.docCard},${point})
-}
-</script>
+    <div>
+        <button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.addDocToCard}</button>
+    </div>
+    <script>
+        function ${btnSaveCardID}() {
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.docCard},${point})
+        }
+    </script>
 </div>
 
-${btnSaveDoc(bookID, noteID, point)}
+${this.btnSaveDoc(bookID, noteID, point)}
 
 <div>
     ${styleColor("#FF00FF", "#FFFFFF")}
     <div>
-        <button onclick="${btnStopID}()" id="btn${btnStopID}">退出</button>
+        <button onclick="${btnStopID}()" id="btn${btnStopID}">${this.plugin.i18n.exit}</button>
     </div>
     <script>
         function ${btnStopID}() {
@@ -272,7 +307,7 @@ ${btnSaveDoc(bookID, noteID, point)}
 <div>
     ${styleColor("#00FFFF", "#000000")}
     <div>
-        <button onclick="${btnNextBookID}()" id="btn${btnNextBookID}">换书</button>
+        <button onclick="${btnNextBookID}()" id="btn${btnNextBookID}">${this.plugin.i18n.nextBook}</button>
     </div>
     <script>
         function ${btnNextBookID}() {
@@ -284,7 +319,7 @@ ${btnSaveDoc(bookID, noteID, point)}
 <div>
     ${styleColor("rgb(76, 108, 136)", "#FFFFFF")}
     <div>
-        <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">忽略本书</button>
+        <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignoreBook}</button>
     </div>
     <script>
         function ${btnIgnoreBookID}() {
@@ -293,6 +328,7 @@ ${btnSaveDoc(bookID, noteID, point)}
     </script>
 </div>
 }}}`;
+    }
 }
 
 export function afterLoad(data: any): string[][] {
@@ -405,38 +441,6 @@ export class HeadingGroup {
         this.next();
         return this.group;
     }
-}
-
-export async function getDocWordCount(docID: string): Promise<WordCountType[]> {
-    await siyuan.pushMsg("获取所有子块……", 3000);
-    const allBlocks: any[] = await siyuan.getChildBlocks(docID);
-
-    const size = 300;
-    const groups = [];
-    while (allBlocks.length > 0) {
-        groups.push(allBlocks.splice(0, size));
-    }
-
-    await siyuan.pushMsg("开始统计字数……", 3000);
-    let iter = 0;
-    const content = [];
-    for (const group of groups) {
-        const tasks = [];
-        for (const { id } of group) {
-            tasks.push(siyuan.getBlocksWordCount([id]));
-        }
-        const rets = await Promise.all(tasks);
-        let i = 0;
-        for (const { id, type } of group) {
-            const { wordCount } = rets[i++];
-            const count = wordCount;
-            content.push({ id, count, type });
-        }
-        iter += i;
-        await siyuan.pushMsg(`已经统计了${iter}个块……`, 3000);
-    }
-    await siyuan.pushMsg("统计字数结束……", 3000);
-    return content;
 }
 
 export function appendChild(parent: HTMLElement, type: string, textContent: string, classList: string[], click?: any) {
