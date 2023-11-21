@@ -205,6 +205,9 @@ export const siyuan = {
     async setBlockAttrs(id: string, attrs: any) {
         return siyuan.call("/api/attr/setBlockAttrs", { id, attrs });
     },
+    async getBlockAttrs(id: string) {
+        return siyuan.call("/api/attr/getBlockAttrs", { id });
+    },
     async transactions(doOperations: IOperation[]) {
         return siyuan.call("/api/transactions", {
             session: Constants.SIYUAN_APPID,
