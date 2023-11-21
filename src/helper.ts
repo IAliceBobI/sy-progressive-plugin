@@ -10,7 +10,7 @@ export type BookInfos = { [key: string]: BookInfo };
 export enum HtmlCBType {
     previous,
     skip,
-    docCard,
+    AddDocCard,
     saveDoc,
     quit,
     nextBook,
@@ -18,6 +18,7 @@ export enum HtmlCBType {
     ignoreBook,
     fullfilContent,
     cleanUnchanged,
+    DelDocCard,
 }
 
 export class Storage {
@@ -290,7 +291,7 @@ ${this.btnPrevious(bookID, noteID, point)}
     </div>
     <script>
         function ${btnSaveCardID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.docCard},${point})
+            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.AddDocCard},${point})
         }
     </script>
 </div>

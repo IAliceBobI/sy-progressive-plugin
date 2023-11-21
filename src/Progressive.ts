@@ -353,8 +353,11 @@ class Progressive {
             case HtmlCBType.quit:
                 await siyuan.removeDocByID(noteID);
                 break;
-            case HtmlCBType.docCard:
+            case HtmlCBType.AddDocCard:
                 await siyuan.addRiffCards([noteID]);
+                break;
+            case HtmlCBType.DelDocCard:
+                await siyuan.removeRiffCards([noteID]);
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
