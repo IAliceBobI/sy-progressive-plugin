@@ -324,7 +324,7 @@ ${this.btnSaveDoc(bookID, noteID, point)}
 <div>
     ${styleColor("rgb(76, 108, 136)", "#FFFFFF")}
     <div>
-        <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignoreBook}</button>
+        <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignore}</button>
     </div>
     <script>
         function ${btnIgnoreBookID}() {
