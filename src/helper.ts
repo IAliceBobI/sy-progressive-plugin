@@ -139,9 +139,11 @@ function styleColor(bgcolor: string, color: string) {
 
 export class Helper {
     private plugin: Plugin;
+
     constructor(plugin: Plugin) {
         this.plugin = plugin;
     }
+
     btnFullfilContent(bookID: string, noteID: string, point: number) {
         const btnFullfilContentID = utils.newID().slice(0, constants.IDLen);
         return `<div>
@@ -230,37 +232,7 @@ ${this.btnCleanUnchanged(bookID, noteID, point)}
 ${this.btnNext(bookID, noteID, point)}
 }}}`;
     }
-    async getDocWordCount(docID: string): Promise<WordCountType[]> {
-        await siyuan.pushMsg(this.plugin.i18n.getAllChildren, 3000);
-        const allBlocks: any[] = await siyuan.getChildBlocks(docID);
 
-        const size = 300;
-        const groups = [];
-        while (allBlocks.length > 0) {
-            groups.push(allBlocks.splice(0, size));
-        }
-
-        await siyuan.pushMsg(this.plugin.i18n.start2count, 3000);
-        let iter = 0;
-        const content = [];
-        for (const group of groups) {
-            const tasks = [];
-            for (const { id } of group) {
-                tasks.push(siyuan.getBlocksWordCount([id]));
-            }
-            const rets = await Promise.all(tasks);
-            let i = 0;
-            for (const { id, type } of group) {
-                const { wordCount } = rets[i++];
-                const count = wordCount;
-                content.push({ id, count, type });
-            }
-            iter += i;
-            await siyuan.pushMsg(this.plugin.i18n.countBlocks.replace("{iter}", iter), 3000);
-        }
-        await siyuan.pushMsg(this.plugin.i18n.countingFinished, 3000);
-        return content;
-    }
     getReadingBtns(bookID: string, noteID: string, point: number) {
         const btnSkipID = utils.newID().slice(0, constants.IDLen);
         const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
@@ -334,6 +306,38 @@ ${this.btnSaveDoc(bookID, noteID, point)}
     </script>
 </div>
 }}}`;
+    }
+
+    async getDocWordCount(docID: string): Promise<WordCountType[]> {
+        await siyuan.pushMsg(this.plugin.i18n.getAllChildren, 3000);
+        const allBlocks: any[] = await siyuan.getChildBlocks(docID);
+
+        const size = 300;
+        const groups = [];
+        while (allBlocks.length > 0) {
+            groups.push(allBlocks.splice(0, size));
+        }
+
+        await siyuan.pushMsg(this.plugin.i18n.start2count, 3000);
+        let iter = 0;
+        const content = [];
+        for (const group of groups) {
+            const tasks = [];
+            for (const { id } of group) {
+                tasks.push(siyuan.getBlocksWordCount([id]));
+            }
+            const rets = await Promise.all(tasks);
+            let i = 0;
+            for (const { id, type } of group) {
+                const { wordCount } = rets[i++];
+                const count = wordCount;
+                content.push({ id, count, type });
+            }
+            iter += i;
+            await siyuan.pushMsg(this.plugin.i18n.countBlocks.replace("{iter}", iter), 3000);
+        }
+        await siyuan.pushMsg(this.plugin.i18n.countingFinished, 3000);
+        return content;
     }
 }
 
