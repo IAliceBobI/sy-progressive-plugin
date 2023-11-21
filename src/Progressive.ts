@@ -293,6 +293,7 @@ class Progressive {
             siyuan.pushMsg(this.plugin.i18n.AddADocFirst);
             return;
         }
+        bookID = bookInfo.bookID;
         const bookIndex = await this.storage.loadBookIndexIfNeeded(bookInfo.bookID);
         if (!utils.isValidNumber(point)) {
             point = (await this.storage.booksInfo(bookInfo.bookID)).point;
