@@ -361,12 +361,6 @@ class Progressive {
             case HtmlCBType.DelDocCard:
                 await siyuan.removeRiffCards([noteID]);
                 break;
-            case HtmlCBType.saveDoc:
-                await this.cleanNote(noteID);
-                await this.addReadingBtns(bookID, noteID, point);
-                await this.storage.gotoBlock(bookID, point + 1);
-                await this.startToLearn(bookID);
-                break;
             case HtmlCBType.ignoreBook:
                 await this.storage.toggleIgnoreBook(bookID);
                 break;

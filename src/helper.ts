@@ -11,14 +11,13 @@ export enum HtmlCBType {
     previous,
     skip,
     AddDocCard,
-    saveDoc,
+    DelDocCard,
     quit,
     nextBook,
     next,
     ignoreBook,
     fullfilContent,
     cleanUnchanged,
-    DelDocCard,
 }
 
 export class Storage {
@@ -189,21 +188,6 @@ export class Helper {
         </div>`;
     }
 
-    btnSaveDoc(bookID: string, noteID: string, point: number) {
-        const btnSaveID = utils.newID().slice(0, constants.IDLen);
-        return `<div>
-            ${styleColor("#0000FF", "#FFFFFF")}
-            <div>
-                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">${this.plugin.i18n.saveAndAdvance}</button>
-            </div>
-            <script>
-                function ${btnSaveID}() {
-                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.saveDoc},${point})
-                }
-            </script>
-        </div>`;
-    }
-
     btnNext(bookID: string, noteID: string, point: number) {
         const btnNextID = utils.newID().slice(0, constants.IDLen);
         return `<div>
@@ -309,8 +293,6 @@ ${this.btnCleanUnchanged(bookID, noteID, point)}
 ${this.btnSkip(bookID, noteID, point)}
 
 ${this.btnSaveCard(bookID, noteID, point)}
-
-${this.btnSaveDoc(bookID, noteID, point)}
 
 ${this.btnStop(bookID, noteID, point)}
 
