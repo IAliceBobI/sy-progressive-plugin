@@ -410,11 +410,11 @@ class Progressive {
     }
 
     private addBtnLine(bookID: string, noteID: string, point: number) {
-        return siyuan.insertBlockAsChildOf(help.tempContent(help.getBtns(bookID, noteID, point)), noteID);
+        return siyuan.insertBlockAsChildOf(help.tempContent(help.getReadingBtns(bookID, noteID, point)), noteID);
     }
 
     private addTwoBtns(bookID: string, noteID: string, point: number) {
-        return siyuan.insertBlockAsChildOf(help.tempContent(help.getTwoBtns(bookID, noteID, point)), noteID);
+        return siyuan.insertBlockAsChildOf(help.tempContent(help.getReviewBtns(bookID, noteID, point)), noteID);
     }
 
     private async fullfilContent(bookID: string, piece: string[], noteID: string, point: number) {

@@ -16,6 +16,8 @@ export enum HtmlCBType {
     nextBook,
     next,
     ignoreBook,
+    fullfilContent,
+    cleanUnchanged,
 }
 
 export class Storage {
@@ -38,7 +40,7 @@ export class Storage {
         this.updateBookInfo(docID, { point: 0 });
     }
 
-    async ignoreBook(bookID: string, i: boolean = true) {
+    async ignoreBook(bookID: string, i = true) {
         if (i)
             this.updateBookInfo(bookID, { ignored: "yes" });
         else
@@ -129,6 +131,36 @@ function styleColor(bgcolor: string, color: string) {
     return `<style>button{display: inline-block; padding: 10px 20px; background-color: ${bgcolor}; color: ${color}; text-align: center; text-decoration: none; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;}button.large { padding: 12px 24px; font-size: 24px; }button.small { padding: 8px 16px; font-size: 14px; }</style>`;
 }
 
+function btnFullfilContent(bookID: string, noteID: string, point: number) {
+    const btnFullfilContentID = utils.newID().slice(0, constants.IDLen);
+    return `<div>
+            ${styleColor("rgb(95, 99, 102)", "#000000")}
+            <div>
+                <button onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">插入原文</button>
+            </div>
+            <script>
+                function ${btnFullfilContentID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.fullfilContent},${point})
+                }
+            </script>
+        </div>`;
+}
+
+function btnCleanUnchanged(bookID: string, noteID: string, point: number) {
+    const btnCleanUnchangedID = utils.newID().slice(0, constants.IDLen);
+    return `<div>
+            ${styleColor("rbg(13, 101, 178)", "#000000")}
+            <div>
+                <button onclick="${btnCleanUnchangedID}()" id="btn${btnCleanUnchangedID}">清理未改原文</button>
+            </div>
+            <script>
+                function ${btnCleanUnchangedID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.cleanUnchanged},${point})
+                }
+            </script>
+        </div>`;
+}
+
 function btnPrevious(bookID: string, noteID: string, point: number) {
     const btnPreviousID = utils.newID().slice(0, constants.IDLen);
     return `<div>
@@ -160,31 +192,35 @@ function btnSaveDoc(bookID: string, noteID: string, point: number) {
 }
 
 function btnNext(bookID: string, noteID: string, point: number) {
-    const btnSaveID = utils.newID().slice(0, constants.IDLen);
+    const btnNextID = utils.newID().slice(0, constants.IDLen);
     return `<div>
             ${styleColor("rgb(18, 59, 94)", "#FFFFFF")}
             <div>
-                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">下一分片</button>
+                <button onclick="${btnNextID}()" id="btn${btnNextID}">下一分片</button>
             </div>
             <script>
-                function ${btnSaveID}() {
+                function ${btnNextID}() {
                     globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.next},${point})
                 }
             </script>
         </div>`;
 }
 
-export function getTwoBtns(bookID: string, noteID: string, point: number) {
+export function getReviewBtns(bookID: string, noteID: string, point: number) {
     return `{{{col
 [${point}]
 
 ${btnPrevious(bookID, noteID, point)}
 
+${btnFullfilContent(bookID, noteID, point)}
+
+${btnCleanUnchanged(bookID, noteID, point)}
+
 ${btnNext(bookID, noteID, point)}
 }}}`;
 }
 
-export function getBtns(bookID: string, noteID: string, point: number) {
+export function getReadingBtns(bookID: string, noteID: string, point: number) {
     const btnSkipID = utils.newID().slice(0, constants.IDLen);
     const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
     const btnStopID = utils.newID().slice(0, constants.IDLen);

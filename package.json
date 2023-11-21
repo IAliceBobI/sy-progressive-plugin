@@ -1,7 +1,7 @@
 {
   "name": "sy-progressive-plugin",
   "version": "0.0.1",
-  "description": "Learning with small steps and fast pace!",
+  "description": "Document chunking progressive reading, fill-in-the-blank flashcard progressive writing.",
   "main": ".src/index.js",
   "scripts": {
     "lint": "eslint . --fix --cache",

@@ -15,8 +15,8 @@
     "zh_CN": "渐进学习"
   },
   "description": {
-    "default": "Split the long document into small chunks and read gradually!",
-    "zh_CN": "把长文档拆分为小块，徐徐图之！"
+    "default": "Document chunking progressive reading, fill-in-the-blank flashcard progressive writing.",
+    "zh_CN": "文档分片渐进阅读，填空式闪卡渐进写作。"
   },
   "readme": {
     "default": "README.md",
@@ -33,6 +33,8 @@
   "keywords": [
     "Learning",
     "Progressive",
-    "Progressive Learning"
+    "Progressive Learning",
+    "Progressive Reading",
+    "Progressive Writing"
   ]
 }
