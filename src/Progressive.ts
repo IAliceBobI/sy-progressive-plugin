@@ -361,7 +361,7 @@ class Progressive {
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
-                await this.addTwoBtns(bookID, noteID, point);
+                await this.addReviewBtns(bookID, noteID, point);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
@@ -409,23 +409,23 @@ class Progressive {
         }
     }
 
-    private addBtnLine(bookID: string, noteID: string, point: number) {
+    private addReadingBtns(bookID: string, noteID: string, point: number) {
         return siyuan.insertBlockAsChildOf(help.tempContent(help.getReadingBtns(bookID, noteID, point)), noteID);
     }
 
-    private addTwoBtns(bookID: string, noteID: string, point: number) {
+    private addReviewBtns(bookID: string, noteID: string, point: number) {
         return siyuan.insertBlockAsChildOf(help.tempContent(help.getReviewBtns(bookID, noteID, point)), noteID);
     }
 
     private async fullfilContent(bookID: string, piece: string[], noteID: string, point: number) {
         this.storage.updateBookInfoTime(bookID);
         piece.reverse();
-        await this.addBtnLine(bookID, noteID, point);
+        await this.addReadingBtns(bookID, noteID, point);
         for (const id of piece) {
             const content = await siyuan.getBlockKramdownWithoutID(id, [`${constants.RefIDKey}="${id}"`], "", `((${id} "*"))`);
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
-        await this.addBtnLine(bookID, noteID, point);
+        await this.addReadingBtns(bookID, noteID, point);
     }
 
     private async getBook2Learn(bookID?: string): Promise<help.BookInfo> {
