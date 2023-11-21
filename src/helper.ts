@@ -40,11 +40,15 @@ export class Storage {
         this.updateBookInfo(docID, { point: 0 });
     }
 
-    async ignoreBook(bookID: string, i = true) {
-        if (i)
-            this.updateBookInfo(bookID, { ignored: "yes" });
-        else
-            this.updateBookInfo(bookID, { ignored: "no" });
+    async toggleIgnoreBook(bookID: string) {
+        const info = await this.booksInfo(bookID);
+        if (info.ignored == "no") {
+            await this.updateBookInfo(bookID, { ignored: "yes" });
+            await siyuan.pushMsg("已经忽略本书")
+        } else {
+            await this.updateBookInfo(bookID, { ignored: "no" });
+            await siyuan.pushMsg("重新推送本书")
+        }
     }
 
     private async updateBookInfo(docID: string, opt: BookInfo) {

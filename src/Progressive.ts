@@ -361,9 +361,7 @@ class Progressive {
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.ignoreBook:
-                await this.storage.ignoreBook(bookID);
-                await siyuan.removeDocByID(noteID);
-                await this.startToLearn();
+                await this.storage.toggleIgnoreBook(bookID);
                 break;
             case HtmlCBType.fullfilContent:
                 {
@@ -478,19 +476,9 @@ class Progressive {
                 this.startToLearnWithLock(bookID);
                 dialog.destroy();
             });
-            if (bookInfo.ignored == "yes") {
-                help.appendChild(subDiv, "button", this.plugin.i18n.deignore, ["prog-style__button"], () => {
-                    this.storage.ignoreBook(bookID, false);
-                    dialog.destroy();
-                    this.viewAllProgressiveBooks();
-                });
-            } else {
-                help.appendChild(subDiv, "button", this.plugin.i18n.ignore, ["prog-style__button"], () => {
-                    this.storage.ignoreBook(bookID, true);
-                    dialog.destroy();
-                    this.viewAllProgressiveBooks();
-                });
-            }
+            help.appendChild(subDiv, "button", this.plugin.i18n.ignore, ["prog-style__button"], () => {
+                this.storage.toggleIgnoreBook(bookID);
+            });
             help.appendChild(subDiv, "button", this.plugin.i18n.Repiece, ["prog-style__button"], () => {
                 this.addProgressiveReadingWithLock(bookID);
                 dialog.destroy();
