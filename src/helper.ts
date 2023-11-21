@@ -45,10 +45,10 @@ export class Storage {
         const info = await this.booksInfo(bookID);
         if (info.ignored == "no") {
             await this.updateBookInfo(bookID, { ignored: "yes" });
-            await siyuan.pushMsg("已经忽略本书")
+            await siyuan.pushMsg("已经忽略本书");
         } else {
             await this.updateBookInfo(bookID, { ignored: "no" });
-            await siyuan.pushMsg("重新推送本书")
+            await siyuan.pushMsg("重新推送本书");
         }
     }
 
@@ -147,16 +147,16 @@ export class Helper {
     btnFullfilContent(bookID: string, noteID: string, point: number) {
         const btnFullfilContentID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-                ${styleColor("rgb(95, 99, 102)", "#000000")}
-                <div>
-                    <button onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">${this.plugin.i18n.insertOriginDoc}</button>
-                </div>
-                <script>
-                    function ${btnFullfilContentID}() {
-                        globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.fullfilContent},${point})
-                    }
-                </script>
-            </div>`;
+            ${styleColor("rgb(95, 99, 102)", "#000000")}
+            <div>
+                <button onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">${this.plugin.i18n.insertOriginDoc}</button>
+            </div>
+            <script>
+                function ${btnFullfilContentID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.fullfilContent},${point})
+                }
+            </script>
+        </div>`;
     }
 
     btnCleanUnchanged(bookID: string, noteID: string, point: number) {
@@ -219,92 +219,98 @@ export class Helper {
         </div>`;
     }
 
-    getReviewBtns(bookID: string, noteID: string, point: number) {
-        return `{{{col
-[${point}]
+    btnSkip(bookID: string, noteID: string, point: number) {
+        const btnSkipID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("#FF0000", "#FFFFFF")}
+            <div>
+                <button onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.Delete}</button>
+            </div>
+            <script>
+                function ${btnSkipID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},${point})
+                }
+            </script>
+        </div>`;
+    }
 
-${this.btnPrevious(bookID, noteID, point)}
+    btnSaveCard(bookID: string, noteID: string, point: number) {
+        const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("#FFFF00", "#000000")}
+            <div>
+                <button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.addDocToCard}</button>
+            </div>
+            <script>
+                function ${btnSaveCardID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.AddDocCard},${point})
+                }
+            </script>
+        </div>`;
+    }
 
-${this.btnFullfilContent(bookID, noteID, point)}
+    btnStop(bookID: string, noteID: string, point: number) {
+        const btnStopID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("#FF00FF", "#FFFFFF")}
+            <div>
+                <button onclick="${btnStopID}()" id="btn${btnStopID}">${this.plugin.i18n.exit}</button>
+            </div>
+            <script>
+                function ${btnStopID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.quit},${point})
+                }
+            </script>
+        </div>`;
+    }
 
-${this.btnCleanUnchanged(bookID, noteID, point)}
+    btnNextBook(bookID: string, noteID: string, point: number) {
+        const btnNextBookID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("#00FFFF", "#000000")}
+            <div>
+                <button onclick="${btnNextBookID}()" id="btn${btnNextBookID}">${this.plugin.i18n.nextBook}</button>
+            </div>
+            <script>
+                function ${btnNextBookID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.nextBook},${point})
+                }
+            </script>
+        </div>`;
+    }
 
-${this.btnNext(bookID, noteID, point)}
-}}}`;
+    btnIgnoreBook(bookID: string, noteID: string, point: number) {
+        const btnIgnoreBookID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("rgb(76, 108, 136)", "#FFFFFF")}
+            <div>
+                <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignore}</button>
+            </div>
+            <script>
+                function ${btnIgnoreBookID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.ignoreBook},${point})
+                }
+            </script>
+        </div>`;
     }
 
     getReadingBtns(bookID: string, noteID: string, point: number) {
-        const btnSkipID = utils.newID().slice(0, constants.IDLen);
-        const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
-        const btnStopID = utils.newID().slice(0, constants.IDLen);
-        const btnNextBookID = utils.newID().slice(0, constants.IDLen);
-        const btnIgnoreBookID = utils.newID().slice(0, constants.IDLen);
         return `{{{col
 [${point}]
 
 ${this.btnPrevious(bookID, noteID, point)}
 
-<div>
-    ${styleColor("#FF0000", "#FFFFFF")}
-    <div>
-        <button onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.Delete}</button>
-    </div>
-    <script>
-        function ${btnSkipID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},${point})
-        }
-    </script>
-</div>
+${this.btnSkip(bookID, noteID, point)}
 
-<div>
-    ${styleColor("#FFFF00", "#000000")}
-    <div>
-        <button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.addDocToCard}</button>
-    </div>
-    <script>
-        function ${btnSaveCardID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.AddDocCard},${point})
-        }
-    </script>
-</div>
+${this.btnSaveCard(bookID, noteID, point)}
 
 ${this.btnSaveDoc(bookID, noteID, point)}
 
-<div>
-    ${styleColor("#FF00FF", "#FFFFFF")}
-    <div>
-        <button onclick="${btnStopID}()" id="btn${btnStopID}">${this.plugin.i18n.exit}</button>
-    </div>
-    <script>
-        function ${btnStopID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.quit},${point})
-        }
-    </script>
-</div>
+${this.btnStop(bookID, noteID, point)}
 
-<div>
-    ${styleColor("#00FFFF", "#000000")}
-    <div>
-        <button onclick="${btnNextBookID}()" id="btn${btnNextBookID}">${this.plugin.i18n.nextBook}</button>
-    </div>
-    <script>
-        function ${btnNextBookID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.nextBook},${point})
-        }
-    </script>
-</div>
+${this.btnNextBook(bookID, noteID, point)}
 
-<div>
-    ${styleColor("rgb(76, 108, 136)", "#FFFFFF")}
-    <div>
-        <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignore}</button>
-    </div>
-    <script>
-        function ${btnIgnoreBookID}() {
-            globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.ignoreBook},${point})
-        }
-    </script>
-</div>
+${this.btnIgnoreBook(bookID, noteID, point)}
 }}}`;
     }
 

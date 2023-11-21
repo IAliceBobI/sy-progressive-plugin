@@ -361,7 +361,7 @@ class Progressive {
                 break;
             case HtmlCBType.saveDoc:
                 await this.cleanNote(noteID);
-                await this.addReviewBtns(bookID, noteID, point);
+                await this.addReadingBtns(bookID, noteID, point);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
@@ -378,7 +378,7 @@ class Progressive {
                 break;
             case HtmlCBType.cleanUnchanged:
                 await this.cleanNote(noteID);
-                await this.addReviewBtns(bookID, noteID, point);
+                await this.addReadingBtns(bookID, noteID, point);
                 break;
             default:
                 throw "Invalid HtmlCBType " + cbType;
@@ -421,10 +421,6 @@ class Progressive {
 
     private addReadingBtns(bookID: string, noteID: string, point: number) {
         return siyuan.insertBlockAsChildOf(help.tempContent(this.helper.getReadingBtns(bookID, noteID, point)), noteID);
-    }
-
-    private addReviewBtns(bookID: string, noteID: string, point: number) {
-        return siyuan.insertBlockAsChildOf(help.tempContent(this.helper.getReviewBtns(bookID, noteID, point)), noteID);
     }
 
     private async fullfilContent(bookID: string, piece: string[], noteID: string) {
