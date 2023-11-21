@@ -13,7 +13,7 @@ class FlashBox {
         this.plugin.eventBus.on("open-menu-content", async ({ detail }) => {
             const menu = detail.menu;
             menu.addItem({
-                label: "插入填空式闪卡" + CardType.B.toString(),
+                label: this.plugin.i18n.insertBlankSpaceCard + CardType.B.toString(),
                 icon: "iconFlashcard",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
@@ -24,7 +24,7 @@ class FlashBox {
                 },
             });
             menu.addItem({
-                label: "插入填空式闪卡" + CardType.C.toString(),
+                label: this.plugin.i18n.insertBlankSpaceCard + CardType.C.toString(),
                 icon: "iconFlashcard",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";

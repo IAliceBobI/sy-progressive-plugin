@@ -55,15 +55,6 @@ class Progressive {
                 },
             });
         });
-        // TODO: only for dev
-        // this.plugin.addTopBar({
-        //     icon: "iconSparkles",
-        //     title: "reload",
-        //     position: "right",
-        //     callback: () => {
-        //         window.location.reload();
-        //     }
-        // });
     }
 
     private addMenu(rect?: DOMRect) {
@@ -132,11 +123,11 @@ class Progressive {
         }
         const row = await siyuan.sqlOne(`select content from blocks where type='d' and id='${bookID}'`);
         if (!row) {
-            siyuan.pushMsg(`似乎${bookID}已经被删除`);
+            siyuan.pushMsg(this.plugin.i18n.maybeBookRemoved.replace("{bookID}", bookID));
             return;
         }
         if (await this.isPiece(bookID)) {
-            siyuan.pushMsg("你发现了一个阅读分片！");
+            siyuan.pushMsg(this.plugin.i18n.youFoundAPiece);
             return;
         }
         await this.addProgressiveReadingDialog(bookID, row["content"]);
@@ -151,13 +142,13 @@ class Progressive {
             content: `<div class="b3-dialog__content">
                 <div class="prog-style__id">${bookName}</div>
                 <div class="fn__hr"></div>
-                <span class="prog-style__id">拆分各级标题</span>
+                <span class="prog-style__id">${this.plugin.i18n.splitByHeadings}</span>
                 <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
                 <div class="fn__hr"></div>
-                <div class="prog-style__id">字数拆分(0为不根据字数拆分)</div>
+                <div class="prog-style__id">${this.plugin.i18n.splitByWordCount}</div>
                 <input type="text" id="${LengthSplitID}" class="prog-style__input"/>
                 <div class="fn__hr"></div>
-                <button id="${btnSplitID}" class="prog-style__button">添加文档/重新添加文档</button>
+                <button id="${btnSplitID}" class="prog-style__button">${this.plugin.i18n.addOrReaddDoc}</button>
             </div>`,
             width: events.isMobile ? "92vw" : "560px",
             height: "540px",
@@ -190,13 +181,13 @@ class Progressive {
                 }
                 let groups: help.WordCountType[][];
                 if (titleCheckBox.checked) {
-                    await siyuan.pushMsg("根据标题拆分……");
+                    await siyuan.pushMsg(this.plugin.i18n.splitByHeadings);
                     groups = new help.HeadingGroup(contentBlocks).split();
                 } else {
                     groups = [contentBlocks];
                 }
                 if (splitLen > 0) {
-                    await siyuan.pushMsg("根据内容长度拆分:" + splitLen);
+                    await siyuan.pushMsg(this.plugin.i18n.splitByWordCount + ":" + splitLen);
                     groups = new help.ContentLenGroup(groups, splitLen).split();
                 }
                 await this.storage.saveIndex(bookID, groups);
@@ -213,7 +204,7 @@ class Progressive {
             blockID = events.lastBlockID;
         }
         if (await this.isPiece(blockID)) {
-            await siyuan.pushMsg("请在原始文章中操作，这只是一个阅读分片！");
+            await siyuan.pushMsg(this.plugin.i18n.opsInOriDoc);
             return;
         }
         const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
@@ -221,7 +212,7 @@ class Progressive {
             const bookID = row["root_id"];
             const idx = await this.storage.loadBookIndexIfNeeded(bookID);
             if (!idx.length) {
-                await siyuan.pushMsg("请先将此文档加入渐进学习列表");
+                await siyuan.pushMsg(this.plugin.i18n.addThisDocFirst);
             } else {
                 for (let i = 0; i < idx.length; i++) {
                     for (let j = 0; j < idx[i].length; j++) {
@@ -232,10 +223,10 @@ class Progressive {
                         }
                     }
                 }
-                await siyuan.pushMsg("请在原始文章中操作，如果还找不到此内容，可尝试添加此文档到渐进学习插件。");
+                await siyuan.pushMsg(this.plugin.i18n.opsInOriDocOrAddIt);
             }
         } else {
-            await siyuan.pushMsg("未找到文档，请重新建立索引或者等待索引建立完成");
+            await siyuan.pushMsg(this.plugin.i18n.cannotFindDocWaitForIndex);
         }
     }
 
@@ -296,7 +287,7 @@ class Progressive {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
         if (!bookInfo.bookID) {
-            siyuan.pushMsg("您还没添加任何文档。");
+            siyuan.pushMsg(this.plugin.i18n.AddADocFirst);
             return;
         }
         const bookIndex = await this.storage.loadBookIndexIfNeeded(bookInfo.bookID);
@@ -304,10 +295,10 @@ class Progressive {
             point = (await this.storage.booksInfo(bookInfo.bookID)).point;
         }
         if (point >= bookIndex.length) {
-            await siyuan.pushMsg("已经是最后一页了");
+            await siyuan.pushMsg(this.plugin.i18n.thisIsLastPage);
             return;
         } else if (point < 0) {
-            await siyuan.pushMsg("已经是第一页了");
+            await siyuan.pushMsg(this.plugin.i18n.thisIsFirstPage);
             return;
         }
         const piece = bookIndex[point];
@@ -323,7 +314,7 @@ class Progressive {
             await this.addReadingBtns(bookID, noteID, point);
             openTab({ app: this.plugin.app, doc: { id: noteID } });
         } else {
-            await siyuan.pushMsg("新建文件失败，请稍后再试试……");
+            await siyuan.pushMsg(this.plugin.i18n.FailToNewDoc);
         }
     }
 
@@ -481,29 +472,29 @@ class Progressive {
             const progress = `${Math.ceil(bookInfo.point / idx.length * 100)}%`;
             help.appendChild(subDiv, "p", name, ["prog-style__id"]);
             help.appendChild(subDiv, "p", progress, ["prog-style__id"]);
-            help.appendChild(subDiv, "button", "阅读", ["prog-style__button"], () => {
+            help.appendChild(subDiv, "button", this.plugin.i18n.Reading, ["prog-style__button"], () => {
                 this.startToLearnWithLock(bookID);
                 dialog.destroy();
             });
             if (bookInfo.ignored == "yes") {
-                help.appendChild(subDiv, "button", "取消忽略", ["prog-style__button"], () => {
+                help.appendChild(subDiv, "button", this.plugin.i18n.deignore, ["prog-style__button"], () => {
                     this.storage.ignoreBook(bookID, false);
                     dialog.destroy();
                     this.viewAllProgressiveBooks();
                 });
             } else {
-                help.appendChild(subDiv, "button", "忽略", ["prog-style__button"], () => {
+                help.appendChild(subDiv, "button", this.plugin.i18n.ignore, ["prog-style__button"], () => {
                     this.storage.ignoreBook(bookID, true);
                     dialog.destroy();
                     this.viewAllProgressiveBooks();
                 });
             }
-            help.appendChild(subDiv, "button", "重建索引", ["prog-style__button"], () => {
+            help.appendChild(subDiv, "button", this.plugin.i18n.Repiece, ["prog-style__button"], () => {
                 this.addProgressiveReadingWithLock(bookID);
                 dialog.destroy();
             });
-            help.appendChild(subDiv, "button", "删除", ["prog-style__button"], () => {
-                confirm("⚠️", "删除：" + name, async () => {
+            help.appendChild(subDiv, "button", this.plugin.i18n.Delete, ["prog-style__button"], () => {
+                confirm("⚠️", this.plugin.i18n.Delete + " : " + name, async () => {
                     await this.storage.removeIndex(bookID);
                     div.removeChild(subDiv);
                 });
