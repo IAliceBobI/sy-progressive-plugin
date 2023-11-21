@@ -334,8 +334,8 @@ class Progressive {
         noteID = await this.createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
         if (noteID) {
             await this.addReadingBtns(bookID, noteID, point);
+            await siyuan.insertBlockAsChildOf(help.tempContent("---"), noteID);
             await this.fullfilContent(bookInfo.bookID, piece, noteID);
-            await this.addReadingBtns(bookID, noteID, point);
             openTab({
                 app: this.plugin.app, doc: { id: noteID },
                 afterOpen: () => {
