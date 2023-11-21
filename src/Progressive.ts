@@ -310,7 +310,7 @@ class Progressive {
             await siyuan.pushMsg("已经是第一页了");
             return;
         }
-        const piece = structuredClone(bookIndex[point]);
+        const piece = bookIndex[point];
         noteID = await this.findDoc(bookInfo.bookID, point);
         if (noteID) {
             openTab({ app: this.plugin.app, doc: { id: noteID } });
@@ -318,7 +318,9 @@ class Progressive {
         }
         noteID = await this.createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
         if (noteID) {
-            await this.fullfilContent(bookInfo.bookID, piece, noteID, point);
+            await this.addReadingBtns(bookID, noteID, point);
+            await this.fullfilContent(bookInfo.bookID, piece, noteID);
+            await this.addReadingBtns(bookID, noteID, point);
             openTab({ app: this.plugin.app, doc: { id: noteID } });
         } else {
             await siyuan.pushMsg("新建文件失败，请稍后再试试……");
@@ -370,6 +372,18 @@ class Progressive {
                 await siyuan.removeDocByID(noteID);
                 await this.startToLearn();
                 break;
+            case HtmlCBType.fullfilContent:
+                {
+                    const index = await this.storage.loadBookIndexIfNeeded(bookID);
+                    const piece = index[point] ?? [];
+                    await siyuan.insertBlockAsChildOf(help.tempContent("---"), noteID);
+                    await this.fullfilContent(bookID, piece, noteID);
+                }
+                break;
+            case HtmlCBType.cleanUnchanged:
+                await this.cleanNote(noteID);
+                await this.addReviewBtns(bookID, noteID, point);
+                break;
             default:
                 throw "Invalid HtmlCBType " + cbType;
         }
@@ -417,15 +431,12 @@ class Progressive {
         return siyuan.insertBlockAsChildOf(help.tempContent(help.getReviewBtns(bookID, noteID, point)), noteID);
     }
 
-    private async fullfilContent(bookID: string, piece: string[], noteID: string, point: number) {
+    private async fullfilContent(bookID: string, piece: string[], noteID: string) {
         this.storage.updateBookInfoTime(bookID);
-        piece.reverse();
-        await this.addReadingBtns(bookID, noteID, point);
-        for (const id of piece) {
+        for (const id of piece.slice().reverse()) {
             const content = await siyuan.getBlockKramdownWithoutID(id, [`${constants.RefIDKey}="${id}"`], "", `((${id} "*"))`);
             await siyuan.insertBlockAsChildOf(content, noteID);
         }
-        await this.addReadingBtns(bookID, noteID, point);
     }
 
     private async getBook2Learn(bookID?: string): Promise<help.BookInfo> {
