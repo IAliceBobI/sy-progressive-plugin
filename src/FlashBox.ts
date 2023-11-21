@@ -39,31 +39,30 @@ class FlashBox {
 
     private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
         let { content } = await siyuan.getBlockMarkdownAndContent(blockID);
-        let cardContent = content;
         if (selected) {
             selected = selected.replace(/=/g, "​=​");
             content = content.replace(/=/g, "​=​");
-            cardContent = content.replace(new RegExp(selected, "g"), `==${selected}==`);
-            cardContent = cardContent.replace(/====/g, "");
+            content = content.replace(new RegExp(selected, "g"), `==${selected}==`);
+            content = content.replace(/====/g, "");
         }
-        if (cardContent.endsWith("*")) {
-            cardContent = cardContent.slice(0, -1);
+        if (content.endsWith("*")) {
+            content = content.slice(0, -1);
         }
         const progref = (await siyuan.getBlockAttrs(blockID))["custom-progref"];
         if (progref) {
-            cardContent += `((${progref} "*"))`;
+            content += `((${progref} "*"))`;
         } else {
-            cardContent += `((${blockID} "*"))`;
+            content += `((${blockID} "*"))`;
         }
         await siyuan.insertBlockAfter("", blockID);
         const cardID = newNodeID();
         if (cardType === CardType.B) {
-            await siyuan.insertBlockAfter(`* ${cardContent}
+            await siyuan.insertBlockAfter(`* ${content}
 * >
 {: id="${cardID}"}
 `, blockID);
         } else {
-            await siyuan.insertBlockAfter(`* ${cardContent}
+            await siyuan.insertBlockAfter(`* ${content}
 * \`\`\`
 {: id="${cardID}"}
 `, blockID);
