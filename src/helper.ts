@@ -149,7 +149,7 @@ function btnSaveDoc(bookID: string, noteID: string, point: number) {
     return `<div>
             ${styleColor("#0000FF", "#FFFFFF")}
             <div>
-                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">保留，继续</button>
+                <button onclick="${btnSaveID}()" id="btn${btnSaveID}">保存继续</button>
             </div>
             <script>
                 function ${btnSaveID}() {
@@ -210,7 +210,7 @@ ${btnPrevious(bookID, noteID, point)}
 <div>
     ${styleColor("#FFFF00", "#000000")}
 <div>
-<button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">制卡</button>
+<button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">文档制卡</button>
 </div>
 <script>
 function ${btnSaveCardID}() {

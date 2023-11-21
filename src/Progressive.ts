@@ -478,11 +478,13 @@ class Progressive {
                 help.appendChild(subDiv, "button", "取消忽略", ["prog-style__button"], () => {
                     this.storage.ignoreBook(bookID, false);
                     dialog.destroy();
+                    this.viewAllProgressiveBooks();
                 });
             } else {
                 help.appendChild(subDiv, "button", "忽略", ["prog-style__button"], () => {
                     this.storage.ignoreBook(bookID, true);
                     dialog.destroy();
+                    this.viewAllProgressiveBooks();
                 });
             }
             help.appendChild(subDiv, "button", "重建索引", ["prog-style__button"], () => {
