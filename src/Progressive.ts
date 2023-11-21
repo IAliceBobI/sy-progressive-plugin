@@ -336,10 +336,12 @@ class Progressive {
     private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         switch (cbType) {
             case HtmlCBType.previous:
-                await this.startToLearn(bookID, point - 1);
+                await this.storage.gotoBlock(bookID, point - 1);
+                await this.startToLearn(bookID);
                 break;
             case HtmlCBType.next:
-                await this.startToLearn(bookID, point + 1);
+                await this.storage.gotoBlock(bookID, point + 1);
+                await this.startToLearn(bookID);
                 break;
             case HtmlCBType.skip:
                 await siyuan.removeDocByID(noteID);

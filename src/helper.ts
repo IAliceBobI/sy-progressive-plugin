@@ -224,7 +224,7 @@ export class Helper {
         return `<div>
             ${styleColor("#FF0000", "#FFFFFF")}
             <div>
-                <button onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.Delete}</button>
+                <button onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.DeleteAndNext}</button>
             </div>
             <script>
                 function ${btnSkipID}() {
@@ -299,6 +299,12 @@ export class Helper {
 [${point}]
 
 ${this.btnPrevious(bookID, noteID, point)}
+
+${this.btnNext(bookID, noteID, point)}
+
+${this.btnFullfilContent(bookID, noteID, point)}
+
+${this.btnCleanUnchanged(bookID, noteID, point)}
 
 ${this.btnSkip(bookID, noteID, point)}
 
