@@ -15,7 +15,7 @@ class FlashBox {
             langKey: "insertBlankSpaceCardB",
             hotkey: "⌘`",
             editorCallback: () => {
-                const blockID = events.lastBlockID
+                const blockID = events.lastBlockID;
                 const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
                 if (blockID) {
                     this.blankSpaceCard(blockID, blank, CardType.B);
@@ -26,7 +26,7 @@ class FlashBox {
             langKey: "insertBlankSpaceCardC",
             hotkey: "⌘6",
             editorCallback: () => {
-                const blockID = events.lastBlockID
+                const blockID = events.lastBlockID;
                 const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
                 if (blockID) {
                     this.blankSpaceCard(blockID, blank, CardType.C);
