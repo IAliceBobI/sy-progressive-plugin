@@ -117,6 +117,7 @@ QQ群: 263961482
 * 给按钮加入 tooltip，改变按钮文本。
 * [更新按钮色系](https://github.com/IAliceBobI/sy-progressive-plugin/issues/1)
 * 填空式闪卡设置快捷键。
+* 修复无法换书的BUG。
 
 ## 2023-11-22
 

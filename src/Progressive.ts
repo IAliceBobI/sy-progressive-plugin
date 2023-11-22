@@ -306,7 +306,7 @@ class Progressive {
         return "";
     }
 
-    private async startToLearn(bookID?: string, point?: number) {
+    private async startToLearn(bookID?: string) {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
         if (!bookInfo.bookID) {
@@ -315,9 +315,8 @@ class Progressive {
         }
         bookID = bookInfo.bookID;
         const bookIndex = await this.storage.loadBookIndexIfNeeded(bookInfo.bookID);
-        if (!utils.isValidNumber(point)) {
-            point = (await this.storage.booksInfo(bookInfo.bookID)).point;
-        }
+        const point = (await this.storage.booksInfo(bookInfo.bookID)).point;
+        await this.storage.updateBookInfoTime(bookID);
         if (point >= bookIndex.length) {
             await siyuan.pushMsg(this.plugin.i18n.thisIsLastPage);
             return;

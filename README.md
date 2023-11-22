@@ -109,6 +109,7 @@ QQ Group: 263961482
 * Add tooltips to buttons and change button text.
 * [Update button color scheme](https://github.com/IAliceBobI/sy-progressive-plugin/issues/1)
 * Set shortcut keys for cloze flashcards.
+* fix bug for `Next Book` Btn.
 
 ## 2023-11-22
 
