@@ -1,7 +1,7 @@
 import { siyuan } from "./utils";
 import * as utils from "./utils";
 import * as constants from "./constants";
-import { ITab, Plugin, openTab } from "siyuan";
+import { Plugin, openTab } from "siyuan";
 
 export type WordCountType = { id: string; count: number; type: string; };
 export type BookInfo = {
