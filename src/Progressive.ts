@@ -342,7 +342,7 @@ class Progressive {
                     if (bookInfo.autoCard == "yes") {
                         setTimeout(() => {
                             siyuan.addRiffCards([noteID]);
-                        }, 1200);
+                        }, 500);
                     }
                 }
             });

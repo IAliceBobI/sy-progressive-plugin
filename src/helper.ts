@@ -179,7 +179,7 @@ export class Helper {
     btnFullfilContent(bookID: string, noteID: string, point: number) {
         const btnFullfilContentID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("rgb(95, 99, 102)", "#000000")}
+            ${styleColor("var(--b3-card-info-background)", "var(--b3-card-info-color)")}
             <div>
                 <button title="${this.plugin.i18n.tipFullfilContent}" onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">${this.plugin.i18n.insertOriginDoc}</button>
             </div>
@@ -194,7 +194,7 @@ export class Helper {
     btnCleanUnchanged(bookID: string, noteID: string, point: number) {
         const btnCleanUnchangedID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("rbg(13, 101, 178)", "#000000")}
+            ${styleColor("var(--b3-card-info-background)", "var(--b3-card-info-color)")}
             <div>
                 <button title="${this.plugin.i18n.tipCleanUnchanged}" onclick="${btnCleanUnchangedID}()" id="btn${btnCleanUnchangedID}">${this.plugin.i18n.cleanUnchangedOriginDoc}</button>
             </div>
@@ -209,7 +209,7 @@ export class Helper {
     btnPrevious(bookID: string, noteID: string, point: number) {
         const btnPreviousID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("#00FF00", "#000000")}
+            ${styleColor("var(--b3-card-success-background)", "var(--b3-card-success-color)")}
             <div>
                 <button title="${this.plugin.i18n.tipPrevious}" onclick="${btnPreviousID}()" id="btn${btnPreviousID}">${this.plugin.i18n.previousPiece}</button>
             </div>
@@ -224,7 +224,7 @@ export class Helper {
     btnNext(bookID: string, noteID: string, point: number) {
         const btnNextID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("rgb(18, 59, 94)", "#FFFFFF")}
+            ${styleColor("var(--b3-card-success-background)", "var(--b3-card-success-color)")}
             <div>
                 <button title="${this.plugin.i18n.tipNext}" onclick="${btnNextID}()" id="btn${btnNextID}">${this.plugin.i18n.nextPiece}</button>
             </div>
@@ -236,15 +236,15 @@ export class Helper {
         </div>`;
     }
 
-    btnSkip(bookID: string, noteID: string, point: number) {
-        const btnSkipID = utils.newID().slice(0, constants.IDLen);
+    btnDeleteAndNext(bookID: string, noteID: string, point: number) {
+        const btnID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("#FF0000", "#FFFFFF")}
+            ${styleColor("var(--b3-card-error-background)", "var(--b3-card-error-color)")}
             <div>
-                <button title="${this.plugin.i18n.tipSkip}" onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.DeleteAndNext}</button>
+                <button title="${this.plugin.i18n.tipSkip}" onclick="${btnID}()" id="btn${btnID}">${this.plugin.i18n.DeleteAndNext}</button>
             </div>
             <script>
-                function ${btnSkipID}() {
+                function ${btnID}() {
                     globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},${point})
                 }
             </script>
@@ -254,7 +254,7 @@ export class Helper {
     btnSaveCard(bookID: string, noteID: string, point: number) {
         const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("#FFFF00", "#000000")}
+            ${styleColor("var(--b3-card-warning-background)", "var(--b3-card-warning-color)")}
             <div>
                 <button title="${this.plugin.i18n.tipAddDocCard}" onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.addDocToCard}</button>
             </div>
@@ -269,7 +269,7 @@ export class Helper {
     btnDelCard(bookID: string, noteID: string, point: number) {
         const btnSaveCardID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("#FFFF00", "#000000")}
+            ${styleColor("var(--b3-card-warning-background)", "var(--b3-card-warning-color)")}
             <div>
                 <button title="${this.plugin.i18n.tipDelDocCard}" onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.delDocCard}</button>
             </div>
@@ -284,7 +284,7 @@ export class Helper {
     btnStop(bookID: string, noteID: string, point: number) {
         const btnStopID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("#FF00FF", "#FFFFFF")}
+            ${styleColor("var(--b3-font-background6)", "#000000")}
             <div>
                 <button title="${this.plugin.i18n.tipQuit}" onclick="${btnStopID}()" id="btn${btnStopID}">${this.plugin.i18n.exit}</button>
             </div>
@@ -299,7 +299,7 @@ export class Helper {
     btnNextBook(bookID: string, noteID: string, point: number) {
         const btnNextBookID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("#00FFFF", "#000000")}
+            ${styleColor("var(--b3-font-background6)", "#000000")}
             <div>
                 <button title="${this.plugin.i18n.tipNextBook}" onclick="${btnNextBookID}()" id="btn${btnNextBookID}">${this.plugin.i18n.nextBook}</button>
             </div>
@@ -314,7 +314,7 @@ export class Helper {
     btnIgnoreBook(bookID: string, noteID: string, point: number) {
         const btnIgnoreBookID = utils.newID().slice(0, constants.IDLen);
         return `<div>
-            ${styleColor("rgb(76, 108, 136)", "#FFFFFF")}
+            ${styleColor("var(--b3-font-background5)", "#000000")}
             <div>
                 <button title="${this.plugin.i18n.tipIgnore}" onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignore}</button>
             </div>
@@ -338,7 +338,7 @@ ${this.btnFullfilContent(bookID, noteID, point)}
 
 ${this.btnCleanUnchanged(bookID, noteID, point)}
 
-${this.btnSkip(bookID, noteID, point)}
+${this.btnDeleteAndNext(bookID, noteID, point)}
 
 ${this.btnSaveCard(bookID, noteID, point)}
 
