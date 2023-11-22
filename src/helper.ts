@@ -181,7 +181,7 @@ export class Helper {
         return `<div>
             ${styleColor("rgb(95, 99, 102)", "#000000")}
             <div>
-                <button onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">${this.plugin.i18n.insertOriginDoc}</button>
+                <button title="${this.plugin.i18n.tipFullfilContent}" onclick="${btnFullfilContentID}()" id="btn${btnFullfilContentID}">${this.plugin.i18n.insertOriginDoc}</button>
             </div>
             <script>
                 function ${btnFullfilContentID}() {
@@ -196,7 +196,7 @@ export class Helper {
         return `<div>
             ${styleColor("rbg(13, 101, 178)", "#000000")}
             <div>
-                <button onclick="${btnCleanUnchangedID}()" id="btn${btnCleanUnchangedID}">${this.plugin.i18n.cleanUnchangedOriginDoc}</button>
+                <button title="${this.plugin.i18n.tipCleanUnchanged}" onclick="${btnCleanUnchangedID}()" id="btn${btnCleanUnchangedID}">${this.plugin.i18n.cleanUnchangedOriginDoc}</button>
             </div>
             <script>
                 function ${btnCleanUnchangedID}() {
@@ -211,7 +211,7 @@ export class Helper {
         return `<div>
             ${styleColor("#00FF00", "#000000")}
             <div>
-                <button onclick="${btnPreviousID}()" id="btn${btnPreviousID}">${this.plugin.i18n.previousPiece}</button>
+                <button title="${this.plugin.i18n.tipPrevious}" onclick="${btnPreviousID}()" id="btn${btnPreviousID}">${this.plugin.i18n.previousPiece}</button>
             </div>
             <script>
                 function ${btnPreviousID}() {
@@ -226,7 +226,7 @@ export class Helper {
         return `<div>
             ${styleColor("rgb(18, 59, 94)", "#FFFFFF")}
             <div>
-                <button onclick="${btnNextID}()" id="btn${btnNextID}">${this.plugin.i18n.nextPiece}</button>
+                <button title="${this.plugin.i18n.tipNext}" onclick="${btnNextID}()" id="btn${btnNextID}">${this.plugin.i18n.nextPiece}</button>
             </div>
             <script>
                 function ${btnNextID}() {
@@ -241,7 +241,7 @@ export class Helper {
         return `<div>
             ${styleColor("#FF0000", "#FFFFFF")}
             <div>
-                <button onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.DeleteAndNext}</button>
+                <button title="${this.plugin.i18n.tipSkip}" onclick="${btnSkipID}()" id="btn${btnSkipID}">${this.plugin.i18n.DeleteAndNext}</button>
             </div>
             <script>
                 function ${btnSkipID}() {
@@ -256,7 +256,7 @@ export class Helper {
         return `<div>
             ${styleColor("#FFFF00", "#000000")}
             <div>
-                <button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.addDocToCard}</button>
+                <button title="${this.plugin.i18n.tipAddDocCard}" onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.addDocToCard}</button>
             </div>
             <script>
                 function ${btnSaveCardID}() {
@@ -271,7 +271,7 @@ export class Helper {
         return `<div>
             ${styleColor("#FFFF00", "#000000")}
             <div>
-                <button onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.delDocCard}</button>
+                <button title="${this.plugin.i18n.tipDelDocCard}" onclick="${btnSaveCardID}()" id="btn${btnSaveCardID}">${this.plugin.i18n.delDocCard}</button>
             </div>
             <script>
                 function ${btnSaveCardID}() {
@@ -286,7 +286,7 @@ export class Helper {
         return `<div>
             ${styleColor("#FF00FF", "#FFFFFF")}
             <div>
-                <button onclick="${btnStopID}()" id="btn${btnStopID}">${this.plugin.i18n.exit}</button>
+                <button title="${this.plugin.i18n.tipQuit}" onclick="${btnStopID}()" id="btn${btnStopID}">${this.plugin.i18n.exit}</button>
             </div>
             <script>
                 function ${btnStopID}() {
@@ -301,7 +301,7 @@ export class Helper {
         return `<div>
             ${styleColor("#00FFFF", "#000000")}
             <div>
-                <button onclick="${btnNextBookID}()" id="btn${btnNextBookID}">${this.plugin.i18n.nextBook}</button>
+                <button title="${this.plugin.i18n.tipNextBook}" onclick="${btnNextBookID}()" id="btn${btnNextBookID}">${this.plugin.i18n.nextBook}</button>
             </div>
             <script>
                 function ${btnNextBookID}() {
@@ -316,7 +316,7 @@ export class Helper {
         return `<div>
             ${styleColor("rgb(76, 108, 136)", "#FFFFFF")}
             <div>
-                <button onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignore}</button>
+                <button title="${this.plugin.i18n.tipIgnore}" onclick="${btnIgnoreBookID}()" id="btn${btnIgnoreBookID}">${this.plugin.i18n.ignore}</button>
             </div>
             <script>
                 function ${btnIgnoreBookID}() {
