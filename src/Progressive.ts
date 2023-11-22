@@ -379,13 +379,11 @@ class Progressive {
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.nextBook:
-                await siyuan.removeRiffCards([noteID]);
-                await siyuan.removeDocByID(noteID);
+                this.helper.closeTab(noteID);
                 await this.startToLearn();
                 break;
             case HtmlCBType.quit:
-                await siyuan.removeRiffCards([noteID]);
-                await siyuan.removeDocByID(noteID);
+                this.helper.closeTab(noteID);
                 break;
             case HtmlCBType.AddDocCard:
                 await siyuan.addRiffCards([noteID]);

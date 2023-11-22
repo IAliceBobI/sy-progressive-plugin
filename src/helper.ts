@@ -1,7 +1,7 @@
 import { siyuan } from "./utils";
 import * as utils from "./utils";
 import * as constants from "./constants";
-import { Plugin } from "siyuan";
+import { ITab, Plugin, openTab } from "siyuan";
 
 export type WordCountType = { id: string; count: number; type: string; };
 export type BookInfo = {
@@ -165,6 +165,15 @@ export class Helper {
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
+    }
+
+    async closeTab(noteID: string) {
+        const tab: any = openTab({
+            app: this.plugin.app, doc: { id: noteID },
+            afterOpen: () => {
+                tab.then((tab: any) => tab.close());
+            }
+        });
     }
 
     btnFullfilContent(bookID: string, noteID: string, point: number) {

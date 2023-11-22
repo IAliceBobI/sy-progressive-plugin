@@ -2,107 +2,128 @@
 
 # Progressive Learning
 
-The purpose of this plugin is to divide long documents into small segments called "fragments" and read them one by one. During the reading process, you can take notes and create flashcards for future review.
+The purpose of this plugin is to divide long documents into smaller segments called "chunks" and read them one by one progressively. During the reading process, you can take notes and create flashcards for future review.
 
 Let's talk about how to use it.
 
-## Adding Documents
+## Add Documents
 
-**Select a long document for progressive learning. Open the plugin menu and click on "Add Current Document"**
+**Select a long document for progressive learning. Open the plugin menu and click on "Add Current Document".**
 
 ![Alt text](assets/addDoc.png)
 
-There are two ways to split the document, and you can use them together or separately, as shown in the image:
+There are two ways to split the document: by headings or by word count. You can use them together or separately, as shown in the image:
 
 ![Alt text](assets/split.png)
 
-After adding the document, the plugin will perform the "fragmentation" operation.
+> The name "small" in the image is just for testing purposes, ignore it!
 
-If the document is large, like the one shown in the image, with millions of words, the plugin may take some time to perform the fragmentation. Please be patient.
+After adding the document, the plugin will perform the "chunking" operation.
 
-The "fragmentation" operation does not modify the original document or create new ones. It only reads, analyzes, and saves the fragments.
+If the document is large, like the one in the image with millions of words, the "chunking" process may take some time, so please be patient.
 
-> **Note:** After the fragmentation, do not modify the original document, such as deleting some blocks, as it will cause the plugin to not be able to find those blocks during learning.
+The "chunking" operation of the plugin does not modify the original text or create new documents. It only reads, analyzes, and saves the chunks.
 
-## Starting the Learning Process
+The "Auto Flashcards" option means that each chunk will be turned into a flashcard when it is read.
 
-**Open the plugin menu and click on "Start Learning"**
+> **Note:** After the document is divided into chunks, avoid making any modifications to the original text, such as deleting sections, as it will cause the plugin to not be able to locate those sections during learning.
 
-> The shortcut for "Start Learning" is `Alt+-`, right after the "Flashcards" shortcut `Alt+0`. One for learning and one for reviewing.
+> **Reminder:** Even when splitting the document only by headings, the speed is still fast for a document with millions of words.
+
+## Start Learning
+
+**Open the plugin menu and click on "Start Learning".**
+
+> The shortcut for "Start Learning" is `Alt+-`, following the shortcut for "Flashcards" `Alt+0`. One for learning and the other for review.
 
 ![Alt text](assets/reading.png)
 
-**"In each `segment`, there is a `*` at the end of each text paragraph, linking to the original document."**
+**Each "chunk" has a "chunk number" prefix in its title.**
 
-**You can freely modify the content within the "fragment," add paragraphs, create flashcards, etc. If you choose to keep this fragment, any modified content within the fragment will be preserved, while the unchanged content will be deleted to maintain simplicity.**
+**Within each "chunk", there is a "*" at the end of each paragraph that links back to the original document.**
 
-> **Note:** The update of the index may be slightly delayed after modifying the content, as the plugin relies on the index. If you modify the text and immediately click on "Keep and Continue" or "Create Flashcards and Continue," the modified content may not be preserved.
+**You can freely modify the content within each "chunk", add paragraphs, create flashcards, and insert the original text at any time.**
 
-![Alt text](assets/buttons.png)
+> **Reminder:** The updating of the index may lag slightly after modifying the content, as the plugin relies on the index. If you modify the text and immediately click the button, it may not take effect.
 
-* `[Fragment Number]`: Fragments are numbered starting from 0. `[0]` represents the beginning of the book. The second fragment is `[1]`. In the image, it is `[39]`.
-* `Previous Fragment`: Keep the notes of the current segment and go back to the previous fragment's content.
-* `Delete and Continue`: Do not keep the notes of the current segment and continue to the next fragment.
-* `Create Flashcards and Continue`: Keep the notes of the current segment and turn the current document into a flashcard. The original text will be deleted, and a link to the original text will be added. Continue to the next fragment.
-* `Keep and Continue`: Keep the notes of the current segment, delete the original text, and add a link to the original text. Continue to the next fragment.
-* `Delete and Exit`: Do not keep the notes of the current segment. Exit the learning process.
-* `Delete and Change Book`: Do not keep the notes of the current segment. Read another document added to the "Progressive Learning" plugin.
+* `[Chunk Number]`: The chunks are numbered starting from 0, where `[0]` represents the beginning of the book. The second chunk is `[1]`. In the image, it is `[4]`.
+* `Previous Chunk`: Keep the notes of the current section and go back to the previous chunk.
+* `Next Chunk`: Keep the notes of the current section and move on to the next chunk.
+* `Insert Original Text`: Insert the content of the original text corresponding to the chunk.
+* `Clean Unmodified Original Text`: Delete the unmodified parts of the original text, while preserving the modified parts.
+* `Delete and Next Chunk`: Discard the notes of the current section and continue to the next chunk.
+* `Add Document Flashcards`: Turn the current document into flashcards.
+* `Delete Document Flashcards`: Remove flashcards from the current document.
+* `Exit`: Keep the notes of the current section and exit the learning mode.
+* `Change Book`: Keep the notes of the current section and switch to another document that has been added to the Progressive Learning plugin.
+* `Ignore This Book`: Stop receiving notifications for this book. It can be reopened in "View All Progressive Learning Documents".
 
-> **Note:** The document title of each fragment can be modified. However, do not modify the document remarks, as the plugin will not be able to find this document in the future.
+> **Reminder:** When a "chunk" is deleted, its associated document flashcards will also be deleted.
 
-## Read the Segment at the Cursor Position
+> **Reminder:** If a deleted "chunk" is encountered again during the learning process, it will be recreated.
 
-If you want to start reading from a specific part of the original document, you can use the "Read Segment at Cursor Position" feature.
+> **Reminder:** The title of each "chunk" can be modified. However, do not modify the document's remarks, otherwise, the plugin will not be able to locate the document in the future.
 
-Open an original document that has already been added to the progressive learning, browse to a specific location, right-click, and go to `Plugin`->`Read Segment at Cursor Position` to jump to that "fragment."
+## Read the Section at the Cursor
+
+If you want to start reading from a specific part of the original document, you can use the "Read Section at Cursor" feature.
+
+Open an original document that has been added to Progressive Learning, navigate to a certain position, right-click, and go to `Plugin` -> `Read Section at Cursor` to jump to that "chunk".
 
 ![Alt text](assets/rightClickMenu.png)
 
 ## Fill-in-the-Blank Flashcards
 
-To create a fill-in-the-blank flashcard, select the portion of the content you want to hide, such as the "story" in the image:
+Select the portion of the text you want to create a flashcard for, for example, the word "Story" in the image below:
 
 ![Alt text](assets/selected.png)
 
-When generating the flashcard, include an input box to provide a space for writing.
+When generating flashcards, include an input box for writing.
 
-Writing the answer on the flashcard will enhance the effectiveness, as you can review the previous thoughts/answers during the next revision.
+Writing the answer on the flashcard will enhance the effectiveness, as you can review the previous thoughts/answers when revisiting it.
 
-If you are writing an article, you can create ambiguous blanks to continuously think and write using the flashcard mechanism - progressive writing.
+For writing articles, you can create ambiguous fill-in-the-blank sections and continuously engage in thinking and writing through the flashcard mechanism—progressive writing.
 
 ![Alt text](assets/card.png)
 
-> **Note:** Flashcard type B represents a quoted block in the writing section, while C represents a code block.
+> **Tip:** Flashcard type B includes a quote block for the writing section, while type C includes a code block.
 
-# Plans
+# Plan
 
 - [ ] Merge a large number of saved fragments into a single document?
 
 # Bug Reports and Suggestions
 
-The plugin needs improvement through long-term use. If you have any issues or suggestions, we can discuss them together.
+The plugin needs everyone, including me, to contribute to its improvement through long-term usage. If you have any issues or suggestions, we can discuss them together.
 
 QQ Group: 263961482
 
-[Or submit issues on GitHub](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
+[Alternatively, submit issues on GitHub](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
 
-[Or submit issues on the official forum](https://ld246.com/tag/siyuan)
+[Alternatively, submit issues on the official forum](https://ld246.com/tag/siyuan)
 
 # Changelog
 
+## 2023-11-22
+
+* Added the option for automatic flashcard creation in documents, enabled by default.
+* Fixed several bugs.
+* Redefined the button row.
+* Added the shard number before the title of a new document.
+
 ## 2023-11-21
 
-* Greatly improve the speed of "slicing" based solely on the title.
-* Move the `*` at the beginning of each sentence within the "slice" to the end.
-* Add flashcard functionality for fill-in-the-blanks.
-* Add ignore book feature.
-* i18n (internationalization).
+* Greatly improved the speed of processing based on the title "Shard" only.
+* Moved the asterisk (*) at the beginning of each sentence in a "Shard" to the end of the sentence.
+* Added fill-in-the-blank flashcard functionality.
+* Added the option to ignore books.
+* i18n.
 
 ## 2023-11-20
 
-* Modified content, including flashcards and appearance, will be saved.
-* Optimized note preservation method.
-* Removed unnecessary introduction in the readme and directlyjumped into the content.
+* Removed the distinction between the original text area and the note area. Any modified content, including flashcard creation and appearance, will be saved.
+* Optimized the note-saving method.
+* Removed unnecessary introduction in the readme and directly started with the content.
 
 ## 2023-11-19
 
@@ -111,4 +132,4 @@ QQ Group: 263961482
 
 ## 2023-11-17
 
-* Initial version.
+* Initial release.
