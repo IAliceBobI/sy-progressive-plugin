@@ -1,5 +1,6 @@
 import { Plugin } from "siyuan";
 import { newNodeID, siyuan } from "./utils";
+import { events } from "./Events";
 
 enum CardType {
     B = "B", C = "C"
@@ -10,11 +11,34 @@ class FlashBox {
 
     onload(plugin: Plugin) {
         this.plugin = plugin;
+        this.plugin.addCommand({
+            langKey: "insertBlankSpaceCardB",
+            hotkey: "⌘`",
+            editorCallback: () => {
+                const blockID = events.lastBlockID
+                const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
+                if (blockID) {
+                    this.blankSpaceCard(blockID, blank, CardType.B);
+                }
+            },
+        });
+        this.plugin.addCommand({
+            langKey: "insertBlankSpaceCardC",
+            hotkey: "⇧`",
+            editorCallback: () => {
+                const blockID = events.lastBlockID
+                const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
+                if (blockID) {
+                    this.blankSpaceCard(blockID, blank, CardType.C);
+                }
+            },
+        });
         this.plugin.eventBus.on("open-menu-content", async ({ detail }) => {
             const menu = detail.menu;
             menu.addItem({
-                label: this.plugin.i18n.insertBlankSpaceCard + CardType.B.toString(),
+                label: this.plugin.i18n.insertBlankSpaceCardB,
                 icon: "iconFlashcard",
+                accelerator: "⌘`",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     const blank = detail?.range?.cloneContents()?.textContent ?? "";
@@ -24,8 +48,9 @@ class FlashBox {
                 },
             });
             menu.addItem({
-                label: this.plugin.i18n.insertBlankSpaceCard + CardType.C.toString(),
+                label: this.plugin.i18n.insertBlankSpaceCardC,
                 icon: "iconFlashcard",
+                accelerator: "⇧`",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     const blank = detail?.range?.cloneContents()?.textContent ?? "";
