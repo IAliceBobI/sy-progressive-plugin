@@ -503,7 +503,7 @@ class Progressive {
                 this.startToLearnWithLock(bookID);
                 dialog.destroy();
             });
-            help.appendChild(subDiv, "button", this.plugin.i18n.ignore + ` ${bookInfo.ignored}`, ["prog-style__button"], () => {
+            help.appendChild(subDiv, "button", this.plugin.i18n.ignoreTxt + ` ${bookInfo.ignored}`, ["prog-style__button"], () => {
                 this.storage.toggleIgnoreBook(bookID);
                 dialog.destroy();
                 this.viewAllProgressiveBooks();

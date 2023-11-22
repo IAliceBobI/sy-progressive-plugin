@@ -46,17 +46,17 @@ The "Auto Flashcards" option means that each chunk will be turned into a flashca
 
 > **Reminder:** The updating of the index may lag slightly after modifying the content, as the plugin relies on the index. If you modify the text and immediately click the button, it may not take effect.
 
-* `[Chunk Number]`: The chunks are numbered starting from 0, where `[0]` represents the beginning of the book. The second chunk is `[1]`. In the image, it is `[4]`.
-* `Previous Chunk`: Keep the notes of the current section and go back to the previous chunk.
-* `Next Chunk`: Keep the notes of the current section and move on to the next chunk.
-* `Insert Original Text`: Insert the content of the original text corresponding to the chunk.
-* `Clean Unmodified Original Text`: Delete the unmodified parts of the original text, while preserving the modified parts.
-* `Delete and Next Chunk`: Discard the notes of the current section and continue to the next chunk.
-* `Add Document Flashcards`: Turn the current document into flashcards.
-* `Delete Document Flashcards`: Remove flashcards from the current document.
-* `Exit`: Keep the notes of the current section and exit the learning mode.
-* `Change Book`: Keep the notes of the current section and switch to another document that has been added to the Progressive Learning plugin.
-* `Ignore This Book`: Stop receiving notifications for this book. It can be reopened in "View All Progressive Learning Documents".
+* `[Chunk Index]`: Chunks are counted starting from 0. `[0]` represents the beginning of a book. The second chunk is `[1]`.
+* `⬅`: Retain notes from the current segment and view the content of the previous `chunk`.
+* `➡`: Retain notes from the current segment and view the content of the next `chunk`.
+* `⬇`: Insert the content of the corresponding `chunk` from the original text.
+* `🧹`: Modified parts of the original text will be retained, while unmodified parts will be deleted.
+* `🗑 ➡`: Delete notes from the current segment and continue to the next `chunk`.
+* `➡ 🗃`: Convert the current document into flashcards.
+* `🗃 ➡`: Delete the flashcards of the current document itself, without affecting flashcards within the document.
+* `🏃`: Retain notes from the current segment. Exit learning mode.
+* `📚📖`: Retain notes from the current segment. View other documents that have been added to the "Progressive Learning" plugin.
+* `🚫`: Stop pushing this book. It can be reopened in the "View All Progressive Learning Documents" section.
 
 > **Reminder:** When a "chunk" is deleted, its associated document flashcards will also be deleted.
 
@@ -103,6 +103,12 @@ QQ Group: 263961482
 [Alternatively, submit issues on the official forum](https://ld246.com/tag/siyuan)
 
 # Changelog
+
+## 2023-11-23
+
+* Add tooltips to buttons and change button text.
+* [Update button color scheme](https://github.com/IAliceBobI/sy-progressive-plugin/issues/1)
+* Set shortcut keys for cloze flashcards.
 
 ## 2023-11-22
 
