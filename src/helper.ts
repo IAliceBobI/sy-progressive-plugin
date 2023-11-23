@@ -27,6 +27,7 @@ export enum HtmlCBType {
     cleanUnchanged = 9,
     DelDocCard = 10,
     deleteAndExit = 11,
+    openFlashcardTab = 12,
 }
 
 export class Storage {
@@ -342,6 +343,21 @@ export class Helper {
         </div>`;
     }
 
+    btnOpenFlashcardTab(bookID: string, noteID: string, point: number) {
+        const btnID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("var(--b3-font-background11)", "#000000")}
+            <div>
+                <button title="以tab的方式打开闪卡" onclick="${btnID}()" id="btn${btnID}">⚡</button>
+            </div>
+            <script>
+                function ${btnID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.openFlashcardTab},${point})
+                }
+            </script>
+        </div>`;
+    }
+
     getReadingBtns(bookID: string, noteID: string, point: number) {
         return `{{{col
 [${point}]
@@ -367,6 +383,8 @@ ${this.btnStop(bookID, noteID, point)}
 ${this.btnNextBook(bookID, noteID, point)}
 
 ${this.btnIgnoreBook(bookID, noteID, point)}
+
+${this.btnOpenFlashcardTab(bookID, noteID, point)}
 }}}`;
     }
 

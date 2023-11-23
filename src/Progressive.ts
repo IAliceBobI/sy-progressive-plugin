@@ -432,6 +432,9 @@ class Progressive {
                 await this.cleanNote(noteID);
                 await this.addReadingBtns(bookID, noteID, point);
                 break;
+            case HtmlCBType.openFlashcardTab:
+                openTab({ app: this.plugin.app, card: { type: "all" } });
+                break;
             default:
                 throw "Invalid HtmlCBType " + cbType;
         }
