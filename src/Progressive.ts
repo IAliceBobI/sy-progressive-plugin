@@ -197,36 +197,46 @@ class Progressive {
             const splitLen = Number(LengthSplitInput.value.trim());
             if (!utils.isValidNumber(splitLen)) {
                 LengthSplitInput.value = "0";
-            } else {
-                dialog.destroy();
-                let contentBlocks;
-                if (splitLen > 0) {
-                    contentBlocks = await this.helper.getDocWordCount(bookID);
-                } else {
-                    contentBlocks = await siyuan.getChildBlocks(bookID);
-                }
-                let groups: help.WordCountType[][];
-                if (titleCheckBox.checked) {
-                    await siyuan.pushMsg(this.plugin.i18n.splitByHeadings);
-                    groups = new help.HeadingGroup(contentBlocks).split();
-                } else {
-                    groups = [contentBlocks];
-                }
-                if (splitLen > 0) {
-                    await siyuan.pushMsg(this.plugin.i18n.splitByWordCount + ":" + splitLen);
-                    groups = new help.ContentLenGroup(groups, splitLen).split();
-                }
-                await this.storage.saveIndex(bookID, groups);
-                await this.storage.resetBookReadingPoint(bookID);
-                if (!autoCardBox.checked) {
-                    await this.storage.toggleAutoCard(bookID, "no");
-                } else {
-                    await this.storage.toggleAutoCard(bookID, "yes");
-                }
-                setTimeout(async () => {
-                    await this.viewAllProgressiveBooks();
-                }, constants.IndexTime2Wait);
+                return;
             }
+
+            const dividePartLen = Number(DividePartsInput.value.trim());
+            if (!utils.isValidNumber(dividePartLen)) {
+                DividePartsInput.value = "4";
+                return;
+            }
+
+            dialog.destroy();
+            let contentBlocks;
+            if (splitLen > 0) {
+                contentBlocks = await this.helper.getDocWordCount(bookID);
+            } else {
+                contentBlocks = await siyuan.getChildBlocks(bookID);
+            }
+            let groups: help.WordCountType[][];
+            if (titleCheckBox.checked) {
+                await siyuan.pushMsg(this.plugin.i18n.splitByHeadings);
+                groups = new help.HeadingGroup(contentBlocks).split();
+            } else {
+                groups = [contentBlocks];
+            }
+            if (dividePartLen > 0) {
+                
+            }
+            if (splitLen > 0) {
+                await siyuan.pushMsg(this.plugin.i18n.splitByWordCount + ":" + splitLen);
+                groups = new help.ContentLenGroup(groups, splitLen).split();
+            }
+            await this.storage.saveIndex(bookID, groups);
+            await this.storage.resetBookReadingPoint(bookID);
+            if (!autoCardBox.checked) {
+                await this.storage.toggleAutoCard(bookID, "no");
+            } else {
+                await this.storage.toggleAutoCard(bookID, "yes");
+            }
+            setTimeout(async () => {
+                await this.viewAllProgressiveBooks();
+            }, constants.IndexTime2Wait);
         });
     }
 
