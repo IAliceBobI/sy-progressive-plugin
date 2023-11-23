@@ -138,23 +138,29 @@ class Progressive {
     private async addProgressiveReadingDialog(bookID: string, bookName: string) {
         const autoCardID = utils.newID();
         const titleSplitID = utils.newID();
+        const DividePartsID = utils.newID();
         const LengthSplitID = utils.newID();
         const btnSplitID = utils.newID();
         const dialog = new Dialog({
             title: this.plugin.i18n.addProgressiveReading,
             content: `<div class="b3-dialog__content">
-                <div class="prog-style__id">${bookName}</div>
                 <div class="fn__hr"></div>
-                <span class="prog-style__id">${this.plugin.i18n.splitByHeadings}</span>
+                <div class="prog-style__id">《${bookName}》</div>
+                <div class="fn__hr"></div>
+                <span class="prog-style__id">1⃣${this.plugin.i18n.splitByHeadings}</span>
                 <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
+                <div class="fn__hr"></div>
+                <div class="prog-style__id">2⃣N等分(0为不等分)</div>
+                <input type="text" id="${DividePartsID}" class="prog-style__input"/>
+                <div class="fn__hr"></div>
+                <div class="prog-style__id">3⃣${this.plugin.i18n.splitByWordCount}</div>
+                <input type="text" id="${LengthSplitID}" class="prog-style__input"/>
                 <div class="fn__hr"></div>
                 <span class="prog-style__id">${this.plugin.i18n.autoCard}</span>
                 <input type="checkbox" id="${autoCardID}" class="prog-style__checkbox"/>
                 <div class="fn__hr"></div>
-                <div class="prog-style__id">${this.plugin.i18n.splitByWordCount}</div>
-                <input type="text" id="${LengthSplitID}" class="prog-style__input"/>
-                <div class="fn__hr"></div>
                 <button id="${btnSplitID}" class="prog-style__button">${this.plugin.i18n.addOrReaddDoc}</button>
+                <div class="fn__hr"></div>
             </div>`,
             width: events.isMobile ? "92vw" : "560px",
             height: "540px",
@@ -180,14 +186,17 @@ class Progressive {
             }
         });
 
+        const DividePartsInput = dialog.element.querySelector("#" + DividePartsID) as HTMLInputElement;
+        DividePartsInput.value = "4";
+
         const LengthSplitInput = dialog.element.querySelector("#" + LengthSplitID) as HTMLInputElement;
-        LengthSplitInput.value = String(constants.PieceLen);
+        LengthSplitInput.value = "0";
 
         const btn = dialog.element.querySelector("#" + btnSplitID) as HTMLButtonElement;
         btn.addEventListener("click", async () => {
             const splitLen = Number(LengthSplitInput.value.trim());
             if (!utils.isValidNumber(splitLen)) {
-                LengthSplitInput.value = String(constants.PieceLen);
+                LengthSplitInput.value = "0";
             } else {
                 dialog.destroy();
                 let contentBlocks;
