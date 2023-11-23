@@ -238,6 +238,7 @@ class Progressive {
             } else {
                 await this.storage.toggleAutoCard(bookID, "yes");
             }
+            await siyuan.setBlockAttrs(bookID, { "custom-sy-readonly": "true" });
             setTimeout(async () => {
                 await this.viewAllProgressiveBooks();
             }, constants.IndexTime2Wait);
