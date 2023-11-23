@@ -200,8 +200,8 @@ class Progressive {
                 return;
             }
 
-            const dividePartLen = Number(DividePartsInput.value.trim());
-            if (!utils.isValidNumber(dividePartLen)) {
+            const dividePars = Number(DividePartsInput.value.trim());
+            if (!utils.isValidNumber(dividePars)) {
                 DividePartsInput.value = "4";
                 return;
             }
@@ -220,8 +220,12 @@ class Progressive {
             } else {
                 groups = [contentBlocks];
             }
-            if (dividePartLen > 0) {
-                
+            if (dividePars > 0) {
+                let tmp: help.WordCountType[][] = [];
+                for (const group of groups) {
+                    tmp.push(...utils.divideArrayIntoParts(group, dividePars))
+                }
+                groups = tmp;
             }
             if (splitLen > 0) {
                 await siyuan.pushMsg(this.plugin.i18n.splitByWordCount + ":" + splitLen);
