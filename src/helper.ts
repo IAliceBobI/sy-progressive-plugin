@@ -16,7 +16,7 @@ export type BookInfos = { [key: string]: BookInfo };
 
 export enum HtmlCBType {
     previous = 0,
-    skip = 1,
+    deleteAndNext = 1,
     AddDocCard = 2,
     // saveDoc = 3,
     quit = 4,
@@ -26,6 +26,7 @@ export enum HtmlCBType {
     fullfilContent = 8,
     cleanUnchanged = 9,
     DelDocCard = 10,
+    deleteAndExit = 11,
 }
 
 export class Storage {
@@ -236,7 +237,22 @@ export class Helper {
         </div>`;
     }
 
-    btnDeleteAndNext(bookID: string, noteID: string, point: number) {
+    btnDeleteExit(bookID: string, noteID: string, point: number) {
+        const btnID = utils.newID().slice(0, constants.IDLen);
+        return `<div>
+            ${styleColor("var(--b3-card-error-background)", "var(--b3-card-error-color)")}
+            <div>
+                <button title="删除当前分片并退出" onclick="${btnID}()" id="btn${btnID}">🗑 🏃</button>
+            </div>
+            <script>
+                function ${btnID}() {
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.deleteAndExit},${point})
+                }
+            </script>
+        </div>`;
+    }
+
+    btnDeleteNext(bookID: string, noteID: string, point: number) {
         const btnID = utils.newID().slice(0, constants.IDLen);
         return `<div>
             ${styleColor("var(--b3-card-error-background)", "var(--b3-card-error-color)")}
@@ -245,7 +261,7 @@ export class Helper {
             </div>
             <script>
                 function ${btnID}() {
-                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.skip},${point})
+                    globalThis.progressive_zZmqus5PtYRi.progressive.htmlBlockReadNextPeice("${bookID}","${noteID}",${HtmlCBType.deleteAndNext},${point})
                 }
             </script>
         </div>`;
@@ -338,7 +354,9 @@ ${this.btnFullfilContent(bookID, noteID, point)}
 
 ${this.btnCleanUnchanged(bookID, noteID, point)}
 
-${this.btnDeleteAndNext(bookID, noteID, point)}
+${this.btnDeleteExit(bookID, noteID, point)}
+
+${this.btnDeleteNext(bookID, noteID, point)}
 
 ${this.btnSaveCard(bookID, noteID, point)}
 
