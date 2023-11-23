@@ -200,13 +200,15 @@ class Progressive {
                 return;
             }
 
-            const dividePars = Number(DividePartsInput.value.trim());
-            if (!utils.isValidNumber(dividePars)) {
+            const divideParts = Number(DividePartsInput.value.trim());
+            if (!utils.isValidNumber(divideParts)) {
                 DividePartsInput.value = "4";
                 return;
             }
 
             dialog.destroy();
+            await siyuan.setBlockAttrs(bookID, { "custom-sy-readonly": "true" });
+
             let contentBlocks;
             if (splitLen > 0) {
                 contentBlocks = await this.helper.getDocWordCount(bookID);
@@ -220,10 +222,10 @@ class Progressive {
             } else {
                 groups = [contentBlocks];
             }
-            if (dividePars > 0) {
+            if (divideParts > 0) {
                 const tmp: help.WordCountType[][] = [];
                 for (const group of groups) {
-                    tmp.push(...utils.divideArrayIntoParts(group, dividePars));
+                    tmp.push(...utils.divideArrayIntoParts(group, divideParts));
                 }
                 groups = tmp;
             }
@@ -238,7 +240,6 @@ class Progressive {
             } else {
                 await this.storage.toggleAutoCard(bookID, "yes");
             }
-            await siyuan.setBlockAttrs(bookID, { "custom-sy-readonly": "true" });
             setTimeout(async () => {
                 await this.viewAllProgressiveBooks();
             }, constants.IndexTime2Wait);
