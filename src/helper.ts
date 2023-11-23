@@ -354,9 +354,9 @@ ${this.btnFullfilContent(bookID, noteID, point)}
 
 ${this.btnCleanUnchanged(bookID, noteID, point)}
 
-${this.btnDeleteExit(bookID, noteID, point)}
-
 ${this.btnDeleteNext(bookID, noteID, point)}
+
+${this.btnDeleteExit(bookID, noteID, point)}
 
 ${this.btnSaveCard(bookID, noteID, point)}
 

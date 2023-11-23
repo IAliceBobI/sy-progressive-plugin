@@ -20,7 +20,7 @@ export function chunks<T>(array: T[], n: number): T[][] {
     const newArr: T[][] = [];
     for (let i = 0; i < array.length; i += n) {
         const part = array.slice(i, i + n);
-        newArr.push(part);
+        if (part.length > 0) newArr.push(part);
     }
     return newArr;
 }

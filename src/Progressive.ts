@@ -221,9 +221,9 @@ class Progressive {
                 groups = [contentBlocks];
             }
             if (dividePars > 0) {
-                let tmp: help.WordCountType[][] = [];
+                const tmp: help.WordCountType[][] = [];
                 for (const group of groups) {
-                    tmp.push(...utils.divideArrayIntoParts(group, dividePars))
+                    tmp.push(...utils.divideArrayIntoParts(group, dividePars));
                 }
                 groups = tmp;
             }
