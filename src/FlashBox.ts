@@ -13,7 +13,7 @@ class FlashBox {
         this.plugin = plugin;
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardB",
-            hotkey: "⌘`",
+            hotkey: "⌘6",
             editorCallback: () => {
                 const blockID = events.lastBlockID;
                 const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
@@ -24,7 +24,7 @@ class FlashBox {
         });
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardC",
-            hotkey: "⌘6",
+            hotkey: "⌘`",
             editorCallback: () => {
                 const blockID = events.lastBlockID;
                 const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
@@ -38,7 +38,7 @@ class FlashBox {
             menu.addItem({
                 label: this.plugin.i18n.insertBlankSpaceCardB,
                 icon: "iconFlashcard",
-                accelerator: "⌘`",
+                accelerator: "⌘6",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     const blank = detail?.range?.cloneContents()?.textContent ?? "";
@@ -50,7 +50,7 @@ class FlashBox {
             menu.addItem({
                 label: this.plugin.i18n.insertBlankSpaceCardC,
                 icon: "iconFlashcard",
-                accelerator: "⌘6",
+                accelerator: "⌘`",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     const blank = detail?.range?.cloneContents()?.textContent ?? "";
