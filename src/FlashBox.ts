@@ -59,13 +59,15 @@ class FlashBox {
         });
     }
 
-    private makeCard(protyle: any, t: CardType) {
+    private async makeCard(protyle: any, t: CardType) {
         const { lastSelectedID, firstSelectedID, markdowns } = this.cloneSelectedLineMarkdowns(protyle);
         if (lastSelectedID) {
             const { cardID, markdown } = this.createList(markdowns, firstSelectedID, t);
-            siyuan.insertBlockAfter("", lastSelectedID);
-            siyuan.insertBlockAfter(markdown, lastSelectedID);
-            siyuan.insertBlockAfter("", lastSelectedID);
+            await siyuan.insertBlockAfter("", lastSelectedID);
+            await utils.sleep(200);
+            await siyuan.insertBlockAfter(markdown, lastSelectedID);
+            await utils.sleep(200);
+            await siyuan.insertBlockAfter("", lastSelectedID);
             setTimeout(() => { siyuan.addRiffCards([cardID]); }, 1000);
         } else {
             const blockID = events.lastBlockID;
@@ -144,7 +146,9 @@ class FlashBox {
         }
         list.push(`{: id="${cardID}"}`);
         await siyuan.insertBlockAfter("", blockID);
+        await utils.sleep(200);
         await siyuan.insertBlockAfter(list.join("\n"), blockID);
+        await utils.sleep(200);
         await siyuan.insertBlockAfter("", blockID);
         await siyuan.addRiffCards([cardID]);
     }
