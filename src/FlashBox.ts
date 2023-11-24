@@ -25,11 +25,18 @@ class FlashBox {
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardC",
             hotkey: "⌘`",
-            editorCallback: () => {
-                const blockID = events.lastBlockID;
-                const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
-                if (blockID) {
-                    this.blankSpaceCard(blockID, blank, CardType.C);
+            editorCallback: (protyle) => {
+                const multiLine = this.getSelectedLineIDs(protyle);
+                if (multiLine.length > 0) {
+                    for (const div of multiLine) {
+                        console.log(div)
+                    }
+                } else {
+                    const blockID = events.lastBlockID;
+                    const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
+                    if (blockID) {
+                        this.blankSpaceCard(blockID, blank, CardType.C);
+                    }
                 }
             },
         });
@@ -60,6 +67,18 @@ class FlashBox {
                 },
             });
         });
+    }
+
+    private getSelectedLineIDs(protyle: any) {
+        const multiLine = protyle?.element?.getElementsByTagName("div") as HTMLDivElement[] ?? [];
+        const rets = []
+        for (const div of multiLine) {
+            if (div.classList.contains("protyle-wysiwyg--select")) {
+                const id = div.getAttribute("data-node-id");
+                if (id) rets.push(id);
+            }
+        }
+        return rets;
     }
 
     private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
