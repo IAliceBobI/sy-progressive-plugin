@@ -77,7 +77,9 @@ class FlashBox {
         for (let i = 0; i < mds.length; i++) {
             const parts = mds[i].trim().split("\n");
             if (parts.length >= 2) {
-                parts.pop();
+                if (parts[parts.length - 1].trim().startsWith("{: ")) {
+                    parts.pop();
+                }
             }
             if (!parts[0].endsWith(" \"*\"))") && i == 0) {
                 parts[0] = parts[0] + `((${lnkID} "*"))`;
