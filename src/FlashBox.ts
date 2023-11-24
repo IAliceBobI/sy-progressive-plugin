@@ -59,9 +59,9 @@ class FlashBox {
     }
 
     private makeCard(protyle: any, t: CardType) {
-        const { lastSelectedID, markdowns } = this.cloneSelectedLineMarkdowns(protyle);
+        const { lastSelectedID, firstSelectedID, markdowns } = this.cloneSelectedLineMarkdowns(protyle);
         if (lastSelectedID) {
-            const { cardID, markdown } = this.createList(markdowns, t);
+            const { cardID, markdown } = this.createList(markdowns, firstSelectedID, t);
             siyuan.insertBlockAfter(markdown, lastSelectedID);
             setTimeout(() => { siyuan.addRiffCards([cardID]); }, 1000);
         } else {
@@ -73,17 +73,25 @@ class FlashBox {
         }
     }
 
-    private createList(markdowns: string[], cardType: CardType) {
+    private createList(markdowns: string[], firstSelectedID: string, cardType: CardType) {
+        if (markdowns.length > 0) {
+            const parts = markdowns[0].split("\n");
+            if (!parts[0].endsWith(` "*"))`)) {
+                parts[0] = parts[0] + `((${firstSelectedID} "*"))`
+            }
+            markdowns[0] = parts.join("\n");
+        }
         const tmp = [];
         for (const m of markdowns) {
             tmp.push("* " + m);
         }
         const cardID = utils.NewNodeID();
         if (cardType === CardType.B) {
-            tmp.push("* >\n\n" + `{: id="${cardID}"}`);
+            tmp.push("* >");
         } else {
-            tmp.push("* ```\n\n" + `{: id="${cardID}"}`);
+            tmp.push("* ```");
         }
+        tmp.push(`{: id="${cardID}"}`)
         return { cardID, "markdown": tmp.join("\n") };
     }
 
@@ -91,16 +99,20 @@ class FlashBox {
         const multiLine = protyle?.element?.getElementsByTagName("div") as HTMLDivElement[] ?? [];
         const markdowns = [];
         let lastSelectedID = "";
+        let firstSelectedID = "";
         for (const div of multiLine) {
             if (div.classList.contains(constants.PROTYLE_WYSIWYG_SELECT)) {
                 const id = div.getAttribute(constants.DATA_NODE_ID);
-                if (id) lastSelectedID = id;
+                if (id) {
+                    lastSelectedID = id;
+                    if (!firstSelectedID) firstSelectedID = id;
+                }
                 div.classList.remove(constants.PROTYLE_WYSIWYG_SELECT);
                 const elem = div.cloneNode(true) as HTMLDivElement;
                 markdowns.push(this.lute.BlockDOM2Md(elem.innerHTML));
             }
         }
-        return { markdowns, lastSelectedID };
+        return { markdowns, firstSelectedID, lastSelectedID };
     }
 
     private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
