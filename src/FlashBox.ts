@@ -1,5 +1,7 @@
-import { Plugin } from "siyuan";
-import { newNodeID, siyuan } from "./utils";
+import { Plugin, Lute } from "siyuan";
+import * as constants from "./constants";
+import { siyuan } from "./utils";
+import * as utils from "./utils";
 import { events } from "./Events";
 
 enum CardType {
@@ -8,36 +10,23 @@ enum CardType {
 
 class FlashBox {
     private plugin: Plugin;
+    private lute: Lute;
 
     onload(plugin: Plugin) {
         this.plugin = plugin;
+        this.lute = (globalThis as any).Lute.New();
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardB",
             hotkey: "⌘6",
-            editorCallback: () => {
-                const blockID = events.lastBlockID;
-                const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
-                if (blockID) {
-                    this.blankSpaceCard(blockID, blank, CardType.B);
-                }
+            editorCallback: (protyle) => {
+                this.makeCard(protyle, CardType.B);
             },
         });
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardC",
             hotkey: "⌘`",
             editorCallback: (protyle) => {
-                const multiLine = this.getSelectedLineIDs(protyle);
-                if (multiLine.length > 0) {
-                    for (const div of multiLine) {
-                        console.log(div)
-                    }
-                } else {
-                    const blockID = events.lastBlockID;
-                    const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
-                    if (blockID) {
-                        this.blankSpaceCard(blockID, blank, CardType.C);
-                    }
-                }
+                this.makeCard(protyle, CardType.C);
             },
         });
         this.plugin.eventBus.on("open-menu-content", async ({ detail }) => {
@@ -69,16 +58,49 @@ class FlashBox {
         });
     }
 
-    private getSelectedLineIDs(protyle: any) {
-        const multiLine = protyle?.element?.getElementsByTagName("div") as HTMLDivElement[] ?? [];
-        const rets = []
-        for (const div of multiLine) {
-            if (div.classList.contains("protyle-wysiwyg--select")) {
-                const id = div.getAttribute("data-node-id");
-                if (id) rets.push(id);
+    private makeCard(protyle: any, t: CardType) {
+        const { lastSelectedID, markdowns } = this.cloneSelectedLineMarkdowns(protyle);
+        if (lastSelectedID) {
+            const { cardID, markdown } = this.createList(markdowns, t);
+            siyuan.insertBlockAfter(markdown, lastSelectedID);
+            setTimeout(() => { siyuan.addRiffCards([cardID]); }, 1000);
+        } else {
+            const blockID = events.lastBlockID;
+            const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
+            if (blockID) {
+                this.blankSpaceCard(blockID, blank, t);
             }
         }
-        return rets;
+    }
+
+    private createList(markdowns: string[], cardType: CardType) {
+        const tmp = [];
+        for (const m of markdowns) {
+            tmp.push("* " + m);
+        }
+        const cardID = utils.NewNodeID();
+        if (cardType === CardType.B) {
+            tmp.push("* >\n\n" + `{: id="${cardID}"}`);
+        } else {
+            tmp.push("* ```\n\n" + `{: id="${cardID}"}`);
+        }
+        return { cardID, "markdown": tmp.join("\n") };
+    }
+
+    private cloneSelectedLineMarkdowns(protyle: any) {
+        const multiLine = protyle?.element?.getElementsByTagName("div") as HTMLDivElement[] ?? [];
+        const markdowns = [];
+        let lastSelectedID = "";
+        for (const div of multiLine) {
+            if (div.classList.contains(constants.PROTYLE_WYSIWYG_SELECT)) {
+                const id = div.getAttribute(constants.DATA_NODE_ID);
+                if (id) lastSelectedID = id;
+                div.classList.remove(constants.PROTYLE_WYSIWYG_SELECT);
+                const elem = div.cloneNode(true) as HTMLDivElement;
+                markdowns.push(this.lute.BlockDOM2Md(elem.innerHTML));
+            }
+        }
+        return { markdowns, lastSelectedID };
     }
 
     private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
@@ -99,7 +121,7 @@ class FlashBox {
             content += `((${blockID} "*"))`;
         }
         await siyuan.insertBlockAfter("", blockID);
-        const cardID = newNodeID();
+        const cardID = utils.NewNodeID();
         if (cardType === CardType.B) {
             await siyuan.insertBlockAfter(`* ${content}
 * >
