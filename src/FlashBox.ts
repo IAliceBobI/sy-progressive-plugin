@@ -73,14 +73,22 @@ class FlashBox {
         }
     }
 
-    private createList(markdowns: string[], firstSelectedID: string, cardType: CardType) {
-        if (markdowns.length > 0) {
-            const parts = markdowns[0].split("\n");
-            if (!parts[0].endsWith(` "*"))`)) {
-                parts[0] = parts[0] + `((${firstSelectedID} "*"))`
+    private tryRmIDAddLink(mds: string[], lnkID: string) {
+        for (let i = 0; i < mds.length; i++) {
+            const parts = mds[i].trim().split("\n");
+            if (parts.length >= 2) {
+                parts.pop();
             }
-            markdowns[0] = parts.join("\n");
+            if (!parts[0].endsWith(` "*"))`) && i == 0) {
+                parts[0] = parts[0] + `((${lnkID} "*"))`
+            }
+            mds[i] = parts.join("\n");
         }
+        return mds;
+    }
+
+    private createList(markdowns: string[], firstSelectedID: string, cardType: CardType) {
+        markdowns = this.tryRmIDAddLink(markdowns, firstSelectedID);
         const tmp = [];
         for (const m of markdowns) {
             tmp.push("* " + m);
@@ -116,34 +124,39 @@ class FlashBox {
     }
 
     private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
-        let { content } = await siyuan.getBlockMarkdownAndContent(blockID);
+        let md;
         if (selected) {
+            let { content } = await siyuan.getBlockMarkdownAndContent(blockID);
             selected = selected.replace(/=/g, "​=​");
             content = content.replace(/=/g, "​=​");
             content = content.replace(new RegExp(selected, "g"), `==${selected}==`);
             content = content.replace(/====/g, "");
-        }
-        if (content.endsWith("*")) {
-            content = content.slice(0, -1);
-        }
-        const progref = (await siyuan.getBlockAttrs(blockID))["custom-progref"];
-        if (progref) {
-            content += `((${progref} "*"))`;
+            if (content.endsWith("*")) {
+                content = content.slice(0, -1);
+            }
+            const progref = (await siyuan.getBlockAttrs(blockID))["custom-progref"];
+            if (progref) {
+                content += `((${progref} "*"))`;
+            } else {
+                content += `((${blockID} "*"))`;
+            }
+            md = content;
         } else {
-            content += `((${blockID} "*"))`;
+            const { dom } = await siyuan.getBlockDOM(blockID);
+            let list = [this.lute.BlockDOM2Md(dom)];
+            list = this.tryRmIDAddLink(list, blockID);
+            md = list[0];
         }
         const cardID = utils.NewNodeID();
+        const list = [];
+        list.push(`* ${md}`);
         if (cardType === CardType.B) {
-            await siyuan.insertBlockAfter(`* ${content}
-* >
-{: id="${cardID}"}
-`, blockID);
+            list.push("* >")
         } else {
-            await siyuan.insertBlockAfter(`* ${content}
-* \`\`\`
-{: id="${cardID}"}
-`, blockID);
+            list.push("* ```")
         }
+        list.push(`{: id="${cardID}"}`)
+        await siyuan.insertBlockAfter(list.join("\n"), blockID);
         await siyuan.addRiffCards([cardID]);
     }
 }
