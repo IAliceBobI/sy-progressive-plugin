@@ -62,7 +62,9 @@ class FlashBox {
         const { lastSelectedID, firstSelectedID, markdowns } = this.cloneSelectedLineMarkdowns(protyle);
         if (lastSelectedID) {
             const { cardID, markdown } = this.createList(markdowns, firstSelectedID, t);
+            siyuan.insertBlockAfter("", lastSelectedID);
             siyuan.insertBlockAfter(markdown, lastSelectedID);
+            siyuan.insertBlockAfter("", lastSelectedID);
             setTimeout(() => { siyuan.addRiffCards([cardID]); }, 1000);
         } else {
             const blockID = events.lastBlockID;
@@ -158,7 +160,9 @@ class FlashBox {
             list.push("* ```");
         }
         list.push(`{: id="${cardID}"}`);
+        await siyuan.insertBlockAfter("", blockID);
         await siyuan.insertBlockAfter(list.join("\n"), blockID);
+        await siyuan.insertBlockAfter("", blockID);
         await siyuan.addRiffCards([cardID]);
     }
 }
