@@ -14,7 +14,7 @@ class FlashBox {
 
     onload(plugin: Plugin) {
         this.plugin = plugin;
-        this.lute = (globalThis as any).Lute.New();
+        this.lute = utils.NewLute();
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardB",
             hotkey: "⌘6",
