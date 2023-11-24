@@ -389,10 +389,12 @@ class Progressive {
     private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         switch (cbType) {
             case HtmlCBType.previous:
+                this.helper.closeTab(noteID);
                 await this.storage.gotoBlock(bookID, point - 1);
                 await this.startToLearn(bookID);
                 break;
-            case HtmlCBType.next:
+                case HtmlCBType.next:
+                this.helper.closeTab(noteID);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
                 break;
