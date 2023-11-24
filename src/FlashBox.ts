@@ -3,6 +3,7 @@ import * as constants from "./constants";
 import { siyuan } from "./utils";
 import * as utils from "./utils";
 import { events } from "./Events";
+import * as helper from "./helper";
 
 enum CardType {
     B = "B", C = "C"
@@ -75,24 +76,8 @@ class FlashBox {
         }
     }
 
-    private tryRmIDAddLink(mds: string[], lnkID: string) {
-        for (let i = 0; i < mds.length; i++) {
-            const parts = mds[i].trim().split("\n");
-            if (parts.length >= 2) {
-                if (parts[parts.length - 1].trim().startsWith("{: ")) {
-                    parts.pop();
-                }
-            }
-            if (!parts[0].endsWith(" \"*\"))") && i == 0) {
-                parts[0] = parts[0] + `((${lnkID} "*"))`;
-            }
-            mds[i] = parts.join("\n");
-        }
-        return mds;
-    }
-
     private createList(markdowns: string[], firstSelectedID: string, cardType: CardType) {
-        markdowns = this.tryRmIDAddLink(markdowns, firstSelectedID);
+        markdowns = helper.tryRmIDAddLink(markdowns, firstSelectedID);
         const tmp = [];
         for (const m of markdowns) {
             tmp.push("* " + m);
@@ -147,9 +132,7 @@ class FlashBox {
             md = content;
         } else {
             const { dom } = await siyuan.getBlockDOM(blockID);
-            let list = [this.lute.BlockDOM2Md(dom)];
-            list = this.tryRmIDAddLink(list, blockID);
-            md = list[0];
+            md = helper.tryRmIDAddLinkOne(this.lute.BlockDOM2Md(dom), blockID);
         }
         const cardID = utils.NewNodeID();
         const list = [];

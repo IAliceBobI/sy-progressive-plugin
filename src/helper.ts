@@ -162,6 +162,28 @@ function styleColor(bgcolor: string, color: string) {
     return `<style>button{display: inline-block; padding: 10px 20px; background-color: ${bgcolor}; color: ${color}; text-align: center; text-decoration: none; font-size: 16px; border: none; border-radius: 4px; cursor: pointer;}button.large { padding: 12px 24px; font-size: 24px; }button.small { padding: 8px 16px; font-size: 14px; }</style>`;
 }
 
+export function tryRmIDAddLinkOne(md: string, lnkID: string) {
+    let list = [md];
+    list = tryRmIDAddLink(list, lnkID);
+    return list[0];
+}
+
+export function tryRmIDAddLink(mds: string[], lnkID: string) {
+    for (let i = 0; i < mds.length; i++) {
+        const parts = mds[i].trim().split("\n");
+        if (parts.length >= 2) {
+            if (parts[parts.length - 1].trim().startsWith("{: ")) {
+                parts.pop();
+            }
+        }
+        if (!parts[0].endsWith(" \"*\"))") && i == 0) {
+            parts[0] = parts[0] + `((${lnkID} "*"))`;
+        }
+        mds[i] = parts.join("\n");
+    }
+    return mds;
+}
+
 export class Helper {
     private plugin: Plugin;
 
