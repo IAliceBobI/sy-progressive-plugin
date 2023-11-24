@@ -194,6 +194,7 @@ export const siyuan = {
         return siyuan.call("/api/block/checkBlockExist", { id });
     },
     async getBlockDOM(id: string) {
+        // {dom, id}
         return siyuan.call("/api/block/getBlockDOM", { id });
     },
     async setBlockAttrs(id: string, attrs: any) {

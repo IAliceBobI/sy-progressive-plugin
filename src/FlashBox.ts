@@ -120,7 +120,6 @@ class FlashBox {
         } else {
             content += `((${blockID} "*"))`;
         }
-        await siyuan.insertBlockAfter("", blockID);
         const cardID = utils.NewNodeID();
         if (cardType === CardType.B) {
             await siyuan.insertBlockAfter(`* ${content}
@@ -133,7 +132,6 @@ class FlashBox {
 {: id="${cardID}"}
 `, blockID);
         }
-        await siyuan.insertBlockAfter("", blockID);
         await siyuan.addRiffCards([cardID]);
     }
 }
