@@ -79,8 +79,8 @@ class FlashBox {
             if (parts.length >= 2) {
                 parts.pop();
             }
-            if (!parts[0].endsWith(` "*"))`) && i == 0) {
-                parts[0] = parts[0] + `((${lnkID} "*"))`
+            if (!parts[0].endsWith(" \"*\"))") && i == 0) {
+                parts[0] = parts[0] + `((${lnkID} "*"))`;
             }
             mds[i] = parts.join("\n");
         }
@@ -99,7 +99,7 @@ class FlashBox {
         } else {
             tmp.push("* ```");
         }
-        tmp.push(`{: id="${cardID}"}`)
+        tmp.push(`{: id="${cardID}"}`);
         return { cardID, "markdown": tmp.join("\n") };
     }
 
@@ -151,11 +151,11 @@ class FlashBox {
         const list = [];
         list.push(`* ${md}`);
         if (cardType === CardType.B) {
-            list.push("* >")
+            list.push("* >");
         } else {
-            list.push("* ```")
+            list.push("* ```");
         }
-        list.push(`{: id="${cardID}"}`)
+        list.push(`{: id="${cardID}"}`);
         await siyuan.insertBlockAfter(list.join("\n"), blockID);
         await siyuan.addRiffCards([cardID]);
     }
