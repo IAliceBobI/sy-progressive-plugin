@@ -410,9 +410,8 @@ ${this.btnOpenFlashcardTab(bookID, noteID, point)}
 }}}`;
     }
 
-    async getDocWordCount(docID: string): Promise<WordCountType[]> {
+    async getDocWordCount(allBlocks: WordCountType[]): Promise<WordCountType[]> {
         await siyuan.pushMsg(this.plugin.i18n.getAllChildren, 3000);
-        const allBlocks: any[] = await siyuan.getChildBlocks(docID);
 
         const size = 300;
         const groups = [];

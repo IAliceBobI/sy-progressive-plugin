@@ -143,16 +143,19 @@ class Progressive {
         const DividePartsID = utils.newID();
         const LengthSplitID = utils.newID();
         const btnSplitID = utils.newID();
+        const statisticDivID = utils.newID();
         const dialog = new Dialog({
             title: this.plugin.i18n.addProgressiveReading,
             content: `<div class="b3-dialog__content">
                 <div class="fn__hr"></div>
                 <div class="prog-style__id">《${bookName}》</div>
                 <div class="fn__hr"></div>
+                <div class="prog-style__id" id="${statisticDivID}"></div>
+                <div class="fn__hr"></div>
                 <span class="prog-style__id">1⃣${this.plugin.i18n.splitByHeadings}</span>
                 <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
                 <div class="fn__hr"></div>
-                <div class="prog-style__id">2⃣N等分(0为不等分)</div>
+                <div class="prog-style__id">2⃣N等分(0为不进行块数等分)</div>
                 <input type="text" id="${DividePartsID}" class="prog-style__input"/>
                 <div class="fn__hr"></div>
                 <div class="prog-style__id">3⃣${this.plugin.i18n.splitByWordCount}</div>
@@ -167,6 +170,21 @@ class Progressive {
             width: events.isMobile ? "92vw" : "560px",
             height: "540px",
         });
+
+        const statisticDiv = dialog.element.querySelector("#" + statisticDivID) as HTMLDivElement;
+        statisticDiv.innerHTML = "统计中……";
+        let contentBlocks: help.WordCountType[] = await siyuan.getChildBlocks(bookID);
+        const { wordCount } = await siyuan.getBlocksWordCount([bookID]);
+        let headCount = 0;
+        for (const block of contentBlocks) {
+            if (block.type == "h") headCount++;
+        }
+        statisticDiv.innerHTML = `
+            总字数：${wordCount}<br>
+            各级标题数：${headCount}<br>
+            总块数：${contentBlocks.length}<br>
+            平均每个标题下有：${Math.ceil(contentBlocks.length / headCount)}块<br>
+            平均每个块有：${Math.ceil(wordCount / contentBlocks.length)}字`;
 
         const titleCheckBox = dialog.element.querySelector("#" + titleSplitID) as HTMLInputElement;
         titleCheckBox.checked = true;
@@ -211,11 +229,8 @@ class Progressive {
             dialog.destroy();
             await siyuan.setBlockAttrs(bookID, { "custom-sy-readonly": "true" });
 
-            let contentBlocks;
             if (splitLen > 0) {
-                contentBlocks = await this.helper.getDocWordCount(bookID);
-            } else {
-                contentBlocks = await siyuan.getChildBlocks(bookID);
+                contentBlocks = await this.helper.getDocWordCount(contentBlocks);
             }
             let groups: help.WordCountType[][];
             if (titleCheckBox.checked) {
