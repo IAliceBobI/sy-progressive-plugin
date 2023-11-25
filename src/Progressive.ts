@@ -140,7 +140,7 @@ class Progressive {
     private async addProgressiveReadingDialog(bookID: string, bookName: string) {
         const autoCardID = utils.newID();
         const titleSplitID = utils.newID();
-        const DividePartsID = utils.newID();
+        const BlockNumID = utils.newID();
         const LengthSplitID = utils.newID();
         const btnSplitID = utils.newID();
         const statisticDivID = utils.newID();
@@ -155,8 +155,8 @@ class Progressive {
                 <span class="prog-style__id">1⃣${this.plugin.i18n.splitByHeadings}</span>
                 <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
                 <div class="fn__hr"></div>
-                <div class="prog-style__id">2⃣N等分(0为不进行块数等分)</div>
-                <input type="text" id="${DividePartsID}" class="prog-style__input"/>
+                <div class="prog-style__id">2⃣按块数拆分(0为不按块数拆分)</div>
+                <input type="text" id="${BlockNumID}" class="prog-style__input"/>
                 <div class="fn__hr"></div>
                 <div class="prog-style__id">3⃣${this.plugin.i18n.splitByWordCount}</div>
                 <input type="text" id="${LengthSplitID}" class="prog-style__input"/>
@@ -168,7 +168,7 @@ class Progressive {
                 <div class="fn__hr"></div>
             </div>`,
             width: events.isMobile ? "92vw" : "560px",
-            height: "540px",
+            height: "640px",
         });
 
         const statisticDiv = dialog.element.querySelector("#" + statisticDivID) as HTMLDivElement;
@@ -206,8 +206,9 @@ class Progressive {
             }
         });
 
-        const DividePartsInput = dialog.element.querySelector("#" + DividePartsID) as HTMLInputElement;
-        DividePartsInput.value = "4";
+        const suggestBlockNum = `${Math.ceil(600 / (wordCount / contentBlocks.length))}`;
+        const BlockNumInput = dialog.element.querySelector("#" + BlockNumID) as HTMLInputElement;
+        BlockNumInput.value = suggestBlockNum;
 
         const LengthSplitInput = dialog.element.querySelector("#" + LengthSplitID) as HTMLInputElement;
         LengthSplitInput.value = "0";
@@ -220,9 +221,9 @@ class Progressive {
                 return;
             }
 
-            const divideParts = Number(DividePartsInput.value.trim());
-            if (!utils.isValidNumber(divideParts)) {
-                DividePartsInput.value = "4";
+            const blockNumber = Number(BlockNumInput.value.trim());
+            if (!utils.isValidNumber(blockNumber)) {
+                BlockNumInput.value = suggestBlockNum;
                 return;
             }
 
@@ -239,10 +240,10 @@ class Progressive {
             } else {
                 groups = [contentBlocks];
             }
-            if (divideParts > 0) {
+            if (blockNumber > 0) {
                 const tmp: help.WordCountType[][] = [];
                 for (const group of groups) {
-                    tmp.push(...utils.divideArrayIntoParts(group, divideParts));
+                    tmp.push(...utils.chunks(group, blockNumber));
                 }
                 groups = tmp;
             }
