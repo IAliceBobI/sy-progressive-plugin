@@ -18,7 +18,7 @@ class FlashBox {
         this.lute = utils.NewLute();
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardB",
-            hotkey: "⌘6",
+            hotkey: "⌥E",
             editorCallback: (protyle) => {
                 this.makeCard(protyle, CardType.B);
             },
@@ -35,7 +35,7 @@ class FlashBox {
             menu.addItem({
                 label: this.plugin.i18n.insertBlankSpaceCardB,
                 icon: "iconFlashcard",
-                accelerator: "⌘6",
+                accelerator: "⌥E",
                 click: () => {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     const blank = detail?.range?.cloneContents()?.textContent ?? "";
