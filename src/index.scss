@@ -8,7 +8,7 @@
     left: 0;
     height: 18px;
     width: 18px;
-    background-color: #eee;
+    background-color: var(--b3-theme-background);
     border-radius: 3px;
   }
 
@@ -41,8 +41,8 @@
   &__button {
     display: inline-block;
     padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
+    background-color: var(--b3-font-background12);
+    color: var(--b3-card-success-color);
     text-align: center;
     text-decoration: none;
     font-size: 16px;
@@ -52,11 +52,11 @@
   }
 
   &__button:hover {
-    background-color: #45a049;
+    background-color: var(--b3-font-background6);
   }
 
   &__button:active {
-    background-color: #3e8e41;
+    background-color: var(--b3-font-background7);
   }
 
   &__button.large {
@@ -71,18 +71,18 @@
 
   &__input {
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--b3-font-background9);
     border-radius: 4px;
     font-size: larger;
     width: 300px;
   }
 
   &__input::placeholder {
-    color: #999;
+    color: var(--b3-font-background9);
   }
 
   &__input:focus {
-    border-color: #4CAF50;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+    border-color: var(--b3-font-background9);
+    box-shadow: 0 0 5px var(--b3-font-background9);
   }
 }
