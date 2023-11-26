@@ -15,8 +15,8 @@
     "zh_CN": "渐进学习"
   },
   "description": {
-    "default": "Document chunking progressive reading, fill-in-the-blank flashcard progressive writing.",
-    "zh_CN": "文档分片渐进阅读，填空式闪卡渐进写作。"
+    "default": "Document chunking for progressive reading, flashcard-style progressive writing.",
+    "zh_CN": "文档分片渐进阅读，写作式闪卡渐进写作。"
   },
   "readme": {
     "default": "README.md",

@@ -155,7 +155,7 @@ class Progressive {
                 <span class="prog-style__id">1⃣${this.plugin.i18n.splitByHeadings}</span>
                 <input type="checkbox" id="${titleSplitID}" class="prog-style__checkbox"/>
                 <div class="fn__hr"></div>
-                <div class="prog-style__id">2⃣按块数拆分(0为不按块数拆分)</div>
+                <div class="prog-style__id">2⃣${this.plugin.i18n.splitByBlockCount}</div>
                 <input type="text" id="${BlockNumID}" class="prog-style__input"/>
                 <div class="fn__hr"></div>
                 <div class="prog-style__id">3⃣${this.plugin.i18n.splitByWordCount}</div>

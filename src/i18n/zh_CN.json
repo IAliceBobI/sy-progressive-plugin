@@ -21,8 +21,8 @@
   "previousPiece": "⬅",
   "cleanUnchangedOriginDoc": "🧹",
   "insertOriginDoc": "⬇",
-  "insertBlankSpaceCardB": "插入填空式闪卡B",
-  "insertBlankSpaceCardC": "插入填空式闪卡C",
+  "insertBlankSpaceCardB": "插入写作式闪卡B",
+  "insertBlankSpaceCardC": "插入写作式闪卡C",
   "autoCard": "自动制卡",
   "ignoreTxt": "忽略",
   "ignore": "🚫",
@@ -39,6 +39,7 @@
   "addThisDocFirst": "请先将此文档加入渐进学习列表",
   "opsInOriDoc": "请在原始文章中操作，这只是一个阅读分片！",
   "addOrReaddDoc": "添加文档/重新添加文档",
+  "splitByBlockCount": "按块数拆分(0为不按块数拆分)",
   "splitByWordCount": "字数拆分(0为不根据字数拆分)",
   "splitByHeadings": "拆分各级标题",
   "youFoundAPiece": "你发现了一个阅读分片！",
@@ -51,5 +52,11 @@
   "viewAllProgressiveBooks": "查看所有渐进学习文档",
   "startToLearn": "开始学习",
   "readThisPiece": "读光标所在段",
-  "slowDownALittleBit": "⏳请等待索引的建立……然后再继续操作……"
+  "slowDownALittleBit": "⏳请等待索引的建立……然后再继续操作……",
+  "openFlashcardInTab": "以tab的方式打开闪卡",
+  "deletePieceAndExit": "删除当前分片并退出",
+  "msgIgnoreBook": "已经忽略本书",
+  "msgPushBook": "重新推送本书",
+  "msgAutoCard": "自动文档制卡",
+  "msgNotAutoCard": "取消自动文档制卡"
 }

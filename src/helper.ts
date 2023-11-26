@@ -54,10 +54,10 @@ export class Storage {
         const info = await this.booksInfo(bookID);
         if (info.ignored == "no") {
             await this.updateBookInfo(bookID, { ignored: "yes" });
-            await siyuan.pushMsg("已经忽略本书");
+            await siyuan.pushMsg(this.plugin.i18n.msgIgnoreBook);
         } else {
             await this.updateBookInfo(bookID, { ignored: "no" });
-            await siyuan.pushMsg("重新推送本书");
+            await siyuan.pushMsg(this.plugin.i18n.msgPushBook);
         }
     }
 
@@ -68,10 +68,10 @@ export class Storage {
         } else {
             if (info.autoCard == "no") {
                 await this.updateBookInfo(bookID, { autoCard: "yes" });
-                await siyuan.pushMsg("自动文档制卡");
+                await siyuan.pushMsg(this.plugin.i18n.msgAutoCard);
             } else {
                 await this.updateBookInfo(bookID, { autoCard: "no" });
-                await siyuan.pushMsg("取消自动文档制卡");
+                await siyuan.pushMsg(this.plugin.i18n.msgNotAutoCard);
             }
         }
     }
@@ -265,7 +265,7 @@ export class Helper {
         return `<div>
             ${styleColor("var(--b3-card-error-background)", "var(--b3-card-error-color)")}
             <div>
-                <button title="删除当前分片并退出" onclick="${btnID}()" id="btn${btnID}">🗑 🏃</button>
+                <button title="${this.plugin.i18n.deletePieceAndExit}" onclick="${btnID}()" id="btn${btnID}">🗑 🏃</button>
             </div>
             <script>
                 function ${btnID}() {
@@ -370,7 +370,7 @@ export class Helper {
         return `<div>
             ${styleColor("var(--b3-font-background11)", "#000000")}
             <div>
-                <button title="以tab的方式打开闪卡" onclick="${btnID}()" id="btn${btnID}">⚡</button>
+                <button title="${this.plugin.i18n.openFlashcardInTab}" onclick="${btnID}()" id="btn${btnID}">⚡</button>
             </div>
             <script>
                 function ${btnID}() {
