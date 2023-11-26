@@ -1,4 +1,4 @@
-import { Dialog, Menu, Plugin, openTab, confirm, Lute } from "siyuan";
+import { Dialog, Menu, Plugin, openTab, confirm } from "siyuan";
 import "./index.scss";
 import { events } from "./Events";
 import { siyuan, timeUtil } from "./utils";
@@ -12,10 +12,8 @@ class Progressive {
     private plugin: Plugin;
     private storage: help.Storage;
     private helper: help.Helper;
-    private lute: Lute;
 
     onload(plugin: Plugin) {
-        this.lute = utils.NewLute();
         Progressive.GLOBAL_THIS["progressive_zZmqus5PtYRi"] = { progressive: this, utils, siyuan, timeUtil, events };
         this.plugin = plugin;
         this.storage = new help.Storage(plugin);
@@ -501,10 +499,11 @@ class Progressive {
     }
 
     private async fullfilContent(bookID: string, piece: string[], noteID: string) {
+        const lute = utils.NewLute();
         this.storage.updateBookInfoTime(bookID);
         for (const id of piece.slice().reverse()) {
             const { dom } = await siyuan.getBlockDOM(id);
-            let md = this.lute.BlockDOM2Md(dom);
+            let md = lute.BlockDOM2Md(dom);
             md = help.tryRmIDAddLinkOne(md, id);
             md = `${md}\n{: ${constants.RefIDKey}="${id}"}`;
             await siyuan.insertBlockAsChildOf(md, noteID);
