@@ -1,4 +1,4 @@
-import { Plugin, Lute } from "siyuan";
+import { Plugin } from "siyuan";
 import * as constants from "./constants";
 import { siyuan } from "./utils";
 import * as utils from "./utils";
@@ -11,11 +11,9 @@ enum CardType {
 
 class FlashBox {
     private plugin: Plugin;
-    private lute: Lute;
 
     onload(plugin: Plugin) {
         this.plugin = plugin;
-        this.lute = utils.NewLute();
         this.plugin.addCommand({
             langKey: "insertBlankSpaceCardB",
             hotkey: "⌥E",
@@ -40,7 +38,7 @@ class FlashBox {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     const blank = detail?.range?.cloneContents()?.textContent ?? "";
                     if (blockID) {
-                        this.blankSpaceCard(blockID, blank, CardType.B);
+                        this.blankSpaceCard(blockID, blank, detail?.range, detail?.protyle, CardType.B);
                     }
                 },
             });
@@ -52,7 +50,7 @@ class FlashBox {
                     const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                     const blank = detail?.range?.cloneContents()?.textContent ?? "";
                     if (blockID) {
-                        this.blankSpaceCard(blockID, blank, CardType.C);
+                        this.blankSpaceCard(blockID, blank, detail?.range, detail?.protyle, CardType.C);
                     }
                 },
             });
@@ -71,9 +69,10 @@ class FlashBox {
             setTimeout(() => { siyuan.addRiffCards([cardID]); }, 1000);
         } else {
             const blockID = events.lastBlockID;
-            const blank = document.getSelection()?.getRangeAt(0)?.cloneContents()?.textContent ?? "";
+            const range = document.getSelection()?.getRangeAt(0);
+            const blank = range?.cloneContents()?.textContent ?? "";
             if (blockID) {
-                this.blankSpaceCard(blockID, blank, t);
+                this.blankSpaceCard(blockID, blank, range, protyle, t);
             }
         }
     }
@@ -95,6 +94,7 @@ class FlashBox {
     }
 
     private cloneSelectedLineMarkdowns(protyle: any) {
+        const lute = utils.NewLute();
         const multiLine = protyle?.element?.getElementsByTagName("div") as HTMLDivElement[] ?? [];
         const markdowns = [];
         let lastSelectedID = "";
@@ -108,33 +108,31 @@ class FlashBox {
                 }
                 div.classList.remove(constants.PROTYLE_WYSIWYG_SELECT);
                 const elem = div.cloneNode(true) as HTMLDivElement;
-                markdowns.push(this.lute.BlockDOM2Md(elem.innerHTML));
+                markdowns.push(lute.BlockDOM2Md(elem.innerHTML));
             }
         }
         return { markdowns, firstSelectedID, lastSelectedID };
     }
 
-    private async blankSpaceCard(blockID: string, selected: string, cardType: CardType) {
+    private getBlockDOM(dom: Element): { dom: Element, blockID: string } {
+        if (dom.tagName.toLocaleLowerCase() == "body") return {} as any;
+        const blockID: string = dom.getAttribute(constants.DATA_NODE_ID) ?? "";
+        if (!blockID) return this.getBlockDOM(dom.parentElement);
+        return { dom, blockID };
+    }
+
+    private async blankSpaceCard(blockID: string, selected: string, range: Range, protyle: any, cardType: CardType) {
+        const lute = utils.NewLute();
         let md;
         if (selected) {
-            let { content } = await siyuan.getBlockMarkdownAndContent(blockID);
-            selected = selected.replace(/=/g, "​=​");
-            content = content.replace(/=/g, "​=​");
-            content = content.replace(new RegExp(selected, "g"), `==${selected}==`);
-            content = content.replace(/====/g, "");
-            if (content.endsWith("*")) {
-                content = content.slice(0, -1);
-            }
-            const progref = (await siyuan.getBlockAttrs(blockID))["custom-progref"];
-            if (progref) {
-                content += `((${progref} "*"))`;
-            } else {
-                content += `((${blockID} "*"))`;
-            }
-            md = content;
+            const { dom } = this.getBlockDOM(range.endContainer.parentElement);
+            if (!dom) return;
+            protyle.toolbar.setInlineMark(protyle, "mark", "range");
+            md = helper.tryRmIDAddLinkOne(lute.BlockDOM2Md(dom.outerHTML), blockID);
+            protyle.toolbar.setInlineMark(protyle, "mark", "range");
         } else {
             const { dom } = await siyuan.getBlockDOM(blockID);
-            md = helper.tryRmIDAddLinkOne(this.lute.BlockDOM2Md(dom), blockID);
+            md = helper.tryRmIDAddLinkOne(lute.BlockDOM2Md(dom), blockID);
         }
         const cardID = utils.NewNodeID();
         const list = [];
