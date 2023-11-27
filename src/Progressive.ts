@@ -405,14 +405,14 @@ class Progressive {
     private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         switch (cbType) {
             case HtmlCBType.previous:
-                this.helper.closeTab(noteID);
                 await this.storage.gotoBlock(bookID, point - 1);
                 await this.startToLearn(bookID);
+                this.helper.closeTab(noteID);
                 break;
             case HtmlCBType.next:
-                this.helper.closeTab(noteID);
                 await this.storage.gotoBlock(bookID, point + 1);
                 await this.startToLearn(bookID);
+                this.helper.closeTab(noteID);
                 break;
             case HtmlCBType.deleteAndExit:
                 await siyuan.removeRiffCards([noteID]);
@@ -425,8 +425,8 @@ class Progressive {
                 await this.startToLearn(bookID);
                 break;
             case HtmlCBType.nextBook:
-                this.helper.closeTab(noteID);
                 await this.startToLearn();
+                this.helper.closeTab(noteID);
                 break;
             case HtmlCBType.quit:
                 this.helper.closeTab(noteID);

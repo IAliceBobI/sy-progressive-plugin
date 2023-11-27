@@ -192,12 +192,8 @@ export class Helper {
     }
 
     async closeTab(noteID: string) {
-        const tab: any = openTab({
-            app: this.plugin.app, doc: { id: noteID },
-            afterOpen: () => {
-                tab.then((tab: any) => tab.close());
-            }
-        });
+        const tab: any = openTab({ app: this.plugin.app, doc: { id: noteID } });
+        tab.then((tab: any) => tab.close());
     }
 
     btnFullfilContent(bookID: string, noteID: string, point: number) {
