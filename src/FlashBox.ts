@@ -115,7 +115,8 @@ class FlashBox {
     }
 
     private getBlockDOM(dom: Element): { dom: Element, blockID: string } {
-        if (dom.tagName.toLocaleLowerCase() == "body") return {} as any;
+        if (!dom) return {} as any;
+        if (dom?.tagName?.toLocaleLowerCase() == "body") return {} as any;
         const blockID: string = dom.getAttribute(constants.DATA_NODE_ID) ?? "";
         if (!blockID) return this.getBlockDOM(dom.parentElement);
         return { dom, blockID };
