@@ -1,8 +1,8 @@
 import { Plugin } from "siyuan";
 import * as constants from "./constants";
-import { siyuan } from "./utils";
-import * as utils from "./utils";
-import { events } from "./Events";
+import { siyuan } from "../../sy-tomato-plugin/src/utils";
+import * as utils from "../../sy-tomato-plugin/src/utils";
+import { events } from "../../sy-tomato-plugin/src/Events";
 import * as helper from "./helper";
 
 enum CardType {

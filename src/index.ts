@@ -1,7 +1,7 @@
 import { Plugin } from "siyuan";
 import { ICONS } from "./icons";
 import { prog } from "./Progressive";
-import { events } from "./Events";
+import { events } from "../../sy-tomato-plugin/src/Events";
 import { flashBox } from "./FlashBox";
 
 export default class ThePlugin extends Plugin {

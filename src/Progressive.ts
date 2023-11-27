@@ -1,9 +1,9 @@
 import { Dialog, Menu, Plugin, openTab, confirm } from "siyuan";
 import "./index.scss";
-import { events } from "./Events";
-import { siyuan, timeUtil } from "./utils";
+import { events } from "../../sy-tomato-plugin/src/Events";
+import { siyuan, timeUtil } from "../../sy-tomato-plugin/src/utils";
 import { HtmlCBType } from "./helper";
-import * as utils from "./utils";
+import * as utils from "../../sy-tomato-plugin/src/utils";
 import * as help from "./helper";
 import * as constants from "./constants";
 

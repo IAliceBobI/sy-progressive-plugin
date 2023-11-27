@@ -1,5 +1,5 @@
-import { siyuan } from "./utils";
-import * as utils from "./utils";
+import { siyuan } from "../../sy-tomato-plugin/src/utils";
+import * as utils from "../../sy-tomato-plugin/src/utils";
 import * as constants from "./constants";
 import { Plugin, openTab } from "siyuan";
 
