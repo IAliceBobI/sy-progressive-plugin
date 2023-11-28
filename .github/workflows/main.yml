@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+env:
+  PROJ_PATH: 
 
 jobs:
   build:

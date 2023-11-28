@@ -1,3 +1,5 @@
+[SRC/源码](https://github.com/IAliceBobI/workspace/tree/main/sy-progressive-plugin)
+
 [English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
 
 # 渐进学习
