@@ -132,7 +132,7 @@ The plugin, including myself, needs ongoing improvement through long-term use. I
 
 QQ Group: 263961482
 
-[Or submit issues on GitHub](https://github.com/IAliceBobI/sy-progressive-plugin/issues)
+[Or submit issues on GitHub](https://github.com/IAliceBobI/sy-plugins/issues)
 
 [Or submit issues on the official forum](https://ld246.com/tag/siyuan)
 
