@@ -52,6 +52,7 @@ jobs:
         run: |
           cd $PROJ_PATH
           pnpm build
+          mv package.zip ..
 
       - name: Release
         uses: ncipollo/release-action@v1
