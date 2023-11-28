@@ -18,8 +18,8 @@ jobs:
 
       - name: Enter the proj
         run: |
-          ls -al
           cd $PROJ_PATH
+          ls -al
 
       - name: Install Node.js
         uses: actions/setup-node@v3
