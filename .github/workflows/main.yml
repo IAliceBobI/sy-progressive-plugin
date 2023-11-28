@@ -5,24 +5,27 @@ on:
     tags:
       - "v*"
 env:
-  PROJ_PATH: 
+  PROJ_PATH: sy-progressive-plugin
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Checkout
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout workspace repo # https://github.com/marketplace/actions/checkout#checkout-multiple-repos-side-by-side
+        uses: actions/checkout@v4
+        with:
+          repository: IAliceBobI/sy-plugins
 
-      # Install Node.js
+      - name: Enter the proj
+        run: |
+          cd $PROJ_PATH
+
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
           registry-url: "https://registry.npmjs.org"
 
-        # Install pnpm
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         id: pnpm-install
@@ -30,14 +33,12 @@ jobs:
           version: 8
           run_install: false
 
-      # Get pnpm store directory
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
-      # Setup pnpm cache
       - name: Setup pnpm cache
         uses: actions/cache@v3
         with:
@@ -46,11 +47,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      # Install dependencies
       - name: Install dependencies
         run: pnpm install
 
-      # Build for production, 这一步会生成一个 package.zip
       - name: Build for production
         run: pnpm build
 
@@ -61,4 +60,4 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: "package.zip"
           token: ${{ secrets.GITHUB_TOKEN }}
-          prerelease: false
+          prerelease: true

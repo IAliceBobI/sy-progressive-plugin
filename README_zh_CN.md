@@ -1,10 +1,10 @@
-[SRC/源码](https://github.com/IAliceBobI/workspace/tree/main/sy-progressive-plugin)
+[SRC/源码](https://github.com/IAliceBobI/sy-plugins/tree/main/sy-progressive-plugin)
 
-[English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
+[English](https://github.com/IAliceBobI/sy-plugins/blob/main/sy-progressive-plugin/README.md)
 
 # 渐进学习
 
-> [我猜下面的图九成九是裂开了😢，看这里吧！](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
+> [我猜下面的图九成九是裂开了😢，看这里吧！](https://gitee.com/TokenzQdBN/sy-plugins/blob/main/sy-progressive-plugin/README_zh_CN.md)
 
 此插件的功能就是，把长文档划分为一个个小片段，下面叫`分片`，挨个`分片`去阅读。阅读过程可以做笔记、做闪卡。
 
