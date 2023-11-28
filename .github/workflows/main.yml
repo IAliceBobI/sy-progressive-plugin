@@ -6,6 +6,7 @@ on:
       - "v*"
 env:
   PROJ_PATH: sy-progressive-plugin
+  DEPS_PATH: sy-tomato-plugin
 
 jobs:
   build:
@@ -47,6 +48,8 @@ jobs:
         run: |
           cd $PROJ_PATH
           pnpm install
+          cd $DEPS_PATH
+          pnpm install
 
       - name: Build for production
         run: |
@@ -61,4 +64,4 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: "package.zip"
           token: ${{ secrets.GITHUB_TOKEN }}
-          prerelease: false
+          prerelease: true
