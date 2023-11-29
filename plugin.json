@@ -2,7 +2,7 @@
   "name": "sy-progressive-plugin",
   "author": "IAliceBobI",
   "url": "https://github.com/IAliceBobI/sy-progressive-plugin",
-  "version": "0.6.44",
+  "version": "0.6.45",
   "minAppVersion": "2.10.13",
   "backends": [
     "all"
