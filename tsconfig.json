@@ -42,11 +42,11 @@
         }
     },
     "include": [
-        "tools/**/*.ts",
         "src/**/*.ts",
         "src/**/*.d.ts",
-        "src/**/*.tsx",
-        "src/**/*.vue"
+        "../sy-tomato-plugin/src/utils.ts",
+        "../sy-tomato-plugin/src/Events.ts",
+        "../sy-tomato-plugin/src/types/**/*.d.ts"
     ],
     "references": [
         {
