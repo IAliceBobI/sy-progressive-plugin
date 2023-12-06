@@ -27,7 +27,7 @@
     "minimist": "^1.2.8",
     "rollup-plugin-livereload": "^2.0.5",
     "sass": "^1.62.1",
-    "siyuan": "0.8.8",
+    "siyuan": "0.9.0",
     "svelte": "^3.57.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4",
