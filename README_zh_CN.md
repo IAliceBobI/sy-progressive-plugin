@@ -116,6 +116,20 @@
 
 > **提示** 写作式闪卡B，就是写作部分是引述块，C则是代码块。
 
+## Daily Card
+
+右键菜单或者快捷键 [Ctrl+`] 可以制卡，并且把卡片归档到 Daily Card 文件夹下。结果类似 Daily Note。
+
+![Alt text](assets/dailyCardMenu.png)
+
+将创建目录结构如下：
+
+![Alt text](assets/dailyCardTree.png)
+
+文件内容：
+
+![Alt text](assets/dailyCardContent.png)
+
 # 还没想好的计划
 
 - [ ] 设置每天阅读的分片数量。
@@ -143,6 +157,10 @@ QQ群: 263961482
 [或者到官方论坛提交问题](https://ld246.com/tag/siyuan)
 
 # 更新日志
+
+## 2023-12-18
+
+* 新增：`制卡并发到DailyCard`功能，把卡片归档，仿照daily note.
 
 ## 2023-12-17
 
