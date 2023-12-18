@@ -12,6 +12,9 @@
 
 > **提示** 闪卡才是核心，本插件只是帮助我们从资料中提取高质量的闪卡。
 
+> [请填写：反馈表单](https://awx9773btw.feishu.cn/share/base/form/shrcnO85H3V1iNvfEAc2JoQyXeh)
+> 或者 [看看大家反馈了什么](https://awx9773btw.feishu.cn/share/base/view/shrcniyck0JM6yJS3rnj2xXGQ9f)
+
 ## 添加文档
 
 **选择一篇较长文档，进行渐进学习。打开插件菜单，点`添加当前文档`**
@@ -120,6 +123,8 @@
 
 右键菜单或者快捷键 [Ctrl+`] 可以制卡，并且把卡片归档到 Daily Card 文件夹下。结果类似 Daily Note。
 
+> 添加闪卡到 daily card 同时，也添加闪卡的嵌入块，到子文件内。子文件以当前文件名加"-card"后缀命名。
+
 ![Alt text](assets/dailyCardMenu.png)
 
 将创建目录结构如下：
@@ -148,15 +153,21 @@
 
 # BUG反馈、建议
 
-插件需要大家包括我，在长期使用中改进，如有问题、建议可以一起讨论。
+[请填写：反馈表单](https://awx9773btw.feishu.cn/share/base/form/shrcnO85H3V1iNvfEAc2JoQyXeh)
 
-QQ群: 263961482
+或者 [看看大家反馈了什么](https://awx9773btw.feishu.cn/share/base/view/shrcniyck0JM6yJS3rnj2xXGQ9f)
+
+或者到`QQ`群: 263961482
 
 [或者到 Github 提交问题](https://github.com/IAliceBobI/sy-plugins/issues)
 
 [或者到官方论坛提交问题](https://ld246.com/tag/siyuan)
 
 # 更新日志
+
+## 2023-12-19
+
+* 闪卡：添加闪卡到 daily card 同时，也添加闪卡的嵌入块，到子文件内。子文件以当前文件名加"-card"后缀命名。
 
 ## 2023-12-18
 
