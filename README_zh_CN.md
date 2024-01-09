@@ -30,11 +30,11 @@
 
 **打开一篇较长文档，进行渐进学习。先打开插件菜单，点`添加当前文档`。**
 
-![Alt text](assets/addDoc.png)
+<img src="assets/addDoc.png" alt="drawing" width="600"/>
 
 插件会先提示您，要对文档进行拆分。 如图：
 
-![Alt text](assets/split.png)
+<img src="assets/split.png" alt="drawing" width="200"/>
 
 这里为您提供三种拆分方式，`标题`、内容`块数`、`字数`，这三种拆分方式可以同使用，也可以单独使用。
 
@@ -88,7 +88,7 @@
 
 > `开始学习`的快捷键`Alt+-`就在`闪卡` `Alt+0`的后面。一个学习，一个复习。
 
-![Alt text](assets/reading.png)
+<img src="assets/reading.png" alt="drawing" width="600"/>
 
 **`分片`标题有`分片序号`前缀**
 
@@ -106,8 +106,8 @@
 * `⬅ 🗑`：删除当前分片并转到上一个`分片`。
 * `🗑 ➡`：删除当前分片并转到下一个`分片`。
 * `🗑 🏃`：删除当前分片。
-* `➡ 🗃`：把当前文档制为闪卡。
-* `🗃 ➡`：删除当前文档本身的闪卡，不影响文档内的闪卡。
+* `➕🗃`：把当前文档制为闪卡。
+* `➖🗃`：删除当前文档本身的闪卡，不影响文档内的闪卡。
 * `🏃`：关闭分片。
 * `📚📖`：换一本书。
 * `🚫`：不再推送本书，可在`查看所有渐进学习文档`中重新打开。
@@ -127,7 +127,7 @@
 
 打开一个已经加入渐进学习的原始文档，浏览到某个位置，右键菜单：`插件`->`读光标所在段`，即可跳到此`分片`。
 
-![Alt text](assets/rightClickMenu.png)
+<img src="assets/rightClickMenu.png" alt="drawing" width="200"/>
 
 ## 写作式闪卡
 
@@ -135,7 +135,7 @@
 
 光标选择要挖空的一段内容，比如图中的“故事”：
 
-![Alt text](assets/selected.png)
+<img src="assets/selected.png" alt="drawing" width="500"/>
 
 生成闪卡时，也加入输入框，提供写作。
 
@@ -143,7 +143,7 @@
 
 如果是写文章，可以挖空含糊的部分，通过闪卡机制持续思考与写作——渐进写作。
 
-![Alt text](assets/card.png)
+<img src="assets/card.png" alt="drawing" width="500"/>
 
 > 使用快捷键： `Alt+E`
 
@@ -157,13 +157,13 @@
 
 下图选中两行：
 
-![Alt text](assets/multilines.png)
+<img src="assets/multilines.png" alt="drawing" width="500"/>
 
 > 使用快捷键： `Alt+E`
 
 则生成并且插入闪卡于下方，如图：
 
-![Alt text](assets/multilinesCard.png)
+<img src="assets/multilinesCard.png" alt="drawing" width="500"/>
 
 > **提示** 如果是在分片中制卡，则卡片会放到书籍的子文件里。比如书籍名为ABC，则卡都收集到ABC-cards文件中。
 
@@ -171,7 +171,7 @@
 
 右键菜单或者快捷键 [Ctrl+`] 可以制卡，并且把卡片归档到 Daily Card 文件夹下。结果类似 Daily Note。
 
-![Alt text](assets/dailyCardMenu.png)
+<img src="assets/dailyCardMenu.png" alt="drawing" width="300"/>
 
 将创建目录结构如下：
 
@@ -179,7 +179,7 @@
 
 文件内容：
 
-![Alt text](assets/dailyCardContent.png)
+<img src="assets/dailyCardContent.png" alt="drawing" width="300"/>
 
 # 还没想好的计划
 
@@ -215,12 +215,16 @@
 
 # 打赏、鼓励 🎉
 
-**[请移步，爱发电](https://afdian.net/a/playerv5)**
+<img src="assets/wx.png" alt="drawing" width="180"/>
+<img src="assets/zfb.jpg" alt="drawing" width="180"/>
+
+**[或者移步，爱发电](https://afdian.net/a/playerv5)**
 
 # 更新日志
 
 ## 2024-01-09
 
+* 更新readme图片。
 * 深度复制：分片、闪卡对原内容的复制，更加彻底。
 
 ## 2024-01-08
