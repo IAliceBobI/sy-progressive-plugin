@@ -18,9 +18,9 @@
   "author": "IAliceBobI",
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^20.10.8",
-    "@typescript-eslint/eslint-plugin": "^6.18.1",
-    "@typescript-eslint/parser": "^6.18.1",
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
     "eslint": "^8.56.0",
     "fast-glob": "^3.3.2",
     "glob": "^7.2.3",
