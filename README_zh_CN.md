@@ -205,6 +205,7 @@
 
 **感谢所有慷慨的支持者，你们的打赏对我的插件开发意义重大。**
 
+* 2024-01 `*舟`
 * 2024-01 [赐我一胖](https://afdian.net/u/74d98cf66f0711eda8ca52540025c377)
 * 2023-12 [爱发电用户_WGH7](https://afdian.net/u/ceefbee4a48111ee983f5254001e7c00)
 * 2023-12 [爱发电用户_Pv38](https://afdian.net/u/3911fecaa3ad11ee8fa95254001e7c00)
@@ -228,8 +229,12 @@
 
 # 打赏、鼓励 🎉
 
-<img src="assets/wx.png" alt="drawing" width="180"/>
-<img src="assets/zfb.jpg" alt="drawing" width="180"/>
+<div>
+<img src="https://player-pubpic.oss-cn-beijing.aliyuncs.com/static/wx.png" alt="alipay" width="180" />
+</div>
+<div>
+<img src="https://player-pubpic.oss-cn-beijing.aliyuncs.com/static/zfb.jpg" alt="wechat" width="180" />
+</div>
 
 **[或者移步，爱发电](https://afdian.net/a/playerv5)**
 
