@@ -20,7 +20,7 @@
 
 > [查看所有反馈，请到这里](https://awx9773btw.feishu.cn/share/base/view/shrcniyck0JM6yJS3rnj2xXGQ9f)
 
-> [打赏鼓励，请到这里](https://afdian.net/a/playerv5)
+> [打赏鼓励，请到这里](https://gitee.com/TokenzQdBN/sy-plugins/blob/main/sy-tomato-plugin/README_zh_CN.md#%E6%89%93%E8%B5%8F%E9%BC%93%E5%8A%B1-)
 
 ## 添加文档
 
