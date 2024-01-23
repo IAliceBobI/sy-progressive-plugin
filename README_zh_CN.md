@@ -205,13 +205,19 @@
 
 不出意外，会在分片下方生成一个`keys-`开头的文件。
 
+<img src="assets/practiceExtract.png" alt="drawing" width="300"/>
+
 ### 第二步
 
 在`keys-`开头的文件内，根据之前自己的概括、翻译，用自己的语言重写原文。
 
+<img src="assets/rewrite.png" alt="drawing" width="300"/>
+
 最后，在`keys-`文件内，右键`对比原文`。
 
 不出意外，会在分片下方生成一个`compare-`开头的文件。
+
+<img src="assets/compare.png" alt="drawing" width="300"/>
 
 # 还没想好的计划
 
@@ -264,6 +270,7 @@
 
 * 添加`仿写`/`翻译`练习流程。详见上方文档说明。
 * 闪卡中复习分片，可选择是否隐藏下方按钮。
+* 分片内的非原文内容，改变颜色。
 
 ## 2024-01-22
 
