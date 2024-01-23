@@ -44,6 +44,8 @@
 
 我总结了下面三种常用方式，一本书选一种即可。
 
+> [打不开图片请看这里](https://gitee.com/TokenzQdBN/sy-plugins/blob/main/sy-progressive-plugin/README_zh_CN.md)
+
 **一、按照标题拆分**
 
 一本书籍，通常由各级标题组成。按照标题拆分，会根据填入的各级的标题，简单把书籍分成多个分片。默认h1~h6都会被拆分。如果不想拆分h5、h6，可输入：“1,2,3,4”。
@@ -87,6 +89,8 @@
 > `开始学习`的快捷键`Alt+-`就在`闪卡` `Alt+0`的后面。一个学习，一个复习。
 
 <img src="assets/reading.png" alt="drawing" width="600"/>
+
+> [打不开图片请看这里](https://gitee.com/TokenzQdBN/sy-plugins/blob/main/sy-progressive-plugin/README_zh_CN.md)
 
 **`分片`标题有`分片序号`前缀**
 
@@ -147,6 +151,8 @@
 
 > 使用快捷键： `Alt+E`
 
+> [打不开图片请看这里](https://gitee.com/TokenzQdBN/sy-plugins/blob/main/sy-progressive-plugin/README_zh_CN.md)
+
 ### 单行选择二
 
 直接把光标放在内容中，不做选择，用菜单或者快捷键制作闪卡即可。
@@ -206,6 +212,8 @@
 不出意外，会在分片下方生成一个`keys-`开头的文件。
 
 <img src="assets/practiceExtract.png" alt="drawing" width="300"/>
+
+> [打不开图片请看这里](https://gitee.com/TokenzQdBN/sy-plugins/blob/main/sy-progressive-plugin/README_zh_CN.md)
 
 ### 第二步
 
@@ -271,6 +279,7 @@
 * 添加`仿写`/`翻译`练习流程。详见上方文档说明。
 * 闪卡中复习分片，可选择是否隐藏下方按钮。
 * 分片内的非原文内容，改变颜色。
+* 修改readme.
 
 ## 2024-01-22
 
