@@ -282,7 +282,7 @@
 
 ## 2024-02-08
 
-* prog-markd 改为 text
+* prog-marked 改为 text
 
 ## 2024-02-07
 
