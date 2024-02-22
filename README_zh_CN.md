@@ -87,6 +87,7 @@
 **打开插件菜单，点`开始学习`，将打开书籍的第一个分片。**
 
 > `开始学习`的快捷键`Alt+-`就在`闪卡` `Alt+0`的后面。一个学习，一个复习。
+> 随机打开一个分片：`Alt+Shift+-`
 
 <img src="assets/reading.png" alt="drawing" width="600"/>
 
