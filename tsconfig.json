@@ -45,8 +45,7 @@
     "include": [
         "src/**/*.ts",
         "src/**/*.d.ts",
-        "../sy-tomato-plugin/src/utils.ts",
-        "../sy-tomato-plugin/src/Events.ts",
+        "../sy-tomato-plugin/src/**/*.ts",
         "../sy-tomato-plugin/src/types/**/*.d.ts"
     ],
     "references": [
