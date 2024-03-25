@@ -2,7 +2,7 @@
     "name":  "sy-progressive-plugin",
     "author":  "IAliceBobI",
     "url":  "https://github.com/IAliceBobI/sy-progressive-plugin",
-    "version":  "0.15.7",
+    "version":  "0.15.8",
     "minAppVersion":  "2.12.6",
     "backends":  [
                      "all"
@@ -16,7 +16,7 @@
                     },
     "description":  {
                         "default":  "Document chunking for progressive reading, flashcard-style progressive writing.",
-                        "zh_CN":  "文档分片渐进阅读，写作式闪卡渐进写作。"
+                        "zh_CN":  "摘抄式渐进学习、分片式渐进学习、写作式闪卡、列表卡、Daily Card"
                     },
     "readme":  {
                    "default":  "README.md",
