@@ -288,7 +288,7 @@
 
 不出意外，会在分片下方生成一个`keys-`开头的文件。
 
-<img src="assets/practiceExtract.png" alt="drawing" width="300"/>
+<img src="assets/practiceExtract.png" alt="drawing" width="1000"/>
 
 > [打不开图片请看这里](https://gitee.com/TokenzQdBN/sy-plugins/blob/main/sy-progressive-plugin/README_zh_CN.md)
 
@@ -296,21 +296,13 @@
 
 在`keys-`开头的文件内，根据之前自己的概括、翻译，用自己的语言重写原文。
 
-<img src="assets/rewrite.png" alt="drawing" width="300"/>
+<img src="assets/rewrite.png" alt="drawing" width="1000"/>
 
 最后，在`keys-`文件内，右键`对比原文`。
 
 不出意外，会在分片下方生成一个`compare-`开头的文件。
 
-<img src="assets/compare.png" alt="drawing" width="300"/>
-
-# 还没想好的计划
-
-- [ ] 设置每天阅读的分片数量。
-- [ ] 给书籍设置优先级，大概是上下拖拽来设置吧。
-- [ ] 随机推送书籍，优先级高的，推送概率高一些，也就是看的多一些。
-- [ ] 统计面板。今日看的书籍，每本多少分片。
-- [ ] 合并大量保存后的分片到一个文档？
+<img src="assets/compare.png" alt="drawing" width="1000"/>
 
 # 鸣谢
 
