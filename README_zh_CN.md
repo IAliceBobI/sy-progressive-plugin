@@ -95,7 +95,7 @@
 
 插件会先提示您，要对文档进行拆分。 如图：
 
-<img src="assets/split.png" alt="drawing" width="200"/>
+<img src="assets/split.png" alt="drawing" width="300"/>
 
 这里为您提供三种拆分方式，`标题`、内容`块数`、`字数`，这三种拆分方式可以同使用，也可以单独使用。
 
@@ -192,7 +192,7 @@
 
 打开一个已经加入渐进学习的原始文档，浏览到某个位置，右键菜单：`插件`->`读光标所在段`，即可跳到此`分片`。
 
-<img src="assets/rightClickMenu.png" alt="drawing" width="200"/>
+<img src="assets/rightClickMenu.png" alt="drawing" width="300"/>
 
 ## 制作闪卡
 
@@ -200,17 +200,17 @@
 
 光标选择要`挖空`的一段内容，比如图中：
 
-<img src="assets/selected.png" alt="drawing" width="500"/>
+<img src="assets/selected.png" alt="drawing" width="700"/>
 
 闪卡将创建到右边的新文件中，并打开文件。
 
 闪卡以列表的形式被创建，方便在下方写下自己的心得。
 
-<img src="assets/card.png" alt="drawing" width="500"/>
+<img src="assets/card.png" alt="drawing" width="900"/>
 
 有些闪卡，我们可以用引用的方式打上N个标签，空格隔开，下图就打上了一个标签：
 
-<img src="assets/refLeading.png" alt="drawing" width="500"/>
+<img src="assets/refLeading.png" alt="drawing" width="700"/>
 
 这样可以在引用的反链面板查看到所有相关内容。
 
@@ -252,11 +252,11 @@
 
 ### 写作式闪卡``` Alt+` ```
 
-<img src="assets/writingCardInit.png" alt="drawing" width="300"/>
+<img src="assets/writingCardInit.png" alt="drawing" width="800"/>
 
 创建后，原文处也插入闪卡的嵌入块，在闪卡中做的内容，也反应到原文。
 
-<img src="assets/writingCard.png" alt="drawing" width="300"/>
+<img src="assets/writingCard.png" alt="drawing" width="1000"/>
 
 ## 命令面板工具
 
