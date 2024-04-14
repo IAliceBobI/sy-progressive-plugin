@@ -298,7 +298,7 @@
 <img src="assets/writingCard.png" alt="drawing" width="1000"/>
 
 
-### `Alt+D`
+### 多行挖空 `Alt+D`
 
 可以删除官方的`Alt+D`，插件的`Alt+D`自动生效。
 
