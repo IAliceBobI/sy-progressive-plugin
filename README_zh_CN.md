@@ -348,10 +348,34 @@
 
 <img src="assets/compare.png" alt="drawing" width="1000"/>
 
+# 其他
+
+## 改变分片笔记的颜色
+
+添加下面的代码片段，颜色部分`#b33131`自己改。
+
+```
+.protyle-wysiwyg div[custom-progref][custom-paragraph-index]:not([custom-prog-origin-text]):not([custom-prog-key-note]) {
+  color: #b33131;
+}
+```
+
+## 改变提取的笔记的颜色
+
+添加下面的代码片段，颜色部分`#b33131`自己改。
+
+```
+.protyle-wysiwyg div[custom-prog-key-note] {
+  color: #b33131;
+}
+```
+
 # 鸣谢
 
 **感谢所有慷慨的支持者，你们的打赏对我的插件开发意义重大。**
 
+* 2024-05 `**刚`
+* 2024-05 `*驰`
 * 2024-05 [盐酸有点咸](https://afdian.net/u/379a287008a111efa3c552540025c377)
 * 2024-04 `*江`
 * 2024-04 [无糖](https://afdian.net/u/7eefa1207fe711ee971552540025c377)
@@ -400,6 +424,10 @@
 **[或者移步，爱发电](https://afdian.net/a/playerv5)**
 
 # 更新日志
+
+## 2024-05-11
+
+* 修复目录按钮的bug。
 
 ## 2024-05-06
 
