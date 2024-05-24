@@ -7,6 +7,7 @@ on:
 env:
   PROJ_PATH: sy-progressive-plugin
   DEPS_PATH: sy-tomato-plugin
+  YARN_CACHE_DIR_PATH: ""
 
 jobs:
   build:
@@ -18,44 +19,38 @@ jobs:
           repository: IAliceBobI/sy-plugins
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        id: pnpm-install
-        with:
-          version: 8
-          run_install: false
+      - name: Install yarn
+        run: npm install -g yarn
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
+      - name: Set yarn cache directory
         shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+        run: echo "YARN_CACHE_DIR_PATH=$(yarn cache dir)" >> $GITHUB_ENV
 
-      - name: Setup pnpm cache
-        uses: actions/cache@v3
+      - name: Cache dependencies
+        uses: actions/cache@v4
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          path: ${{ env.YARN_CACHE_DIR_PATH }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+            ${{ runner.os }}-yarn-
 
       - name: Install dependencies
         run: |
           cd $PROJ_PATH
-          pnpm install
+          yarn install
           cd ..
           cd $DEPS_PATH
-          pnpm install
+          yarn install
 
       - name: Build for production
         run: |
           cd $PROJ_PATH
-          pnpm build
+          yarn build
           mv package.zip ..
 
       - name: Release
@@ -65,4 +60,4 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: "package.zip"
           token: ${{ secrets.GITHUB_TOKEN }}
-          prerelease: false
+          prerelease: true
