@@ -72,7 +72,7 @@ jobs:
       - name: Run Script
         run: |
           cd dist
-          zip package.zip ./*
+          zip -r package.zip ./*
           mv package.zip ..
 
       - name: Release
