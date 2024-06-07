@@ -71,7 +71,9 @@ jobs:
 
       - name: Run Script
         run: |
-          zip -j package.zip dist/*
+          cd dist
+          zip package.zip ./*
+          mv package.zip ..
 
       - name: Release
         uses: ncipollo/release-action@v1
@@ -80,4 +82,4 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: "package.zip"
           token: ${{ secrets.GITHUB_TOKEN }}
-          prerelease: true
+          prerelease: false
