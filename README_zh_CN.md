@@ -1,4 +1,4 @@
-[English](README.md)
+[English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
 
 > [我猜下面的图九成九是裂开了😢，看这里吧！](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
