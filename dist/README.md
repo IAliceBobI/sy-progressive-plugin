@@ -1,7 +1,8 @@
 [中文](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
-
 # Progressive Reading Based on `Digesting` (Digesting Mode)
+
+> [I guess the image below is probably broken 😢, check here!](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
 ## Usage
 
@@ -372,6 +373,7 @@ Add the following code snippet, and change the color part `#b33131` as needed.
 
 **Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.**
 
+* 2024-06 `雨`
 * 2024-06 `*超`
 * 2024-06 `**峰`
 * 2024-06 [固元膏v](https://afdian.net/u/d1fe450cbf4b11ea9ffa52540025c377)
@@ -429,9 +431,14 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-06-12
+
+* i18n
+
 ## 2024-06-11
 
-* Enhance robustness.
+* Partial i18n.
+* Enhanced robustness.
 
 ## 2024-06-08
 
