@@ -431,6 +431,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-06-13
+
+* fix topbar btns
+
 ## 2024-06-12
 
 * i18n
