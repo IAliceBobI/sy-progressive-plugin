@@ -6,7 +6,7 @@
 
 ## 使用方法
 
-![alt text](assets/digestMenu.png)
+<img src="assets/digest1.gif" alt="drawing" width="800"/>
 
 **默认快捷键：`Alt+Z`。** 这是一个菜单，里面有多个功能。
 
@@ -39,6 +39,8 @@
 多级摘抄并不会产生多级文件夹。全部摘抄都在同一个文件夹内。
 
 ## 制卡
+
+<img src="assets/createCard1.gif" alt="drawing" width="800"/>
 
 只读模式也可以用，用快捷键。
 
@@ -97,6 +99,8 @@
 `Alt+Z -> 🗑️`将删除完成状态的摘抄文件。
 
 ## 摘抄轨迹链`Alt+Z -> 🌲`
+
+<img src="assets/ditestTree.gif" alt="drawing" width="800"/>
 
 在任何一个摘抄文件内使用：
 
@@ -296,11 +300,15 @@
 
 ### 多行挖空 `Alt+D`
 
+<img src="assets/multilineblank.gif" alt="drawing" width="800"/>
+
 可以删除官方的`Alt+D`，插件的`Alt+D`自动生效。
 
 实现官方挖空功能，以及增加多行挖空功能。
 
 选中多行，`Alt+D`即可。
+
+在复习闪卡时，挖空的内容会被当做答案，被隐藏起来。
 
 ## 命令面板工具
 
@@ -374,6 +382,7 @@
 
 **感谢所有慷慨的支持者，你们的打赏对我的插件开发意义重大。**
 
+* 2024-06 [爱发电用户_jykN](https://afdian.net/u/20b38264295811efb0695254001e7c00)
 * 2024-06 `雨`
 * 2024-06 `*超`
 * 2024-06 `**峰`
@@ -431,6 +440,10 @@
 **[或者移步，爱发电](https://afdian.net/a/playerv5)**
 
 # 更新日志
+
+## 2024-06-16
+
+* 在只读文档上摘抄，制卡时不在原文做标记。
 
 ## 2024-06-13
 

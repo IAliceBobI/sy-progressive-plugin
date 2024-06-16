@@ -6,7 +6,7 @@
 
 ## Usage
 
-![alt text](assets/digestMenu.png)
+<img src="assets/digest1.gif" alt="drawing" width="800"/>
 
 **Default shortcut: `Alt+Z`.** This is a menu with multiple functions.
 
@@ -39,6 +39,8 @@ It's akin to manual `fragmentation`. Selecting content blocks can create `fragme
 Multi-level digesting does not create multi-level folders. All digests are in the same folder.
 
 ## Card Creation
+
+<img src="assets/createCard1.gif" alt="drawing" width="800"/>
 
 It can also be used in read-only mode with the shortcut.
 
@@ -97,6 +99,8 @@ Use within any digest file:
 `Alt+Z -> 🗑️` will delete the digest files in the completed state.
 
 ## Digest Trace Chain `Alt+Z -> 🌲`
+
+<img src="assets/ditestTree.gif" alt="drawing" width="800"/>
 
 Use within any digest file:
 
@@ -295,11 +299,15 @@ After creation, the original text will also insert an embedded block of the flas
 
 ### Multi-line Cloze `Alt+D`
 
+<img src="assets/multilineblank.gif" alt="drawing" width="800"/>
+
 The official `Alt+D` can be deleted, and the plugin's `Alt+D` will automatically take effect.
 
 This implements the official cloze deletion function and adds a multi-line cloze deletion feature.
 
 Select multiple lines, and use `Alt+D`.
+
+When reviewing flashcards, the content that has been blanked out is treated as the answer and is hidden.
 
 ## Command Palette Tool
 
@@ -373,6 +381,7 @@ Add the following code snippet, and change the color part `#b33131` as needed.
 
 **Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.**
 
+* 2024-06 [爱发电用户_jykN](https://afdian.net/u/20b38264295811efb0695254001e7c00)
 * 2024-06 `雨`
 * 2024-06 `*超`
 * 2024-06 `**峰`
@@ -430,6 +439,10 @@ Join the `QQ` group: 263961482
 **[Or visit, Afdian](https://afdian.net/a/playerv5)**
 
 # Changelog
+
+## 2024-06-16
+
+* When copying from a read-only document, do not mark on the original text when making cards.
 
 ## 2024-06-13
 
