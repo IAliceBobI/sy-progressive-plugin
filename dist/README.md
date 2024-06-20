@@ -442,6 +442,7 @@ Join the `QQ` group: 263961482
 
 ## 2024-06-20
 
+* Create a flashcard: Fix the bug that causes the answer to leak in the context of the flashcard.
 * Change the color of the settings icon.
 
 ## 2024-06-16
