@@ -440,6 +440,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-06-20
+
+* Change the color of the settings icon.
+
 ## 2024-06-16
 
 * When copying from a read-only document, do not mark on the original text when making cards.
