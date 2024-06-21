@@ -440,6 +440,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-06-21
+
+* After creating cards, batch modify the background of the original text.
+
 ## 2024-06-20
 
 * Create a flashcard: Fix the bug that causes the answer to leak in the context of the flashcard.
