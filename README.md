@@ -38,6 +38,10 @@ It's akin to manual `fragmentation`. Selecting content blocks can create `fragme
 
 Multi-level digesting does not create multi-level folders. All digests are in the same folder.
 
+## Word & Flashcard
+
+<img src="assets/createWords.gif" alt="drawing" width="800"/>
+
 ## Card Creation
 
 <img src="assets/createCard1.gif" alt="drawing" width="800"/>
@@ -381,6 +385,7 @@ Add the following code snippet, and change the color part `#b33131` as needed.
 
 **Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.**
 
+* 2024-06 [虚青海](https://afdian.net/a/xqh042)
 * 2024-06 [爱发电用户_jykN](https://afdian.net/u/20b38264295811efb0695254001e7c00)
 * 2024-06 `雨`
 * 2024-06 `*超`
@@ -439,6 +444,10 @@ Join the `QQ` group: 263961482
 **[Or visit, Afdian](https://afdian.net/a/playerv5)**
 
 # Changelog
+
+## 2024-06-29
+
+* Alt+Z can copy the selected word and add AI's interpretation to it.
 
 ## 2024-06-21
 

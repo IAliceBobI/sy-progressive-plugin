@@ -38,6 +38,10 @@
 
 多级摘抄并不会产生多级文件夹。全部摘抄都在同一个文件夹内。
 
+## 单词 & 闪卡
+
+<img src="assets/createWords.gif" alt="drawing" width="800"/>
+
 ## 制卡
 
 <img src="assets/createCard1.gif" alt="drawing" width="800"/>
@@ -382,6 +386,7 @@
 
 **感谢所有慷慨的支持者，你们的打赏对我的插件开发意义重大。**
 
+* 2024-06 [虚青海](https://afdian.net/a/xqh042)
 * 2024-06 [爱发电用户_jykN](https://afdian.net/u/20b38264295811efb0695254001e7c00)
 * 2024-06 `雨`
 * 2024-06 `*超`
@@ -440,6 +445,10 @@
 **[或者移步，爱发电](https://afdian.net/a/playerv5)**
 
 # 更新日志
+
+## 2024-06-29
+
+* alt+z可以摘抄选中单词，并加入AI的释义。
 
 ## 2024-06-21
 
