@@ -445,6 +445,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-07-03
+
+* Excerpt words: Optimize Google and Bing links to look up word meanings.
+
 ## 2024-06-29
 
 * Alt+Z can copy the selected word and add AI's interpretation to it.
