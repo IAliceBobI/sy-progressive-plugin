@@ -445,6 +445,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-07-05
+
+* Excerpt words: Add backtracking links.
+
 ## 2024-07-03
 
 * Excerpt words: Optimize Google and Bing links to look up word meanings.
