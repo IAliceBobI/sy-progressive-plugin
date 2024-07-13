@@ -385,6 +385,7 @@ Add the following code snippet, and change the color part `#b33131` as needed.
 
 **Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.**
 
+* 2024-07 `**岚`
 * 2024-06 [虚青海](https://afdian.net/a/xqh042)
 * 2024-06 [爱发电用户_jykN](https://afdian.net/u/20b38264295811efb0695254001e7c00)
 * 2024-06 `雨`
@@ -444,6 +445,10 @@ Join the `QQ` group: 263961482
 **[Or visit, Afdian](https://afdian.net/a/playerv5)**
 
 # Changelog
+
+## 2024-07-13
+
+* The new segment, if automatically generated as a flashcard, will automatically mark it as difficult and schedule a review only after two days.
 
 ## 2024-07-05
 
