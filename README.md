@@ -446,6 +446,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-07-14
+
+* Fix bugs related to sentence segmentation.
+
 ## 2024-07-13
 
 * The new segment, if automatically generated as a flashcard, will automatically mark it as difficult and schedule a review only after two days.
