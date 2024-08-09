@@ -466,6 +466,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-08-09
+
+* Sharding and excerpting can select not to include backtracking links.
+
 ## 2024-08-03
 
 * Imitation Writing Process: Upgrade.
