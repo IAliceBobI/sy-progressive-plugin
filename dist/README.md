@@ -373,6 +373,12 @@
   <img src="assets/compare.png" alt="drawing" width="1000"/>
 </details>
 
+## Extract Notes from All Shards
+Use ctrl+f4, right-click on the shard to use.
+
+## Merge All Shards into a New File
+Right-click on the shard to use. For shards that have been modified, using this function is equivalent to creating a new book of your own.
+
 # Other
 <details>
   
@@ -468,6 +474,7 @@ Join the `QQ` group: 263961482
 
 ## 2024-08-09
 
+* In the right-click menu of the shard, you can merge all shards into a new file.
 * Sharding and excerpting can select not to include backtracking links.
 
 ## 2024-08-03
