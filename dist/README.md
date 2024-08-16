@@ -408,6 +408,7 @@ Right-click on the shard to use. For shards that have been modified, using this 
 <details>
   <summary>Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.</summary>
 
+* 2024-08 `duanduan`
 * 2024-07 `凭风引`
 * 2024-07 `**岚`
 * 2024-06 [虚青海](https://afdian.com/a/xqh042)
@@ -471,6 +472,10 @@ Join the `QQ` group: 263961482
 **[Or visit, Afdian](https://afdian.com/a/playerv5)**
 
 # Changelog
+
+## 2024-08-16
+
+* Sharding, excerpting, and adding links pointing to oneself for easy opening within the flashcard.
 
 ## 2024-08-09
 
