@@ -216,8 +216,8 @@
   * `⬅ 🗑`: Delete the current segment and go to the previous `Segment`.
   * `🗑 ➡`: Delete the current segment and go to the next `Segment`.
   * `🗑 🏃`: Delete the current segment.
-  * `➕🗃`: Turn the current document into flashcards.
-  * `➖🗃`: Delete the flashcards of the current document itself, without affecting the flashcards within the document.
+  * `＋🗃`: Turn the current document into flashcards.
+  * `－🗃`: Delete the flashcards of the current document itself, without affecting the flashcards within the document.
   * `🏃`: Close the segment.
   * `📚📖`: Switch to another book.
   * `🚫`: Stop pushing this book, and it can be reopened in `View All Progressive Learning Documents`.
