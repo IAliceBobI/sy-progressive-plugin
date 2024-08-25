@@ -475,6 +475,13 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-08-26
+
+* Card Creation Functionality Enhancement
+
+<details>
+  <summary>more changelogs</summary>
+
 ## 2024-08-22
 
 * Upgrade dependencies.
@@ -504,9 +511,6 @@ Join the `QQ` group: 263961482
 ## 2024-07-13
 
 * The new segment, if automatically generated as a flashcard, will automatically mark it as difficult and schedule a review only after two days.
-
-<details>
-  <summary>more changelogs</summary>
 
 ## 2024-07-05
 
