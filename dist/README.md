@@ -475,6 +475,10 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-09-02
+
+* Separate configuration for marking and background in the original text for card creation and excerpting.
+
 ## 2024-08-26
 
 * Card Creation Functionality Enhancement
