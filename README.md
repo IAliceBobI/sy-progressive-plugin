@@ -475,6 +475,13 @@ Join the `QQ` group: 263961482
 
 # Changelog
 
+## 2024-09-12
+
+* Table Card Optimization.
+
+<details>
+  <summary>more changelogs</summary>
+
 ## 2024-09-06
 
 * Fixed the issue of duplicate references in card creation from segments.
@@ -486,9 +493,6 @@ Join the `QQ` group: 263961482
 ## 2024-08-26
 
 * Card Creation Functionality Enhancement
-
-<details>
-  <summary>more changelogs</summary>
 
 ## 2024-08-22
 
