@@ -446,6 +446,7 @@ ctrl+f4，分片右键使用。
 <details>
   <summary>感谢所有慷慨的支持者，你们的打赏对我的插件开发意义重大。</summary>
 
+* 2024-08 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
 * 2024-08 `edapan`
 * 2024-08 [虚青海](https://afdian.com/a/xqh042)
 * 2024-08 `duanduan`
@@ -493,12 +494,6 @@ ctrl+f4，分片右键使用。
 
 </details>
 
-# BUG反馈、建议
-
-者到`QQ`群: 263961482
-
-[或者到 Github 提交问题](https://github.com/IAliceBobI/sy-plugins/issues)
-
 # 打赏、鼓励、催更 🎉
 
 <div>
@@ -508,8 +503,6 @@ ctrl+f4，分片右键使用。
 <div>
 <img src="https://player-pubpic.oss-cn-beijing.aliyuncs.com/static/zfb1.jpg" alt="wechat" width="300" />
 </div>
-
-**[或者移步，爱发电](https://afdian.com/a/playerv5)**
 
 # 更新日志
 
