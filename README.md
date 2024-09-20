@@ -468,6 +468,10 @@ Right-click on the shard to use. For shards that have been modified, using this 
 
 # Changelog
 
+## 2024-09-21
+
+* Excerpt trajectory upgrade.
+
 ## 2024-09-12
 
 * Table Card Optimization.
