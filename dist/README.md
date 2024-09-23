@@ -470,7 +470,7 @@ Right-click on the shard to use. For shards that have been modified, using this 
 
 ## 2024-09-23
 
-* Open new window to bottom, otherwise to the right
+* Open new window: 0 do not open, 1 open to front, 2 open to back, 3 open to right, 4 open to bottom
 
 ## 2024-09-21
 
