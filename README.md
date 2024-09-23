@@ -468,6 +468,10 @@ Right-click on the shard to use. For shards that have been modified, using this 
 
 # Changelog
 
+## 2024-09-23
+
+* Open new window to bottom, otherwise to the right
+
 ## 2024-09-21
 
 * Excerpt trajectory upgrade.
