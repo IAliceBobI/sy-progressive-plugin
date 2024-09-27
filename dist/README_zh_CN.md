@@ -446,7 +446,8 @@ ctrl+f4，分片右键使用。
 <details>
   <summary>感谢所有慷慨的支持者，你们的打赏对我的插件开发意义重大。</summary>
 
-* 2024-08 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
+* 2024-09 星愿无辰
+* 2024-09 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
 * 2024-08 `edapan`
 * 2024-08 [虚青海](https://afdian.com/a/xqh042)
 * 2024-08 `duanduan`
@@ -506,6 +507,13 @@ ctrl+f4，分片右键使用。
 
 # 更新日志
 
+## 2024-09-27
+
+* 制卡时，可以在末尾添加一条横线。
+
+<details>
+  <summary>更多更新日志</summary>
+
 ## 2024-09-23
 
 * 新开窗: 0不打开，1打开到前台，2打开到后台，3打开到右边，4打开到底部
@@ -517,9 +525,6 @@ ctrl+f4，分片右键使用。
 ## 2024-09-12
 
 * 表格制卡优化。
-
-<details>
-  <summary>更多更新日志</summary>
 
 ## 2024-09-06
 

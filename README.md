@@ -408,7 +408,8 @@ Right-click on the shard to use. For shards that have been modified, using this 
 <details>
   <summary>Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.</summary>
 
-* 2024-08 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
+* 2024-09 星愿无辰
+* 2024-09 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
 * 2024-08 `edapan`
 * 2024-08 [虚青海](https://afdian.com/a/xqh042)
 * 2024-08 `duanduan`
@@ -468,6 +469,13 @@ Right-click on the shard to use. For shards that have been modified, using this 
 
 # Changelog
 
+## 2024-09-27
+
+* When making cards, a horizontal line can be added at the end.
+
+<details>
+  <summary>more changelogs</summary>
+
 ## 2024-09-23
 
 * Open new window: 0 do not open, 1 open to front, 2 open to back, 3 open to right, 4 open to bottom
@@ -479,9 +487,6 @@ Right-click on the shard to use. For shards that have been modified, using this 
 ## 2024-09-12
 
 * Table Card Optimization.
-
-<details>
-  <summary>more changelogs</summary>
 
 ## 2024-09-06
 
