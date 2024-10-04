@@ -5,6 +5,7 @@
 # 基于`摘抄`的渐进阅读（摘抄模式）
 
 ## 使用方法
+
 <details>
   
   <img src="assets/digest1.gif" alt="drawing" width="800"/>
@@ -24,9 +25,11 @@
   摘抄出来的文档与`分片模式`中`分片`的功能与样式一样。
   
   > **连续两次按下快捷键 `Alt+Z`，触发摘抄。**
+
 </details>
 
 ## 轻量级
+
 <details>
   
   相对于`分片模式`，没有自动分片环节，在文档中选择多个内容块，就可做摘抄。
@@ -36,21 +39,27 @@
   > **提示：** 可以对`分片模式`产生的`分片`使用摘抄。
   
   > **提示：** `摘抄模式`可与`分片模式`同时使用。
+
 </details>
 
 ## 扁平化
+
 <details>
   
   多级摘抄并不会产生多级文件夹。全部摘抄都在同一个文件夹内。
+
 </details>
 
 ## 单词 & 闪卡
+
 <details>
   
   <img src="assets/createWords.gif" alt="drawing" width="800"/>
+
 </details>
 
 ## 制卡
+
 <details>
   
   <img src="assets/createCard1.gif" alt="drawing" width="800"/>
@@ -60,24 +69,30 @@
   摘抄可以看作是草稿，可以写写画画，然后制卡。
   
   制卡可以使用下文介绍的 ``` 写作式闪卡Alt+` ``` 、`制卡Alt+E` 、 ``` Daily Card Alt+S 与 Alt+` ```
+
 </details>
 
 ## 复习
+
 <details>
   
   推荐使用`番茄工具箱`的`toolbar`中的`闪卡按钮`。这种`tab`的方式复习闪卡，可以方便做摘抄。
+
 </details>
 
 ## 闪卡转移策略(多)
+
 <details>
   
   每个摘抄都制卡。
   
   > `Alt+Z -> 🗃️` 可以切换为`单`模式。
   > 每本书籍有自己的`闪卡转移策略`。
+
 </details>
 
 ## 闪卡转移策略(单)
+
 <details>
   
   > `Alt+Z -> 🗃️` 可以切换为`多`模式。
@@ -104,25 +119,31 @@
   
   > 新闪卡会自动点一次困难，并把到期时间拉回当前(与`番茄工具箱`的`阅读点`策略一致)，可立刻复习。
   > 此操作是为了，调整各个难度对应的，下次复习时间。
+
 </details>
 
 ## 打开上一个、下一个摘抄
+
 <details>
   
   `Alt+Z -> 👈` `Alt+Z -> 👉`
   
   在某个摘抄上使用此功能，将打开原文上距离相近的摘抄。
+
 </details>
 
 ## 清理已经完成的摘抄
+
 <details>
   
   在任何一个摘抄文件内使用：
   
   `Alt+Z -> 🗑️`将删除完成状态的摘抄文件。
+
 </details>
 
 ## 摘抄轨迹链`Alt+Z -> 🌲`
+
 <details>
   
   <img src="assets/ditestTree.gif" alt="drawing" width="800"/>
@@ -132,9 +153,11 @@
   `Alt+Z -> 🌲`将打开轨迹文件。每一行代表一个摘抄的路径，路径上每个节点都是一个摘抄文件，最终将指向原文。
   
   ![alt text](assets/digestTrace.png)
+
 </details>
 
 # 基于`分片`的渐进阅读（分片模式）
+
 <details>
   
   把长文档划分为一个个小片段，下面叫`分片`，挨个`分片`去阅读。阅读过程可以做笔记、做闪卡。
@@ -148,9 +171,11 @@
   **提示：** *闪卡才是核心，本插件只是帮助我们更舒服地，持续地阅读书籍，进而从书籍中提取高质量的闪卡。*
   
   > [打赏鼓励，请到这里](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md#bug%E5%8F%8D%E9%A6%88%E5%BB%BA%E8%AE%AE)
+
 </details>
 
 ## 添加文档
+
 <details>
   
   开始使用的第一步，是打开一本书籍。
@@ -208,9 +233,11 @@
   > **提示** 有的书籍内容可能需要反复思考，才能提炼出来高质量的闪卡，`自动制卡`只是粗略地制卡。
   
   > **注意** `分片`后，原书不要修改，比如删除一些块，会导致学习时插件找不到这些块。
+
 </details>
 
 ## 开始学习
+
 <details>
   
   成功添加爱书后，我们进入阅读环节。
@@ -255,9 +282,11 @@
   > **提示** 被删除的`分片`，如果被再次阅读到，还会被重新创建出来。
   
   > **提示** 每个`分片`的文档标题是可以修改的。但文档备注不要修改，不然插件以后找不到这个文档。
+
 </details>
 
 ## 读光标所在段
+
 <details>
   
   如果想从原始文档的某个部分开始看，可以使用`读光标所在段`功能。
@@ -265,11 +294,13 @@
   打开一个已经加入渐进学习的原始文档，浏览到某个位置，右键菜单：`插件`->`读光标所在段`，即可跳到此`分片`。
   
   <img src="assets/rightClickMenu.png" alt="drawing" width="300"/>
+
 </details>
 
 ## 制作闪卡
 
 ### 制作挖空卡`Alt+E`
+
 <details>
   
   光标选择要`挖空`的一段内容，比如图中：
@@ -295,15 +326,19 @@
   > 推荐配合`番茄工具箱`的`闪卡优先级`功能、`底部反链`功能。
   
   > [打不开图片请看这里](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
+
 </details>
 
 ### 直接制卡，不挖空，还是`Alt+E`
+
 <details>
   
   直接把光标放在内容中，不做选择，用菜单或者快捷键制作闪卡即可。
+
 </details>
 
 ### 多行选择，还是`Alt+E`
+
 <details>
   
   下图选中两行：
@@ -317,9 +352,11 @@
   <img src="assets/multilinesCard.png" alt="drawing" width="500"/>
   
   > **提示** 如果是在分片中制卡，则卡片会放到书籍的子文件里。比如书籍名为ABC，则卡都收集到ABC-cards文件中。
+
 </details>
 
 ### Daily Card`Alt+S`或者``` Ctrl+` ```
+
 <details>
   
   右键菜单或者快捷键 ``` Ctrl+` 引用原文 or Alt+S 不引用原文 ``` 可以制卡，并且把卡片归档到 Daily Card 文件夹下。结果类似 Daily Note。
@@ -329,9 +366,11 @@
   将创建目录结构如下，并制卡：
   
   ![Alt text](assets/dailyCardTree.png)
+
 </details>
 
 ### 写作式闪卡``` Alt+` ```
+
 <details>
   
   <img src="assets/writingCardInit.png" alt="drawing" width="800"/>
@@ -339,9 +378,11 @@
   创建后，原文处也插入闪卡的嵌入块，在闪卡中做的内容，也反应到原文。
   
   <img src="assets/writingCard.png" alt="drawing" width="1000"/>
+
 </details>
 
 ### 多行挖空 `Alt+D`
+
 <details>
   
   <img src="assets/multilineblank.gif" alt="drawing" width="800"/>
@@ -353,21 +394,27 @@
   选中多行，`Alt+D`即可。
   
   在复习闪卡时，挖空的内容会被当做答案，被隐藏起来。
+
 </details>
 
 ## 命令面板工具
+
 <details>
   
   替换`*`与`@`为超链接`siyuan://`。快捷键`F9`。
+
 </details>
 
 ## 移动分片内的块到上一个、下一个分片
+
 <details>
   
   ![Alt text](assets/moveBlock.png)
+
 </details>
 
 ## 搜集功能`alt+shift+z`
+
 <details>
   
   可把各个分片中，选择中内容，复制到`summary-*`文件。
@@ -377,9 +424,11 @@
   对于需要前后对照着看的书籍，有较大的帮助。
   
   如果不在分片内使用，则搜集到 daily note.
+
 </details>
 
 ## 仿写练习流程
+
 <details>
   
   仿写练习流程，也可以叫翻译练习流程。
@@ -407,6 +456,7 @@
   不出意外，会在分片下方生成一个`compare-`开头的文件。
   
   <img src="assets/compare.png" alt="drawing" width="1000"/>
+
 </details>
 
 ## 提取所有分片的笔记 
@@ -418,6 +468,7 @@ ctrl+f4，分片右键使用。
 分片右键使用。对于修改过的分片，使用本功能，相当于创建一个本自己的新书。
 
 # 其他
+
 <details>
   
   ## 改变分片笔记的颜色
@@ -439,6 +490,7 @@ ctrl+f4，分片右键使用。
     color: #b33131;
   }
   ```
+  
 </details>
 
 # 鸣谢
