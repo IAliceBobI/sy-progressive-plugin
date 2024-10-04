@@ -1,6 +1,7 @@
 [中文](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
 # Progressive Reading Based on `Digesting` (Digesting Mode)
+
 <details>
   
   > [I guess the image below is probably broken 😢, check here!](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
@@ -112,9 +113,11 @@
   `Alt+Z -> 🌲` will open the trace file. Each line represents a digest path, with each node on the path being a digest file, ultimately pointing to the original text.
   
   ![alt text](assets/digestTrace.png)
+
 </details>
 
 # Shard-Based Incremental Reading (Shard Mode)
+
 <details>
   
   Divide long documents into smaller segments, referred to here as `shards`, and read each `shard` one by one. During the reading process, you can take notes and create flashcards.
@@ -239,9 +242,11 @@
   Open an original document that has been added to progressive learning, navigate to a specific location, right-click the menu: `Plugin` -> `Read the Paragraph Under the Cursor`, and you will jump to this `Segment`.
   
   <img src="assets/rightClickMenu.png" alt="drawing" width="300"/>
+
 </details>
 
 ## Making Flashcards
+
 <details>
   
   ### Making Cloze Cards `Alt+E`
@@ -317,21 +322,27 @@
   Select multiple lines, and use `Alt+D`.
   
   When reviewing flashcards, the content that has been blanked out is treated as the answer and is hidden.
+
 </details>
 
 ## Command Palette Tool
+
 <details>
   
   Replace `*` and `@` with hyperlinks `siyuan://`. Shortcut key `F9`.
+
 </details>
 
 ## Move Blocks within Segments to Previous or Next Segment
+
 <details>
   
   ![Alt text](assets/moveBlock.png)
+
 </details>
 
 ## Collection Function `alt+shift+z`
+
 <details>
   
   This function can copy selected content from various segments to the `summary-*` file.
@@ -341,9 +352,11 @@
   It is particularly helpful for books that require comparison between distant segments.
   
   If not used within segments, it will collect to the daily note.
+
 </details>
 
 ## Imitation Practice Process
+
 <details>
   
   The imitation practice process, also known as the translation practice process.
@@ -371,6 +384,7 @@
   As expected, a file starting with `compare-` will be generated below the segment.
   
   <img src="assets/compare.png" alt="drawing" width="1000"/>
+
 </details>
 
 ## Extract Notes from All Shards
@@ -380,6 +394,7 @@ Use ctrl+f4, right-click on the shard to use.
 Right-click on the shard to use. For shards that have been modified, using this function is equivalent to creating a new book of your own.
 
 # Other
+
 <details>
   
   ## Change the Color of Segment Notes
@@ -401,9 +416,11 @@ Right-click on the shard to use. For shards that have been modified, using this 
     color: #b33131;
   }
   ```
+
 </details>
 
 # Acknowledgements
+
 
 <details>
   <summary>Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.</summary>
@@ -458,6 +475,7 @@ Right-click on the shard to use. For shards that have been modified, using this 
 * 2023-12 [爱发电用户_EbBe](https://afdian.com/u/d11e3c741bc711ee95eb52540025c377)
 * 2023-12 [爱发电用户_b2864](https://afdian.com/u/b286492496af11eea38752540025c377)
 
+
 </details>
 
 # Donations, Encouragement, and Reminders for Updates 🎉
@@ -475,6 +493,7 @@ Right-click on the shard to use. For shards that have been modified, using this 
 ## 2024-09-27
 
 * When making cards, a horizontal line can be added at the end.
+
 
 <details>
   <summary>more changelogs</summary>
@@ -1074,5 +1093,6 @@ Right-click on the shard to use. For shards that have been modified, using this 
 ## 2023-11-17
 
 * Initial release.
+
 
 </details>
