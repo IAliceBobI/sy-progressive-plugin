@@ -408,9 +408,12 @@ Right-click on the shard to use. For shards that have been modified, using this 
 <details>
   <summary>Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.</summary>
 
+* 2024-10 `**强`
+* 2024-10 Sonetto
 * 2024-09 星愿无辰
 * 2024-09 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
 * 2024-08 `edapan`
+* 2024-08 `**生`
 * 2024-08 [虚青海](https://afdian.com/a/xqh042)
 * 2024-08 `duanduan`
 * 2024-07 `凭风引`
