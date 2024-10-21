@@ -490,13 +490,14 @@ Right-click on the shard to use. For shards that have been modified, using this 
 
 # Changelog
 
-## 2024-09-27
-
-* When making cards, a horizontal line can be added at the end.
-
+[中文](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
 <details>
   <summary>more changelogs</summary>
+
+## 2024-09-27
+
+* When making cards, a horizontal line can be added at the end.
 
 ## 2024-09-23
 
