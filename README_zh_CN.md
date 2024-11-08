@@ -1,5 +1,7 @@
 [English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
 
+# [issue 反馈提交到这里](https://pd.qq.com/s/2fh7nh7gz)
+
 > [我猜下面的图九成九是裂开了😢，看这里吧！](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
 # 基于`摘抄`的渐进阅读（摘抄模式）
@@ -498,6 +500,9 @@ ctrl+f4，分片右键使用。
 <details>
   <summary>感谢所有慷慨的支持者，你们的打赏对我的插件开发意义重大。</summary>
 
+* 2024-11 [爱发电用户_35865](https://afdian.com/u/35865882c7e411ed8b3b5254001e7c00)
+* 2024-11 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
+* 2024-10 `Nnf`
 * 2024-10 `**强`
 * 2024-10 Sonetto
 * 2024-09 星愿无辰

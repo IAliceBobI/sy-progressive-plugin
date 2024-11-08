@@ -1,5 +1,9 @@
 [中文](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
+# [issue 反馈提交到这里](https://pd.qq.com/s/2fh7nh7gz)
+
+<details>
+
 # Progressive Reading Based on `Digesting` (Digesting Mode)
 
 <details>
@@ -425,6 +429,9 @@ Right-click on the shard to use. For shards that have been modified, using this 
 <details>
   <summary>Thank you to all the generous supporters, your donations are of great significance to the development of my plugins.</summary>
 
+* 2024-11 [爱发电用户_35865](https://afdian.com/u/35865882c7e411ed8b3b5254001e7c00)
+* 2024-11 [Tisamn](https://afdian.com/u/cef7f2e42a0f11efb03952540025c377)
+* 2024-10 `Nnf`
 * 2024-10 `**强`
 * 2024-10 Sonetto
 * 2024-09 星愿无辰
@@ -474,7 +481,6 @@ Right-click on the shard to use. For shards that have been modified, using this 
 * 2023-12 [没头脑和不高兴](https://afdian.com/u/25e08b1eb1a511edbb3d5254001e7c00)
 * 2023-12 [爱发电用户_EbBe](https://afdian.com/u/d11e3c741bc711ee95eb52540025c377)
 * 2023-12 [爱发电用户_b2864](https://afdian.com/u/b286492496af11eea38752540025c377)
-
 
 </details>
 
@@ -1096,4 +1102,5 @@ Right-click on the shard to use. For shards that have been modified, using this 
 * Initial release.
 
 
+</details>
 </details>
