@@ -1,8 +1,6 @@
 [中文](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
-# [issue 反馈提交到这里](https://pd.qq.com/s/2fh7nh7gz)
-
-<details>
+# [issue 反馈](https://pd.qq.com/s/2fh7nh7gz)
 
 # Progressive Reading Based on `Digesting` (Digesting Mode)
 
@@ -1102,5 +1100,4 @@ Right-click on the shard to use. For shards that have been modified, using this 
 * Initial release.
 
 
-</details>
 </details>
