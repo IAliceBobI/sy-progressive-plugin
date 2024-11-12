@@ -1,6 +1,6 @@
 [English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
 
-# [issue 反馈](https://pd.qq.com/s/2fh7nh7gz)
+# [issue 反馈 交流 QQ频道](https://pd.qq.com/s/2fh7nh7gz)
 
 > [我猜下面的图九成九是裂开了😢，看这里吧！](https://gitee.com/TokenzQdBN/sy-progressive-plugin/blob/main/README_zh_CN.md)
 

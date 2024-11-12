@@ -1,6 +1,6 @@
 [中文](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README_zh_CN.md)
 
-# [issue 反馈](https://pd.qq.com/s/2fh7nh7gz)
+# [issue 反馈 交流 QQ频道](https://pd.qq.com/s/2fh7nh7gz)
 
 # Progressive Reading Based on `Digesting` (Digesting Mode)
 
