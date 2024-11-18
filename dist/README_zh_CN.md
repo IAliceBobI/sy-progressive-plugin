@@ -1,6 +1,6 @@
 [English](https://github.com/IAliceBobI/sy-progressive-plugin/blob/main/README.md)
 
-## [new doc 👈👈👈](https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink)
+## [doc 帮助文档 👈](https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink)
 
 # [issue 反馈 交流 QQ频道](https://pd.qq.com/s/2fh7nh7gz)
 
