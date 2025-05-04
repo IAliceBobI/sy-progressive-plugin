@@ -1,40 +1,23 @@
-// ref path of original
-.protyle-wysiwyg div[custom-origin-hpath]:not([custom-prog-origin-text])::before {
-  content: attr(custom-origin-hpath);
-  font-size: 80%;
-  color: var(--b3-font-color2);
-  padding-left: 15px;
+.protyle-wysiwyg div[custom-staticlink],
+.protyle-wysiwyg div[custom-tomato-readingpoint] {
+  opacity: 0.65;
+  // transform: scale(0.65);
+  // transform-origin: 0 0;
+  color: var(--b3-font-color8);
+  background-color: var(--b3-font-background5);
 }
 
-// ref path
-.protyle-wysiwyg div[custom-ref-hpath]:not([custom-origin-hpath]):not([custom-prog-origin-text])::before {
-  content: attr(custom-ref-hpath);
-  font-size: 80%;
-  color: var(--b3-font-color3);
-  padding-left: 15px;
+.protyle-wysiwyg div[custom-card-priority-stop] {
+  opacity: 0.3;
 }
 
-// note in pieces
-.protyle-wysiwyg div[custom-progref][custom-paragraph-index]:not([custom-prog-origin-text]):not([custom-prog-key-note]) {
-  color: var(--b3-font-color2);
+.protyle-wysiwyg div[custom-card-priority-stop]::after {
+  content: attr(custom-card-priority-stop);
+  color: var(--b3-font-color5);
 }
 
-// key note
-.protyle-wysiwyg div[custom-prog-key-note] {
-  color: var(--b3-font-color2);
-}
-
-// last block of the previous piece
-.protyle-wysiwyg div[custom-prog-piece-previous] {
-  transform: scale(0.9);
-  transform-origin: 0 0;
-  border-left: 5px solid var(--b3-font-background5);
-  border-right: 5px solid var(--b3-font-background5);
-  padding: 10px;
-}
-
-// words
-.protyle-wysiwyg div[custom-prog-words] {
+// ai response
+.protyle-wysiwyg div[custom-ai-response] {
   color: var(--b3-font-color5);
   background-color: var(--b3-font-background5);
 }
@@ -44,44 +27,98 @@
   border-bottom: 1px groove var(--b3-font-color5);
 }
 
+// bottom link
+.protyle-wysiwyg div[custom-lnk-bottom] {
+  border: 1px solid var(--b3-font-color5);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.buttom-bk-borderedDiv {
+  border: 1px solid var(--b3-theme-surface-lighter);
+}
+
+.protyle-wysiwyg div[custom-sync-block-id] {
+  border: 1px dashed var(--b3-font-color5);
+}
+
+// readonly
+.protyle-wysiwyg div[custom-tomato-readonly]::before {
+  content: attr(memo);
+}
+
+.protyle-wysiwyg div[custom-tomato-readonly] {
+  color: var(--b3-font-color4);
+  background-color: var(--b3-font-background4);
+
+  div:not(.protyle-attr) {
+    display: none;
+  }
+
+  div.protyle-attr::after {
+    content: "🔒";
+  }
+}
+
+.protyle-wysiwyg div[custom-tomato-line-blur] {
+  filter: blur(5px);
+  opacity: 0.7;
+}
+
+.protyle-wysiwyg div[custom-tomato-line-blur]:hover {
+  filter: none;
+  opacity: 1;
+}
+
+// bi ref links
+.protyle-wysiwyg {
+  div[custom-tomato-reflink]::after {
+    content: attr(custom-tomato-reflink);
+    font-size: small;
+  }
+
+  div[custom-tomato-reflink] {
+    display: flex;
+  }
+}
+
 // super block as card
 .protyle-wysiwyg div[custom-super-card-box] {
   border: 1px solid var(--b3-font-color5);
 }
 
-// @keyframes progFadeIn {
+// @keyframes tomatoFadeIn {
 //   from {
-//     opacity: 0.4;
-//     color: var(--b3-font-color1);
-//     background-color: var(--b3-font-background7);
+//     opacity: 0.1;
+//     color: var(--b3-font-color2);
+//     background-color: var(--b3-font-background1);
 //   }
 //   to {
 //     opacity: 1;
 //   }
 // }
-// .protyle-wysiwyg div[custom-progref] {
-//   animation: progFadeIn 0.1s forwards;
+// .tomato-cmd-box {
+//   animation: tomatoFadeIn 0.3s forwards 3;
 // }
 
-.prog-style {
-  &__p {
-    margin: 0;
+.tomato-style {
+  &__bkContainer {
+    font-size: larger;
   }
 
-  &__checkbox {
-    top: 0;
-    left: 0;
-    height: 18px;
-    width: 18px;
-    background-color: var(--b3-theme-background);
-    border-radius: 3px;
-  }
+  &__bkContent {
+    padding-left: 30px;
 
-  &__container_div {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
+    ul {
+      padding-left: 20px;
+    }
+
+    ul ul {
+      padding-left: 40px;
+    }
+
+    ul ul ul {
+      padding-left: 60px;
+    }
   }
 
   &__container {
@@ -93,9 +130,21 @@
 
   &__centered-text {
     text-align: center;
-    font-size: 40px;
+    font-size: 30px;
   }
 
+  &__code {
+    background-color: var(--b3-protyle-code-linenumber-hl);
+    color: var(--b3-font-color5);
+    font-size: small;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: "Courier New", monospace;
+    vertical-align: top;
+  }
+}
+
+.schedule-style {
   &__id {
     background: var(--b3-card-info-background);
     border-radius: 4px;
@@ -106,8 +155,8 @@
   &__button {
     display: inline-block;
     padding: 10px 20px;
-    background-color: var(--b3-font-background12);
-    color: var(--b3-card-success-color);
+    background-color: var(--b3-font-background4);
+    color: var(--b3-font-color5);
     text-align: center;
     text-decoration: none;
     font-size: 16px;
@@ -117,11 +166,11 @@
   }
 
   &__button:hover {
-    background-color: var(--b3-font-background6);
+    background-color: var(--b3-font-background3);
   }
 
   &__button:active {
-    background-color: var(--b3-font-background7);
+    background-color: var(--b3-font-background3);
   }
 
   &__button.large {
@@ -134,20 +183,16 @@
     font-size: 14px;
   }
 
-  &__input {
+  &__input-field {
     padding: 10px;
-    border: 1px solid var(--b3-font-background9);
+    border: 1px solid var(--b3-protyle-search-border-color);
     border-radius: 4px;
     font-size: larger;
     width: 300px;
   }
 
-  &__input::placeholder {
-    color: var(--b3-font-background9);
-  }
-
-  &__input:focus {
-    border-color: var(--b3-font-background9);
-    box-shadow: 0 0 5px var(--b3-font-background9);
+  &__input-field:focus {
+    border-color: var(--b3-protyle-search-current-background);
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
   }
 }

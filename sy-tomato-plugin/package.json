@@ -1,5 +1,5 @@
 {
-  "name": "sy-progressive-plugin",
+  "name": "sy-tomato-plugin",
   "version": "0.0.1",
   "description": "",
   "type": "module",
@@ -8,17 +8,34 @@
     "build": "vite build"
   },
   "keywords": [
-    "Learning",
-    "Progressive",
-    "Progressive Learning",
-    "Progressive Reading",
-    "Progressive Writing"
+    "TomatoClock",
+    "Time management",
+    "Productivity",
+    "Pomodoro technique",
+    "Timer plugin",
+    "Task scheduling",
+    "Focus sessions",
+    "Work intervals",
+    "Breaks",
+    "Time tracking",
+    "Timeboxing",
+    "Time optimization",
+    "Efficiency",
+    "Work-life balance",
+    "Distraction management",
+    "Task prioritization",
+    "Time blocking",
+    "Time visualization",
+    "Progress tracking",
+    "Goal setting"
   ],
   "author": "IAliceBobI",
   "license": "MIT",
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "@tsconfig/svelte": "^4.0.1",
+    "@types/elliptic": "^6.4.18",
+    "@types/fabric": "^5.3.7",
     "@types/node": "^20.12.7",
     "fast-glob": "^3.2.12",
     "glob": "^11.0.0",
@@ -34,7 +51,17 @@
     "vite-plugin-zip-pack": "^1.2.3"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.4",
     "@types/uuid": "^9.0.8",
+    "@xyflow/svelte": "^0.1.23",
+    "elliptic": "^6.5.7",
+    "fabric": "^5.4.0",
+    "html2canvas": "^1.4.1",
+    "moment-timezone": "^0.5.45",
+    "openai": "^4.49.1",
+    "pinyin-pro": "^3.20.3",
+    "terser": "^5.31.6",
+    "ts-md5": "^1.3.1",
     "uuid": "^9.0.1"
   }
 }

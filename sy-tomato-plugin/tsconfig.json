@@ -50,9 +50,6 @@
         "src/**/*.ts",
         "src/**/*.d.ts",
         "src/**/*.svelte",
-        "../sy-tomato-plugin/src/**/*.ts",
-        "../sy-tomato-plugin/src/types/**/*.d.ts",
-        "../sy-tomato-plugin/src/types/**/*.svelte",
     ],
     "exclude": [
         "node_modules"

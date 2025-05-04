@@ -5,8 +5,7 @@ on:
     tags:
       - "v*"
 # env:
-#   PROJ_PATH: sy-progressive-plugin
-#   DEPS_PATH: sy-tomato-plugin
+#   PROJ_PATH: sy-tomato-plugin
 #   YARN_CACHE_DIR_PATH: ""
 # jobs:
 #   build:
@@ -42,9 +41,6 @@ on:
 #         run: |
 #           cd $PROJ_PATH
 #           yarn install
-#           cd ..
-#           cd $DEPS_PATH
-#           yarn install
 
 #       - name: Build for production
 #         run: |
@@ -60,7 +56,6 @@ on:
 #           artifacts: "package.zip"
 #           token: ${{ secrets.GITHUB_TOKEN }}
 #           prerelease: false
-
 jobs:
   build:
     runs-on: ubuntu-latest

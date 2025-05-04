@@ -13,7 +13,7 @@ const isWatch = args.watch || args.w || false;
 // const distDir = isWatch ? devDistDir : "./dist";
 // console.info("isWatch=>", isWatch);
 // console.info("distDir=>", distDir);
-const devDistDir = process.env.SYPLUGINDIR + "/sy-progressive-plugin";
+const devDistDir = process.env.SYPLUGINDIR ? process.env.SYPLUGINDIR + "/sy-tomato-plugin" : "build";
 const distDir = devDistDir;
 
 export default defineConfig({
@@ -71,7 +71,7 @@ export default defineConfig({
     // 设置为 false 可以禁用最小化混淆
     // 或是用来指定是应用哪种混淆器
     // boolean | 'terser' | 'esbuild'
-    minify: isWatch ? false : "esbuild", // "terser",
+    minify: isWatch ? false : "esbuild",
 
     lib: {
       // Could also be a dictionary or array of multiple entry points
@@ -79,6 +79,15 @@ export default defineConfig({
       // the proper extensions will be added
       fileName: "index",
       formats: ["cjs"],
+    },
+
+    terserOptions: {
+      compress: true, // 启用压缩
+      mangle: true,   // 启用变量名混淆
+      output: {
+        beautify: false, // 禁用美化输出
+        comments: false  // 移除注释
+      }
     },
 
     rollupOptions: {
