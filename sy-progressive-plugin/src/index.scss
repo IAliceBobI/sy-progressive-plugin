@@ -1,0 +1,153 @@
+// ref path of original
+.protyle-wysiwyg div[custom-origin-hpath]:not([custom-prog-origin-text])::before {
+  content: attr(custom-origin-hpath);
+  font-size: 80%;
+  color: var(--b3-font-color2);
+  padding-left: 15px;
+}
+
+// ref path
+.protyle-wysiwyg div[custom-ref-hpath]:not([custom-origin-hpath]):not([custom-prog-origin-text])::before {
+  content: attr(custom-ref-hpath);
+  font-size: 80%;
+  color: var(--b3-font-color3);
+  padding-left: 15px;
+}
+
+// note in pieces
+.protyle-wysiwyg div[custom-progref][custom-paragraph-index]:not([custom-prog-origin-text]):not([custom-prog-key-note]) {
+  color: var(--b3-font-color2);
+}
+
+// key note
+.protyle-wysiwyg div[custom-prog-key-note] {
+  color: var(--b3-font-color2);
+}
+
+// last block of the previous piece
+.protyle-wysiwyg div[custom-prog-piece-previous] {
+  transform: scale(0.9);
+  transform-origin: 0 0;
+  border-left: 5px solid var(--b3-font-background5);
+  border-right: 5px solid var(--b3-font-background5);
+  padding: 10px;
+}
+
+// words
+.protyle-wysiwyg div[custom-prog-words] {
+  color: var(--b3-font-color5);
+  background-color: var(--b3-font-background5);
+}
+
+// super list
+.protyle-wysiwyg div[custom-super-list] {
+  border-bottom: 1px groove var(--b3-font-color5);
+}
+
+// super block as card
+.protyle-wysiwyg div[custom-super-card-box] {
+  border: 1px solid var(--b3-font-color5);
+}
+
+// @keyframes progFadeIn {
+//   from {
+//     opacity: 0.4;
+//     color: var(--b3-font-color1);
+//     background-color: var(--b3-font-background7);
+//   }
+//   to {
+//     opacity: 1;
+//   }
+// }
+// .protyle-wysiwyg div[custom-progref] {
+//   animation: progFadeIn 0.1s forwards;
+// }
+
+.prog-style {
+  &__p {
+    margin: 0;
+  }
+
+  &__checkbox {
+    top: 0;
+    left: 0;
+    height: 18px;
+    width: 18px;
+    background-color: var(--b3-theme-background);
+    border-radius: 3px;
+  }
+
+  &__container_div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  &__container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+
+  &__centered-text {
+    text-align: center;
+    font-size: 40px;
+  }
+
+  &__id {
+    background: var(--b3-card-info-background);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: large;
+  }
+
+  &__button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: var(--b3-font-background12);
+    color: var(--b3-card-success-color);
+    text-align: center;
+    text-decoration: none;
+    font-size: 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  &__button:hover {
+    background-color: var(--b3-font-background6);
+  }
+
+  &__button:active {
+    background-color: var(--b3-font-background7);
+  }
+
+  &__button.large {
+    padding: 12px 24px;
+    font-size: 24px;
+  }
+
+  &__button.small {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  &__input {
+    padding: 10px;
+    border: 1px solid var(--b3-font-background9);
+    border-radius: 4px;
+    font-size: larger;
+    width: 300px;
+  }
+
+  &__input::placeholder {
+    color: var(--b3-font-background9);
+  }
+
+  &__input:focus {
+    border-color: var(--b3-font-background9);
+    box-shadow: 0 0 5px var(--b3-font-background9);
+  }
+}
