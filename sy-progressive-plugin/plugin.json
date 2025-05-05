@@ -1,0 +1,40 @@
+{
+  "name": "sy-progressive-plugin",
+  "author": "IAliceBobI",
+  "url": "https://github.com/IAliceBobI/sy-progressive-plugin",
+  "version": "2.0.39",
+  "minAppVersion": "2.12.6",
+  "backends": [
+    "all"
+  ],
+  "frontends": [
+    "all"
+  ],
+  "displayName": {
+    "default": "Progressive Learning",
+    "zh_CN": "渐进学习"
+  },
+  "description": {
+    "default": "Excerpt-based Progressive Learning, Fragmented Progressive Learning, Writing-based Flashcards, List Cards, Daily Card",
+    "zh_CN": "摘抄式渐进学习、分片式渐进学习、原地制卡、列表卡、Daily Card"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh_CN": "README_zh_CN.md"
+  },
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": "",
+    "custom": [
+      "https://afdian.com/a/playerv5"
+    ]
+  },
+  "keywords": [
+    "Learning",
+    "Progressive",
+    "Progressive Learning",
+    "Progressive Reading",
+    "Progressive Writing"
+  ]
+}
