@@ -23,7 +23,11 @@
         btnViewContents,
         cardAppendTime,
         cardUnderPiece,
+        digest2dailycard,
+        digest2Trace,
         digestNoBacktraceLink,
+        doubleClick2DigestDesktop,
+        doubleClick2DigestMobile,
         flashcardAddRefs,
         flashcardMultipleLnks,
         flashcardNotebook,
@@ -45,6 +49,7 @@
         summaryEnable,
         userToken,
         windowOpenStyle,
+        words2dailycard,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import TomatoVIP from "../../sy-tomato-plugin/src/TomatoVIP.svelte";
@@ -121,6 +126,7 @@
             <BuyTomato isTomato={false}></BuyTomato>
         </div>
     </div>
+
     <label>
         <input
             spellcheck="false"
@@ -137,6 +143,24 @@
             bind:value={$flashcardNotebook}
         />
         {tomatoI18n.新闪卡存入的笔记本ID}
+    </label>
+
+    <label>
+        <input
+            type="checkbox"
+            class="b3-switch settingBox"
+            bind:checked={$doubleClick2DigestMobile}
+        />
+        {tomatoI18n.移动端双击屏幕多行选择}
+    </label>
+
+    <label>
+        <input
+            type="checkbox"
+            class="b3-switch settingBox"
+            bind:checked={$doubleClick2DigestDesktop}
+        />
+        {tomatoI18n.桌面端多行选择后Shift双击左键打开摘抄菜单}
     </label>
 
     <label class:codeNotValid>
@@ -286,6 +310,39 @@
         {tomatoI18n.分片功能 + "：" + tomatoI18n.合并所有分片到新文件}<TomatoVIP
             {codeValid}
         ></TomatoVIP>
+    </label>
+
+    <label class:codeNotValid>
+        <input
+            disabled={codeNotValid}
+            class:codeNotValid
+            type="checkbox"
+            class="b3-switch settingBox"
+            bind:checked={$words2dailycard}
+        />
+        {tomatoI18n.摘抄的单词加入到dailycard中}<TomatoVIP {codeValid}
+        ></TomatoVIP>
+    </label>
+
+    <label class:codeNotValid>
+        <input
+            disabled={codeNotValid}
+            class:codeNotValid
+            type="checkbox"
+            class="b3-switch settingBox"
+            bind:checked={$digest2dailycard}
+        />
+        {tomatoI18n.摘抄加入到dailycard当天目录下}<TomatoVIP {codeValid}
+        ></TomatoVIP>
+    </label>
+
+    <label>
+        <input
+            type="checkbox"
+            class="b3-switch settingBox"
+            bind:checked={$digest2Trace}
+        />
+        {tomatoI18n.摘抄时生成摘抄轨迹}
     </label>
 
     <label>

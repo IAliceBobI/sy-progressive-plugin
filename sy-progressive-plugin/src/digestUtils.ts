@@ -7,8 +7,9 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { spliyBy } from "./SplitSentence";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { digest2dailycard, digest2Trace, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { getDailyPath } from "./FlashBox";
 
 async function addPlusLnk(selected: HTMLElement[], digestID: string, lute: Lute) {
     const div = selected[selected.length - 1];
@@ -40,10 +41,11 @@ export class DigestBuilder {
     docID: string;
     docName: string;
     boxID: string;
+    ids: string[];
     anchorID: string;
     plugin: Plugin;
     ctime: string;
-    singleCard: boolean;
+    cardMode: string;
     bookID: string;
     allText: string;
     otab: SingleTab;
@@ -62,7 +64,7 @@ export class DigestBuilder {
         this.bookID = bookID;
 
         this.attrs = await siyuan.getBlockAttrs(this.bookID);
-        this.singleCard = this.attrs["custom-book-single-card"] === "1";
+        this.cardMode = this.attrs["custom-book-single-card"] ?? "1";
     }
 
     async getDigest(bIdx: string, ctime: string, arrow: string, order: string) {
@@ -80,34 +82,41 @@ export class DigestBuilder {
         if (row.length > 0) return row[0]?.root_id;
     }
 
-    async toggleMultiCardMode() {
+    async saveCardMode() {
         const newAttrs = {} as AttrType;
-        if (this.singleCard) {
-            newAttrs["custom-book-single-card"] = "2";
-            siyuan.pushMsg(tomatoI18n.每个摘抄都加入闪卡);
+        newAttrs["custom-book-single-card"] = this.cardMode;
+        if (this.cardMode == "0") {
+            siyuan.pushMsg(tomatoI18n.摘抄不加入闪卡);
+        } else if (this.cardMode == "1") {
+            siyuan.pushMsg(tomatoI18n.只有最新的一个摘抄加入闪卡);
         } else {
-            newAttrs["custom-book-single-card"] = "1";
-            siyuan.pushMsg(tomatoI18n.只有一个摘抄加入闪卡);
+            siyuan.pushMsg(tomatoI18n.每个摘抄都加入闪卡);
         }
         await siyuan.setBlockAttrs(this.bookID, newAttrs);
     }
 
     private async setDigestCard(digestID: string) {
-        if (this.singleCard) {
-            const row = await siyuan.sqlOne(`SELECT a.id FROM blocks a
-                INNER JOIN (
-                    SELECT hpath,content
-                    FROM blocks
-                    WHERE type='d'
-                    AND id ='${this.bookID}'
-                ) b ON a.hpath = b.hpath || '/digest-' || b.content
-            WHERE a.type='d' limit 1`);
-            if (row?.id) {
-                const cards = await siyuan.getTreeRiffCardsAll(row.id);
-                await siyuan.removeRiffCards(cards.map(card => card.id));
+        if (digest2dailycard.get()) {
+            addCardSetDueTime(digestID)
+        } else {
+            if (this.cardMode == "0") {
+                return;
+            } else if (this.cardMode == "1") {
+                const row = await siyuan.sqlOne(`SELECT a.id FROM blocks a
+                    INNER JOIN (
+                        SELECT hpath,content
+                        FROM blocks
+                        WHERE type='d'
+                        AND id ='${this.bookID}'
+                    ) b ON a.hpath = b.hpath || '/digest-' || b.content
+                WHERE a.type='d' limit 1`);
+                if (row?.id) {
+                    const cards = await siyuan.getTreeRiffCardsAll(row.id);
+                    await siyuan.removeRiffCards(cards.map(card => card.id));
+                }
             }
+            addCardSetDueTime(digestID)
         }
-        addCardSetDueTime(digestID)
     }
 
     async finishDigest() {
@@ -211,8 +220,16 @@ export class DigestBuilder {
         if (open) await this.otab.open(traceID);
     }
 
+    private async getDigestDocID() {
+        if (digest2dailycard.get()) {
+            return getDailyPath().split("/").slice(0, -1).join("/")
+        } else {
+            return getHPathByDocID(this.bookID, "digest");
+        }
+    }
+
     private async newDigestDoc(idx: string, md: string) {
-        const hpath = await getHPathByDocID(this.bookID, "digest");
+        const hpath = await this.getDigestDocID();
         const attr = {} as AttrType;
         const ct = new Date().getTime();
         attr["custom-pdigest-index"] = `${this.bookID}#${idx.padStart(10, "0")}`;
@@ -232,11 +249,14 @@ export class DigestBuilder {
         const digestID = await this.newDigestDoc(idx, md.join("\n"));
         await this.otab.open(digestID, windowOpenStyle.get() as any);
         await this.setDigestCard(digestID);
-        if (digestProgressiveBox.settings.markOriginText && !(await events.isDocReadonly(this.protyle, this.attrs)))
+        if (digestProgressiveBox.settings.markOriginText && !(await events.isDocReadonly(this.protyle, this.attrs))) {
             addPlusLnk(this.selected, digestID, digestProgressiveBox.lute);
-        setTimeout(() => {
-            this.getDigestLnk(false);
-        }, 4000);
+        }
+        if (digest2Trace.get()) {
+            setTimeout(() => {
+                this.getDigestLnk(false);
+            }, 4000);
+        }
     }
 
     async tryOpen(rows: Attributes[]) {

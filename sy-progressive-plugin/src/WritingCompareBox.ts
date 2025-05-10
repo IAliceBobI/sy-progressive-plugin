@@ -115,6 +115,14 @@ class WritingCompareBox {
                         await this.extractNotes(protyle.block?.rootID, protyle.notebookId, markKey);
                     },
                 });
+                menu.addItem({
+                    label: tomatoI18n.去除笔记颜色,
+                    icon: "iconTheme",
+                    accelerator: "",
+                    click: async () => {
+                        await this.noColor(protyle);
+                    },
+                });
                 if (merg2newBookEnable.get() && lastVerifyResult()) {
                     menu.addItem({
                         label: tomatoI18n.合并所有分片到新文件,
@@ -169,6 +177,18 @@ class WritingCompareBox {
         OpenSyFile2(this.plugin, su.id);
     }
 
+    private async noColor(protyle: IProtyle) {
+        const { docID } = events.getInfo(protyle)
+        const { root } = await getDocBlocks(docID, "", false, true, 1)
+        const attrs: AttrType = { "custom-prog-key-no-color": "1" };
+        const param = root.children
+            .filter(c => !getAttribute(c.div, "custom-prog-origin-text"))
+            .map(c => {
+                return { id: c.id, attrs }
+            });
+        await siyuan.batchSetBlockAttrs(param);
+    }
+
     private async extractAllNotes(protyle: IProtyle, markKey: string) {
         siyuan.pushMsg(tomatoI18n.提取所有分片的笔记)
         const docInfo = events.getInfo(protyle);
@@ -176,7 +196,13 @@ class WritingCompareBox {
         const { pieceIDs, bookID } = await getAllPieces(markKey);
         const blocks = await getAllBlocks(pieceIDs, true, true, true);
         const sup = new DomSuperBlockBuilder();
-        blocks.forEach(b => sup.append(b.div));
+        blocks.forEach(b => {
+            removeAttribute(b.div, "custom-progmark");
+            removeAttribute(b.div, "custom-in-book-index");
+            removeAttribute(b.div, "custom-paragraph-index");
+            removeAttribute(b.div, "custom-progref");
+            sup.append(b.div);
+        });
         const div = sup.build();
 
         let keysDocID = await findAllInOneKeyDoc(bookID);

@@ -1,43 +1,46 @@
 <script lang="ts">
-    import { Dialog, IProtyle } from "siyuan";
+    import { IProtyle } from "siyuan";
     import { onDestroy, onMount } from "svelte";
     import { events } from "../../sy-tomato-plugin/src/libs/Events";
     import { DigestBuilder, getDigestMd } from "./digestUtils";
     import {
         attrNewLine,
         getAllText,
+        setTimeouts,
         siyuan,
     } from "../../sy-tomato-plugin/src/libs/utils";
-    import { digestProgressiveBox } from "./DigestProgressiveBox";
+    import { digestProgressiveBox, initDi } from "./DigestProgressiveBox";
     import { WordBuilder } from "./wordsUtils";
     import { pinyinAll } from "../../sy-tomato-plugin/src/libs/docUtils";
     import { domNewLine } from "../../sy-tomato-plugin/src/libs/sydom";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+    import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
+    import { SelectionML } from "../../sy-tomato-plugin/src/libs/SelectionML";
 
-    export let dialog: Dialog = null;
     export let protyle: IProtyle;
     export let settings: TomatoSettings;
+    export let dm: DestroyManager;
+    export let isDouble: boolean;
 
-    let di = new DigestBuilder();
+    let moreToolsBtn: HTMLElement;
+    let tableTools: HTMLElement;
+    let tableSelect: HTMLElement;
+    let di: DigestBuilder;
     let word = new WordBuilder(settings);
-    let singleCard = false;
+    let selectionMl: SelectionML;
+    let cardMode = "0";
     let seletedText = "";
     let anchorID = "";
+    let needReinit = true;
 
-    onMount(async () => {
+    async function init() {
+        if (!needReinit) return;
+        needReinit = false;
+
         const s = await events.selectedDivs(protyle);
-        di.protyle = protyle;
-        di.settings = settings;
-        di.element = s.element;
-        di.docID = s.docID;
-        di.docName = s.docName;
-        di.anchorID = s.ids[s.ids.length - 1];
-        di.selected = s.selected;
-        di.boxID = s.boxID;
-        di.plugin = digestProgressiveBox.plugin;
-        di.otab = digestProgressiveBox.singleTab;
-        await di.init();
-        singleCard = di.singleCard;
+
+        di = await initDi(s, protyle, settings);
+        cardMode = di.cardMode;
 
         word.plugin = digestProgressiveBox.plugin;
         word.anchorID = di.anchorID;
@@ -54,6 +57,33 @@
 
         anchorID = s.ids[0];
 
+        if (isDouble && events.isMobile) {
+            tableTools.style.display = "none";
+            tableSelect.style.display = null;
+            setTimeouts(
+                () => {
+                    moreToolsBtn.focus();
+                },
+                300,
+                2000,
+                500,
+            );
+        }
+    }
+
+    function hideTr() {
+        if (tableTools.style.display == "none") {
+            tableTools.style.display = null;
+        } else {
+            tableTools.style.display = "none";
+        }
+    }
+
+    onMount(async () => {
+        const s = await events.selectedDivs(protyle);
+        selectionMl = new SelectionML(s);
+        await init();
+
         digestProgressiveBox.digestCallback = async () => {
             digestProgressiveBox.digestCallback = null;
             await di.digest();
@@ -64,7 +94,7 @@
     onDestroy(destroy);
 
     function destroy() {
-        dialog?.destroy();
+        dm.destroyBy("2");
     }
 
     function openBrowser(t: string) {
@@ -83,18 +113,72 @@
             "_blank",
         );
     }
+
+    async function splitParagph() {
+        const lines = getAllText(di.selected, "\n")
+            .split("\n")
+            .map((i) => domNewLine(i).outerHTML);
+        const ops = siyuan.transInsertBlocksAfter(lines, anchorID);
+        ops.push(...siyuan.transDeleteBlocks(di.ids));
+        await siyuan.transactions(ops);
+        destroy();
+    }
+    async function mergeParagph() {
+        const text = getAllText(di.selected, "\n");
+        const l = domNewLine(text).outerHTML;
+        const ops = siyuan.transInsertBlocksAfter([l], di.ids.at(-1));
+        // ops.push(...siyuan.transDeleteBlocks(di.ids));
+        await siyuan.transactions(ops);
+        destroy();
+    }
 </script>
 
 <!-- https://learn.svelte.dev/tutorial/if-blocks -->
 <div class="protyle-wysiwyg">
-    <table>
+    <table bind:this={tableSelect}>
         <tbody>
             <tr>
                 <td>
                     <button
-                        title="{tomatoI18n.摘抄}(Alt+Z)"
+                        class="b3-button"
+                        title={tomatoI18n.向上选择}
+                        on:click={() => {
+                            selectionMl.selectUp();
+                            needReinit = true;
+                        }}>⏫</button
+                    >
+                </td>
+                <td>
+                    <button
+                        bind:this={moreToolsBtn}
+                        class="b3-button"
+                        title={tomatoI18n.显示与隐藏工具}
+                        on:click={hideTr}>🔧</button
+                    >
+                </td>
+                <td>
+                    <button
+                        class="b3-button"
+                        title={tomatoI18n.向下选择}
+                        on:click={() => {
+                            selectionMl.selectDown();
+                            needReinit = true;
+                        }}>⏬</button
+                    >
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table bind:this={tableTools}>
+        <tbody>
+            <tr>
+                <td>
+                    <button
+                        title="{tomatoI18n.执行摘抄}(Alt+Z)"
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             await di.digest();
                             destroy();
                         }}>🍕</button
@@ -102,9 +186,10 @@
                 </td>
                 <td>
                     <button
-                        title="{tomatoI18n.摘抄}&{tomatoI18n.断句}"
+                        title="{tomatoI18n.执行摘抄}&{tomatoI18n.断句}"
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             await di.digest(true);
                             destroy();
                         }}>✂</button
@@ -127,6 +212,7 @@
                         title={tomatoI18n.摘录单词}
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             destroy();
                             await word.digest();
                         }}>🔤</button
@@ -137,6 +223,7 @@
                         title={tomatoI18n.摘录单词并加入闪卡}
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             destroy();
                             await word.digest(true);
                         }}>🗂️</button
@@ -147,6 +234,7 @@
                         title={tomatoI18n.摘录单词并加入闪卡并用AI解释}
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             destroy();
                             await word.digest(true, true);
                         }}>🤖</button
@@ -187,25 +275,28 @@
             </tr>
             <tr>
                 <td colspan="2">
-                    <button
-                        title={tomatoI18n.切换单卡多卡模式}
-                        class="b3-button"
-                        on:click={async () => {
-                            await di.toggleMultiCardMode();
-                            destroy();
+                    <select
+                        class="b3-select"
+                        bind:value={cardMode}
+                        on:change={() => {
+                            di.cardMode = cardMode;
+                            di.saveCardMode();
                         }}
                     >
-                        {#if singleCard}
-                            <span title={tomatoI18n.只有一个摘抄加入闪卡}
-                                >🍎</span
-                            >
-                        {:else}
-                            <span title={tomatoI18n.每个摘抄都加入闪卡}
-                                >🍎🍎</span
-                            >
-                        {/if}</button
-                    ></td
-                >
+                        <option value="0" title={tomatoI18n.摘抄不加入闪卡}>
+                            🚫💳
+                        </option>
+                        <option
+                            value="1"
+                            title={tomatoI18n.只有最新的一个摘抄加入闪卡}
+                        >
+                            💳
+                        </option>
+                        <option value="2" title={tomatoI18n.每个摘抄都加入闪卡}>
+                            💳💳
+                        </option>
+                    </select>
+                </td>
                 <td>
                     <button
                         title={tomatoI18n.标记摘抄为完成状态并转移闪卡到其他摘抄}
@@ -226,9 +317,10 @@
             <tr>
                 <td colspan="3">
                     <button
-                        title={tomatoI18n.断句并插入下方}
+                        title={tomatoI18n.按照标点符号断句并插入下方}
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             let { md } = await getDigestMd(
                                 settings,
                                 di.selected,
@@ -247,9 +339,10 @@
                         }}>✂👇</button
                     >
                     <button
-                        title="{tomatoI18n.断句并插入下方}(checkbox)"
+                        title="{tomatoI18n.按照标点符号断句并插入下方}(checkbox)"
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             const { md } = await getDigestMd(
                                 settings,
                                 di.selected,
@@ -269,12 +362,35 @@
                     >
                 </td>
             </tr>
+            <tr>
+                <td colspan="3">
+                    <button
+                        title={tomatoI18n.按照回车拆分为多个段落块}
+                        class="b3-button"
+                        on:click={async () => {
+                            await init();
+                            await splitParagph();
+                            destroy();
+                        }}>✂📄</button
+                    >
+                    <button
+                        title={tomatoI18n.合并为单个段落块}
+                        class="b3-button"
+                        on:click={async () => {
+                            await init();
+                            await mergeParagph();
+                            destroy();
+                        }}>📦📄</button
+                    >
+                </td>
+            </tr>
             <tr
                 ><td colspan="3">
                     <button
                         title={tomatoI18n.在上方插入汉语拼音}
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             const { onePY, allPY } = pinyinAll(
                                 seletedText,
                                 "_",
@@ -290,6 +406,7 @@
                         title={tomatoI18n.上网查询所选内容}
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             openBrowser(seletedText);
                             destroy();
                         }}>🌐</button
@@ -298,6 +415,7 @@
                         title={"baidu AI"}
                         class="b3-button"
                         on:click={async () => {
+                            await init();
                             window.open(
                                 `https://chat.baidu.com/search?word=${seletedText}`,
                                 "_blank",
@@ -310,6 +428,3 @@
         </tbody>
     </table>
 </div>
-
-<style>
-</style>

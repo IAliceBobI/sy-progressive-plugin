@@ -9,7 +9,7 @@ import { writingCompareBox } from "./WritingCompareBox";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { getPluginSpec, isObject, newID, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { btnCleanOriginText, btnDelCard, btnDeleteBack, btnDeleteExit, btnDeleteNext, btnFullfilContent, btnIgnoreBook, btnNext, btnNextBook, btnOpenFlashcardTab, btnPrevious, btnSaveCard, btnSplitByPunctuations, btnSplitByPunctuationsList, btnSplitByPunctuationsListCheck, btnStop, btnViewContents, cardAppendTime, cardUnderPiece, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, getAllPieceNotesEnable, hideBtnsInFlashCard, makeCardEnable, makeCardHereEnable, markOriginText, markOriginTextBG, merg2newBookEnable, multilineMarkEnable, openCardsOnOpenPiece, pieceMoveEnable, pieceNoBacktraceLink, send2dailyCardEnable, send2dailyCardNoRefEnable, summary2dailynote, summaryEnable, userID, userToken, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { btnCleanOriginText, btnDelCard, btnDeleteBack, btnDeleteExit, btnDeleteNext, btnFullfilContent, btnIgnoreBook, btnNext, btnNextBook, btnOpenFlashcardTab, btnPrevious, btnSaveCard, btnSplitByPunctuations, btnSplitByPunctuationsList, btnSplitByPunctuationsListCheck, btnStop, btnViewContents, cardAppendTime, cardUnderPiece, digest2dailycard, digest2Trace, digestNoBacktraceLink, doubleClick2DigestDesktop, doubleClick2DigestMobile, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, getAllPieceNotesEnable, hideBtnsInFlashCard, makeCardEnable, makeCardHereEnable, markOriginText, markOriginTextBG, merg2newBookEnable, multilineMarkEnable, openCardsOnOpenPiece, pieceMoveEnable, pieceNoBacktraceLink, send2dailyCardEnable, send2dailyCardNoRefEnable, summary2dailynote, summaryEnable, userID, userToken, windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -19,6 +19,11 @@ import { resetKey, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
     userID.load(plugin);
+    digest2Trace.load(plugin);
+    digest2dailycard.load(plugin);
+    words2dailycard.load(plugin);
+    doubleClick2DigestDesktop.load(plugin);
+    doubleClick2DigestMobile.load(plugin);
     merg2newBookEnable.load(plugin);
     getAllPieceNotesEnable.load(plugin);
     makeCardEnable.load(plugin);
@@ -161,6 +166,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             destroyCallback: () => {
                 dm.destroyBy("1")
             },
+            hideCloseIcon: true,
         });
         const d = new Settings({
             target: dialog.element.querySelector("#" + id),
