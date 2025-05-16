@@ -1,12 +1,18 @@
 import { Dialog, IEventBusMap, IProtyle, Lute, Plugin } from "siyuan";
-import { newID, NewLute } from "../../sy-tomato-plugin/src/libs/utils";
+import { newID, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
 import DigestProgressive from "./DigestProgressive.svelte";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-import { doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
+import { digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
+import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
+import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+
+export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
+export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)
+export const digest执行摘抄并断句 = winHotkey("⇧⌥X", "执行摘抄并断句 2025-5-12 22:02:39", "✂", () => tomatoI18n.执行摘抄并断句)
 
 class DigestProgressiveBox {
     plugin: Plugin;
@@ -18,14 +24,16 @@ class DigestProgressiveBox {
 
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
         if (!this.plugin) return;
-        detail.menu.addItem({
-            iconHTML: "＋🍕",
-            label: this.plugin.i18n.digestProgressive,
-            accelerator: "⌥A",
-            click: () => {
-                this.openDialog(detail.protyle);
-            }
-        });
+        if (digestmenu.get()) {
+            detail.menu.addItem({
+                label: digest渐进阅读摘抄模式.langText(),
+                iconHTML: digest渐进阅读摘抄模式.icon,
+                accelerator: digest渐进阅读摘抄模式.m,
+                click: () => {
+                    this.openDialog(detail.protyle);
+                }
+            });
+        }
     }
 
     async onload(plugin: Plugin, settings: TomatoSettings) {
@@ -33,9 +41,11 @@ class DigestProgressiveBox {
         this.settings = settings;
         this.lute = NewLute();
         this.singleTab = new SingleTab(this.plugin);
+        await verifyKeyProgressive()
         this.plugin.addCommand({
-            langKey: "digestProgressive",
-            hotkey: "⌥A",
+            langKey: digest渐进阅读摘抄模式.langKey,
+            langText: digest渐进阅读摘抄模式.langText(),
+            hotkey: digest渐进阅读摘抄模式.m,
             callback: () => {
                 if (this.digestCallback) {
                     this.digestCallback();
@@ -46,30 +56,33 @@ class DigestProgressiveBox {
         });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
-            menu.addItem({
-                label: this.plugin.i18n.digestProgressive,
-                iconHTML: "＋🍕",
-                accelerator: "⌥A",
-                click: () => {
-                    this.openDialog(detail.protyle);
-                },
-            });
+            if (digestmenu.get()) {
+                menu.addItem({
+                    label: digest渐进阅读摘抄模式.langText(),
+                    iconHTML: digest渐进阅读摘抄模式.icon,
+                    accelerator: digest渐进阅读摘抄模式.m,
+                    click: () => {
+                        this.openDialog(detail.protyle);
+                    },
+                });
+            }
         });
 
         this.plugin.addCommand({
-            langKey: "摘抄2025-5-6 14:14:20",
-            langText: tomatoI18n.执行摘抄,
-            hotkey: "⇧⌥A",
+            langKey: digest执行摘抄.langKey,
+            langText: digest执行摘抄.langText(),
+            hotkey: digest执行摘抄.m,
             editorCallback: async (protyle) => {
                 const s = await events.selectedDivs(protyle);
                 const di = await initDi(s, protyle, settings);
                 di.digest();
             }
         });
+
         this.plugin.addCommand({
-            langKey: "摘抄断句2025-5-6 14:14:21",
-            langText: tomatoI18n.执行摘抄并断句,
-            hotkey: "⇧⌥Z",
+            langKey: digest执行摘抄并断句.langKey,
+            langText: digest执行摘抄并断句.langText(),
+            hotkey: digest执行摘抄并断句.m,
             editorCallback: async (protyle) => {
                 const s = await events.selectedDivs(protyle);
                 const di = await initDi(s, protyle, settings);

@@ -5,8 +5,9 @@ import { OpenAIClient } from "../../sy-tomato-plugin/src/libs/openAI";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { getDailyPath } from "./FlashBox";
+import { getDailyAttrValue, getDailyPath } from "./FlashBox";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
+import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 
 export class WordBuilder {
     docID: string;
@@ -24,9 +25,12 @@ export class WordBuilder {
     }
 
     private async getDocID() {
-        if (words2dailycard.get()) {
+        if (words2dailycard.get() && lastVerifyResult()) {
             const hpath = getDailyPath()
-            return siyuanCache.createDocWithMdIfNotExists(5000, events.boxID, hpath, "");
+            const v = getDailyAttrValue();
+            const attr = {};
+            attr[`custom-dailycard-${v}`] = v;
+            return siyuanCache.createDocWithMdIfNotExists(5000, events.boxID, hpath, "", attr);
         } else {
             const hpath = await getHPathByDocID(this.bookID, "words");
             return getWordsDoc(this.bookID, this.boxID, hpath)

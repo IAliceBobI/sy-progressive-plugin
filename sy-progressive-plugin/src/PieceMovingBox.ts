@@ -1,12 +1,16 @@
 import { IProtyle, Plugin } from "siyuan";
 import { getDocIalPieces, isProtylePiece } from "./helper";
-import { getAttribute, isValidNumber, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { getAttribute, isValidNumber, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { pieceMoveEnable } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { PieceMovingDown, PieceMovingUp } from "../../sy-tomato-plugin/src/libs/stores";
+import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
+import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+
+export const PieceMovingBox移动到上一分片内 = winHotkey("ctrl+alt+u", "移动到上一分片内 2025-5-13 11:27:32", "🚚⬆️", () => tomatoI18n.移动到上一分片内, true, PieceMovingUp)
+export const PieceMovingBox移动到下一分片内 = winHotkey("ctrl+alt+i", "移动到下一分片内 2025-5-13 11:27:26", "🚚⬇️", () => tomatoI18n.移动到下一分片内, true, PieceMovingDown)
 
 class PieceMovingBox {
     private plugin: Plugin;
@@ -15,54 +19,89 @@ class PieceMovingBox {
     blockIconEvent(detail: any) {
         if (!this.plugin) return;
 
-        if (!lastVerifyResult()) return;
-        if (!pieceMoveEnable.get()) return;
-
         const protyle: IProtyle = detail.protyle;
         const { isPiece } = isProtylePiece(protyle);
         if (isPiece) {
-            detail.menu.addItem({
-                iconHTML: "🚚⬆️",
-                label: tomatoI18n.移动到上一分片内,
-                click: () => {
-                    this.move(protyle, -1);
-                }
-            });
-            detail.menu.addItem({
-                iconHTML: "🚚⬇️",
-                label: tomatoI18n.移动到下一分片内,
-                click: () => {
-                    this.move(protyle, 1);
-                }
-            });
+            if (PieceMovingBox移动到上一分片内.menu()) {
+                detail.menu.addItem({
+                    iconHTML: PieceMovingBox移动到上一分片内.icon,
+                    label: PieceMovingBox移动到上一分片内.langText(),
+                    accelerator: PieceMovingBox移动到上一分片内.m,
+                    click: () => {
+                        this.move(protyle, -1);
+                    }
+                });
+            }
+            if (PieceMovingBox移动到下一分片内.menu()) {
+                detail.menu.addItem({
+                    iconHTML: PieceMovingBox移动到下一分片内.icon,
+                    label: PieceMovingBox移动到下一分片内.langText(),
+                    accelerator: PieceMovingBox移动到下一分片内.m,
+                    click: () => {
+                        this.move(protyle, 1);
+                    }
+                });
+            }
         }
     }
 
     async onload(plugin: Plugin, settings: TomatoSettings) {
-        if (! await verifyKeyProgressive()) return;
-        if (!pieceMoveEnable.get()) return;
-
         this.plugin = plugin;
         this.settings = settings;
+        await verifyKeyProgressive()
+
+        this.plugin.addCommand({
+            langKey: PieceMovingBox移动到上一分片内.langKey,
+            langText: PieceMovingBox移动到上一分片内.langText(),
+            hotkey: PieceMovingBox移动到上一分片内.m,
+            editorCallback: async (protyle) => {
+                if (PieceMovingBox移动到上一分片内.cmd()) {
+                    const { isPiece } = isProtylePiece(protyle);
+                    if (isPiece) {
+                        this.move(protyle, -1);
+                    }
+                }
+            },
+        });
+        this.plugin.addCommand({
+            langKey: PieceMovingBox移动到下一分片内.langKey,
+            langText: PieceMovingBox移动到下一分片内.langText(),
+            hotkey: PieceMovingBox移动到下一分片内.m,
+            editorCallback: async (protyle) => {
+                if (PieceMovingBox移动到下一分片内.cmd()) {
+                    const { isPiece } = isProtylePiece(protyle);
+                    if (isPiece) {
+                        this.move(protyle, 1);
+                    }
+                }
+            },
+        });
+
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const protyle: IProtyle = detail.protyle;
             const { isPiece } = isProtylePiece(protyle);
             if (isPiece) {
                 const menu = detail.menu;
-                menu.addItem({
-                    label: tomatoI18n.移动到上一分片内,
-                    iconHTML: "🚚⬆️",
-                    click: () => {
-                        this.move(protyle, -1);
-                    },
-                });
-                menu.addItem({
-                    label: tomatoI18n.移动到下一分片内,
-                    iconHTML: "🚚⬇️",
-                    click: () => {
-                        this.move(protyle, 1);
-                    },
-                });
+                if (PieceMovingBox移动到上一分片内.menu()) {
+                    menu.addItem({
+                        iconHTML: PieceMovingBox移动到上一分片内.icon,
+                        label: PieceMovingBox移动到上一分片内.langText(),
+                        accelerator: PieceMovingBox移动到上一分片内.m,
+                        click: () => {
+                            this.move(protyle, -1);
+                        },
+                    });
+                }
+                if (PieceMovingBox移动到下一分片内.menu()) {
+                    menu.addItem({
+                        iconHTML: PieceMovingBox移动到下一分片内.icon,
+                        label: PieceMovingBox移动到下一分片内.langText(),
+                        accelerator: PieceMovingBox移动到下一分片内.m,
+                        click: () => {
+                            this.move(protyle, 1);
+                        },
+                    });
+                }
             }
         });
     }

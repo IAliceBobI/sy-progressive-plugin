@@ -4,9 +4,12 @@ import { NewLute, cloneCleanDiv, getID, siyuan } from "../../sy-tomato-plugin/sr
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { summary2dailynote, summaryEnable, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
-import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+import { PieceSummaryBoxmenu, summary2dailynote, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
+import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+
+export const PieceSummaryBox收集内容到文件 = winHotkey("shift+alt+o", "收集内容到文件 2025-5-13 08:44:46", "💼", () => tomatoI18n.收集内容到文件, true, PieceSummaryBoxmenu)
 
 class PieceSummaryBox {
     private plugin: Plugin;
@@ -15,47 +18,46 @@ class PieceSummaryBox {
 
     blockIconEvent(detail: any) {
         if (!this.plugin) return;
-
-        if (!lastVerifyResult()) return;
-        if (!summaryEnable.get()) return;
-
         const menu = detail.menu;
-        menu.addItem({
-            iconHTML: "💼",
-            label: tomatoI18n.收集内容到文件,
-            accelerator: "⌥⇧Z",
-            click: async () => {
-                this.copyBlocks(events.protyle?.protyle);
-            }
-        });
-    }
-
-    async onload(plugin: Plugin, settings: TomatoSettings) {
-        if (! await verifyKeyProgressive()) return;
-        if (!summaryEnable.get()) return;
-
-
-        this.plugin = plugin;
-        this.settings = settings;
-        this.lute = NewLute();
-        this.plugin.addCommand({
-            langKey: "collect2025-4-27 11:43:05",
-            langText: tomatoI18n.收集内容到文件,
-            hotkey: "⌥⇧Z",
-            callback: () => {
-                this.copyBlocks(events.protyle?.protyle);
-            },
-        });
-        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
-            const menu = detail.menu;
+        if (PieceSummaryBox收集内容到文件.menu()) {
             menu.addItem({
-                iconHTML: "💼",
-                label: tomatoI18n.收集内容到文件,
-                accelerator: "⌥⇧Z",
+                iconHTML: PieceSummaryBox收集内容到文件.icon,
+                label: PieceSummaryBox收集内容到文件.langText(),
+                accelerator: PieceSummaryBox收集内容到文件.m,
                 click: async () => {
                     this.copyBlocks(events.protyle?.protyle);
                 }
             });
+        }
+    }
+
+    async onload(plugin: Plugin, settings: TomatoSettings) {
+        this.plugin = plugin;
+        this.settings = settings;
+        this.lute = NewLute();
+        await verifyKeyProgressive();
+        this.plugin.addCommand({
+            langKey: PieceSummaryBox收集内容到文件.langKey,
+            langText: PieceSummaryBox收集内容到文件.langText(),
+            hotkey: PieceSummaryBox收集内容到文件.m,
+            callback: () => {
+                if (PieceSummaryBox收集内容到文件.cmd()) {
+                    this.copyBlocks(events.protyle?.protyle);
+                }
+            },
+        });
+        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
+            const menu = detail.menu;
+            if (PieceSummaryBox收集内容到文件.menu()) {
+                menu.addItem({
+                    iconHTML: PieceSummaryBox收集内容到文件.icon,
+                    label: PieceSummaryBox收集内容到文件.langText(),
+                    accelerator: PieceSummaryBox收集内容到文件.m,
+                    click: async () => {
+                        this.copyBlocks(events.protyle?.protyle);
+                    }
+                });
+            }
         });
     }
 

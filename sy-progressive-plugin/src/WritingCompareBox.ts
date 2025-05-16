@@ -1,13 +1,14 @@
 import { IProtyle, Plugin } from "siyuan";
-import { add_href, attrNewLine, cloneCleanDiv, getAttribute, ial2str, isValidNumber, parseIAL, removeAttribute, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { add_href, attrNewLine, cloneCleanDiv, getAttribute, ial2str, isValidNumber, parseIAL, removeAttribute, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import { findAllInOneKeyDoc, findCompareDoc, findKeysDoc, findNewBookDoc, findPieceDoc, getAllInOneKeyDoc, getCompareDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtyleKeyDoc, isProtylePiece } from "./helper";
 import { MarkKey, PROG_ORIGIN_TEXT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { getAllPieceNotesEnable, merg2newBookEnable, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { getAllPieceNotesEnable, merg2newBookEnable, send2compareNoteEnable, send2exctract2bottomEnable, send2exctractNoteEnable, send2removeNoteColor, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { DomSuperBlockBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
-import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
+import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
 type BlockContent = {
     ial?: AttrType, id?: string, markdown?: string, content?: string,
@@ -17,6 +18,13 @@ function b2c(row: Block): BlockContent {
     return { ial: parseIAL(row.ial), id: row.id, markdown: row.markdown, content: row.content };
 }
 
+export const WC提取所有分片的笔记 = winHotkey("⌘F4", "提取所有分片的笔记 2025-5-13 09:34:21", "iconCopy", () => tomatoI18n.提取所有分片的笔记, true, getAllPieceNotesEnable)
+export const WC提取笔记到底部 = winHotkey("shift+alt+r", "提取笔记到底部 2025-5-13 09:34:24", "iconCopy", () => tomatoI18n.提取笔记到底部, true, send2exctract2bottomEnable)
+export const WC提取笔记 = winHotkey("⌘F5", "提取笔记 2025-5-13 09:34:24", "iconCopy", () => tomatoI18n.提取笔记)
+export const WC去除笔记颜色 = winHotkey("⌥⌘F5", "去除笔记颜色 2025-5-13 09:34:24", "iconTheme", () => tomatoI18n.去除笔记颜色, true, send2removeNoteColor)
+export const WC合并所有分片到新文件 = winHotkey("⌥⌘F6", "合并所有分片到新文件 2025-5-13 09:34:21", "iconCopy", () => tomatoI18n.合并所有分片到新文件, true, merg2newBookEnable)
+export const WC对比原文 = winHotkey("⌘F6", "对比原文 2025-5-13 09:34:24", "iconEye", () => tomatoI18n.对比原文)
+
 class WritingCompareBox {
     private plugin: Plugin;
     settings: TomatoSettings;
@@ -24,33 +32,37 @@ class WritingCompareBox {
     async onload(plugin: Plugin, settings: TomatoSettings) {
         this.plugin = plugin;
         this.settings = settings;
-        if (getAllPieceNotesEnable.get() && await verifyKeyProgressive()) {
-            this.plugin.addCommand({
-                langKey: "extractAllNotes2025-4-29 23:50:41",
-                langText: tomatoI18n.提取所有分片的笔记,
-                hotkey: "⌘F4",
-                editorCallback: async (protyle) => {
+        await verifyKeyProgressive();
+        this.plugin.addCommand({
+            langKey: WC提取所有分片的笔记.langKey,
+            langText: WC提取所有分片的笔记.langText(),
+            hotkey: WC提取所有分片的笔记.m,
+            editorCallback: async (protyle) => {
+                if (WC提取所有分片的笔记.cmd()) {
                     const { isPiece, markKey } = isProtylePiece(protyle);
                     if (isPiece) {
                         await this.extractAllNotes(protyle, markKey);
                     }
-                },
-            });
-        }
+                }
+            },
+        });
         this.plugin.addCommand({
-            langKey: "extract to bottom 2024年12月31日14:19:49",
-            langText: tomatoI18n.提取笔记到底部,
-            hotkey: "⇧⌥N",
+            langKey: WC提取笔记到底部.langKey,
+            langText: WC提取笔记到底部.langText(),
+            hotkey: WC提取笔记到底部.m,
             editorCallback: async (protyle) => {
-                const { isPiece } = isProtylePiece(protyle);
-                if (isPiece) {
-                    await this.extractNotes2bottom(protyle);
+                if (WC提取笔记到底部.cmd()) {
+                    const { isPiece } = isProtylePiece(protyle);
+                    if (isPiece) {
+                        await this.extractNotes2bottom(protyle);
+                    }
                 }
             }
         });
         this.plugin.addCommand({
-            langKey: "extractNotes",
-            hotkey: "⌘F5",
+            langKey: WC提取笔记.langKey,
+            langText: WC提取笔记.langText(),
+            hotkey: WC提取笔记.m,
             editorCallback: async (protyle) => {
                 const { isPiece, markKey } = isProtylePiece(protyle);
                 if (isPiece) {
@@ -58,22 +70,23 @@ class WritingCompareBox {
                 }
             },
         });
-        if (merg2newBookEnable.get() && await verifyKeyProgressive()) {
-            this.plugin.addCommand({
-                langKey: "2024-08-09 15:10:45 extract book",
-                langText: tomatoI18n.合并所有分片到新文件,
-                hotkey: "",
-                editorCallback: async (protyle) => {
+        this.plugin.addCommand({
+            langKey: WC合并所有分片到新文件.langKey,
+            langText: WC合并所有分片到新文件.langText(),
+            hotkey: WC合并所有分片到新文件.m,
+            editorCallback: async (protyle) => {
+                if (WC合并所有分片到新文件.cmd()) {
                     const { isPiece, markKey } = isProtylePiece(protyle);
                     if (isPiece) {
                         await this.extractAsBook(protyle.notebookId, protyle.block?.rootID, protyle.notebookId, markKey);
                     }
-                },
-            });
-        }
+                }
+            },
+        });
         this.plugin.addCommand({
-            langKey: "compareNotes",
-            hotkey: "⌘F6",
+            langKey: WC对比原文.langKey,
+            langText: WC对比原文.langText(),
+            hotkey: WC对比原文.m,
             editorCallback: async (protyle) => {
                 const { isKeyDoc, keyDocAttr } = isProtyleKeyDoc(protyle);
                 if (isKeyDoc) {
@@ -81,70 +94,87 @@ class WritingCompareBox {
                 }
             },
         });
+        this.plugin.addCommand({
+            langKey: WC去除笔记颜色.langKey,
+            langText: WC去除笔记颜色.langText(),
+            hotkey: WC去除笔记颜色.m,
+            editorCallback: async (protyle) => {
+                if (WC去除笔记颜色.cmd()) await this.noColor(protyle);
+            },
+        });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const protyle: IProtyle = detail.protyle;
             const { isPiece, markKey } = isProtylePiece(protyle);
+
             if (isPiece) {
                 const menu = detail.menu;
-                if (getAllPieceNotesEnable.get() && lastVerifyResult()) {
+                if (WC提取所有分片的笔记.menu()) {
                     menu.addItem({
-                        label: tomatoI18n.提取所有分片的笔记,
-                        icon: "iconCopy",
-                        accelerator: "⌘F4",
+                        label: WC提取所有分片的笔记.langText(),
+                        icon: WC提取所有分片的笔记.icon,
+                        accelerator: WC提取所有分片的笔记.m,
                         click: async () => {
                             await this.extractAllNotes(protyle, markKey);
                         },
                     });
                 }
-                menu.addItem({
-                    label: tomatoI18n.提取笔记到底部,
-                    icon: "iconCopy",
-                    accelerator: "⇧⌥N",
-                    click: async () => {
-                        const { isPiece } = isProtylePiece(protyle);
-                        if (isPiece) {
-                            await this.extractNotes2bottom(protyle);
-                        }
-                    },
-                });
-                menu.addItem({
-                    label: this.plugin.i18n.extractNotes,
-                    icon: "iconCopy",
-                    accelerator: "⌘F5",
-                    click: async () => {
-                        await this.extractNotes(protyle.block?.rootID, protyle.notebookId, markKey);
-                    },
-                });
-                menu.addItem({
-                    label: tomatoI18n.去除笔记颜色,
-                    icon: "iconTheme",
-                    accelerator: "",
-                    click: async () => {
-                        await this.noColor(protyle);
-                    },
-                });
-                if (merg2newBookEnable.get() && lastVerifyResult()) {
+                if (WC提取笔记到底部.menu()) {
                     menu.addItem({
-                        label: tomatoI18n.合并所有分片到新文件,
-                        icon: "iconCopy",
-                        accelerator: "",
+                        label: WC提取笔记到底部.langText(),
+                        icon: WC提取笔记到底部.icon,
+                        accelerator: WC提取笔记到底部.m,
+                        click: async () => {
+                            const { isPiece } = isProtylePiece(protyle);
+                            if (isPiece) {
+                                await this.extractNotes2bottom(protyle);
+                            }
+                        },
+                    });
+                }
+                if (send2exctractNoteEnable.get()) {
+                    menu.addItem({
+                        label: WC提取笔记.langText(),
+                        icon: WC提取笔记.icon,
+                        accelerator: WC提取笔记.m,
+                        click: async () => {
+                            await this.extractNotes(protyle.block?.rootID, protyle.notebookId, markKey);
+                        },
+                    });
+                }
+                if (WC去除笔记颜色.menu()) {
+                    menu.addItem({
+                        label: WC去除笔记颜色.langText(),
+                        icon: WC去除笔记颜色.icon,
+                        accelerator: WC去除笔记颜色.m,
+                        click: async () => {
+                            await this.noColor(protyle);
+                        },
+                    });
+                }
+                if (WC合并所有分片到新文件.menu()) {
+                    menu.addItem({
+                        label: WC合并所有分片到新文件.langText(),
+                        icon: WC合并所有分片到新文件.icon,
+                        accelerator: WC合并所有分片到新文件.m,
                         click: async () => {
                             await this.extractAsBook(protyle.notebookId, protyle.block?.rootID, protyle.notebookId, markKey);
                         },
                     });
                 }
             } else {
-                const { isKeyDoc, keyDocAttr } = isProtyleKeyDoc(protyle);
-                if (isKeyDoc) {
-                    const menu = detail.menu;
-                    menu.addItem({
-                        label: this.plugin.i18n.compareNotes,
-                        icon: "iconEye",
-                        accelerator: "⌘F6",
-                        click: async () => {
-                            await this.compareNotes(protyle.block?.rootID, protyle.notebookId, keyDocAttr);
-                        },
-                    });
+                if (send2compareNoteEnable.get()) {
+                    const { isKeyDoc, keyDocAttr } = isProtyleKeyDoc(protyle);
+                    if (isKeyDoc) {
+                        const menu = detail.menu;
+                        menu.addItem({
+                            label: WC对比原文.langText(),
+                            icon: WC对比原文.icon,
+                            accelerator: WC对比原文.m,
+                            click: async () => {
+                                await this.compareNotes(protyle.block?.rootID, protyle.notebookId, keyDocAttr);
+                            },
+                        });
+                    }
                 }
             }
         });

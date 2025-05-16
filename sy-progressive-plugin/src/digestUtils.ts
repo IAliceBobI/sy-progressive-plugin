@@ -10,6 +10,7 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { digest2dailycard, digest2Trace, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { getDailyPath } from "./FlashBox";
+import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 
 async function addPlusLnk(selected: HTMLElement[], digestID: string, lute: Lute) {
     const div = selected[selected.length - 1];
@@ -96,7 +97,7 @@ export class DigestBuilder {
     }
 
     private async setDigestCard(digestID: string) {
-        if (digest2dailycard.get()) {
+        if (digest2dailycard.get() && lastVerifyResult()) {
             addCardSetDueTime(digestID)
         } else {
             if (this.cardMode == "0") {
@@ -221,7 +222,7 @@ export class DigestBuilder {
     }
 
     private async getDigestDocID() {
-        if (digest2dailycard.get()) {
+        if (digest2dailycard.get() && lastVerifyResult()) {
             return getDailyPath().split("/").slice(0, -1).join("/")
         } else {
             return getHPathByDocID(this.bookID, "digest");
@@ -252,7 +253,7 @@ export class DigestBuilder {
         if (digestProgressiveBox.settings.markOriginText && !(await events.isDocReadonly(this.protyle, this.attrs))) {
             addPlusLnk(this.selected, digestID, digestProgressiveBox.lute);
         }
-        if (digest2Trace.get()) {
+        if (digest2Trace.get() && lastVerifyResult()) {
             setTimeout(() => {
                 this.getDigestLnk(false);
             }, 4000);

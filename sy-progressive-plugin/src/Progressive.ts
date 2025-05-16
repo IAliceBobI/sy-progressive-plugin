@@ -1,9 +1,10 @@
 import { Dialog, Menu, Plugin, openTab, confirm, Lute, IProtyle, Protyle } from "siyuan";
 import "./index.scss";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
-import { addCardSetDueTime, closeTabByTitle, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { addCardSetDueTime, closeTabByTitle, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import * as help from "./helper";
+import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import * as constants from "./constants";
 import {
     BlockNodeEnum, CONTENT_EDITABLE, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey,
@@ -16,9 +17,19 @@ import { Storage } from "./Storage";
 import { HtmlCBType } from "./constants";
 import { getDocBlocks, isMultiLineElement, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { addClickEvent, btn, getContentPrefix, getReadingBtns1, getReadingBtns2, getReadingBtns3 } from "./ProgressiveBtn";
-import { windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+
+export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK 2025-5-12 21:37:37", "⚙️", () => tomatoI18n.渐进学习的设置)
+export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn 2025-5-13 13:32:20", "📖", () => tomatoI18n.开始学习)
+export const Progressive开始随机学习 = winHotkey("⌥⇧-", "Progressive startToLearnRand 2025-5-13 13:32:21", "🔀📖", () => tomatoI18n.开始随机学习)
+export const Progressive查看所有渐进学习文档 = winHotkey("⌥=", "查看所有渐进学习文档 2025-5-13 13:32:21", "👁️📚", () => tomatoI18n.查看所有渐进学习文档)
+export const Progressive上一页 = winHotkey("ctrl+left", "上一页 2025-5-13 13:32:21", "⏫", () => tomatoI18n.上一页)
+export const Progressive下一页 = winHotkey("ctrl+right", "下一页 2025-5-13 13:32:21", "⏬", () => tomatoI18n.下一页)
+export const Progressive跳到分片或回到原文 = winHotkey("⇧⌥w", "跳到分片或回到原文 2025-5-13 13:32:21", "🎯📖", () => tomatoI18n.跳到分片或回到原文)
+export const Progressive添加当前文档到渐进阅读分片模式 = winHotkey("⇧⌥m", "添加当前文档到渐进阅读(分片模式) 2025-5-13 13:32:21", "＋📗", () => tomatoI18n.添加当前文档到渐进阅读分片模式)
 
 class Progressive {
     plugin: Plugin;
@@ -65,83 +76,99 @@ class Progressive {
 
         await this.storage.onLayoutReady();
         this.plugin.addCommand({
-            langKey: "startToLearn",
-            hotkey: "⌥-",
+            langKey: Progressive开始学习.langKey,
+            langText: Progressive开始学习.langText(),
+            hotkey: Progressive开始学习.m,
             callback: async () => {
                 await this.startToLearnWithLock();
             },
         });
         this.plugin.addCommand({
-            langKey: "startToLearnRand",
-            hotkey: "⌥⇧-",
+            langKey: Progressive开始随机学习.langKey,
+            langText: Progressive开始随机学习.langText(),
+            hotkey: Progressive开始随机学习.m,
             callback: async () => {
                 await this.startToLearnWithLock("", true);
             },
         });
         this.plugin.addCommand({
-            langKey: "viewAllProgressiveBooks",
-            hotkey: "⌥=",
+            langKey: Progressive查看所有渐进学习文档.langKey,
+            langText: Progressive查看所有渐进学习文档.langText(),
+            hotkey: Progressive查看所有渐进学习文档.m,
             callback: async () => {
                 await this.viewAllProgressiveBooks();
             },
         });
         this.plugin.addCommand({
-            langKey: "上一页2024-11-19 10:53:57",
-            langText: tomatoI18n.上一页,
-            hotkey: "⌘←", // "⇧↑", "⇧↓", "⇧→", "⇧←",
+            langKey: Progressive上一页.langKey,
+            langText: Progressive上一页.langText(),
+            hotkey: Progressive上一页.m,
             callback: () => this.movePage(-1),
         });
         this.plugin.addCommand({
-            langKey: "下一页2024-11-19 10:53:57",
-            langText: tomatoI18n.下一页,
-            hotkey: "⌘→",
+            langKey: Progressive下一页.langKey,
+            langText: Progressive下一页.langText(),
+            hotkey: Progressive下一页.m,
             callback: () => this.movePage(1),
         });
         this.plugin.addCommand({
-            langKey: "goto2024-12-31 11:09:00",
-            langText: tomatoI18n.跳到分片或回到原文,
-            hotkey: "⇧⌥O",
+            langKey: Progressive跳到分片或回到原文.langKey,
+            langText: Progressive跳到分片或回到原文.langText(),
+            hotkey: Progressive跳到分片或回到原文.m,
             callback: () => {
                 this.readThisPiece();
             }
         });
+        this.plugin.addCommand({
+            langKey: Progressive添加当前文档到渐进阅读分片模式.langKey,
+            langText: Progressive添加当前文档到渐进阅读分片模式.langText(),
+            hotkey: Progressive添加当前文档到渐进阅读分片模式.m,
+            callback: () => {
+                this.addProgressiveReadingWithLock();
+            }
+        });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
-            menu.addItem({
-                iconHTML: "＋📗",
-                label: this.plugin.i18n.addProgressiveReading,
-                accelerator: "",
-                click: async () => {
-                    await this.addProgressiveReadingWithLock();
-                }
-            });
-            menu.addItem({
-                iconHTML: "👁️📚",
-                label: this.plugin.i18n.viewAllProgressiveBooks,
-                accelerator: "⌥=",
-                click: async () => {
-                    await this.viewAllProgressiveBooks();
-                }
-            });
-            menu.addItem({
-                label: tomatoI18n.跳到分片或回到原文,
-                iconHTML: "🎯📖",
-                accelerator: "⇧⌥O",
-                click: () => {
-                    const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
-                    if (blockID) {
-                        this.readThisPiece(blockID);
+            if (piecesmenu.get()) {
+                menu.addItem({
+                    iconHTML: Progressive添加当前文档到渐进阅读分片模式.icon,
+                    label: Progressive添加当前文档到渐进阅读分片模式.langText(),
+                    accelerator: Progressive添加当前文档到渐进阅读分片模式.m,
+                    click: async () => {
+                        await this.addProgressiveReadingWithLock();
                     }
-                },
-            });
-            menu.addItem({
-                iconHTML: "🔀📖",
-                label: this.plugin.i18n.startToLearn,
-                accelerator: "⌥-",
-                click: () => {
-                    this.startToLearnWithLock();
-                }
-            });
+                });
+            }
+            if (ProgressiveViewAllMenu.get()) {
+                menu.addItem({
+                    iconHTML: Progressive查看所有渐进学习文档.icon,
+                    label: Progressive查看所有渐进学习文档.langText(),
+                    accelerator: Progressive查看所有渐进学习文档.m,
+                    click: async () => {
+                        await this.viewAllProgressiveBooks();
+                    }
+                });
+            }
+            if (ProgressiveJumpMenu.get()) {
+                menu.addItem({
+                    iconHTML: Progressive跳到分片或回到原文.icon,
+                    label: Progressive跳到分片或回到原文.langText(),
+                    accelerator: Progressive跳到分片或回到原文.m,
+                    click: () => {
+                        this.readThisPiece();
+                    },
+                });
+            }
+            if (ProgressiveStart2learn.get()) {
+                menu.addItem({
+                    iconHTML: Progressive开始学习.icon,
+                    label: Progressive开始学习.langText(),
+                    accelerator: Progressive开始学习.m,
+                    click: () => {
+                        this.startToLearnWithLock();
+                    }
+                });
+            }
         });
         events.addListener("ProgressiveBox", (eventType, detail: Protyle) => {
             if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
@@ -234,61 +261,58 @@ class Progressive {
     blockIconEvent(detail: any) {
         if (!this.plugin) return;
         const menu = detail.menu;
-        menu.addItem({
-            iconHTML: "＋📗",
-            label: this.plugin.i18n.addProgressiveReading,
-            accelerator: "",
-            click: async () => {
-                await this.addProgressiveReadingWithLock();
-            }
-        });
-        menu.addItem({
-            iconHTML: "🎯📖",
-            label: tomatoI18n.跳到分片或回到原文,
-            accelerator: "⇧⌥O",
-            click: async () => {
-                await this.readThisPiece();
-            }
-        });
+        if (ProgressiveJumpMenu.get()) {
+            menu.addItem({
+                iconHTML: Progressive跳到分片或回到原文.icon,
+                label: Progressive跳到分片或回到原文.langText(),
+                accelerator: Progressive跳到分片或回到原文.m,
+                click: () => {
+                    this.readThisPiece();
+                }
+            });
+        }
     }
 
     private addMenu(rect?: DOMRect) {
         const menu = new Menu("progressiveMenu");
         menu.addItem({
-            iconHTML: "＋📗",
-            label: this.plugin.i18n.addProgressiveReading,
-            accelerator: "",
+            iconHTML: Progressive添加当前文档到渐进阅读分片模式.icon,
+            label: Progressive添加当前文档到渐进阅读分片模式.langText(),
+            accelerator: Progressive添加当前文档到渐进阅读分片模式.m,
             click: async () => {
                 await this.addProgressiveReadingWithLock();
             }
         });
         menu.addItem({
-            iconHTML: "👁️📚",
-            label: this.plugin.i18n.viewAllProgressiveBooks,
-            accelerator: "⌥=",
+            iconHTML: Progressive查看所有渐进学习文档.icon,
+            label: Progressive查看所有渐进学习文档.langText(),
+            accelerator: Progressive查看所有渐进学习文档.m,
             click: async () => {
                 await this.viewAllProgressiveBooks();
             }
         });
         menu.addItem({
-            iconHTML: "🎯📖",
-            label: tomatoI18n.跳到分片或回到原文,
-            accelerator: "⇧⌥O",
-            click: async () => {
-                await this.readThisPiece();
-            }
-        });
-        menu.addItem({
-            iconHTML: "🔀📖",
-            label: this.plugin.i18n.startToLearn,
-            accelerator: "⌥-",
+            iconHTML: Progressive跳到分片或回到原文.icon,
+            label: Progressive跳到分片或回到原文.langText(),
+            accelerator: Progressive跳到分片或回到原文.m,
             click: () => {
-                this.startToLearnWithLock();
+                this.readThisPiece();
             }
         });
+        if (ProgressiveStart2learn.get()) {
+            menu.addItem({
+                iconHTML: Progressive开始学习.icon,
+                label: Progressive开始学习.langText(),
+                accelerator: Progressive开始学习.m,
+                click: () => {
+                    this.startToLearnWithLock();
+                }
+            });
+        }
         menu.addItem({
-            iconHTML: "⚙️",
-            label: tomatoI18n.渐进学习的设置,
+            iconHTML: progSettingsOpenHK.icon,
+            label: progSettingsOpenHK.langText(),
+            accelerator: progSettingsOpenHK.m,
             click: () => {
                 this.plugin.setting.open(tomatoI18n.渐进学习)
             }
@@ -353,14 +377,14 @@ class Progressive {
     }
 
     async readThisPiece(blockID?: string) {
-        if (!blockID) {
-            blockID = events.lastBlockID;
-        }
+        if (!blockID) blockID = events.selectedDivsSync().ids.at(0);
+        if (!blockID) return;
         const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
         if (row) {
             const bookID = row["root_id"];
             const idx = await this.storage.loadBookIndexIfNeeded(bookID);
             if (idx?.length <= 0) {
+                // not a book
                 for (const div of document.querySelectorAll(`div[${DATA_NODE_ID}="${blockID}"]`)) {
                     const refID = utils.getAttribute(div as any, RefIDKey)
                     if (refID) {
@@ -375,15 +399,24 @@ class Progressive {
                         if (blockID === idx[i][j]) {
                             await this.storage.gotoBlock(bookID, i);
                             await this.startToLearnWithLock(bookID);
+                            setTimeout(async () => {
+                                const pieceBlockID = await this.getPiecesByRefID(blockID)
+                                if (pieceBlockID) await OpenSyFile2(this.plugin, pieceBlockID);
+                            }, 1200);
                             return;
                         }
                     }
                 }
-                await siyuan.pushMsg(this.plugin.i18n.opsInOriDocOrAddIt);
+                await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
             }
         } else {
             await siyuan.pushMsg(this.plugin.i18n.cannotFindDocWaitForIndex);
         }
+    }
+
+    private async getPiecesByRefID(oriID: string) {
+        const rows = await siyuan.sqlAttr(`select * from attributes where name="${RefIDKey}" and value="${oriID}" limit 1`)
+        return rows.at(0).block_id;
     }
 
     async startToLearnWithLock(bookID = "", isRand = false) {
@@ -625,11 +658,17 @@ class Progressive {
     }
 
     private async splitAndInsert(bookID: string, noteID: string, t: AsList, ids: string[]) {
-        const s = new SplitSentence(bookID, this.plugin, noteID, t);
-        if (ids?.length > 0) {
-            await s.splitByIDs(ids);
-            await s.insert(false);
+        if (lastVerifyResult()) {
+            const s = new SplitSentence(bookID, this.plugin, noteID, t);
+            if (ids?.length > 0) {
+                await s.splitByIDs(ids);
+                await s.insert(false);
+            }
+            return true
+        } else {
+            await siyuan.pushMsg(tomatoI18n.此功能需要激活VIP)
         }
+        return false;
     }
 
     private async addReadingBtns(bookID: string, noteID: string, point: number) {
@@ -652,15 +691,18 @@ class Progressive {
             allContent.push(await this.copyBlock(point - 1, info, lastID, div, [PROG_PIECE_PREVIOUS]));
         }
 
+        let splited = false
         if (stype) {
-            await this.splitAndInsert(bookID, noteID, stype, piece);
+            splited = await this.splitAndInsert(bookID, noteID, stype, piece);
         } else if (info.autoSplitSentenceP) {
-            await this.splitAndInsert(bookID, noteID, "p", piece);
+            splited = await this.splitAndInsert(bookID, noteID, "p", piece);
         } else if (info.autoSplitSentenceI) {
-            await this.splitAndInsert(bookID, noteID, "i", piece);
+            splited = await this.splitAndInsert(bookID, noteID, "i", piece);
         } else if (info.autoSplitSentenceT) {
-            await this.splitAndInsert(bookID, noteID, "t", piece);
-        } else {
+            splited = await this.splitAndInsert(bookID, noteID, "t", piece);
+        }
+
+        if (!splited) {
             const idx: { i: number } = { i: 1 };
             const rows = (await siyuan.getRows(piece, "markdown,ial,type")).filter(row => !!row.markdown);
             for (const { id, markdown, ial, type } of rows) {

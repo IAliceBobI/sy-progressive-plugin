@@ -1,5 +1,5 @@
 import { IProtyle } from "siyuan";
-import { set_href, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { set_href, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import * as gconst from "../../sy-tomato-plugin/src/libs/gconst";
@@ -9,8 +9,9 @@ import { domNewLine, DomSuperBlockBuilder, getSpans } from "../../sy-tomato-plug
 import { getDocTracer, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { flashcardAddRefs, flashcardNotebook, flashcardUseLink, makeCardEnable, makeCardHereEnable, multilineMarkEnable, send2dailyCardEnable, send2dailyCardNoRefEnable, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
-import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 
 enum CardType {
     Here = "Here", None = "None"
@@ -22,7 +23,7 @@ export function getDailyPath() {
     return `/daily card/c${y}/c${y}-${m}/c${today}`;
 }
 
-function getDailyAttrValue() {
+export function getDailyAttrValue() {
     const today = utils.timeUtil.dateFormat(new Date()).split(" ")[0];
     const [y, m, d] = today.split("-");
     return y + m + d;
@@ -36,6 +37,12 @@ function getBlockDOM(dom: HTMLElement): { dom: HTMLElement, blockID: string } {
     return { dom, blockID };
 }
 
+export const flashBox制卡 = winHotkey("⌥E", "制卡 2025-5-13 09:05:57", "＋🗃️", () => tomatoI18n.制卡)
+export const flashBox原地制卡 = winHotkey("⌥`", "原地制卡 2025-5-13 09:05:57", "＋🗃️⬇️", () => tomatoI18n.原地制卡)
+export const flashBox制卡并发到dailycard = winHotkey("⌘`", "制卡并发到dailycard 2025-5-13 09:05:57", "🗓️🗃️⭐", () => tomatoI18n.制卡并发到dailycard)
+export const flashBox制卡并发到dailycard无引用 = winHotkey("⌥S", "制卡并发到dailycard无引用 2025-5-13 09:05:57", "🗓️🗃️", () => tomatoI18n.制卡并发到dailycard无引用, true, send2dailyCardNoRefEnable)
+export const flashBox多行标记 = winHotkey("shift+alt+enter", "多行标记 2025-5-13 09:05:57", "🪧", () => tomatoI18n.多行标记)
+
 class FlashBox {
     private plugin: BaseTomatoPlugin;
     private settings: TomatoSettings;
@@ -44,9 +51,9 @@ class FlashBox {
         if (!this.plugin) return;
         if (makeCardEnable.get()) {
             detail.menu.addItem({
-                iconHTML: "＋🗃️",
-                accelerator: "⌥E",
-                label: tomatoI18n.制卡,
+                iconHTML: flashBox制卡.icon,
+                accelerator: flashBox制卡.m,
+                label: flashBox制卡.langText(),
                 click: () => {
                     this.makeCard(detail.protyle, CardType.None);
                 }
@@ -54,9 +61,9 @@ class FlashBox {
         }
         if (makeCardHereEnable.get()) {
             detail.menu.addItem({
-                iconHTML: "＋🗃️⬇️",
-                accelerator: "⌥`",
-                label: tomatoI18n.原地制卡,
+                iconHTML: flashBox原地制卡.icon,
+                accelerator: flashBox原地制卡.m,
+                label: flashBox原地制卡.langText(),
                 click: () => {
                     this.makeCard(detail.protyle, CardType.Here);
                 }
@@ -64,19 +71,19 @@ class FlashBox {
         }
         if (send2dailyCardEnable.get()) {
             detail.menu.addItem({
-                iconHTML: "🗓️🗃️⭐",
-                accelerator: "⌘`",
-                label: tomatoI18n.制卡并发到dailycard,
+                iconHTML: flashBox制卡并发到dailycard.icon,
+                accelerator: flashBox制卡并发到dailycard.m,
+                label: flashBox制卡并发到dailycard.langText(),
                 click: () => {
                     this.makeCard(detail.protyle, CardType.None, getDailyPath());
                 }
             });
         }
-        if (send2dailyCardNoRefEnable.get()) {
+        if (flashBox制卡并发到dailycard无引用.menu()) {
             detail.menu.addItem({
-                iconHTML: "🗓️🗃️",
-                accelerator: "⌥S",
-                label: tomatoI18n.制卡并发到dailycard无引用,
+                iconHTML: flashBox制卡并发到dailycard无引用.icon,
+                accelerator: flashBox制卡并发到dailycard无引用.m,
+                label: flashBox制卡并发到dailycard无引用.langText(),
                 click: () => {
                     this.makeCard(detail.protyle, CardType.None, getDailyPath(), true);
                 }
@@ -84,9 +91,9 @@ class FlashBox {
         }
         if (multilineMarkEnable.get()) {
             detail.menu.addItem({
-                iconHTML: "🪧",
-                accelerator: "⌥D",
-                label: tomatoI18n.多行标记,
+                iconHTML: flashBox多行标记.icon,
+                accelerator: flashBox多行标记.m,
+                label: flashBox多行标记.langText(),
                 click: () => {
                     this.multilineMark(detail.protyle);
                 }
@@ -97,51 +104,55 @@ class FlashBox {
     async onload(plugin: BaseTomatoPlugin, settings: TomatoSettings) {
         this.plugin = plugin;
         this.settings = settings;
+        await verifyKeyProgressive();
+
         this.plugin.addCommand({
-            langKey: "insertBlankSpaceCard2025-4-28 15:32:50",
-            langText: tomatoI18n.制卡,
-            hotkey: "⌥E",
+            langKey: flashBox制卡.langKey,
+            langText: flashBox制卡.langText(),
+            hotkey: flashBox制卡.m,
             callback: () => {
                 this.makeCard(events.protyle?.protyle, CardType.None);
             },
         });
         this.plugin.addCommand({
-            langKey: "原地制卡2025-4-28 15:37:07",
-            langText: tomatoI18n.原地制卡,
-            hotkey: "⌥`",
+            langKey: flashBox原地制卡.langKey,
+            langText: flashBox原地制卡.langText(),
+            hotkey: flashBox原地制卡.m,
             callback: () => {
                 this.makeCard(events.protyle?.protyle, CardType.Here);
             },
         });
         this.plugin.addCommand({
-            langKey: "制卡并发到dailycard2025-4-28 15:43:53",
-            langText: tomatoI18n.制卡并发到dailycard,
-            hotkey: "⌘`",
+            langKey: flashBox制卡并发到dailycard.langKey,
+            langText: flashBox制卡并发到dailycard.langText(),
+            hotkey: flashBox制卡并发到dailycard.m,
             callback: () => {
                 this.makeCard(events.protyle?.protyle, CardType.None, getDailyPath());
             },
         });
         this.plugin.addCommand({
-            langKey: "send2dailyCardNoRef2025-4-28 15:45:42",
-            langText: tomatoI18n.制卡并发到dailycard无引用,
-            hotkey: "⌥S",
+            langKey: flashBox制卡并发到dailycard无引用.langKey,
+            langText: flashBox制卡并发到dailycard无引用.langText(),
+            hotkey: flashBox制卡并发到dailycard无引用.m,
             callback: () => {
-                this.makeCard(events.protyle?.protyle, CardType.None, getDailyPath(), true);
+                if (flashBox制卡并发到dailycard无引用.cmd()) {
+                    this.makeCard(events.protyle?.protyle, CardType.None, getDailyPath(), true);
+                }
             },
         });
         this.plugin.addCommand({
-            langKey: "cardMark2025-4-28 15:57:05",
-            langText: tomatoI18n.多行标记,
-            hotkey: "⌥D",
+            langKey: flashBox多行标记.langKey,
+            langText: flashBox多行标记.langText(),
+            hotkey: flashBox多行标记.m,
             editorCallback: (p) => this.multilineMark(p),
         });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
             if (makeCardEnable.get()) {
                 menu.addItem({
-                    label: tomatoI18n.制卡,
-                    iconHTML: "＋🗃️",
-                    accelerator: "⌥E",
+                    iconHTML: flashBox制卡.icon,
+                    accelerator: flashBox制卡.m,
+                    label: flashBox制卡.langText(),
                     click: () => {
                         const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                         const blank = detail?.range?.cloneContents()?.textContent ?? "";
@@ -153,9 +164,9 @@ class FlashBox {
             }
             if (makeCardHereEnable.get()) {
                 menu.addItem({
-                    label: tomatoI18n.原地制卡,
-                    iconHTML: "＋🗃️⬇️",
-                    accelerator: "⌥`",
+                    iconHTML: flashBox原地制卡.icon,
+                    accelerator: flashBox原地制卡.m,
+                    label: flashBox原地制卡.langText(),
                     click: () => {
                         const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                         const blank = detail?.range?.cloneContents()?.textContent ?? "";
@@ -167,9 +178,9 @@ class FlashBox {
             }
             if (send2dailyCardEnable.get()) {
                 menu.addItem({
-                    label: tomatoI18n.制卡并发到dailycard,
-                    iconHTML: "🗓️🗃️⭐",
-                    accelerator: "⌘`",
+                    iconHTML: flashBox制卡并发到dailycard.icon,
+                    accelerator: flashBox制卡并发到dailycard.m,
+                    label: flashBox制卡并发到dailycard.langText(),
                     click: () => {
                         const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                         const blank = detail?.range?.cloneContents()?.textContent ?? "";
@@ -179,11 +190,11 @@ class FlashBox {
                     },
                 });
             }
-            if (send2dailyCardNoRefEnable.get()) {
+            if (flashBox制卡并发到dailycard无引用.menu()) {
                 menu.addItem({
-                    label: tomatoI18n.制卡并发到dailycard无引用,
-                    iconHTML: "🗓️🗃️",
-                    accelerator: "⌥S",
+                    iconHTML: flashBox制卡并发到dailycard无引用.icon,
+                    accelerator: flashBox制卡并发到dailycard无引用.m,
+                    label: flashBox制卡并发到dailycard无引用.langText(),
                     click: () => {
                         const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
                         const blank = detail?.range?.cloneContents()?.textContent ?? "";
@@ -195,9 +206,9 @@ class FlashBox {
             }
             if (multilineMarkEnable.get()) {
                 detail.menu.addItem({
-                    iconHTML: "🪧",
-                    accelerator: "⌥D",
-                    label: tomatoI18n.多行标记,
+                    iconHTML: flashBox多行标记.icon,
+                    accelerator: flashBox多行标记.m,
+                    label: flashBox多行标记.langText(),
                     click: () => {
                         this.multilineMark(detail.protyle);
                     }
@@ -327,7 +338,7 @@ class FlashBox {
         let refPath: string = "";
         let inBookIdx: string = "";
         const spans: HTMLElement[] = [];
-        if (flashcardAddRefs.get() && await verifyKeyProgressive()) {
+        if (flashcardAddRefs.get() && lastVerifyResult()) {
             spans.push(...await getSpans(divs, await getDocTracer()));
         }
         for (const div of divs) {

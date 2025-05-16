@@ -19,11 +19,11 @@ export function addClickEvent(element: HTMLElement) {
 
 export function getReadingBtns3(bookID: string, noteID: string, point: number) {
     return `{{{col
-${btn(HtmlCBType.splitByPunctuations, "✂📜", tomatoI18n.按标点断句, bookID, noteID, point, prog.settings.btnSplitByPunctuations)}
+${btn(HtmlCBType.splitByPunctuations, "✂📜👑", tomatoI18n.按标点断句 + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuations)}
 
-${btn(HtmlCBType.splitByPunctuationsListCheck, "✂✅", tomatoI18n.按标点断句Checkbox, bookID, noteID, point, prog.settings.btnSplitByPunctuationsListCheck)}
+${btn(HtmlCBType.splitByPunctuationsListCheck, "✂✅👑", tomatoI18n.按标点断句Checkbox + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuationsListCheck)}
 
-${btn(HtmlCBType.splitByPunctuationsList, "✂📌", tomatoI18n.按标点断句列表, bookID, noteID, point, prog.settings.btnSplitByPunctuationsList)}
+${btn(HtmlCBType.splitByPunctuationsList, "✂📌👑", tomatoI18n.按标点断句列表 + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuationsList)}
 
 ${btn(HtmlCBType.nop, SPACE, "", bookID, noteID, point, false)}
 
