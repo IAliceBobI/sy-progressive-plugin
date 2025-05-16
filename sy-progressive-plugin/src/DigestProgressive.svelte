@@ -24,6 +24,7 @@
 
     let moreToolsBtn: HTMLElement;
     let tableTools: HTMLElement;
+    let digestBtn: HTMLElement;
     let tableSelect: HTMLElement;
     let di: DigestBuilder;
     let word = new WordBuilder(settings);
@@ -68,14 +69,18 @@
                 2000,
                 500,
             );
+        } else {
+            digestBtn.style.display = "none";
         }
     }
 
     function hideTr() {
         if (tableTools.style.display == "none") {
             tableTools.style.display = null;
+            digestBtn.style.display = "none";
         } else {
             tableTools.style.display = "none";
+            digestBtn.style.display = null;
         }
     }
 
@@ -150,20 +155,31 @@
                 </td>
                 <td>
                     <button
-                        bind:this={moreToolsBtn}
-                        class="b3-button"
-                        title={tomatoI18n.显示与隐藏工具}
-                        on:click={hideTr}>🔧</button
-                    >
-                </td>
-                <td>
-                    <button
                         class="b3-button"
                         title={tomatoI18n.向下选择}
                         on:click={() => {
                             selectionMl.selectDown();
                             needReinit = true;
                         }}>⏬</button
+                    >
+                </td>
+                <td>
+                    <button
+                        bind:this={moreToolsBtn}
+                        class="b3-button"
+                        title={tomatoI18n.显示与隐藏工具}
+                        on:click={hideTr}>🔧</button
+                    >
+                </td>
+                <td bind:this={digestBtn}>
+                    <button
+                        title="{tomatoI18n.执行摘抄}(Alt+Z)"
+                        class="b3-button"
+                        on:click={async () => {
+                            await init();
+                            await di.digest();
+                            destroy();
+                        }}>🍕</button
                     >
                 </td>
             </tr>
