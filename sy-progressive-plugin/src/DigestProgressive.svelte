@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { IProtyle } from "siyuan";
+    import { IProtyle, Plugin } from "siyuan";
     import { onDestroy, onMount } from "svelte";
     import { events } from "../../sy-tomato-plugin/src/libs/Events";
     import { DigestBuilder, getDigestMd } from "./digestUtils";
@@ -11,20 +11,24 @@
     } from "../../sy-tomato-plugin/src/libs/utils";
     import { digestProgressiveBox, initDi } from "./DigestProgressiveBox";
     import { WordBuilder } from "./wordsUtils";
-    import { pinyinAll } from "../../sy-tomato-plugin/src/libs/docUtils";
+    import {
+        getDocTracer,
+        pinyinAll,
+    } from "../../sy-tomato-plugin/src/libs/docUtils";
     import { domNewLine } from "../../sy-tomato-plugin/src/libs/sydom";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
     import { SelectionML } from "../../sy-tomato-plugin/src/libs/SelectionML";
+    import { addFlashCard } from "../../sy-tomato-plugin/src/libs/listUtils";
+    import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
     export let protyle: IProtyle;
+    export let plugin: Plugin;
     export let settings: TomatoSettings;
     export let dm: DestroyManager;
     export let isDouble: boolean;
 
-    let moreToolsBtn: HTMLElement;
     let tableTools: HTMLElement;
-    let digestBtn: HTMLElement;
     let tableSelect: HTMLElement;
     let di: DigestBuilder;
     let word = new WordBuilder(settings);
@@ -63,24 +67,24 @@
             tableSelect.style.display = null;
             setTimeouts(
                 () => {
-                    moreToolsBtn.focus();
+                    tableSelect.focus();
                 },
                 300,
                 2000,
                 500,
             );
         } else {
-            digestBtn.style.display = "none";
+            tableTools.style.display = "none";
         }
     }
 
     function hideTr() {
-        if (tableTools.style.display == "none") {
-            tableTools.style.display = null;
-            digestBtn.style.display = "none";
-        } else {
+        if (tableSelect.style.display == "none") {
+            tableSelect.style.display = null;
             tableTools.style.display = "none";
-            digestBtn.style.display = null;
+        } else {
+            tableSelect.style.display = "none";
+            tableTools.style.display = null;
         }
     }
 
@@ -139,308 +143,319 @@
 </script>
 
 <!-- https://learn.svelte.dev/tutorial/if-blocks -->
-<div class="protyle-wysiwyg">
-    <table bind:this={tableSelect}>
-        <tbody>
-            <tr>
-                <td>
-                    <button
-                        class="b3-button"
-                        title={tomatoI18n.向上选择}
-                        on:click={() => {
-                            selectionMl.selectUp();
-                            needReinit = true;
-                        }}>⏫</button
-                    >
-                </td>
-                <td>
-                    <button
-                        class="b3-button"
-                        title={tomatoI18n.向下选择}
-                        on:click={() => {
-                            selectionMl.selectDown();
-                            needReinit = true;
-                        }}>⏬</button
-                    >
-                </td>
-                <td>
-                    <button
-                        bind:this={moreToolsBtn}
-                        class="b3-button"
-                        title={tomatoI18n.显示与隐藏工具}
-                        on:click={hideTr}>🔧</button
-                    >
-                </td>
-                <td bind:this={digestBtn}>
-                    <button
-                        title="{tomatoI18n.执行摘抄}(Alt+Z)"
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            await di.digest();
-                            destroy();
-                        }}>🍕</button
-                    >
-                </td>
-            </tr>
-        </tbody>
-    </table>
 
-    <table bind:this={tableTools}>
-        <tbody>
-            <tr>
-                <td>
-                    <button
-                        title="{tomatoI18n.执行摘抄}(Alt+Z)"
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            await di.digest();
-                            destroy();
-                        }}>🍕</button
+<table bind:this={tableSelect}>
+    <tbody>
+        <tr>
+            <td>
+                <button
+                    class="b3-button"
+                    title={tomatoI18n.向上选择}
+                    on:click={() => {
+                        selectionMl.selectUp();
+                        needReinit = true;
+                    }}>⏫</button
+                >
+            </td>
+            <td>
+                <button
+                    class="b3-button"
+                    title={tomatoI18n.向下选择}
+                    on:click={() => {
+                        selectionMl.selectDown();
+                        needReinit = true;
+                    }}>⏬</button
+                >
+            </td>
+            <td>
+                <button
+                    title="{tomatoI18n.执行摘抄}(Alt+Z)"
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        await di.digest();
+                        destroy();
+                    }}>🍕</button
+                >
+            </td>
+            <td>
+                <button
+                    title="{tomatoI18n.用选中的行创建超级块超级块制卡取消制卡}(Alt+Z)"
+                    class="b3-button"
+                    on:click={async () => {
+                        const id = await addFlashCard(
+                            protyle,
+                            await getDocTracer(),
+                            plugin,
+                            await verifyKeyProgressive(),
+                        );
+                        if (id) await siyuan.addRiffCards([id]);
+                        destroy();
+                    }}>💳</button
+                >
+            </td>
+            <td>
+                <button
+                    class="b3-button"
+                    title={tomatoI18n.显示与隐藏工具}
+                    on:click={hideTr}>🔧</button
+                >
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<table class="protyle-wysiwyg" bind:this={tableTools}>
+    <tbody>
+        <tr>
+            <td>
+                <button
+                    title="{tomatoI18n.执行摘抄}(Alt+Z)"
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        await di.digest();
+                        destroy();
+                    }}>🍕</button
+                >
+            </td>
+            <td>
+                <button
+                    title="{tomatoI18n.执行摘抄}&{tomatoI18n.断句}"
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        await di.digest(true);
+                        destroy();
+                    }}>✂</button
+                >
+            </td>
+            <td>
+                <button
+                    title={tomatoI18n.查看摘抄轨迹链}
+                    class="b3-button"
+                    on:click={async () => {
+                        await di.getDigestLnk();
+                        destroy();
+                    }}>🌲</button
+                >
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <button
+                    title={tomatoI18n.摘录单词}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        destroy();
+                        await word.digest();
+                    }}>🔤</button
+                >
+            </td>
+            <td>
+                <button
+                    title={tomatoI18n.摘录单词并加入闪卡}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        destroy();
+                        await word.digest(true);
+                    }}>🗂️</button
+                >
+            </td>
+            <td>
+                <button
+                    title={tomatoI18n.摘录单词并加入闪卡并用AI解释}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        destroy();
+                        await word.digest(true, true);
+                    }}>🤖</button
+                >
+            </td>
+        </tr>
+        <tr>
+            <td
+                ><button
+                    title={tomatoI18n.打开前一个摘抄}
+                    class="b3-button"
+                    on:click={async () => {
+                        await di.gotoDigest("<", "desc");
+                        destroy();
+                    }}>👈</button
+                >
+            </td>
+            <td>
+                <button
+                    title={tomatoI18n.打开下一个摘抄}
+                    class="b3-button"
+                    on:click={async () => {
+                        await di.gotoDigest(">", "asc");
+                        destroy();
+                    }}>👉</button
+                >
+            </td>
+            <td>
+                <button
+                    title={tomatoI18n.清理已经完成的摘抄}
+                    class="b3-button"
+                    on:click={async () => {
+                        await di.cleanDigest();
+                        destroy();
+                    }}>🗑️</button
+                >
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <select
+                    class="b3-select"
+                    bind:value={cardMode}
+                    on:change={() => {
+                        di.cardMode = cardMode;
+                        di.saveCardMode();
+                    }}
+                >
+                    <option value="0" title={tomatoI18n.摘抄不加入闪卡}>
+                        🚫💳
+                    </option>
+                    <option
+                        value="1"
+                        title={tomatoI18n.只有最新的一个摘抄加入闪卡}
                     >
-                </td>
-                <td>
-                    <button
-                        title="{tomatoI18n.执行摘抄}&{tomatoI18n.断句}"
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            await di.digest(true);
-                            destroy();
-                        }}>✂</button
-                    >
-                </td>
-                <td>
-                    <button
-                        title={tomatoI18n.查看摘抄轨迹链}
-                        class="b3-button"
-                        on:click={async () => {
-                            await di.getDigestLnk();
-                            destroy();
-                        }}>🌲</button
-                    >
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <button
-                        title={tomatoI18n.摘录单词}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            destroy();
-                            await word.digest();
-                        }}>🔤</button
-                    >
-                </td>
-                <td>
-                    <button
-                        title={tomatoI18n.摘录单词并加入闪卡}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            destroy();
-                            await word.digest(true);
-                        }}>🗂️</button
-                    >
-                </td>
-                <td>
-                    <button
-                        title={tomatoI18n.摘录单词并加入闪卡并用AI解释}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            destroy();
-                            await word.digest(true, true);
-                        }}>🤖</button
-                    >
-                </td>
-            </tr>
-            <tr>
-                <td
-                    ><button
-                        title={tomatoI18n.打开前一个摘抄}
-                        class="b3-button"
-                        on:click={async () => {
-                            await di.gotoDigest("<", "desc");
-                            destroy();
-                        }}>👈</button
-                    >
-                </td>
-                <td>
-                    <button
-                        title={tomatoI18n.打开下一个摘抄}
-                        class="b3-button"
-                        on:click={async () => {
-                            await di.gotoDigest(">", "asc");
-                            destroy();
-                        }}>👉</button
-                    >
-                </td>
-                <td>
-                    <button
-                        title={tomatoI18n.清理已经完成的摘抄}
-                        class="b3-button"
-                        on:click={async () => {
-                            await di.cleanDigest();
-                            destroy();
-                        }}>🗑️</button
-                    >
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2">
-                    <select
-                        class="b3-select"
-                        bind:value={cardMode}
-                        on:change={() => {
-                            di.cardMode = cardMode;
-                            di.saveCardMode();
-                        }}
-                    >
-                        <option value="0" title={tomatoI18n.摘抄不加入闪卡}>
-                            🚫💳
-                        </option>
-                        <option
-                            value="1"
-                            title={tomatoI18n.只有最新的一个摘抄加入闪卡}
-                        >
-                            💳
-                        </option>
-                        <option value="2" title={tomatoI18n.每个摘抄都加入闪卡}>
-                            💳💳
-                        </option>
-                    </select>
-                </td>
-                <td>
-                    <button
-                        title={tomatoI18n.标记摘抄为完成状态并转移闪卡到其他摘抄}
-                        class="b3-button"
-                        on:click={async () => {
-                            if (di.ctime) {
-                                await di.finishDigest();
-                            } else {
-                                await siyuan.pushMsg(
-                                    `《${di.docName}》${tomatoI18n.这并不是一个摘抄}`,
-                                );
-                            }
-                            destroy();
-                        }}>🔨</button
-                    >
-                </td>
-            </tr>
-            <tr>
-                <td colspan="3">
-                    <button
-                        title={tomatoI18n.按照标点符号断句并插入下方}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            let { md } = await getDigestMd(
-                                settings,
-                                di.selected,
-                                di.protyle,
-                                true,
-                                false,
+                        💳
+                    </option>
+                    <option value="2" title={tomatoI18n.每个摘抄都加入闪卡}>
+                        💳💳
+                    </option>
+                </select>
+            </td>
+            <td>
+                <button
+                    title={tomatoI18n.标记摘抄为完成状态并转移闪卡到其他摘抄}
+                    class="b3-button"
+                    on:click={async () => {
+                        if (di.ctime) {
+                            await di.finishDigest();
+                        } else {
+                            await siyuan.pushMsg(
+                                `《${di.docName}》${tomatoI18n.这并不是一个摘抄}`,
                             );
-                            md.splice(0, 0, attrNewLine());
-                            md.push(attrNewLine());
-                            md = md.map((i) => {
-                                i = i.split("\n").slice(0, -1).join("\n");
-                                return domNewLine(i).outerHTML;
-                            });
-                            await siyuan.insertBlocksAfter(md, di.anchorID);
-                            destroy();
-                        }}>✂👇</button
-                    >
-                    <button
-                        title="{tomatoI18n.按照标点符号断句并插入下方}(checkbox)"
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            const { md } = await getDigestMd(
-                                settings,
-                                di.selected,
-                                di.protyle,
-                                true,
-                                false,
-                                true,
-                            );
-                            md.splice(0, 0, attrNewLine());
-                            md.push(attrNewLine());
-                            await siyuan.insertBlockAfter(
-                                md.join("\n"),
-                                di.anchorID,
-                            );
-                            destroy();
-                        }}>📌👇</button
-                    >
-                </td>
-            </tr>
-            <tr>
-                <td colspan="3">
-                    <button
-                        title={tomatoI18n.按照回车拆分为多个段落块}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            await splitParagph();
-                            destroy();
-                        }}>✂📄</button
-                    >
-                    <button
-                        title={tomatoI18n.合并为单个段落块}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            await mergeParagph();
-                            destroy();
-                        }}>📦📄</button
-                    >
-                </td>
-            </tr>
-            <tr
-                ><td colspan="3">
-                    <button
-                        title={tomatoI18n.在上方插入汉语拼音}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            const { onePY, allPY } = pinyinAll(
-                                seletedText,
-                                "_",
-                            );
-                            if (allPY != onePY) {
-                                await siyuan.insertBlockBefore(allPY, anchorID);
-                            }
-                            await siyuan.insertBlockBefore(onePY, anchorID);
-                            destroy();
-                        }}>pīn</button
-                    >
-                    <button
-                        title={tomatoI18n.上网查询所选内容}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            openBrowser(seletedText);
-                            destroy();
-                        }}>🌐</button
-                    >
-                    <button
-                        title={"baidu AI"}
-                        class="b3-button"
-                        on:click={async () => {
-                            await init();
-                            window.open(
-                                `https://chat.baidu.com/search?word=${seletedText}`,
-                                "_blank",
-                            );
-                            destroy();
-                        }}>AI</button
-                    >
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+                        }
+                        destroy();
+                    }}>🔨</button
+                >
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3">
+                <button
+                    title={tomatoI18n.按照标点符号断句并插入下方}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        let { md } = await getDigestMd(
+                            settings,
+                            di.selected,
+                            di.protyle,
+                            true,
+                            false,
+                        );
+                        md.splice(0, 0, attrNewLine());
+                        md.push(attrNewLine());
+                        md = md.map((i) => {
+                            i = i.split("\n").slice(0, -1).join("\n");
+                            return domNewLine(i).outerHTML;
+                        });
+                        await siyuan.insertBlocksAfter(md, di.anchorID);
+                        destroy();
+                    }}>✂👇</button
+                >
+                <button
+                    title="{tomatoI18n.按照标点符号断句并插入下方}(checkbox)"
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        const { md } = await getDigestMd(
+                            settings,
+                            di.selected,
+                            di.protyle,
+                            true,
+                            false,
+                            true,
+                        );
+                        md.splice(0, 0, attrNewLine());
+                        md.push(attrNewLine());
+                        await siyuan.insertBlockAfter(
+                            md.join("\n"),
+                            di.anchorID,
+                        );
+                        destroy();
+                    }}>📌👇</button
+                >
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3">
+                <button
+                    title={tomatoI18n.按照回车拆分为多个段落块}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        await splitParagph();
+                        destroy();
+                    }}>✂📄</button
+                >
+                <button
+                    title={tomatoI18n.合并为单个段落块}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        await mergeParagph();
+                        destroy();
+                    }}>📦📄</button
+                >
+            </td>
+        </tr>
+        <tr
+            ><td colspan="3">
+                <button
+                    title={tomatoI18n.在上方插入汉语拼音}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        const { onePY, allPY } = pinyinAll(seletedText, "_");
+                        if (allPY != onePY) {
+                            await siyuan.insertBlockBefore(allPY, anchorID);
+                        }
+                        await siyuan.insertBlockBefore(onePY, anchorID);
+                        destroy();
+                    }}>pīn</button
+                >
+                <button
+                    title={tomatoI18n.上网查询所选内容}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        openBrowser(seletedText);
+                        destroy();
+                    }}>🌐</button
+                >
+                <button
+                    title={"baidu AI"}
+                    class="b3-button"
+                    on:click={async () => {
+                        await init();
+                        window.open(
+                            `https://chat.baidu.com/search?word=${seletedText}`,
+                            "_blank",
+                        );
+                        destroy();
+                    }}>AI</button
+                >
+            </td>
+        </tr>
+    </tbody>
+</table>

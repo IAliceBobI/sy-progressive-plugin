@@ -114,6 +114,8 @@ class DigestProgressiveBox {
         const dialog = new Dialog({
             title: this.plugin.i18n.digestProgressive,
             content: `<div id='${id}'></div>`,
+            width: null,
+            height: null,
             destroyCallback: () => {
                 dm.destroyBy("1")
             },
@@ -126,6 +128,7 @@ class DigestProgressiveBox {
                 protyle,
                 settings: this.settings,
                 isDouble,
+                plugin: this.plugin,
             }
         });
         dm.add("1", () => dialog.destroy())
