@@ -7,10 +7,11 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { spliyBy } from "./SplitSentence";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { digest2dailycard, digest2Trace, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { getDailyPath } from "./FlashBox";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
 
 async function addPlusLnk(selected: HTMLElement[], digestID: string, lute: Lute) {
     const div = selected[selected.length - 1];
@@ -65,7 +66,7 @@ export class DigestBuilder {
         this.bookID = bookID;
 
         this.attrs = await siyuan.getBlockAttrs(this.bookID);
-        this.cardMode = this.attrs["custom-book-single-card"] ?? "1";
+        this.cardMode = this.attrs["custom-book-single-card"] ?? digestGlobalSigle.get();
     }
 
     async getDigest(bIdx: string, ctime: string, arrow: string, order: string) {
@@ -257,6 +258,9 @@ export class DigestBuilder {
             setTimeout(() => {
                 this.getDigestLnk(false);
             }, 4000);
+        }
+        if (digestAddReadingpoint.get()) {
+            readingPointBox.addReadPointLock(this.ids[this.ids.length - 1], this.selected[this.selected.length - 1])
         }
     }
 

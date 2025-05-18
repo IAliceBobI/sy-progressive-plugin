@@ -21,6 +21,7 @@
     import { SelectionML } from "../../sy-tomato-plugin/src/libs/SelectionML";
     import { addFlashCard } from "../../sy-tomato-plugin/src/libs/listUtils";
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+    import { digestGlobalSigle } from "../../sy-tomato-plugin/src/libs/stores";
 
     export let protyle: IProtyle;
     export let plugin: Plugin;
@@ -33,7 +34,7 @@
     let di: DigestBuilder;
     let word = new WordBuilder(settings);
     let selectionMl: SelectionML;
-    let cardMode = "0";
+    let cardMode = "2";
     let seletedText = "";
     let anchorID = "";
     let needReinit = true;
@@ -74,7 +75,7 @@
                 500,
             );
         } else {
-            tableTools.style.display = "none";
+            tableSelect.style.display = "none";
         }
     }
 
@@ -169,6 +170,16 @@
             </td>
             <td>
                 <button
+                    class="b3-button"
+                    title={tomatoI18n.取消最后一次选择的内容}
+                    on:click={() => {
+                        selectionMl.cancelLast();
+                        needReinit = true;
+                    }}>✖️</button
+                >
+            </td>
+            <td>
+                <button
                     title="{tomatoI18n.执行摘抄}(Alt+Z)"
                     class="b3-button"
                     on:click={async () => {
@@ -183,6 +194,7 @@
                     title="{tomatoI18n.用选中的行创建超级块超级块制卡取消制卡}(Alt+Z)"
                     class="b3-button"
                     on:click={async () => {
+                        await init();
                         const id = await addFlashCard(
                             protyle,
                             await getDocTracer(),
@@ -238,6 +250,13 @@
                         await di.getDigestLnk();
                         destroy();
                     }}>🌲</button
+                >
+            </td>
+            <td>
+                <button
+                    class="b3-button"
+                    title={tomatoI18n.显示与隐藏工具}
+                    on:click={hideTr}>🔧</button
                 >
             </td>
         </tr>
@@ -315,6 +334,7 @@
                     bind:value={cardMode}
                     on:change={() => {
                         di.cardMode = cardMode;
+                        digestGlobalSigle.write(cardMode);
                         di.saveCardMode();
                     }}
                 >

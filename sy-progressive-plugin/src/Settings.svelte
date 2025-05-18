@@ -60,6 +60,7 @@
         piecesmenu,
         ProgressiveJumpMenu,
         ProgressiveViewAllMenu,
+        digestAddReadingpoint,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import TomatoVIP from "../../sy-tomato-plugin/src/TomatoVIP.svelte";
@@ -589,6 +590,15 @@
             bind:checked={$markOriginTextBG}
         />
         {tomatoI18n.制卡摘抄改变原文背景}
+    </div>
+
+    <div class="settingBox">
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$digestAddReadingpoint}
+        />
+        {tomatoI18n.摘抄后加入阅读点}
     </div>
 
     <div class="settingBox">

@@ -20,7 +20,7 @@ class DigestProgressiveBox {
     lute: Lute;
     singleTab: SingleTab;
     digestCallback: any;
-    private doubleDialogOpen = false;
+    private dialogOpened = false;
 
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
         if (!this.plugin) return;
@@ -106,9 +106,15 @@ class DigestProgressiveBox {
     }
 
     private async openDialog(protyle: IProtyle, isDouble = false) {
+        navigator.locks.request("摘抄面板2025年5月18日13:06:48", (lock) => {
+            if (lock) this._openDialog(protyle, isDouble);
+        })
+    }
+
+    private _openDialog(protyle: IProtyle, isDouble = false) {
         if (!protyle) return;
-        if (this.doubleDialogOpen) return;
-        this.doubleDialogOpen = true;
+        if (this.dialogOpened) return;
+        this.dialogOpened = true;
         const id = newID();
         const dm = new DestroyManager()
         const dialog = new Dialog({
@@ -134,7 +140,7 @@ class DigestProgressiveBox {
         dm.add("1", () => dialog.destroy())
         dm.add("2", () => d.$destroy())
         dm.add("3", () => digestProgressiveBox.digestCallback = null)
-        dm.add("4", () => this.doubleDialogOpen = false)
+        dm.add("4", () => this.dialogOpened = false)
     }
 }
 
