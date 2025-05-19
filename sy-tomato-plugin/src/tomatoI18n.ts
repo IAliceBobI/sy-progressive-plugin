@@ -198,6 +198,40 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    public get 移动端显示悬浮按钮() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "移动端显示悬浮按钮";
+            case "es_ES": return "Mostrar botón flotante en móvil";
+            case "fr_FR": return "Afficher le bouton flottant sur mobile";
+            case "ja_JP": return "モバイルにフローティングボタンを表示";
+            case "zh_CHT": return "移動端顯示懸浮按鈕";
+            case "it_IT": return "Mostra pulsante fluttuante su mobile";
+            case "de_DE": return "Schwebende Schaltfläche auf Mobilgeräten anzeigen";
+            case "he_IL": return "הצג כפתור צף במכשירי טלפון";
+            case "ru_RU": return "Показывать плавающую кнопку на мобильных устройствах";
+            case "pl_PL": return "Pokaż przycisk pływający na urządzeniach mobilnych";
+            case "en_US":
+            default: return "Show floating button on mobile";
+        }
+    }
+
+    public get 桌面端显示悬浮按钮() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "桌面端显示悬浮按钮";
+            case "es_ES": return "Mostrar botón flotante en escritorio";
+            case "fr_FR": return "Afficher le bouton flottant sur bureau";
+            case "ja_JP": return "デスクトップにフローティングボタンを表示";
+            case "zh_CHT": return "桌麵端顯示懸浮按鈕";
+            case "it_IT": return "Mostra pulsante fluttuante su desktop";
+            case "de_DE": return "Schwebende Schaltfläche auf dem Desktop anzeigen";
+            case "he_IL": return "הצג כפתור צף על שולחן העבודה";
+            case "ru_RU": return "Показывать плавающую кнопку на рабочем столе";
+            case "pl_PL": return "Pokaż przycisk pływający na pulpicie";
+            case "en_US":
+            default: return "Show floating button on desktop";
+        }
+    }
+
     public get aaa() {
         // tyepscript: 翻译为各国语言。写入case的return中。
         // 不要改属性名字，不要添加其他代码，不要改错，就改当前代码片段。en_US与default返回语言一致。

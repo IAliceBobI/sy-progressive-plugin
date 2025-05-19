@@ -489,7 +489,7 @@
             class="b3-switch"
             bind:checked={$doubleClick2DigestMobile}
         />
-        {tomatoI18n.移动端双击屏幕多行选择}
+        {tomatoI18n.移动端显示悬浮按钮}
     </div>
 
     <div class="settingBox">
@@ -498,7 +498,7 @@
             class="b3-switch"
             bind:checked={$doubleClick2DigestDesktop}
         />
-        {tomatoI18n.桌面端多行选择后Shift双击左键打开摘抄菜单}
+        {tomatoI18n.桌面端显示悬浮按钮}
     </div>
 
     <div class:codeNotValid class="settingBox">

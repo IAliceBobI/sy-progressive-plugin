@@ -2739,3 +2739,10 @@ export function saveRestorePagePosition(scrollPositionKey: string, dm: DestroyMa
         dialog.focus();
     }
 }
+
+export function icon(name: string, size = 20) {
+    if (size) {
+        return `<svg width="${size}px" height="${size}px"><use xlink:href="#icon${name}"></use></svg>`;
+    }
+    return `<svg><use xlink:href="#icon${name}"></use></svg>`;
+}

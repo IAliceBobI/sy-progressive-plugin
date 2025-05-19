@@ -9,6 +9,7 @@ import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import { digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+import { createFloatingBtn } from "./FloatingAction";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)
@@ -92,26 +93,16 @@ class DigestProgressiveBox {
 
         if (events.isMobile) {
             if (doubleClick2DigestMobile.get()) {
-                document.addEventListener("dblclick", () => {
-                    this.openDialog(events.protyle?.protyle, true)
-                }, false);
+                createFloatingBtn(this.plugin, this.settings)
             }
         } else {
             if (doubleClick2DigestDesktop.get()) {
-                document.addEventListener("dblclick", () => {
-                    this.openDialog(events.protyle?.protyle, true)
-                }, false);
+                createFloatingBtn(this.plugin, this.settings)
             }
         }
     }
 
-    private async openDialog(protyle: IProtyle, isDouble = false) {
-        navigator.locks.request("摘抄面板2025年5月18日13:06:48", (lock) => {
-            if (lock) this._openDialog(protyle, isDouble);
-        })
-    }
-
-    private _openDialog(protyle: IProtyle, isDouble = false) {
+    private openDialog(protyle: IProtyle) {
         if (!protyle) return;
         if (this.dialogOpened) return;
         this.dialogOpened = true;
@@ -122,6 +113,7 @@ class DigestProgressiveBox {
             content: `<div id='${id}'></div>`,
             width: null,
             height: null,
+            hideCloseIcon: true,
             destroyCallback: () => {
                 dm.destroyBy("1")
             },
@@ -133,7 +125,6 @@ class DigestProgressiveBox {
                 dm,
                 protyle,
                 settings: this.settings,
-                isDouble,
                 plugin: this.plugin,
             }
         });

@@ -157,10 +157,10 @@
     import NotebookSelect from "./NotebookSelect.svelte";
     import {
         cleanDataview,
+        icon,
         saveRestorePagePosition,
         siyuan,
     } from "./libs/utils";
-    import { icon } from "./libs/bkUtils";
     import { expStore, resetKey, verifyKeyTomato } from "./libs/user";
     import BuyTomato from "./BuyTomato.svelte";
     import { ImgBoxHotKey } from "./ImgBox";
