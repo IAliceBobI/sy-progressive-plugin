@@ -23,6 +23,7 @@
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
     import { digestGlobalSigle } from "../../sy-tomato-plugin/src/libs/stores";
     import { SPACE } from "../../sy-tomato-plugin/src/libs/gconst";
+    import { getProgFloatingDm } from "./FloatingAction";
 
     export let protyle: IProtyle = null;
     export let dm: DestroyManager = null;
@@ -40,6 +41,13 @@
     let firstID = "";
     let anchorID = "";
     let selectedInfo: ReturnType<typeof events.selectedDivsSync> = null;
+
+    function hideFlationBtn() {
+        const e: HTMLElement = getProgFloatingDm()?.getData("e");
+        if (e) {
+            e.style.display = "none";
+        }
+    }
 
     function hideTr() {
         if (tableSelect.style.display == "none") {
@@ -224,8 +232,8 @@
                 >
             </td>
             {#if isFloating}
-                <td data-dragger> {@html icon("Move")} </td>
-                <td data-dragger>{SPACE}</td>
+                <td> {@html icon("Move")} </td>
+                <td>{SPACE}</td>
             {/if}
         </tr>
         <tr>
@@ -267,8 +275,18 @@
                     on:click={hideTr}>🔧</button
                 >
             </td>
-            <td data-dragger>{SPACE}</td>
-            <td data-dragger>{SPACE}</td>
+            {#if isFloating}
+                <td>
+                    <button
+                        class="b3-button"
+                        title={tomatoI18n.关闭悬浮按钮双击可以再次打开}
+                        on:click={hideFlationBtn}
+                    >
+                        {@html icon("iconQuit", 5)}</button
+                    >
+                </td>
+                <td>{SPACE}</td>
+            {/if}
         </tr>
     </tbody>
 </table>
@@ -358,7 +376,7 @@
                 >
             </td>
             {#if isFloating}
-                <td data-dragger> {@html icon("Move")} </td>
+                <td> {@html icon("Move")} </td>
             {/if}
         </tr>
         <tr>
@@ -398,7 +416,7 @@
                     }}>🗑️</button
                 >
             </td>
-            <td data-dragger>{SPACE}</td>
+            <td>{SPACE}</td>
         </tr>
         <tr>
             <td colspan="2">
@@ -445,7 +463,7 @@
                     }}>🔨</button
                 >
             </td>
-            <td data-dragger>{SPACE}</td>
+            <td>{SPACE}</td>
         </tr>
         <tr>
             <td colspan="3">
@@ -493,7 +511,7 @@
                     }}>📌👇</button
                 >
             </td>
-            <td data-dragger>{SPACE}</td>
+            <td>{SPACE}</td>
         </tr>
         <tr>
             <td colspan="3">
@@ -518,7 +536,7 @@
                     }}>📦📄</button
                 >
             </td>
-            <td data-dragger>{SPACE}</td>
+            <td>{SPACE}</td>
         </tr>
         <tr
             ><td colspan="3">
@@ -560,7 +578,7 @@
                     }}>AI</button
                 >
             </td>
-            <td data-dragger>{SPACE}</td>
+            <td>{SPACE}</td>
         </tr>
     </tbody>
 </table>

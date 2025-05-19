@@ -232,6 +232,23 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    public get 关闭悬浮按钮双击可以再次打开() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "关闭悬浮按钮，双击可以再次打开";
+            case "es_ES": return "Cierra el botón flotante. Puedes abrirlo de nuevo haciendo doble clic.";
+            case "fr_FR": return "Fermez le bouton flottant. Vous pouvez le rouvrir en double-cliquant.";
+            case "ja_JP": return "フローティングボタンを閉じます。ダブルクリックで再度開くことができます。";
+            case "zh_CHT": return "關閉懸浮按鈕，雙擊可以再次打開";
+            case "it_IT": return "Chiudi il pulsante fluttuante. Puoi riaprirlo facendo doppio clic.";
+            case "de_DE": return "Schließen Sie die schwebende Schaltfläche. Sie können sie durch Doppelklicken erneut öffnen.";
+            case "he_IL": return "סגור את הכפתור הצף. באפשרותך לפתוח אותו שוב על ידי לחיצה כפולה.";
+            case "ru_RU": return "Закройте плавающую кнопку. Вы можете открыть ее снова, сделав двойной щелчок.";
+            case "pl_PL": return "Zamknij przycisk pływający. Możesz go ponownie otworzyć poprzez podwójne kliknięcie.";
+            case "en_US":
+            default: return "Close the floating button. You can reopen it by double-clicking.";
+        }
+    }
+
     public get aaa() {
         // tyepscript: 翻译为各国语言。写入case的return中。
         // 不要改属性名字，不要添加其他代码，不要改错，就改当前代码片段。en_US与default返回语言一致。

@@ -9,7 +9,7 @@ import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import { digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { createFloatingBtn } from "./FloatingAction";
+import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)
@@ -94,10 +94,18 @@ class DigestProgressiveBox {
         if (events.isMobile) {
             if (doubleClick2DigestMobile.get()) {
                 createFloatingBtn(this.plugin, this.settings)
+                document.addEventListener("dblclick", () => {
+                    const e: HTMLElement = getProgFloatingDm()?.getData("e")
+                    if (e) { e.style.display = "block"; }
+                });
             }
         } else {
             if (doubleClick2DigestDesktop.get()) {
                 createFloatingBtn(this.plugin, this.settings)
+                document.addEventListener("dblclick", () => {
+                    const e: HTMLElement = getProgFloatingDm()?.getData("e")
+                    if (e) { e.style.display = "block"; }
+                });
             }
         }
     }

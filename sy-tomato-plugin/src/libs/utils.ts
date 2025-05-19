@@ -2741,6 +2741,7 @@ export function saveRestorePagePosition(scrollPositionKey: string, dm: DestroyMa
 }
 
 export function icon(name: string, size = 20) {
+    if (name.startsWith("icon")) name = name.slice(4)
     if (size) {
         return `<svg width="${size}px" height="${size}px"><use xlink:href="#icon${name}"></use></svg>`;
     }

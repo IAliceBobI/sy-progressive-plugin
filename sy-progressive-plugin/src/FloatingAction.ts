@@ -4,7 +4,11 @@ import FloatingButton from "./FloatingButton.svelte"
 
 const DMKey = "progressive_FloatingBtn_DMKey_MuTepw8eKDTziKHA9W2WQSt";
 
-function getDm() {
+export function getProgFloatingDm() {
+    return globalThis[DMKey] as DestroyManager
+}
+
+function newProgFloatingDm() {
     let dm = globalThis[DMKey] as DestroyManager
     dm?.destroyBy();
     dm = new DestroyManager()//(true,"btn");
@@ -13,7 +17,7 @@ function getDm() {
 }
 
 export function createFloatingBtn(plugin: Plugin, settings: TomatoSettings) {
-    const dm = getDm();
+    const dm = newProgFloatingDm();
     const target = document.body.appendChild(document.createElement("div"));
     const sv = new FloatingButton({
         target,
@@ -25,4 +29,5 @@ export function createFloatingBtn(plugin: Plugin, settings: TomatoSettings) {
     });
     dm.add("sv", () => sv.$destroy());
     dm.add("div", () => target.parentElement?.removeChild(target));
+    dm.setData("e", target)
 }
