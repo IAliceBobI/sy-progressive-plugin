@@ -124,7 +124,7 @@ class DigestProgressiveBox {
     }
 
     private addMenuButton(protyle: IProtyle) {
-        addCustomButton(protyle, 'progressive-menu', tomatoI18n.打开摘抄菜单, "Menu", () => {
+        addCustomButton(protyle, 'progressive-menu', tomatoI18n.打开多行选择菜单, "Menu", () => {
             const e: HTMLElement = getProgFloatingDm()?.getData("e")
             if (e) { e.style.display = "block"; }
         });

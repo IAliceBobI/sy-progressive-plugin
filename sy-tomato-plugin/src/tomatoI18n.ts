@@ -282,22 +282,6 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Desktop: Add multi-line selection button to the top right corner of the editor";
         }
     }
-    public get 打开摘抄菜单() {
-        switch (this.conf.appearance.lang) {
-            case "zh_CN": return "打开摘抄菜单";
-            case "es_ES": return "Abrir menú de citas";
-            case "fr_FR": return "Ouvrir le menu des citations";
-            case "ja_JP": return "引用メニューを開く";
-            case "zh_CHT": return "打開摘抄菜單";
-            case "it_IT": return "Apri menu citazioni";
-            case "de_DE": return "Zitiermenü öffnen";
-            case "he_IL": return "פתח תפריט ציטוטים";
-            case "ru_RU": return "Открыть меню цитат";
-            case "pl_PL": return "Otwórz menu cytowań";
-            case "en_US":
-            default: return "Open quote menu";
-        }
-    }
 
     public get 移动端编辑器右上角添加多行选择菜单() {
         switch (this.conf.appearance.lang) {
@@ -330,6 +314,23 @@ export class TomatoI18n extends TomatoI18nABC {
             case "pl_PL": return "Stacjonarny: Dodaj menu wielokrotnego wyboru w prawym górnym rogu edytora";
             case "en_US":
             default: return "Desktop: Add multi-line selection menu to top-right corner of editor";
+        }
+    }
+
+    public get 打开多行选择菜单() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "打开多行选择菜单";
+            case "es_ES": return "Abrir menú de selección múltiple";
+            case "fr_FR": return "Ouvrir le menu de sélection multiple";
+            case "ja_JP": return "複数行選択メニューを開く";
+            case "zh_CHT": return "打開多行選擇菜單";
+            case "it_IT": return "Apri menu selezione multipla";
+            case "de_DE": return "Mehrzeiliges Auswahlfeld öffnen";
+            case "he_IL": return "פתח תפריט בחירה מרובה";
+            case "ru_RU": return "Открыть меню множественного выбора";
+            case "pl_PL": return "Otwórz menu wyboru wielokrotnego";
+            case "en_US":
+            default: return "Open multi-line selection menu";
         }
     }
 
