@@ -1,7 +1,7 @@
-import { Dialog, IEventBusMap, IProtyle, Lute, Plugin } from "siyuan";
+import { Dialog, IEventBusMap, IProtyle, Lute, Plugin, Protyle } from "siyuan";
 import { newID, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
 import DigestProgressive from "./DigestProgressive.svelte";
-import { events } from "../../sy-tomato-plugin/src/libs/Events";
+import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
@@ -10,6 +10,7 @@ import { digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from 
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
+import { addCustomButton } from "../../sy-tomato-plugin/src/exportFiles";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)
@@ -91,23 +92,42 @@ class DigestProgressiveBox {
             }
         });
 
+        const createBtn = () => {
+            createFloatingBtn(this.plugin, this.settings)
+            const e: HTMLElement = getProgFloatingDm()?.getData("e")
+            if (e) { e.style.display = "none"; }
+            this._addSelectionButton()
+        }
         if (events.isMobile) {
             if (doubleClick2DigestMobile.get()) {
-                createFloatingBtn(this.plugin, this.settings)
-                document.addEventListener("dblclick", () => {
-                    const e: HTMLElement = getProgFloatingDm()?.getData("e")
-                    if (e) { e.style.display = "block"; }
-                });
+                createBtn();
             }
         } else {
             if (doubleClick2DigestDesktop.get()) {
-                createFloatingBtn(this.plugin, this.settings)
-                document.addEventListener("dblclick", () => {
-                    const e: HTMLElement = getProgFloatingDm()?.getData("e")
-                    if (e) { e.style.display = "block"; }
-                });
+                createBtn();
             }
         }
+    }
+
+    private _addSelectionButton() {
+        events.addListener("selection btns 2025-5-21 15:24:40", (eventType, detail: Protyle) => {
+            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                navigator.locks.request("lock 2025-5-21 15:24:43", { mode: "exclusive" }, async (lock) => {
+                    if (lock) {
+                        const protyle: IProtyle = detail.protyle;
+                        if (!protyle) return;
+                        this.addMenuButton(protyle)
+                    }
+                });
+            }
+        });
+    }
+
+    private addMenuButton(protyle: IProtyle) {
+        addCustomButton(protyle, 'progressive-menu', tomatoI18n.打开摘抄菜单, "Menu", () => {
+            const e: HTMLElement = getProgFloatingDm()?.getData("e")
+            if (e) { e.style.display = "block"; }
+        });
     }
 
     private openDialog(protyle: IProtyle) {
