@@ -251,7 +251,10 @@ class MixBox {
                                 delete ial["custom-qf-doc-md5"];
                                 delete ial["custom-qf-knowledge-file-id"];
                                 delete ial["custom-qf-file-id"];
-                                delete ial["picgo-file-map-key"];
+                                delete ial["custom-picgo-file-map-key"];
+                                delete ial["icon"];
+                                delete ial["tags"];
+                                delete ial["title-img"];
                                 const virAttrStr = Object.entries(ial)
                                     .sort((a, b) => a[0].localeCompare(b[0]))
                                     .map(([k, v]) => {
@@ -273,6 +276,7 @@ class MixBox {
                                         }
                                     })
                                     .filter(i => !!i)
+                                    .map(i => i.slice(0, 150))
                                     .join("");
                                 top.setAttribute(DocAttrShowKey, virAttrStr)
                             }

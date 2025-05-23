@@ -6,11 +6,12 @@ import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-import { digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
+import { add2piecesBtn2lockIcon, digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
 import { addCustomButton } from "../../sy-tomato-plugin/src/exportFiles";
+import { prog } from "./Progressive";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)
@@ -107,6 +108,25 @@ class DigestProgressiveBox {
                 createBtn();
             }
         }
+        if (add2piecesBtn2lockIcon.get()) {
+            this._add2piecesBtn2lockIcon();
+        }
+    }
+
+    private _add2piecesBtn2lockIcon() {
+        events.addListener("selection btns 2025-5-23 09:47:12", (eventType, detail: Protyle) => {
+            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                navigator.locks.request("lock 2025-5-23 09:47:16", { mode: "exclusive" }, async (lock) => {
+                    if (lock) {
+                        const protyle: IProtyle = detail.protyle;
+                        if (!protyle) return;
+                        addCustomButton(protyle, 'progressive-add2piece', tomatoI18n.添加当前文档到渐进阅读分片模式, "Add", () => {
+                            prog.addProgressiveReadingWithLock();
+                        });
+                    }
+                });
+            }
+        });
     }
 
     private _addSelectionButton() {

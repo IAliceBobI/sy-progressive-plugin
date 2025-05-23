@@ -334,6 +334,42 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    public get 开始执行() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "开始执行";
+            case "es_ES": return "Comenzar ejecución";
+            case "fr_FR": return "Démarrer l'exécution";
+            case "ja_JP": return "実行を開始";
+            case "zh_CHT": return "開始執行";
+            case "it_IT": return "Inizia esecuzione";
+            case "de_DE": return "Ausführung starten";
+            case "he_IL": return "התחל ביצוע";
+            case "ru_RU": return "Начать выполнение";
+            case "pl_PL": return "Rozpocznij wykonywanie";
+            case "en_US":
+            default: return "Start execution";
+        }
+    }
+
+    public get 在编辑器右上角添加加入渐进阅读分片模式按钮() {
+        // tyepscript: 翻译为各国语言。写入case的return中。
+        // 不要改属性名字，不要添加其他代码，不要改错，就改当前代码片段。en_US与default返回语言一致。
+        // 最后删除注释。
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "在编辑器右上角添加加入渐进阅读分片模式按钮";
+            case "es_ES":
+            case "fr_FR":
+            case "ja_JP":
+            case "zh_CHT":
+            case "it_IT":
+            case "de_DE":
+            case "he_IL":
+            case "ru_RU":
+            case "pl_PL":
+            case "en_US":
+            default:
+        }
+    }
     public get aaa() {
         // tyepscript: 翻译为各国语言。写入case的return中。
         // 不要改属性名字，不要添加其他代码，不要改错，就改当前代码片段。en_US与default返回语言一致。
