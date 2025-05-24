@@ -62,6 +62,7 @@
         ProgressiveViewAllMenu,
         digestAddReadingpoint,
         add2piecesBtn2lockIcon,
+        add2digBtn2lockIcon,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import TomatoVIP from "../../sy-tomato-plugin/src/TomatoVIP.svelte";
@@ -509,6 +510,15 @@
             bind:checked={$add2piecesBtn2lockIcon}
         />
         {tomatoI18n.在编辑器右上角添加加入渐进阅读分片模式按钮}
+    </div>
+
+    <div class="settingBox">
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$add2digBtn2lockIcon}
+        />
+        {tomatoI18n.在编辑器右上角添加摘抄按钮}
     </div>
 
     <div class:codeNotValid class="settingBox">

@@ -6,7 +6,7 @@ import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-import { add2piecesBtn2lockIcon, digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
+import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
@@ -111,6 +111,28 @@ class DigestProgressiveBox {
         if (add2piecesBtn2lockIcon.get()) {
             this._add2piecesBtn2lockIcon();
         }
+        if (add2digBtn2lockIcon.get()) {
+            this._add2digBtn2lockIcon();
+        }
+
+    }
+
+    private _add2digBtn2lockIcon() {
+        events.addListener("selection btns 2025-5-25 00:40:16", (eventType, detail: Protyle) => {
+            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                navigator.locks.request("lock 2025-5-25 00:40:19", { mode: "exclusive" }, async (lock) => {
+                    if (lock) {
+                        const protyle: IProtyle = detail.protyle;
+                        if (!protyle) return;
+                        addCustomButton(protyle, 'progressive-add2dig', tomatoI18n.执行摘抄, "Star", async () => {
+                            const s = await events.selectedDivs(protyle);
+                            const di = await initDi(s, protyle, this.settings);
+                            di.digest();
+                        });
+                    }
+                });
+            }
+        });
     }
 
     private _add2piecesBtn2lockIcon() {

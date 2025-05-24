@@ -368,6 +368,125 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    public get 思维导线() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "思维导线";
+            case "es_ES": return "hilo de pensamiento";
+            case "fr_FR": return "fil de réflexion";
+            case "ja_JP": return "マインドワイヤー";
+            case "zh_CHT": return "思維導線";
+            case "it_IT": return "fili conduttori del pensiero";
+            case "de_DE": return "Gedankenfaden";
+            case "he_IL": return "חוטי מחשבה";
+            case "ru_RU": return "мыслительные провода";
+            case "pl_PL": return "przewody myśli";
+            case "en_US":
+            default: return "mindwire"
+        }
+    }
+
+    public get 思维导线帮助() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "引用渲染为连线。可根据引用，在段落块间添加连线";
+            case "es_ES": return "Las referencias se representan como conexiones. Puedes añadir conexiones entre bloques de párrafos según las referencias";
+            case "fr_FR": return "Les références sont rendues sous forme de connexions. Vous pouvez ajouter des connexions entre les blocs de paragraphes en fonction des références";
+            case "ja_JP": return "参照は接続線として描画されます。参照に応じて、段落ブロック間の接続線を追加できます";
+            case "zh_CHT": return "引用渲染為連線。可根據引用，在段落塊間添加連線";
+            case "it_IT": return "Le citazioni vengono rese come connessioni. È possibile aggiungere collegamenti tra blocchi di paragrafi in base alle citazioni";
+            case "de_DE": return "Referenzen werden als Verbindungen dargestellt. Anhand von Referenzen können Sie Verbindungen zwischen Absatzblöcken hinzufügen";
+            case "he_IL": return "הפניות מצוירות כקווים חיבור. ניתן להוסיף קווי חיבור בין בלוקי פסקאות על פי הפניות";
+            case "ru_RU": return "Ссылки отображаются в виде соединительных линий. Можно добавлять линии между блоками абзацев на основе ссылок";
+            case "pl_PL": return "Cytowania są renderowane jako połączenia. Możesz dodawać połączenia między blokami akapitów na podstawie cytowań";
+            case "en_US":
+            default: return "References are rendered as connections. You can add connections between paragraph blocks based on references"
+        }
+    }
+
+    public get 流动线条效果() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "流动线条效果";
+            case "es_ES": return "Efecto de líneas fluidas";
+            case "fr_FR": return "Effet de lignes fluides";
+            case "ja_JP": return "流動線効果";
+            case "zh_CHT": return "流動線條效果";
+            case "it_IT": return "Effetto linee fluide";
+            case "de_DE": return "Fließende Linien Effekt";
+            case "he_IL": return "אפקט קווי זרימה";
+            case "ru_RU": return "Эффект текущих линий";
+            case "pl_PL": return "Efekt płynących linii";
+            case "en_US":
+            default: return "Flowing lines effect";
+        }
+    }
+
+    public get 启用或禁用思维导线() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "启用或禁用思维导线";
+            case "es_ES": return "Habilitar o deshabilitar guía de pensamiento";
+            case "fr_FR": return "Activer ou désactiver le guide de pensée";
+            case "ja_JP": return "思考ガイドの有効化または無効化";
+            case "zh_CHT": return "啟用或禁用思維導線";
+            case "it_IT": return "Abilita o disabilita guida mentale";
+            case "de_DE": return "Denkführung aktivieren oder deaktivieren";
+            case "he_IL": return "הפעל או השבת מדריך חשיבה";
+            case "ru_RU": return "Включить или отключить направляющую мышления";
+            case "pl_PL": return "Włącz lub wyłącz przewodnik myślowy";
+            case "en_US":
+            default: return "Enable or disable thought guide";
+        }
+    }
+
+    public get 启用思维导线() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "启用思维导线";
+            case "es_ES": return "Habilitar guía de pensamiento";
+            case "fr_FR": return "Activer le guide de pensée";
+            case "ja_JP": return "思考ガイドを有効化";
+            case "zh_CHT": return "啟用思維導線";
+            case "it_IT": return "Abilita guida mentale";
+            case "de_DE": return "Denkführung aktivieren";
+            case "he_IL": return "הפעל מדריך חשיבה";
+            case "ru_RU": return "Включить направляющую мышления";
+            case "pl_PL": return "Włącz przewodnik myślowy";
+            case "en_US":
+            default: return "Enable thought guide";
+        }
+    }
+
+    public get 禁用思维导线() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "禁用思维导线";
+            case "es_ES": return "Deshabilitar guía de pensamiento";
+            case "fr_FR": return "Désactiver le guide de pensée";
+            case "ja_JP": return "思考ガイドを無効化";
+            case "zh_CHT": return "禁用思維導線";
+            case "it_IT": return "Disabilita guida mentale";
+            case "de_DE": return "Denkführung deaktivieren";
+            case "he_IL": return "השבת מדריך חשיבה";
+            case "ru_RU": return "Отключить направляющую мышления";
+            case "pl_PL": return "Wyłącz przewodnik myślowy";
+            case "en_US":
+            default: return "Disable thought guide";
+        }
+    }
+
+    public get 在编辑器右上角添加摘抄按钮() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "在编辑器右上角添加摘抄按钮";
+            case "es_ES": return "Añadir botón de citas en la esquina superior derecha del editor";
+            case "fr_FR": return "Ajouter un bouton de citation dans le coin supérieur droit de l'éditeur";
+            case "ja_JP": return "エディターの右上に引用ボタンを追加";
+            case "zh_CHT": return "在編輯器右上角添加摘抄按鈕";
+            case "it_IT": return "Aggiungi pulsante citazione nell'angolo in alto a destra dell'editor";
+            case "de_DE": return "Zitat-Button oben rechts im Editor hinzufügen";
+            case "he_IL": return "הוסף כפתור ציטוט בפינה הימנית העליונה של העורך";
+            case "ru_RU": return "Добавить кнопку цитирования в правом верхнем углу редактора";
+            case "pl_PL": return "Dodaj przycisk cytowania w prawym górnym rogu edytora";
+            case "en_US":
+            default: return "Add quote button in the upper right corner of the editor";
+        }
+    }
+
     public get aaa() {
         // tyepscript: 翻译为各国语言。写入case的return中。
         // 不要改属性名字，不要添加其他代码，不要改错，就改当前代码片段。en_US与default返回语言一致。
