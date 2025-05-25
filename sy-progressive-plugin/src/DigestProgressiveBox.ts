@@ -108,13 +108,12 @@ class DigestProgressiveBox {
                 createBtn();
             }
         }
-        if (add2piecesBtn2lockIcon.get()) {
-            this._add2piecesBtn2lockIcon();
-        }
         if (add2digBtn2lockIcon.get()) {
             this._add2digBtn2lockIcon();
         }
-
+        if (add2piecesBtn2lockIcon.get()) {
+            this._add2piecesBtn2lockIcon();
+        }
     }
 
     private _add2digBtn2lockIcon() {

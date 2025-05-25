@@ -419,23 +419,6 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
-    public get 启用或禁用思维导线() {
-        switch (this.conf.appearance.lang) {
-            case "zh_CN": return "启用或禁用思维导线";
-            case "es_ES": return "Habilitar o deshabilitar guía de pensamiento";
-            case "fr_FR": return "Activer ou désactiver le guide de pensée";
-            case "ja_JP": return "思考ガイドの有効化または無効化";
-            case "zh_CHT": return "啟用或禁用思維導線";
-            case "it_IT": return "Abilita o disabilita guida mentale";
-            case "de_DE": return "Denkführung aktivieren oder deaktivieren";
-            case "he_IL": return "הפעל או השבת מדריך חשיבה";
-            case "ru_RU": return "Включить или отключить направляющую мышления";
-            case "pl_PL": return "Włącz lub wyłącz przewodnik myślowy";
-            case "en_US":
-            default: return "Enable or disable thought guide";
-        }
-    }
-
     public get 启用思维导线() {
         switch (this.conf.appearance.lang) {
             case "zh_CN": return "启用思维导线";
@@ -484,6 +467,74 @@ export class TomatoI18n extends TomatoI18nABC {
             case "pl_PL": return "Dodaj przycisk cytowania w prawym górnym rogu edytora";
             case "en_US":
             default: return "Add quote button in the upper right corner of the editor";
+        }
+    }
+
+    public get 启用或禁用全局思维导线() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "启用或禁用全局思维导线";
+            case "es_ES": return "Habilitar o deshabilitar el hilo de pensamiento global";
+            case "fr_FR": return "Activer ou désactiver le fil de pensée global";
+            case "ja_JP": return "グローバル思考スレッドの有効化または無効化";
+            case "zh_CHT": return "啟用或禁用全局思維導線";
+            case "it_IT": return "Abilita o disabilita il filo di pensiero globale";
+            case "de_DE": return "Globalen Gedankenfaden aktivieren oder deaktivieren";
+            case "he_IL": return "הפעל או השבת את חוט המחשבה הגלובלי";
+            case "ru_RU": return "Включить или отключить глобальную нить мышления";
+            case "pl_PL": return "Włącz lub wyłącz globalną nić myślową";
+            case "en_US":
+            default: return "Enable or disable global thought thread";
+        }
+    }
+
+    public get 启用或禁用文档思维导线() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "启用或禁用文档思维导线";
+            case "es_ES": return "Habilitar o deshabilitar el hilo de pensamiento del documento";
+            case "fr_FR": return "Activer ou désactiver le fil de pensée du document";
+            case "ja_JP": return "ドキュメント思考スレッドの有効化または無効化";
+            case "zh_CHT": return "啟用或禁用文檔思維導線";
+            case "it_IT": return "Abilita o disabilita il filo di pensiero del documento";
+            case "de_DE": return "Dokument-Gedankenfaden aktivieren oder deaktivieren";
+            case "he_IL": return "הפעל או השבת את חוט המחשבה של המסמך";
+            case "ru_RU": return "Включить или отключить нить мышления документа";
+            case "pl_PL": return "Włącz lub wyłącz dokumentową nić myślową";
+            case "en_US":
+            default: return "Enable or disable document thought thread";
+        }
+    }
+
+    public get 豆包智能体ID() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "发布后的豆包智能体ID（可选）";
+            case "es_ES": return "ID del agente inteligente Doubao después de la publicación (opcional)";
+            case "fr_FR": return "ID de l'agent intelligent Doubao après publication (optionnel)";
+            case "ja_JP": return "公開後のDoubaoインテリジェントエージェントID（オプション）";
+            case "zh_CHT": return "發布後的豆包智能體ID（可選）";
+            case "it_IT": return "ID dell'agente intelligente Doubao dopo la pubblicazione (opzionale)";
+            case "de_DE": return "Doubao-Intelligent-Agent-ID nach der Veröffentlichung (optional)";
+            case "he_IL": return "מזהה הסוכן החכם של Doubao לאחר הפרסום (אופציונלי)";
+            case "ru_RU": return "ID интеллектуального агента Doubao после публикации (необязательно)";
+            case "pl_PL": return "ID inteligentnego agenta Doubao po publikacji (opcjonalne)";
+            case "en_US":
+            default: return "Doubao intelligent agent ID after publishing (optional)";
+        }
+    }
+
+    public get 需要先发布到豆包再填写发布后的豆包智能体ID() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "需要先发布到豆包，再到设置中，填写发布后的豆包智能体ID";
+            case "es_ES": return "Primero debes publicar en Doubao, luego ir a configuración y completar el ID del agente inteligente Doubao después de la publicación";
+            case "fr_FR": return "Vous devez d'abord publier sur Doubao, puis aller dans les paramètres et remplir l'ID de l'agent intelligent Doubao après publication";
+            case "ja_JP": return "まずDoubaoに公開してから、設定で公開後のDoubaoインテリジェントエージェントIDを入力してください";
+            case "zh_CHT": return "需要先發佈到豆包，再到設定中，填寫發佈後的豆包智能體ID";
+            case "it_IT": return "Devi prima pubblicare su Doubao, poi andare nelle impostazioni e inserire l'ID dell'agente intelligente Doubao dopo la pubblicazione";
+            case "de_DE": return "Sie müssen zuerst auf Doubao veröffentlichen, dann zu den Einstellungen gehen und die Doubao-Intelligent-Agent-ID nach der Veröffentlichung eingeben";
+            case "he_IL": return "ראשית עליך לפרסם ב-Doubao, לאחר מכן לעבור להגדרות ולהזין את מזהה הסוכן החכם של Doubao לאחר הפרסום";
+            case "ru_RU": return "Сначала необходимо опубликовать в Doubao, затем перейти в настройки и ввести ID интеллектуального агента Doubao после публикации";
+            case "pl_PL": return "Najpierw musisz opublikować w Doubao, następnie przejść do ustawień i wprowadzić ID inteligentnego agenta Doubao po publikacji";
+            case "en_US":
+            default: return "You need to first publish to Doubao, then go to settings and fill in the Doubao intelligent agent ID after publishing";
         }
     }
 
