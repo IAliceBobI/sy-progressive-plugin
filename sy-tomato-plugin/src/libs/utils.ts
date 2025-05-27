@@ -10,6 +10,7 @@ import { linkBoxUseLnkOrRef } from "./stores";
 import { getDocBlocks } from "./docUtils";
 import { domRef, DomSuperBlockBuilder } from "./sydom";
 import { DestroyManager } from "./destroyer";
+import { parseCustomTag } from "./ial";
 
 export function closeTabByTitle(tabs: AttrType[], excludeDocID: string) {
     if (tabs?.length > 0) {
@@ -302,7 +303,7 @@ export function setAttribute(e: any, name: keyof AttrType, value: string) {
     if (e?.setAttribute) e.setAttribute(name, value);
 }
 
-export function getAttribute(e: any, name: keyof AttrType) {
+export function getAttribute(e: any, name: keyof AttrType): string {
     if (e?.getAttribute) return e.getAttribute(name)
 }
 
@@ -530,8 +531,10 @@ export function ial2str(ial: AttrType): string {
 export function parseIAL(ial: string) {
     const obj = {} as AttrType;
     if (ial) {
-        const attrs = ial.matchAll(/([^\s]+)="([^\s]+)"/g);
-        for (const attr of attrs) obj[attr[1]] = attr[2];
+        // const attrs = ial.matchAll(/([^\s]+)="([^\s]+)"/g);
+        // for (const attr of attrs) obj[attr[1]] = attr[2];
+        const attrs = parseCustomTag(ial)
+        return attrs;
     }
     return obj;
 }
@@ -2763,4 +2766,8 @@ export function icon(name: string, size = 20) {
         return `<svg width="${size}px" height="${size}px"><use xlink:href="#icon${name}"></use></svg>`;
     }
     return `<svg><use xlink:href="#icon${name}"></use></svg>`;
+}
+
+export function getDocLastElement(protyle: IProtyle) {
+    return protyle?.wysiwyg?.element?.lastElementChild;
 }
