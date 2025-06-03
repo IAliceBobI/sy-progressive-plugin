@@ -1,5 +1,5 @@
 import { Dialog, IEventBusMap, IProtyle, Lute, Plugin, Protyle } from "siyuan";
-import { newID, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
+import { isEditor, newID, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
 import DigestProgressive from "./DigestProgressive.svelte";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
@@ -123,6 +123,7 @@ class DigestProgressiveBox {
                     if (lock) {
                         const protyle: IProtyle = detail.protyle;
                         if (!protyle) return;
+                        if (!isEditor(protyle)) return;
                         addCustomButton(protyle, 'progressive-add2dig', tomatoI18n.执行摘抄, "Star", async () => {
                             const s = await events.selectedDivs(protyle);
                             const di = await initDi(s, protyle, this.settings);
@@ -141,6 +142,7 @@ class DigestProgressiveBox {
                     if (lock) {
                         const protyle: IProtyle = detail.protyle;
                         if (!protyle) return;
+                        if (!isEditor(protyle)) return;
                         addCustomButton(protyle, 'progressive-add2piece', tomatoI18n.添加当前文档到渐进阅读分片模式, "Add", () => {
                             prog.addProgressiveReadingWithLock();
                         });
@@ -157,6 +159,7 @@ class DigestProgressiveBox {
                     if (lock) {
                         const protyle: IProtyle = detail.protyle;
                         if (!protyle) return;
+                        if (!isEditor(protyle)) return;
                         this.addMenuButton(protyle)
                     }
                 });
