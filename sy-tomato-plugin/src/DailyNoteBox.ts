@@ -1,11 +1,11 @@
 import { IProtyle } from "siyuan";
 import { events } from "./libs/Events";
-import { add_href, add_ref, cloneCleanDiv, closeTabByTitle, getContextPath, getOpenedEditors, Siyuan, siyuan, timeUtil, } from "./libs/utils";
+import { add_href, add_ref, cloneCleanDiv, closeTabByTitle, getAllText, getContextPath, getOpenedEditors, Siyuan, siyuan, timeUtil, } from "./libs/utils";
 import { DATA_NODE_ID } from "./libs/gconst";
 import { dailyNoteBoxCheckbox, dailyNoteCopyAnchorText, dailyNoteCopyComment, dailyNoteCopyFlashCard, dailyNoteCopyInsertPR, dailyNoteCopyMenu, dailyNoteCopySimple, dailyNoteCopyUpdateBG, dailyNoteCopyUseRef, dailyNoteGoToBottom, dailyNoteGoToBottomMenu, dailyNoteMoveToBottom, dailyNotetopbarleft, dailyNotetopbarright, readingPointBoxCheckbox, storeNoteBox_selectedNotebook } from "./libs/stores";
 import { tomatoI18n } from "./tomatoI18n";
 import { readingPointBox } from "./ReadingPointBox";
-import { domNewLine, DomSuperBlockBuilder } from "./libs/sydom";
+import { domLnk, domNewLine, DomSuperBlockBuilder } from "./libs/sydom";
 import { DialogText } from "./libs/DialogText";
 import { isReadonly, OpenSyFile2 } from "./libs/docUtils";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
@@ -78,7 +78,7 @@ class DailyNoteBox {
         if (dailyNotetopbarleft.get()) {
             plugin.addTopBar({
                 icon: DailyNoteBox上一个日志.icon,
-                title: DailyNoteBox上一个日志.langText() + DailyNoteBox上一个日志.w(false, true),
+                title: DailyNoteBox上一个日志.langText() + DailyNoteBox上一个日志.w(),
                 position: "left",
                 callback: () => {
                     this.openDailyNote(-1000 * 60 * 60 * 24);
@@ -89,7 +89,7 @@ class DailyNoteBox {
         if (dailyNotetopbarright.get()) {
             plugin.addTopBar({
                 icon: DailyNoteBox下一个日志.icon,
-                title: DailyNoteBox下一个日志.langText() + DailyNoteBox下一个日志.w(false, true),
+                title: DailyNoteBox下一个日志.langText() + DailyNoteBox下一个日志.w(),
                 position: "left",
                 callback: () => {
                     this.openDailyNote(1000 * 60 * 60 * 24);
@@ -387,12 +387,18 @@ class DailyNoteBox {
                     siyuan.addRiffCards([cardID])
                 }
             } else {
-                if (dailyNoteMoveToBottom.get()) {
-                    const tail = await siyuan.getTailChildBlocks(docID, 1);
-                    await siyuan.moveBlocksAfter(ids, tail[0].id);
-                } else {
-                    await siyuan.moveBlocksAsChild(ids, docID);
+                const ops = []
+                if (true) {
+                    const lnk = domLnk("", ids.at(0), getAllText(selected, "").replaceAll("\n", "").slice(0, 30))
+                    ops.push(...siyuan.transInsertBlocksAfter([lnk], ids.at(0)));
                 }
+                if (dailyNoteMoveToBottom.get()) {
+                    ops.push(...siyuan.transMoveBlocksAfter(ids, await siyuan.getDocLastID(docID)))
+                } else {
+                    ops.push(...siyuan.transMoveBlocksAsChild(ids, docID))
+                }
+                await siyuan.transactions(ops)
+                // await OpenSyFile2(this.plugin, ids.at(-1));
             }
         } catch (_e) {
             await siyuan.pushMsg(tomatoI18n.您配置的笔记本x是否已经打开了(boxID));

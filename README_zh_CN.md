@@ -2,7 +2,7 @@
 
 # [DOC 帮助文档 📖](https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink)
 
-# [ISSUE 反馈 交流 QQ频道 💬](https://pd.qq.com/s/2fh7nh7gz)
+# [ISSUE 在这里交流 💬](https://pd.qq.com/s/2fh7nh7gz)
 
 # [CHANGELOG 更新日志 📅](https://awx9773btw.feishu.cn/docx/Cm7nd2G9KoJhOjxGACycvJU6nRg?from=from_copylink)
 

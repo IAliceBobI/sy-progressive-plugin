@@ -9,7 +9,7 @@ import { writingCompareBox } from "./WritingCompareBox";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { getPluginSpec, isObject, newID, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, btnCleanOriginText, btnDelCard, btnDeleteBack, btnDeleteExit, btnDeleteNext, btnFullfilContent, btnIgnoreBook, btnNext, btnNextBook, btnOpenFlashcardTab, btnPrevious, btnSaveCard, btnSplitByPunctuations, btnSplitByPunctuationsList, btnSplitByPunctuationsListCheck, btnStop, btnViewContents, cardAppendTime, cardUnderPiece, digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, doubleClick2DigestDesktop, doubleClick2DigestMobile, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, getAllPieceNotesEnable, hideBtnsInFlashCard, makeCardEnable, makeCardHereEnable, markOriginText, markOriginTextBG, merg2newBookEnable, multilineMarkEnable, openCardsOnOpenPiece, PieceMovingDown, PieceMovingUp, pieceNoBacktraceLink, piecesmenu, PieceSummaryBoxmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, send2compareNoteEnable, send2dailyCardEnable, send2dailyCardNoRefEnable, send2exctract2bottomEnable, send2exctractNoteEnable, send2removeNoteColor, summary2dailynote, userID, userToken, windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
+import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, btnCleanOriginText, btnDelCard, btnDeleteBack, btnDeleteExit, btnDeleteNext, btnFullfilContent, btnIgnoreBook, btnNext, btnNextBook, btnOpenFlashcardTab, btnPrevious, btnSaveCard, btnSplitByPunctuations, btnSplitByPunctuationsList, btnSplitByPunctuationsListCheck, btnStop, btnViewContents, cardAppendTime, cardUnderPiece, digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, doubleClick2DigestDesktop, doubleClick2DigestMobile, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, getAllPieceNotesEnable, hideBtnsInFlashCard, hideVIP, makeCardEnable, makeCardHereEnable, markOriginText, markOriginTextBG, merg2newBookEnable, multilineMarkEnable, openCardsOnOpenPiece, PieceMovingDown, PieceMovingUp, pieceNoBacktraceLink, piecesmenu, PieceSummaryBoxmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, send2compareNoteEnable, send2dailyCardEnable, send2dailyCardNoRefEnable, send2exctract2bottomEnable, send2exctractNoteEnable, send2removeNoteColor, summary2dailynote, userID, userToken, windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -20,6 +20,7 @@ import { setGlobal } from "../../sy-tomato-plugin/src/libs/globalUtils";
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
     userID.load(plugin);
+    hideVIP.load(plugin);
     add2digBtn2lockIcon.load(plugin);
     add2piecesBtn2lockIcon.load(plugin);
     digestAddReadingpoint.load(plugin);

@@ -312,6 +312,7 @@ const settingFactory = <T>(key: TSK, defaultValue: T, file: string, _void: TSK) 
 
 export const userToken = settingFactory("userToken", "", STORAGE_SETTINGS, null as TSK);
 export const userID = settingFactory("userID", "", STORAGE_SETTINGS, null as TSK);
+export const hideVIP = settingFactory("hideVIP", true, STORAGE_SETTINGS, null as TSK);
 export const addSelectionBtnsMobile = settingFactory("addSelectionBtnsMobile", true, STORAGE_SETTINGS, null as TSK);
 export const addSelectionBtnsDesktop = settingFactory("addSelectionBtnsDesktop", true, STORAGE_SETTINGS, null as TSK);
 export const cssRefStyle = settingFactory("cssRefStyle", false, STORAGE_SETTINGS, null as TSK);
@@ -454,7 +455,7 @@ export const mindWireEnable = settingFactory("mindWireEnable", true, STORAGE_SET
 export const mindWireGlobalMenu = settingFactory("mindWireGlobalMenu", true, STORAGE_SETTINGS, null as TSK);
 export const mindWireDocMenu = settingFactory("mindWireDocMenu", true, STORAGE_SETTINGS, null as TSK);
 export const mindWireDynamicLine = settingFactory("mindWireDynamicLine", false, STORAGE_SETTINGS, null as TSK);
-export const mindWireStarRefOnly = settingFactory("mindWireStarRefOnly", false, STORAGE_SETTINGS, null as TSK);
+export const mindWireStarRefOnly = settingFactory("mindWireStarRefOnly", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxMenuShow = settingFactory("aiBoxMenuShow", true, STORAGE_SETTINGS, null as TSK);
 export const cozeSearchMenuShow = settingFactory("cozeSearchMenuShow", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxPrompts = settingFactory("aiBoxPrompts", [], STORAGE_SETTINGS, null as TSK);
