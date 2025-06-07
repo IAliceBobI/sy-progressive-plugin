@@ -111,7 +111,6 @@
         linkBoxSyncRef,
         linkBoxAttrIconOnHide,
         commentBoxCheckbox,
-        commentBoxAddFlashCard,
         commentBoxAddUnderline,
         commentBoxShowID,
         back_link_show_path,
@@ -162,6 +161,14 @@
         mindWireLine,
         mindWireColorfull,
         mindWireWidth,
+        cssSuperBlockBorder,
+        cardPrioritySetPriInterval,
+        commentAllBlockRef,
+        foldTypes,
+        foldTypesSuperBlock,
+        foldTypesNODE_LIST,
+        foldTypesBLOCKQUOTE,
+        foldTypesNODE_TABLE,
     } from "./libs/stores";
     import { STORAGE_SETTINGS } from "./constants";
     import { tomatoI18n } from "./tomatoI18n";
@@ -169,10 +176,17 @@
     import {
         cleanDataview,
         icon,
+        pushUniq,
+        removeFromArr,
         saveRestorePagePosition,
         siyuan,
     } from "./libs/utils";
-    import { expStore, lastVerifyResult, resetKey, verifyKeyTomato } from "./libs/user";
+    import {
+        expStore,
+        lastVerifyResult,
+        resetKey,
+        verifyKeyTomato,
+    } from "./libs/user";
     import BuyTomato from "./BuyTomato.svelte";
     import { ImgBoxHotKey } from "./ImgBox";
     import { AIBoxHotkey } from "./AIBox";
@@ -193,7 +207,7 @@
         CardPriorityBox推迟闪卡,
         CardPriority恢复所有暂停的闪卡,
     } from "./CardPriorityBox";
-    import { CommentBox添加批注到日记 } from "./CommentBox";
+    import { CommentBoxTab批注, CommentBox添加批注到日记 } from "./CommentBox";
     import {
         CpBox批量删除大量连续内容块,
         CpBox批量复制大量连续内容块,
@@ -255,7 +269,7 @@
         ReadingPointBox跳到当前文档的阅读点,
     } from "./ReadingPointBox";
     import { ScheduleCopyID } from "./Schedule";
-    import { SPACE } from "./libs/gconst";
+    import { BlockNodeEnum, SPACE } from "./libs/gconst";
     import {
         Tag2RefBox模糊查找引用Lnk,
         Tag2RefBox模糊查找引用Ref,
@@ -495,6 +509,15 @@
             {tomatoI18n.显示备注}
         </div>
     </div>
+    <!-- 给所有超级块加上边框 -->
+    <div class="settingBox">
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$cssSuperBlockBorder}
+        />
+        {tomatoI18n.给所有超级块加上边框}
+    </div>
     <!-- 极简无序列表样式 -->
     <div class="settingBox">
         <div>
@@ -570,6 +593,94 @@
                 bind:checked={$awaysExitFocusStore}
             />
             {tomatoI18n.总是退出聚焦}
+        </div>
+    </div>
+    <!-- 折叠助手 -->
+    <div class="settingBox">
+        <div>
+            {tomatoI18n.块折叠助手}： {tomatoI18n.在块的右上角显示折叠图标}
+            <strong>
+                <a
+                    href="https://awx9773btw.feishu.cn/docx/RqDsdlLkwolnUgxyEmVcDuv8nwd?from=from_copylink"
+                >
+                    {tomatoI18n.帮助}</a
+                >
+            </strong>
+        </div>
+        <div>
+            <!-- 超级块 -->
+            <label class="space">
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$foldTypesSuperBlock}
+                    on:change={() => {
+                        if ($foldTypesSuperBlock) {
+                            pushUniq(
+                                $foldTypes,
+                                BlockNodeEnum.NODE_SUPER_BLOCK,
+                            );
+                        } else {
+                            removeFromArr(
+                                $foldTypes,
+                                BlockNodeEnum.NODE_SUPER_BLOCK,
+                            );
+                        }
+                    }}
+                />
+                {tomatoI18n.超级块}
+            </label>
+            <!-- 引述块 -->
+            <label class="space">
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$foldTypesBLOCKQUOTE}
+                    on:change={() => {
+                        if ($foldTypesBLOCKQUOTE) {
+                            pushUniq($foldTypes, BlockNodeEnum.NODE_BLOCKQUOTE);
+                        } else {
+                            removeFromArr(
+                                $foldTypes,
+                                BlockNodeEnum.NODE_BLOCKQUOTE,
+                            );
+                        }
+                    }}
+                />
+                {tomatoI18n.引述块}
+            </label>
+            <!-- 列表块 -->
+            <label class="space">
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$foldTypesNODE_LIST}
+                    on:change={() => {
+                        if ($foldTypesNODE_LIST) {
+                            pushUniq($foldTypes, BlockNodeEnum.NODE_LIST);
+                        } else {
+                            removeFromArr($foldTypes, BlockNodeEnum.NODE_LIST);
+                        }
+                    }}
+                />
+                {tomatoI18n.列表块}
+            </label>
+            <!-- 表格 -->
+            <label class="space">
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$foldTypesNODE_TABLE}
+                    on:change={() => {
+                        if ($foldTypesNODE_TABLE) {
+                            pushUniq($foldTypes, BlockNodeEnum.NODE_TABLE);
+                        } else {
+                            removeFromArr($foldTypes, BlockNodeEnum.NODE_TABLE);
+                        }
+                    }}
+                />
+                {tomatoI18n.表格}
+            </label>
         </div>
     </div>
     <!-- 状态栏番茄钟 -->
@@ -753,6 +864,10 @@
             </strong>
         </div>
         {#if $commentBoxCheckbox}
+            <div>
+                {tomatoI18n.打开批注页签}
+                <strong>{CommentBoxTab批注.w()}</strong>
+            </div>
             <div>{tomatoI18n.menu不显示菜单不影响快捷键的使用}</div>
             <div>
                 <input
@@ -767,17 +882,17 @@
                 <input
                     type="checkbox"
                     class="b3-switch"
-                    bind:checked={$commentBoxAddFlashCard}
+                    bind:checked={$commentBoxAddUnderline}
                 />
-                {tomatoI18n.加入闪卡}
+                {tomatoI18n.批注添加下划线}
             </div>
             <div>
                 <input
                     type="checkbox"
                     class="b3-switch"
-                    bind:checked={$commentBoxAddUnderline}
+                    bind:checked={$commentAllBlockRef}
                 />
-                {tomatoI18n.批注添加下划线}
+                {tomatoI18n.所有原文都加引用}
             </div>
             <div>
                 <input
@@ -1535,6 +1650,14 @@
                     bind:checked={$card_priority_stopBtn_hide}
                 />
                 {tomatoI18n.隐藏闪卡暂停按钮}
+            </div>
+
+            <div>
+                <input
+                    class="b3-text-field"
+                    bind:value={$cardPrioritySetPriInterval}
+                />
+                {tomatoI18n.间隔x分钟检查所有闪卡加上默认优先级}
             </div>
         {/if}
     </div>
@@ -2440,6 +2563,9 @@
         top: 0;
         background-color: var(--b3-theme-surface);
         z-index: 10;
+    }
+    .space {
+        margin-right: 10px;
     }
     .settingBox {
         margin: 10px;

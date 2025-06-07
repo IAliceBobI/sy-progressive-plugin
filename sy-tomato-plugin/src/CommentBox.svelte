@@ -8,6 +8,7 @@
         getCursorElement,
         isStringNumber,
         parseIAL,
+        removeAttribute,
         removeInvisibleChars,
         siyuan,
         strIncludeAttr,
@@ -23,15 +24,20 @@
         commentBoxVirtualRef,
     } from "./libs/stores";
     import { tomatoI18n } from "./tomatoI18n";
-    import { getDocBlocks, getDocTracer, OpenSyFile2 } from "./libs/docUtils";
+    import {
+        getDocBlocks,
+        getDocTracer,
+        isReadonly,
+        OpenSyFile2,
+    } from "./libs/docUtils";
     import { findElementByAttr } from "./libs/listUtils";
     import { zipNways } from "./libs/functional";
     import { verifyKeyTomato } from "./libs/user";
     import { events } from "./libs/Events";
 
     export let dock: Dock;
+    export let isDock = true;
     type LoadRefs = { refs: Ref[]; loaded: boolean };
-    dock;
     let backLinks: BacklinkSv<Protyle>[] = [];
     let refs: LoadRefs = { refs: [], loaded: false };
     let stop = false;
@@ -64,13 +70,23 @@
 
     onMount(() => {
         updateStop();
-        commentBox.svelteCallback = svelteCallback;
-        commentBox.svelteResize = updateStop;
-        return () => {
-            commentBox.svelteCallback = null;
-            commentBox.svelteResize = null;
-            release();
-        };
+        if (isDock) {
+            commentBox.svelteCallback = svelteCallback;
+            commentBox.svelteResize = updateStop;
+            return () => {
+                commentBox.svelteCallback = null;
+                commentBox.svelteResize = null;
+                release();
+            };
+        } else {
+            commentBox.svelteCallbackTab = svelteCallback;
+            commentBox.svelteResizeTab = updateStop;
+            return () => {
+                commentBox.svelteCallbackTab = null;
+                commentBox.svelteResizeTab = null;
+                release();
+            };
+        }
     });
 
     function release() {
@@ -147,6 +163,30 @@
         refs.refs = idContents;
     }
 
+    async function removeUnderlines(e: HTMLElement, protyle: IProtyle) {
+        const ro = await isReadonly(protyle);
+        if (ro == "true") return;
+        const id = getAttribute(e, "data-node-id");
+        if (getAttribute(e, "custom-tomato-key-comment")) {
+            removeAttribute(e, "custom-tomato-key-comment");
+            e.querySelectorAll(`span[data-type="text"]`).forEach((e) => {
+                const el = e as HTMLElement;
+                const str = el.style?.backgroundColor as string;
+                const k = "var(--b3-font-background-tomato-key-comment)";
+                if (str.includes(k)) {
+                    el.style.backgroundColor = "";
+                    removeAttribute(el, "data-type");
+                }
+            });
+            await siyuan.updateBlocks([{ id, domStr: e.outerHTML }]);
+        }
+        if (getAttribute(e, "custom-tomato-comment")) {
+            await siyuan.setBlockAttrs(id, {
+                "custom-tomato-comment": "",
+            });
+        }
+    }
+
     async function _svelteCallback_block(protyle: IProtyle) {
         const e = getCursorElement();
         if (!e) return;
@@ -218,7 +258,11 @@
                     )
                     .then(async (refL1) => {
                         // refL1 不能直接用，需要再向上找父块。
-                        if (!(refL1?.length > 0)) return;
+                        if (!(refL1?.length > 0)) {
+                            // 如果没有反引，删除下划线
+                            await removeUnderlines(e, protyle);
+                            return;
+                        }
                         for (const l1 of refL1) l1.attrs = parseIAL(l1.ial);
 
                         const commentBKs = await siyuan

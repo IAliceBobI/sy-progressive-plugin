@@ -1,28 +1,30 @@
-import { adaptHotkey, Dock, IProtyle } from "siyuan";
+import { adaptHotkey, Custom, Dialog, Dock, IProtyle, openTab, Tab } from "siyuan";
 import { events, EventType } from "./libs/Events";
-import { add_ref, cloneCleanDiv, extendMap, getAllText, getAttribute, getContextPath, newID, NewNodeID, setAttribute, setTimeouts, siyuan, } from "./libs/utils";
+import { getDialogContainer, newID, } from "./libs/utils";
 import CommentBoxSvelte from "./CommentBox.svelte";
-import { commentBoxAddFlashCard, commentBoxAddUnderline, commentBoxCheckbox, commentBoxMenu, storeNoteBox_selectedNotebook } from "./libs/stores";
+import { commentBoxCheckbox, commentBoxMenu, storeNoteBox_selectedNotebook } from "./libs/stores";
 import { tomatoI18n } from "./tomatoI18n";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { isReadonly } from "./libs/docUtils";
-import { DialogTextArea } from "./libs/DialogText";
-import { domNewHeading, domNewLine, DomSuperBlockBuilder } from "./libs/sydom";
 import { winHotkey } from "./libs/winHotkey";
+import { DestroyManager } from "./libs/destroyer";
+import CommentInput from "./CommentInput.svelte";
 
 const DOCK_TYPE = "dock_CommentBox";
+const TAB_TYPE = "custom_tab_CommentBox"
 
-export const CommentBox添加批注到日记 = winHotkey("⇧⌥F", "comment box 2024-12-20 12:01:14")
+export const CommentBox添加批注到日记 = winHotkey("⇧⌥F", "comment box 2024-12-20 12:01:14", "iconQuoteTomato", () => tomatoI18n.添加批注到日记, false)
+export const CommentBoxTab批注 = winHotkey("⇧⌥I", "comment tab 2025-6-7 12:24:11", "iconQuoteTomato", () => tomatoI18n.批注, false)
 
 class CommentBox {
     plugin: BaseTomatoPlugin;
     settingCfg: TomatoSettings;
     svelteCallback: (protyle: IProtyle) => void;
     svelteResize: () => void;
+    svelteCallbackTab: (protyle: IProtyle) => void;
+    svelteResizeTab: () => void;
     svelte: CommentBoxSvelte;
-
-    onunload() {
-    }
+    private customTab: () => Custom;
 
     onload(plugin: BaseTomatoPlugin) {
         if (plugin.initCfg()) {
@@ -42,7 +44,7 @@ class CommentBox {
 
         this.plugin.addCommand({
             langKey: CommentBox添加批注到日记.langKey,
-            langText: tomatoI18n.添加批注到日记,
+            langText: CommentBox添加批注到日记.langText(),
             hotkey: CommentBox添加批注到日记.m,
             callback: () => {
                 this.findDivs(events.protyle.protyle, false);
@@ -53,9 +55,9 @@ class CommentBox {
             const menu = detail.menu;
             if (commentBoxMenu.get()) {
                 menu.addItem({
-                    icon: "iconQuoteTomato",
+                    icon: CommentBox添加批注到日记.icon,
                     accelerator: CommentBox添加批注到日记.m,
-                    label: tomatoI18n.添加批注到日记,
+                    label: CommentBox添加批注到日记.langText(),
                     click: () => {
                         this.findDivs(detail.protyle, false);
                     },
@@ -70,7 +72,69 @@ class CommentBox {
                     if (this.svelteCallback) {
                         this.svelteCallback(detail.protyle);
                     }
+                    if (this.svelteCallbackTab) {
+                        this.svelteCallbackTab(detail.protyle);
+                    }
                 }
+            });
+
+            plugin.addTopBar({
+                icon: CommentBoxTab批注.icon,
+                title: CommentBoxTab批注.langText() + CommentBoxTab批注.w(),
+                position: "left",
+                callback: () => this.openCommentTab(),
+            });
+
+            this.plugin.addCommand({
+                langKey: CommentBoxTab批注.langKey,
+                langText: CommentBoxTab批注.langText(),
+                hotkey: CommentBoxTab批注.m,
+                callback: () => this.openCommentTab(),
+            });
+
+            this.customTab;
+            this.customTab = this.plugin.addTab({
+                type: TAB_TYPE,
+                resize() {
+                    if (commentBox.svelteResizeTab) commentBox.svelteResizeTab();
+                },
+                init(this) {
+                    const id = newID();
+                    this.element.innerHTML = `<div id="${id}"></div>`;
+                    this.data.sm = new DestroyManager();
+                    const svelte = new CommentBoxSvelte({
+                        target: this.element.querySelector("#" + id),
+                        props: {
+                            dock: this as any,
+                            isDock: false,
+                        }
+                    });
+                    this.data.sm.add("tab", () => { this.destroy(); });
+                    this.data.sm.add("svelte", () => { svelte.$destroy(); });
+                },
+                beforeDestroy() { },
+                destroy() {
+                    this.data.sm.destroyBy("tab");
+                }
+            });
+        }
+    }
+
+    private tab: Tab;
+    async openCommentTab() {
+        if (this.tab) {
+            this.tab.close();
+            this.tab = null;
+        } else {
+            this.tab = await openTab({
+                position: "right",
+                app: this.plugin.app,
+                custom: {
+                    icon: CommentBoxTab批注.icon,
+                    title: CommentBoxTab批注.langText(),
+                    data: { docID: events.docID, blockID: events.lastBlockID },
+                    id: this.plugin.name + TAB_TYPE
+                },
             });
         }
     }
@@ -80,9 +144,9 @@ class CommentBox {
         if (commentBoxMenu.get()) {
             const protyle: IProtyle = detail.protyle;
             detail.menu.addItem({
-                icon: "iconQuoteTomato",
+                icon: CommentBox添加批注到日记.icon,
                 accelerator: CommentBox添加批注到日记.m,
-                label: tomatoI18n.添加批注到日记,
+                label: CommentBox添加批注到日记.langText(),
                 click: () => {
                     this.findDivs(protyle, false);
                 }
@@ -96,106 +160,37 @@ class CommentBox {
         if (!selected || selected.length == 0) return;
         let boxID = storeNoteBox_selectedNotebook.getOr();
         if (!boxID) boxID = events.boxID;
-        const createDailyNoteTask = siyuan.createDailyNote(boxID);
-        const rpath = getContextPath(ids[0]).then(a => a.getPathStr());
-        const ops: IOperation[] = [];
-        const newDivs: HTMLElement[] = [];
-        new DialogTextArea(tomatoI18n.添加批注, "", async (text) => {
-            const builder = new DomSuperBlockBuilder();
 
-            let txt = getAllText(selected, "")
-            if (rangeText) {
-                const div = domNewLine(rangeText.trim());
-                add_ref(div, ids[0], "*", true, false)
-                newDivs.push(div)
-            } else {
-                const new2old = new Map<string, string>();
-                const cloned = selected.map(s => {
-                    const { new2old: m, div } = cloneCleanDiv(s, true)
-                    extendMap(new2old, m);
-                    return div;
-                });
-                newDivs.push(...cloned);
-                cloned
-                    .map(div => {
-                        const all: HTMLElement[] = [...div.querySelectorAll(`div[data-node-id][data-type="NodeParagraph"]`)] as any;
-                        if (all.length == 0) return [div];
-                        return all;
-                    })
-                    .flat()
-                    .forEach((div) => {
-                        add_ref(div, new2old.get(getAttribute(div, "data-node-id")), "*", true, true)
-                        setAttribute(div, "custom-comment-bk-id", builder.id);
-                        div.style.backgroundColor = "";
-                    })
-            }
-
-            builder.setAttr("custom-lnk-bottom", "1");
-            builder.setAttr("custom-tomato-ref-hpath", await rpath);
-            text.trim().split("\n").forEach(l => builder.append(domNewLine(l)))
-
-            const heandingID = NewNodeID();
-            if (newDivs.length == 1) {
-                setAttribute(newDivs.at(0), "fold", "1");
-                builder.append(newDivs.at(0));
-            } else {
-                const txtLen = txt.length;
-                const maxLen = 32;
-                txt = txt.slice(0, maxLen)
-                if (txtLen > maxLen) {
-                    txt += "..."
-                }
-                const h = domNewHeading(txt, "h6", heandingID, true);
-                setAttribute(h, "custom-comment-heading", "1")
-                builder.append(h);
-                builder.append(...newDivs)
-
-                newDivs.forEach(div => {
-                    setAttribute(div, "fold", "1")
-                    setAttribute(div, "heading-fold", "1")
-                });
-            }
-
-            const { id: docID } = await createDailyNoteTask;
-            const tail = await siyuan.getDocLastID(docID);
-            ops.push(...siyuan.transInsertBlocksAfter([builder.build().outerHTML], tail))
-            await siyuan.transactions(ops);
-
-            if (commentBoxAddFlashCard.get()) {
-                siyuan.addRiffCards([builder.id])
-            }
-
-            if (commentBoxAddUnderline.get() && await ro != "true" && newDivs.length == 1) {
-                const hasUnderline = (e: HTMLElement) => {
-                    if (e?.tagName === "SPAN") {
-                        if (getAttribute(e, "data-type") === "u") {
-                            return true;
-                        }
-                    }
-                }
-                try {
-                    const a = range?.startContainer?.parentElement;
-                    const b = range?.endContainer?.parentElement;
-                    protyle.toolbar.setInlineMark(protyle, "u", "range");
-                    if (hasUnderline(a) || hasUnderline(b)) {
-                        protyle.toolbar.setInlineMark(protyle, "u", "range");
-                    }
-                } catch (e) {
-                }
-            }
-
-            if (newDivs.length > 1) {
-                setTimeouts(() => {
-                    newDivs.forEach(div => {
-                        document
-                            .querySelectorAll(`div[data-node-id="${getAttribute(div, "data-node-id")}"]`)
-                            .forEach(e => {
-                                e?.parentElement?.removeChild(e);
-                            });
-                    });
-                }, 500, 3000, 800);
+        const id = newID();
+        const dm = new DestroyManager();
+        const dialog = new Dialog({
+            title: tomatoI18n.添加批注,
+            content: `<div id="${id}"></div>`,
+            width: events.isMobile ? "90vw" : null,
+            height: events.isMobile ? null : null,
+            transparent: true,
+            destroyCallback() {
+                dm.destroyBy("dialog");
+            },
+            resizeCallback(_type: string) {
+                dm.getFn("resizeCallback")(getDialogContainer(dialog));
             }
         });
+        dm.add("dialog", () => dialog.destroy());
+        const svelte = new CommentInput({
+            target: dialog.element.querySelector("#" + id),
+            props: {
+                dm,
+                protyle,
+                boxID,
+                ro,
+                ids,
+                selected,
+                rangeText,
+                range,
+            }
+        });
+        dm.add("svelte", () => svelte.$destroy());
     }
 
     private addDock() {
@@ -205,7 +200,7 @@ class CommentBox {
             config: {
                 position: "RightBottom",
                 size: { width: 200, height: 0 },
-                icon: "iconQuoteTomato",
+                icon: CommentBox添加批注到日记.icon,
                 title,
                 hotkey: "⌥⌘S",
             },

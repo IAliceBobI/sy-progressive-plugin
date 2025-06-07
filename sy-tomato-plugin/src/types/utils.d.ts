@@ -15,10 +15,20 @@ type Overlay = { left: number, top: number, width: number, height: number, angle
 type TSK = keyof TomatoSettings
 
 type TomatoSettings = {
-    mindWireWidth: number,
+    foldTypes: string[],
+    foldTypesNODE_TABLE: boolean,
+    foldTypesNODE_LIST: boolean,
+    foldTypesBLOCKQUOTE: boolean,
+    foldTypesSuperBlock: boolean,
+    commentAllBlockRef: boolean,
+    commentBoxAddKeepText: boolean,
+    cardPrioritySetPriInterval: string,
+    cssSuperBlockBorder: boolean,
+    commentBoxAddTime: boolean,
     mindWireColorfull: boolean,
     mindWireLine: boolean,
     hideVIP: boolean,
+    mindWireWidth: number,
     mindWireStarRefOnly: boolean,
     mindWireDocMenu: boolean,
     mindWireGlobalMenu: boolean,
@@ -276,6 +286,8 @@ type AttrType = {
     style?: string,
     md?: string,// for 'Writing' plugin
     content?: string,// for 'Writing' plugin
+    "custom-tomato-key-comment"?: string,
+    "custom-tomato-comment"?: string,
     "title-img"?: string,
     "custom-tomato-ref-hpath"?: string,
     "tomato-bk-ignore"?: string,
@@ -362,7 +374,6 @@ type AttrType = {
     "custom-super-card-box"?: string,
     "custom-super-card-question"?: string,
     "custom-super-card-answer"?: string,
-    "custom-comment-heading"?: string,
     "custom-comment-fold"?: string,
     "custom-comment-bk-id"?: string,
     "custom-lnk-bottom"?: string,
@@ -373,6 +384,7 @@ type AttrType = {
     "custom-progref"?: string,
     "custom-prog-piece-previous"?: string,
     "custom-mindwire-enable"?: string,
+    "custom-comment-superblock-fold"?: string,
 };
 
 type AttrKey = keyof AttrType;

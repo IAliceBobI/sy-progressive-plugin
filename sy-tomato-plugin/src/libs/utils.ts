@@ -1,4 +1,4 @@
-import { Config, Constants, Lute, Protyle, fetchSyncPost, confirm, IProtyle, getAllEditor } from "siyuan";
+import { Config, Constants, Lute, Protyle, fetchSyncPost, confirm, IProtyle, getAllEditor, Dialog } from "siyuan";
 import { v4 as uuid } from "uuid";
 import * as gconst from "./gconst";
 import * as moment from "moment-timezone";
@@ -289,6 +289,28 @@ export function pushNotNull<T>(arr: T[] | undefined, ...items: T[]): T[] {
                 arr.push(i);
             }
         }
+    }
+    return arr;
+}
+
+export function removeFromArr<T>(arr: T[] | undefined, ...items: T[]): T[] {
+    if (!arr) arr = [];
+    for (let i = 0; i < items.length; i++) {
+        const idx = arr.indexOf(items.at(i))
+        if (idx >= 0) {
+            arr.splice(idx, 1)
+            i--
+        }
+    }
+    return arr;
+}
+
+export function pushUniq<T>(arr: T[] | undefined, ...items: T[]): T[] {
+    if (!arr) arr = [];
+    for (const i of items) {
+        const idx = arr.indexOf(i)
+        if (idx >= 0) continue
+        arr.push(i)
     }
     return arr;
 }
@@ -2286,6 +2308,9 @@ export const siyuan = {
         // "due": "20240224214412"
         return siyuan.call("/api/riff/batchSetRiffCardsDueTime", { cardDues });
     },
+    async getRiffCardsAllFlat(pageSize = 1000) {
+        return [...(await siyuan.getRiffCardsAll(pageSize)).values()].flat()
+    },
     async getRiffCardsAll(pageSize = 1000) {
         const total: Map<string, GetCardRetBlock[]> = new Map();
         // let j = 0;
@@ -2784,4 +2809,8 @@ export function getDocLastElement(protyle: IProtyle) {
 
 export function isEditor(protyle: IProtyle) {
     return !!getAttribute(protyle.element, "data-id") || events.isMobile
+}
+
+export function getDialogContainer(dialog: Dialog) {
+    return dialog?.element?.querySelector("div.b3-dialog > div.b3-dialog__container")
 }

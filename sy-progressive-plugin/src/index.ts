@@ -210,7 +210,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         });
 
         this.setting.addItem({
-            title: tomatoI18n.渐进学习的设置,
+            title: progSettingsOpenHK.langText(),
             createActionElement: () => {
                 const btnaElement = document.createElement("button");
                 btnaElement.className = "b3-button b3-button--outline fn__flex-center fn__size200";
@@ -238,7 +238,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
 
         this.addTopBar({
             icon: "iconSettingsProg",
-            title: tomatoI18n.渐进学习的设置,
+            title: progSettingsOpenHK.langText() + progSettingsOpenHK.w(),
             position: "left",
             callback: () => {
                 this.openSettings();
