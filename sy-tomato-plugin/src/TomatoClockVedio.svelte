@@ -3,6 +3,7 @@
     import { onDestroy, afterUpdate, onMount } from "svelte";
     import { DestroyManager } from "./libs/destroyer";
     import { TomatoClockID, tomatoClock } from "./TomatoClock";
+    import { tomato_clocks_audio } from "./libs/stores";
 
     export let vedioID: BlockID;
     export let dm: DestroyManager;
@@ -15,6 +16,19 @@
     };
 
     onMount(async () => {
+        // 播放声音
+        if (tomato_clocks_audio.get()) {
+            const audio = new Audio(tomato_clocks_audio.get());
+            try {
+                audio.play();
+            } catch (e) {
+                console.error("Failed to play audio:", e);
+            }
+            dm?.add("close audio", () => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+        }
         if (dm) {
             window.addEventListener("keydown", handleEscapePress);
             dm.add("Escape Key Lisener", () =>

@@ -15,12 +15,13 @@ type Overlay = { left: number, top: number, width: number, height: number, angle
 type TSK = keyof TomatoSettings
 
 type TomatoSettings = {
+    tomato_clocks_audio: string,
     foldTypes: string[],
+    foldTypesNODE_HEADING: boolean,
     foldTypesNODE_TABLE: boolean,
     foldTypesNODE_LIST: boolean,
     foldTypesBLOCKQUOTE: boolean,
     foldTypesSuperBlock: boolean,
-    commentAllBlockRef: boolean,
     commentBoxAddKeepText: boolean,
     cardPrioritySetPriInterval: string,
     cssSuperBlockBorder: boolean,
@@ -286,6 +287,7 @@ type AttrType = {
     style?: string,
     md?: string,// for 'Writing' plugin
     content?: string,// for 'Writing' plugin
+    "data-inline-comment"?: string,
     "custom-tomato-key-comment"?: string,
     "custom-tomato-comment"?: string,
     "title-img"?: string,

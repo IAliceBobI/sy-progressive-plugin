@@ -318,6 +318,7 @@ export const foldTypesSuperBlock = settingFactory("foldTypesSuperBlock", false, 
 export const foldTypesBLOCKQUOTE = settingFactory("foldTypesBLOCKQUOTE", false, STORAGE_SETTINGS, null as TSK);
 export const foldTypesNODE_LIST = settingFactory("foldTypesNODE_LIST", false, STORAGE_SETTINGS, null as TSK);
 export const foldTypesNODE_TABLE = settingFactory("foldTypesNODE_TABLE", false, STORAGE_SETTINGS, null as TSK);
+export const foldTypesNODE_HEADING = settingFactory("foldTypesNODE_HEADING", false, STORAGE_SETTINGS, null as TSK);
 export const addSelectionBtnsMobile = settingFactory("addSelectionBtnsMobile", true, STORAGE_SETTINGS, null as TSK);
 export const addSelectionBtnsDesktop = settingFactory("addSelectionBtnsDesktop", true, STORAGE_SETTINGS, null as TSK);
 export const cssRefStyle = settingFactory("cssRefStyle", false, STORAGE_SETTINGS, null as TSK);
@@ -340,6 +341,7 @@ export const graphAddTopbarIcon = settingFactory("graphAddTopbarIcon", true, STO
 export const graph打开块关系图Menu = settingFactory("graphopengraphMenu", true, STORAGE_SETTINGS, null as TSK);
 export const graph定位到图中的节点Menu = settingFactory("graphlocatetographMenu", true, STORAGE_SETTINGS, null as TSK);
 export const tomatoClockCheckbox = settingFactory("tomatoClockCheckbox", true, STORAGE_SETTINGS, null as TSK);
+export const tomato_clocks_audio = settingFactory("tomato_clocks_audio", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", STORAGE_SETTINGS, null as TSK);
 export const tomato_clocks = settingFactory("tomato-clocks", "5,10,15,20,25,45", STORAGE_SETTINGS, null as TSK);
 export const tomato_clocks_force_dialog = settingFactory("tomato_clocks_force_dialog", true, STORAGE_SETTINGS, null as TSK);
 export const tomato_clocks_force_notice = settingFactory("tomato-clocks-force-notice", "", STORAGE_SETTINGS, null as TSK);
@@ -491,7 +493,6 @@ export const commentBoxAddKeepText = settingFactory("commentBoxAddKeepText", tru
 export const commentBoxAddUnderline = settingFactory("commentBoxAddUnderline", true, STORAGE_SETTINGS, null as TSK);
 export const commentBoxShowID = settingFactory("commentBoxShowID", false, STORAGE_SETTINGS, null as TSK);
 export const commentBoxStaticOutlink = settingFactory("commentBoxStaticOutlink", false, STORAGE_SETTINGS, null as TSK);
-export const commentAllBlockRef = settingFactory("commentAllBlockRef", false, STORAGE_SETTINGS, null as TSK);
 
 // ---------------
 

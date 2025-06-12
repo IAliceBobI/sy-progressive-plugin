@@ -163,12 +163,13 @@
         mindWireWidth,
         cssSuperBlockBorder,
         cardPrioritySetPriInterval,
-        commentAllBlockRef,
         foldTypes,
         foldTypesSuperBlock,
         foldTypesNODE_LIST,
         foldTypesBLOCKQUOTE,
         foldTypesNODE_TABLE,
+        foldTypesNODE_HEADING,
+        tomato_clocks_audio,
     } from "./libs/stores";
     import { STORAGE_SETTINGS } from "./constants";
     import { tomatoI18n } from "./tomatoI18n";
@@ -681,6 +682,25 @@
                 />
                 {tomatoI18n.表格}
             </label>
+            <!-- 标题块 -->
+            <label class="space">
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$foldTypesNODE_HEADING}
+                    on:change={() => {
+                        if ($foldTypesNODE_HEADING) {
+                            pushUniq($foldTypes, BlockNodeEnum.NODE_HEADING);
+                        } else {
+                            removeFromArr(
+                                $foldTypes,
+                                BlockNodeEnum.NODE_HEADING,
+                            );
+                        }
+                    }}
+                />
+                {tomatoI18n.标题}
+            </label>
         </div>
     </div>
     <!-- 状态栏番茄钟 -->
@@ -722,6 +742,11 @@
             <div>
                 <input class="b3-text-field" bind:value={$tomato_clocks} />
                 {tomatoI18n.番茄钟时长多个间用逗号隔开}
+            </div>
+
+            <div>
+                <input class="b3-text-field" bind:value={$tomato_clocks_audio} />
+                {tomatoI18n.时间到播放声音}
             </div>
 
             <div>
@@ -885,14 +910,6 @@
                     bind:checked={$commentBoxAddUnderline}
                 />
                 {tomatoI18n.批注添加下划线}
-            </div>
-            <div>
-                <input
-                    type="checkbox"
-                    class="b3-switch"
-                    bind:checked={$commentAllBlockRef}
-                />
-                {tomatoI18n.所有原文都加引用}
             </div>
             <div>
                 <input
