@@ -178,11 +178,11 @@
                     spellcheck="false"
                 />
             </label>
-            <button class="b3-button" on:click={active}>
+            <button class="b3-button b3-button--outline" on:click={active}>
                 {tomatoI18n.激活}
             </button>
             <button
-                class="b3-button"
+                class="b3-button b3-button--outline"
                 on:click={() => {
                     if (buyDIV.style.display) buyDIV.style.display = "";
                     else buyDIV.style.display = "none";
@@ -809,7 +809,7 @@
     </div>
 
     <div class="settingBox">
-        <button class="b3-button" on:click={save}>{tomatoI18n.保存}</button>
+        <button class="b3-button b3-button--outline" on:click={save}>{tomatoI18n.保存}</button>
     </div>
 </div>
 

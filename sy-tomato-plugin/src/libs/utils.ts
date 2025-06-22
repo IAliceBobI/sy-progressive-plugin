@@ -1,5 +1,4 @@
 import { Config, Constants, Lute, Protyle, fetchSyncPost, confirm, IProtyle, getAllEditor, Dialog } from "siyuan";
-import { v4 as uuid } from "uuid";
 import * as gconst from "./gconst";
 import * as moment from "moment-timezone";
 import { TomatoI18n } from "../tomatoI18n";
@@ -11,16 +10,27 @@ import { getDocBlocks } from "./docUtils";
 import { domRef, DomSuperBlockBuilder } from "./sydom";
 import { DestroyManager } from "./destroyer";
 import { parseCustomTag } from "./ial";
+import { BaseTomatoPlugin } from "./BaseTomatoPlugin";
+import { getGlobal } from "stonev5-utils";
+
+export function closeTab(title: string) {
+    return closeTabByTitle([{ title, id: "1" }], "2");
+}
 
 export function closeTabByTitle(tabs: AttrType[], excludeDocID: string) {
+    let closed = false;
     if (tabs?.length > 0) {
         const openedTabs = [...document.querySelectorAll(`span.item__text`)];
-        for (const t of tabs) {
-            if (t.id === excludeDocID) continue;
-            const f = openedTabs.find(o => o.textContent === t.title);
-            (f?.nextElementSibling as HTMLButtonElement)?.click();
+        for (const tab of tabs) {
+            if (tab.id === excludeDocID) continue;
+            const f = openedTabs.find(o => o.textContent === tab.title);
+            if (f) {
+                (f.nextElementSibling as HTMLButtonElement)?.click();
+                closed = true;
+            }
         }
     }
+    return closed;
 }
 
 export function getOpenedEditors() {
@@ -305,16 +315,6 @@ export function removeFromArr<T>(arr: T[] | undefined, ...items: T[]): T[] {
     return arr;
 }
 
-export function pushUniq<T>(arr: T[] | undefined, ...items: T[]): T[] {
-    if (!arr) arr = [];
-    for (const i of items) {
-        const idx = arr.indexOf(i)
-        if (idx >= 0) continue
-        arr.push(i)
-    }
-    return arr;
-}
-
 export function push<T>(arr: T[] | undefined, ...items: T[]): T[] {
     if (!arr) arr = [];
     arr.push(...items);
@@ -464,13 +464,44 @@ export function downloadStringAsFile(content: string, filename: string, mimeType
     URL.revokeObjectURL(url);
 }
 
-export async function readAllFiles() {
-    const pathes1 = await getAllFileIDs().then(p => [...p.values()].map(i => "/data" + i));
-    const dbPath = "/data/storage/av";
-    const pathes2 = siyuan.readDir(dbPath).then(i => {
-        return i?.filter(i => i.name.endsWith(".json"))?.map(i => dbPath + "/" + i.name) ?? []
-    })
-    return Promise.all([pathes1, pathes2]).then(all => all.flat())
+export async function readAllFiles(av = true) {
+    const pathes1 = getAllFileIDs().then(p => [...p.values()].map(i => "/data" + i));
+    let pathes2: string[] = [];
+    if (av) {
+        const dbPath = "/data/storage/av";
+        pathes2 = await siyuan.readDir(dbPath).then(i => {
+            return i?.filter(i => i.name.endsWith(".json"))?.map(i => dbPath + "/" + i.name) ?? []
+        })
+    }
+    return [await pathes1, pathes2].flat()
+}
+
+export async function readAllFilePathIDs(whitelistIDs: string[], blacklistIDs: string[], av: boolean) {
+    let pathes = await readAllFiles(av);
+    if (whitelistIDs?.length > 0) {
+        pathes = pathes.filter(p => {
+            for (const v of whitelistIDs) {
+                if (p.includes(v)) return true;
+            }
+        })
+    }
+    if (blacklistIDs?.length > 0) {
+        pathes = pathes.filter(p => {
+            for (const v of blacklistIDs) {
+                if (p.includes(v)) return false;
+            }
+            return true;
+        })
+    }
+    pathes = pathes.map(p => p.replace("/data/storage/av/", "").replace("/data/", "")).filter(p => !!p);
+    const ids = pathes.map(path => {
+        // if (!path.includes(".sy")) {
+        //     throw new Error(`Invalid file path: "${path}". Expected a path containing ".sy".`);
+        // }
+        path = path.slice(0, -3);
+        return path.split("/")
+    }).flat().filter(i => !!i)
+    return { ids, pathes };
 }
 
 export async function getPluginSpec(name: string): Promise<PluginSpec> {
@@ -1294,10 +1325,6 @@ export function findBookOpennedFirst(bookID: string, bookIDList: string[]): stri
     return bookID;
 }
 
-export function newID() {
-    return "ID" + uuid().replace(/-/g, "");
-}
-
 export function dir(path: string) {
     const parts = path.split("/");
     const file = parts.pop();
@@ -1443,6 +1470,10 @@ export const siyuan = {
     async currentTimeMs(secs = 0) {
         const response = await fetchSyncPost("/api/system/currentTime", {});
         return response.data + secs * 1000;
+    },
+    async getWorkspaces() {
+        const response = await fetchSyncPost("/api/system/getWorkspaces", {});
+        return response.data
     },
     async copyFile(src: string, dest: string) {
         return siyuan.call("/api/file/copyFile", { src, dest });
@@ -1697,6 +1728,15 @@ export const siyuan = {
     async openNotebook(notebookID: string) {
         const notebook = notebookID;
         return siyuan.call("/api/notebook/openNotebook", { notebook });
+    },
+    async getNotebookByName(name: string): Promise<LsNotebook> {
+        const resp = await siyuan.call("/api/notebook/lsNotebooks", {});
+        for (const book of resp?.["notebooks"] ?? []) {
+            if (book.name === name) {
+                return book;
+            }
+        }
+        return {} as LsNotebook;
     },
     async lsNotebooks(closed?: boolean): Promise<LsNotebook[]> {
         const resp = await siyuan.call("/api/notebook/lsNotebooks", {});
@@ -2822,3 +2862,93 @@ export function getProtylesByID(id: string) {
             return e != null
         }) ?? []
 }
+
+export function uniqueFilter<T>(keySelector: (item: T) => any) {
+    const seen = new Set<any>();
+    return (item: T) => {
+        const key = keySelector(item);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    };
+};
+
+const ILLEGAL_CHARS_REGEX = /[\x00\/\\:*?"<>|]/g;  // \x00 代表空字符 [5](@ref)[4](@ref)
+
+export function sanitizePathSegment(segment: string): string {
+    // 保留 Windows 驱动器标识（如 C:）
+    // if (segment.length === 2 && segment[1] === ':') {
+    //     return segment;
+    // }
+    return segment.replace(ILLEGAL_CHARS_REGEX, '_'); // 替换为下划线
+}
+
+// export async function readDir(dirPath: string): Promise<string[]> {
+//     const fs: typeof import('fs/promises') = require('fs/promises');
+//     if (!fs) return;
+//     const joiner = require('path');
+//     if (!joiner) return;
+//     const files: string[] = [];
+//     const items = await fs.readdir(dirPath, { withFileTypes: true }); // 获取带类型的目录项
+//     for (const item of items) {
+//         const fullPath = joiner.join(dirPath, item.name);
+//         if (item.isDirectory()) {
+//             files.push(...await readDir(fullPath)); // 递归子目录
+//         } else {
+//             files.push(fullPath);
+//         }
+//     }
+//     return files;
+// }
+
+export function getTomatoPluginInstance(): BaseTomatoPlugin {
+    return getGlobal(gconst.TomatoPluginInstance)
+}
+
+export function getTomatoPluginConfig(): TomatoSettings {
+    return getGlobal(gconst.TomatoPluginConfig)
+}
+
+export function getProgressivePluginInstance(): BaseTomatoPlugin {
+    return getGlobal(gconst.ProgressivePluginInstance)
+}
+
+export function getProgressivePluginConfig(): TomatoSettings {
+    return getGlobal(gconst.ProgressivePluginConfig)
+}
+
+export function getNotebookByName(name: string) {
+    return Siyuan?.notebooks?.find(n => n.name == name)
+}
+
+export function getNotebookByID(id: string) {
+    return Siyuan?.notebooks?.find(n => n.id == id)
+}
+
+export function getNotebookFirstOne() {
+    return Siyuan?.notebooks?.find(n => n.closed != null && n.closed == false)
+}
+
+export function osFs() {
+    return require('fs/promises') as typeof import('fs/promises');
+}
+
+export function osFsSync() {
+    return require('fs') as typeof import('fs');
+}
+
+export function osPath() {
+    return require('path') as typeof import('path');
+}
+
+export async function getHpath(id: string) {
+    if (!id) return "";
+    const row = await siyuan.getRowByID(id);
+    if (row) {
+        let n = getNotebookByID(row.box)?.name ?? ""
+        n = n + (row.hpath ?? "");
+        if (n) return n;
+    }
+    return id;
+}
+

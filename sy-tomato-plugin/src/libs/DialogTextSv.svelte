@@ -53,6 +53,7 @@
         </div>
         {#if useTextArea}
             <textarea
+                placeholder={defaultValue}
                 bind:this={area}
                 class="b3-text-field block area"
                 bind:value={inputText}
@@ -87,7 +88,9 @@
                     }
                 }}
             />
-            <button class="b3-button" on:click={btnClick}>Enter</button>
+            <button class="b3-button b3-button--outline" on:click={btnClick}
+                >Enter</button
+            >
         {/if}
     </div>
 </div>

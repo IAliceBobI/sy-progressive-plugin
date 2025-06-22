@@ -6,8 +6,10 @@ import { TOMATO_LINE_THROUGH } from "./libs/gconst";
 import { OpenSyFile2 } from "./libs/docUtils";
 import { DomSuperBlockBuilder } from "./libs/sydom";
 import { verifyKeyTomato } from "./libs/user";
-import { addSelectionBtnsDesktop, addSelectionBtnsMobile } from "./libs/stores";
+import { addSelectionBtnsDesktop, addSelectionBtnsMobile, noteBoxCheckbox } from "./libs/stores";
 import { SelectionML } from "./libs/SelectionML";
+import { noteBox } from "./NoteBox";
+
 
 export function mergeDocMenuListener() {
     events.addListener_open_menu_doctree("2025-5-8 17:27:45合并文档", (detial) => {
@@ -142,10 +144,19 @@ function _addSelectionButton() {
                         addSelectPrevButton(protyle, params)
                         addSelectNextButton(protyle, params)
                         addCancelButton(protyle, params)
+                        if (noteBoxCheckbox.get() && events.isMobile) {
+                            noteBoxShow(protyle)
+                        }
                     }
                 }
             });
         }
+    });
+}
+
+function noteBoxShow(protyle: IProtyle) {
+    addCustomButton(protyle, 'tomato-note-box', tomatoI18n.拍照闪念, "Camera", () => {
+        noteBox.showInDialog()
     });
 }
 

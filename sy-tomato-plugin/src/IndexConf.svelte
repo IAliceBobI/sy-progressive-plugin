@@ -170,14 +170,26 @@
         foldTypesNODE_TABLE,
         foldTypesNODE_HEADING,
         tomato_clocks_audio,
+        exportPath,
+        exportIntervalSec,
+        exportCleanFiles,
+        markdownExportBoxCheckbox,
+        exportWhiteList,
+        exportBlackList,
+        markdownExportPics,
+        exportIntervalSecOn,
+        exportCleanFilesOn,
+        floatingballEnable,
+        floatingballDocList,
+        floatingballKeyboardList,
     } from "./libs/stores";
     import { STORAGE_SETTINGS } from "./constants";
     import { tomatoI18n } from "./tomatoI18n";
     import NotebookSelect from "./NotebookSelect.svelte";
     import {
         cleanDataview,
+        getHpath,
         icon,
-        pushUniq,
         removeFromArr,
         saveRestorePagePosition,
         siyuan,
@@ -270,7 +282,14 @@
         ReadingPointBox跳到当前文档的阅读点,
     } from "./ReadingPointBox";
     import { ScheduleCopyID } from "./Schedule";
-    import { BlockNodeEnum, SPACE } from "./libs/gconst";
+    import {
+        BlockNodeEnum,
+        FloatingBallDocType_dialog,
+        FloatingBallDocType_float,
+        FloatingBallDocType_tab,
+        FloatingBallNotVIPLimit,
+        SPACE,
+    } from "./libs/gconst";
     import {
         Tag2RefBox模糊查找引用Lnk,
         Tag2RefBox模糊查找引用Ref,
@@ -287,11 +306,32 @@
         MindWire启用或禁用思维导线,
         MindWire启用或禁用文档思维导线,
     } from "./MindWire";
+    import {
+        cleanExportedMds,
+        exportMd2Dir,
+        MarkdownExport全量导出,
+        MarkdownExport增量导出,
+        MarkdownExport确保导出符合配置,
+    } from "./MarkdownExportBox";
+    import { pushReplaceBy, pushUniq } from "stonev5-utils";
+    import { events } from "./libs/Events";
+    import { shortcut2string } from "./libs/keyboard";
     export let dm: DestroyManager;
     export let plugin: BaseTomatoPlugin;
+    let addDocSettings: HTMLElement;
+    let addShortcutSettings: HTMLElement;
     let buyDIV: HTMLElement;
     let settingsDiv: HTMLElement;
     let searchInput: HTMLElement;
+    let addDoc_docName = "";
+    let addDoc_docIcon = "";
+    let addDoc_keyboardIcon = "";
+    let addDoc_keyboardpreview = "";
+    let addDoc_keyboardKeyCode = "";
+    let addDoc_keyboardAlt = false;
+    let addDoc_keyboardShift = false;
+    let addDoc_keyboardCtrl = false;
+    let addDoc_useDialog = FloatingBallDocType_float.id;
     let codeValid = false;
     $: codeNotValid = !codeValid;
     const ICONS_SIZE = 14;
@@ -317,6 +357,8 @@
             searchSettings(settingsDiv, searchKey);
         }
         searchInput.focus();
+        addDocSettings.style.display = "none";
+        addShortcutSettings.style.display = "none";
     });
 
     async function active() {
@@ -331,6 +373,47 @@
         dm.destroyBy();
         await plugin.saveData(STORAGE_SETTINGS, plugin.settingCfg);
         window.location.reload();
+    }
+
+    function toggleDiv(div: HTMLElement) {
+        if (div.style.display === "none" || div.style.display === "") {
+            div.style.display = "block";
+        } else {
+            div.style.display = "none";
+        }
+    }
+
+    function showName(name: string, icon: string, docType?: number) {
+        let docTypeStr = "";
+        switch (docType) {
+            case FloatingBallDocType_tab.id:
+                docTypeStr = FloatingBallDocType_tab.txt;
+                break;
+            case FloatingBallDocType_dialog.id:
+                docTypeStr = FloatingBallDocType_dialog.txt;
+                break;
+            case FloatingBallDocType_float.id:
+                docTypeStr = FloatingBallDocType_float.txt;
+                break;
+            default:
+        }
+        if (docTypeStr) {
+            docTypeStr = `(${docTypeStr})`;
+        }
+
+        if (name.toLocaleLowerCase() == icon.toLocaleLowerCase()) {
+            return name + docTypeStr;
+        }
+        return `${name}(${icon})${docTypeStr}`;
+    }
+
+    function flatingkbchange() {
+        addDoc_keyboardpreview = shortcut2string({
+            key: addDoc_keyboardKeyCode,
+            altKey: addDoc_keyboardAlt,
+            ctrlKey: addDoc_keyboardCtrl,
+            shiftKey: addDoc_keyboardShift,
+        });
     }
 </script>
 
@@ -352,11 +435,11 @@
                     placeholder="1656000000123_22000101_ldID_siyuanTomatoCode_3044022018c8d8bca......"
                     spellcheck="false"
                 />
-                <button class="b3-button" on:click={active}>
+                <button class="b3-button b3-button--outline" on:click={active}>
                     {tomatoI18n.激活}
                 </button>
                 <button
-                    class="b3-button"
+                    class="b3-button b3-button--outline"
                     on:click={() => {
                         if (buyDIV.style.display) buyDIV.style.display = "";
                         else buyDIV.style.display = "none";
@@ -703,6 +786,424 @@
             </label>
         </div>
     </div>
+    <!-- 悬浮球 -->
+    <div class="settingBox">
+        <div>
+            <input
+                type="checkbox"
+                class="b3-switch"
+                bind:checked={$floatingballEnable}
+            />
+            {tomatoI18n.悬浮球}
+            <strong>
+                <a
+                    href="https://awx9773btw.feishu.cn/docx/IFT9drxvSoYKVmxCcqncFOgknXg?from=from_copylink"
+                >
+                    {tomatoI18n.帮助}</a
+                >
+            </strong>
+        </div>
+        {#if $floatingballEnable}
+            <!-- 列出文档绑定 -->
+            <div>
+                {#if $floatingballDocList.length > FloatingBallNotVIPLimit && !lastVerifyResult()}
+                    ⚠️{tomatoI18n.非VIP上限为x个(FloatingBallNotVIPLimit, "📄")}
+                {/if}
+            </div>
+            {#each $floatingballDocList as item, index}
+                <div>
+                    <label class="space">
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            bind:checked={item.enable}
+                        />{tomatoI18n.桌面端}
+                    </label>
+                    <label class="space">
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            bind:checked={item.enableMobile}
+                        />{tomatoI18n.移动端}
+                    </label>
+                    <button
+                        class="b3-button b3-button--text space"
+                        on:click={() => {
+                            $floatingballDocList.splice(index, 1);
+                            $floatingballDocList = $floatingballDocList;
+                        }}
+                    >
+                        🗑️
+                    </button>
+                    <span class="text space"
+                        >📄{showName(
+                            item.docName,
+                            item.docIcon,
+                            item.openDocType,
+                        )}
+                    </span>
+                </div>
+            {/each}
+            <!-- 列出快捷键绑定 -->
+            <div>
+                {#if $floatingballKeyboardList.length > FloatingBallNotVIPLimit && !lastVerifyResult()}
+                    ⚠️{tomatoI18n.非VIP上限为x个(FloatingBallNotVIPLimit, "⌨️")}
+                {/if}
+            </div>
+            {#each $floatingballKeyboardList as item, index}
+                <div>
+                    <label class="space">
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            bind:checked={item.enable}
+                        />{tomatoI18n.桌面端}
+                    </label>
+                    <label class="space">
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            bind:checked={item.enableMobile}
+                        />{tomatoI18n.移动端}
+                    </label>
+                    <button
+                        class="b3-button b3-button--text space"
+                        on:click={() => {
+                            $floatingballKeyboardList.splice(index, 1);
+                            $floatingballKeyboardList =
+                                $floatingballKeyboardList;
+                        }}
+                    >
+                        🗑️
+                    </button>
+                    <span class="text space"
+                        >⌨️{showName(shortcut2string(item), item.keyIcon)}
+                    </span>
+                </div>
+            {/each}
+            <!-- 添加按钮 -->
+            <div>
+                <button
+                    class="b3-button b3-button--outline space"
+                    on:click={() => {
+                        toggleDiv(addDocSettings);
+                    }}
+                    >➕{tomatoI18n.文档}
+                </button>
+                <button
+                    class="b3-button b3-button--outline space"
+                    on:click={() => {
+                        toggleDiv(addShortcutSettings);
+                    }}
+                    >➕{tomatoI18n.快捷键}
+                </button>
+            </div>
+            <!-- 绑定文档配置 -->
+            <div bind:this={addDocSettings}>
+                <div class="spacetop">
+                    <input
+                        placeholder={addDoc_docName}
+                        class="b3-text-field space"
+                        bind:value={addDoc_docIcon}
+                    />{tomatoI18n.图标}
+                </div>
+                <div class="spacetop">
+                    <input
+                        class="b3-text-field space"
+                        bind:value={addDoc_docName}
+                    />{tomatoI18n.文档名}
+                </div>
+                <div class="spacetop">
+                    <label class="space">
+                        <input
+                            type="radio"
+                            name="addDoc_openType"
+                            value={FloatingBallDocType_tab.id}
+                            bind:group={addDoc_useDialog}
+                        />
+                        {FloatingBallDocType_tab.txt}
+                    </label>
+                    <label class="space">
+                        <input
+                            type="radio"
+                            name="addDoc_openType"
+                            value={FloatingBallDocType_dialog.id}
+                            bind:group={addDoc_useDialog}
+                        />
+                        {FloatingBallDocType_dialog.txt}
+                    </label>
+                    <label class="space">
+                        <input
+                            type="radio"
+                            name="addDoc_openType"
+                            value={FloatingBallDocType_float.id}
+                            bind:group={addDoc_useDialog}
+                        />
+                        {FloatingBallDocType_float.txt}
+                    </label>
+                    <!-- <select
+                        class="b3-select space"
+                        bind:value={addDoc_useDialog}
+                    >
+                        <option value={FloatingBallDocType_tab.id}
+                            >{FloatingBallDocType_tab.txt}</option
+                        >
+                        <option value={FloatingBallDocType_dialog.id}
+                            >{FloatingBallDocType_dialog.txt}</option
+                        >
+                        <option value={FloatingBallDocType_float.id}
+                            >{FloatingBallDocType_float.txt}</option
+                        >
+                    </select> -->
+                </div>
+                <button
+                    class="b3-button b3-button--outline spacetop"
+                    on:click={() => {
+                        if (addDoc_docName) {
+                            let icon = addDoc_docIcon;
+                            if (!icon) {
+                                icon = addDoc_docName;
+                            }
+                            $floatingballDocList = pushReplaceBy(
+                                $floatingballDocList,
+                                {
+                                    docName: addDoc_docName,
+                                    docIcon: icon,
+                                    openDocType: addDoc_useDialog,
+                                    enable: true,
+                                    enableMobile: true,
+                                },
+                                (item) => item.docName,
+                            );
+                            floatingballDocList.write();
+                        }
+                    }}
+                    >{tomatoI18n.绑定文档到悬浮按钮}
+                </button>
+                <button
+                    class="b3-button b3-button--outline spacetop"
+                    on:click={() => {
+                        addDoc_docName = "$$dailynote";
+                        addDoc_docIcon = "🗓️📒";
+                    }}
+                    >{tomatoI18n.特殊绑定当天日志}
+                </button>
+            </div>
+            <!-- 绑定快捷键配置 -->
+            <div bind:this={addShortcutSettings}>
+                <div class="spacetop">
+                    <input
+                        placeholder={addDoc_keyboardpreview}
+                        class="b3-text-field space"
+                        bind:value={addDoc_keyboardIcon}
+                    />{tomatoI18n.图标}
+                </div>
+                <div class="spacetop">
+                    <input
+                        class="b3-text-field space"
+                        bind:value={addDoc_keyboardKeyCode}
+                        on:input={flatingkbchange}
+                    />{tomatoI18n.键}
+                </div>
+                <div class="spacetop">
+                    <label class="space">
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            bind:checked={addDoc_keyboardAlt}
+                            on:change={flatingkbchange}
+                        />alt
+                    </label>
+                    <label class="space">
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            bind:checked={addDoc_keyboardShift}
+                            on:change={flatingkbchange}
+                        />shift
+                    </label>
+                    <label class="space">
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            bind:checked={addDoc_keyboardCtrl}
+                            on:change={flatingkbchange}
+                        />{events.isMac ? "cmd" : "ctrl"}
+                    </label>
+                </div>
+                <button
+                    class="b3-button b3-button--outline spacetop"
+                    on:click={() => {
+                        if (addDoc_keyboardKeyCode) {
+                            let icon = addDoc_keyboardIcon;
+                            if (!icon) {
+                                icon = addDoc_keyboardpreview;
+                            }
+                            addDoc_keyboardKeyCode =
+                                addDoc_keyboardKeyCode.toLocaleUpperCase();
+                            $floatingballKeyboardList = pushReplaceBy(
+                                $floatingballKeyboardList,
+                                {
+                                    enableMobile: true,
+                                    enable: true,
+                                    keyIcon: icon,
+                                    key: addDoc_keyboardKeyCode,
+                                    altKey: addDoc_keyboardAlt,
+                                    shiftKey: addDoc_keyboardShift,
+                                    ctrlKey: addDoc_keyboardCtrl,
+                                },
+                                (item) =>
+                                    `${item.key}#${item.altKey}#${item.ctrlKey}#${item.shiftKey}`,
+                            );
+                            floatingballKeyboardList.write();
+                        }
+                    }}
+                    >{tomatoI18n.绑定快捷键到悬浮按钮 + addDoc_keyboardpreview}
+                </button>
+            </div>
+        {/if}
+    </div>
+    <!-- 导出工作空间 -->
+    <div class="settingBox">
+        <div>
+            <input
+                type="checkbox"
+                class="b3-switch"
+                bind:checked={$markdownExportBoxCheckbox}
+            />
+            {tomatoI18n.导出工作空间}
+            <strong>
+                <a
+                    href="https://awx9773btw.feishu.cn/docx/UmNxds5JLo4m1qxc7j3cOvh4ncc?from=from_copylink"
+                >
+                    {tomatoI18n.帮助}</a
+                >
+            </strong>
+        </div>
+        {#if $markdownExportBoxCheckbox}
+            <div>
+                {#if $exportWhiteList.length === 0}
+                    <div>
+                        <strong
+                            >⚠️{tomatoI18n.白名单为空请先在文档树中右键添加文档}⚠️</strong
+                        >
+                    </div>
+                {:else}
+                    {#each $exportWhiteList as item, index}
+                        <div>
+                            <button
+                                class="b3-button b3-button--text space"
+                                on:click={() => {
+                                    $exportWhiteList.splice(index, 1);
+                                    $exportWhiteList = $exportWhiteList;
+                                }}
+                            >
+                                🗑️
+                            </button>
+                            {#await getHpath(item)}
+                                <span class="text">{item} ✅</span>
+                            {:then v}
+                                <span class="text">{v} ✅</span>
+                            {/await}
+                        </div>
+                    {/each}
+                {/if}
+            </div>
+            <div>
+                {#if $exportBlackList.length === 0}
+                    <div>
+                        {tomatoI18n.黑名单为空可在文档树中右键添加}
+                    </div>
+                {:else}
+                    {#each $exportBlackList as item, index}
+                        <div>
+                            <button
+                                class="b3-button b3-button--text space"
+                                on:click={() => {
+                                    $exportBlackList.splice(index, 1);
+                                    $exportBlackList = $exportBlackList;
+                                }}
+                            >
+                                🗑️
+                            </button>
+                            {#await getHpath(item)}
+                                <span class="text">{item} 🚫</span>
+                            {:then v}
+                                <span class="text">{v} 🚫</span>
+                            {/await}
+                        </div>
+                    {/each}
+                {/if}
+            </div>
+            <div>
+                <input class="b3-text-field space" bind:value={$exportPath} />
+                {tomatoI18n.导出工作空间到此文件夹}
+            </div>
+            <div class:codeNotValid>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$exportIntervalSecOn}
+                />
+                {#if $exportIntervalSecOn}
+                    <input
+                        title={tomatoI18n.可以填写小数}
+                        class="b3-text-field space"
+                        bind:value={$exportIntervalSec}
+                    />
+                    {tomatoI18n.每x秒执行一次增量导出($exportIntervalSec)}
+                {:else}
+                    {tomatoI18n.每x秒执行一次增量导出("0")}
+                {/if}
+                <TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+            <div class:codeNotValid>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$exportCleanFilesOn}
+                />
+                {#if $exportCleanFilesOn}
+                    <input
+                        title={tomatoI18n.可以填写小数}
+                        class="b3-text-field space"
+                        bind:value={$exportCleanFiles}
+                    />
+                    {tomatoI18n.每x分钟确保导出符合配置($exportCleanFiles)}
+                {:else}
+                    {tomatoI18n.每x分钟确保导出符合配置("0")}
+                {/if}
+                <TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+            <div>
+                <label class="space">
+                    <input
+                        type="checkbox"
+                        class="b3-switch"
+                        bind:checked={$markdownExportPics}
+                    />{tomatoI18n.导出图片}
+                </label>
+                <button
+                    class="b3-button b3-button--outline space"
+                    on:click={() => exportMd2Dir(true)}
+                    >{MarkdownExport全量导出.langText() +
+                        MarkdownExport全量导出.w()}
+                </button>
+                <button
+                    class="b3-button b3-button--outline space"
+                    on:click={() => exportMd2Dir()}
+                    >{MarkdownExport增量导出.langText() +
+                        MarkdownExport增量导出.w()}
+                </button>
+                <button
+                    class="b3-button b3-button--outline space"
+                    on:click={() => cleanExportedMds()}
+                    >{MarkdownExport确保导出符合配置.langText() +
+                        MarkdownExport确保导出符合配置.w()}
+                </button>
+            </div>
+        {/if}
+    </div>
     <!-- 状态栏番茄钟 -->
     <div class="settingBox">
         <div>
@@ -745,7 +1246,10 @@
             </div>
 
             <div>
-                <input class="b3-text-field" bind:value={$tomato_clocks_audio} />
+                <input
+                    class="b3-text-field"
+                    bind:value={$tomato_clocks_audio}
+                />
                 {tomatoI18n.时间到播放声音}
             </div>
 
@@ -1562,7 +2066,7 @@
         {/if}
         <div>
             <button
-                class="b3-button"
+                class="b3-button b3-button--outline"
                 on:click={() => {
                     siyuan.removeBrokenCards(tomatoI18n);
                 }}
@@ -1674,7 +2178,12 @@
                     class="b3-text-field"
                     bind:value={$cardPrioritySetPriInterval}
                 />
-                {tomatoI18n.间隔x分钟检查所有闪卡加上默认优先级}
+                {tomatoI18n.间隔x分钟检查所有闪卡加上默认优先级(
+                    $cardPrioritySetPriInterval,
+                )}
+                {#if !$cardPrioritySetPriInterval || $cardPrioritySetPriInterval == "0"}
+                    （{tomatoI18n.不扫描优先级}）
+                {/if}
             </div>
         {/if}
     </div>
@@ -2128,7 +2637,9 @@
             </div>
         {/if}
         <div>
-            <button class="b3-button" on:click={() => cleanDataview()}
+            <button
+                class="b3-button b3-button--outline"
+                on:click={() => cleanDataview()}
                 >🗑️
             </button>{tomatoI18n.删除失效的数据库}
         </div>
@@ -2563,7 +3074,9 @@
     </div>
     <!-- save -->
     <div class="settingBox">
-        <button class="b3-button" on:click={save}>{tomatoI18n.保存}</button>
+        <button class="b3-button b3-button--outline" on:click={save}
+            >{tomatoI18n.保存}</button
+        >
     </div>
 </div>
 
@@ -2583,6 +3096,9 @@
     }
     .space {
         margin-right: 10px;
+    }
+    .spacetop {
+        margin-top: 5px;
     }
     .settingBox {
         margin: 10px;

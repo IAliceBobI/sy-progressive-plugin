@@ -4,10 +4,10 @@ import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { events, EventType } from "./libs/Events";
 import { getAttribute, getID, isEditor, siyuan } from "./libs/utils";
 import { murmurHash3 } from "./libs/hash";
-import { setGlobal } from "./libs/globalUtils";
 import { winHotkey } from "./libs/winHotkey";
 import { tomatoI18n } from "./tomatoI18n";
 import { lastVerifyResult, verifyKeyTomato } from "./libs/user";
+import { setGlobal } from "stonev5-utils";
 
 export const MindWire启用或禁用思维导线 = winHotkey("ctrl+alt+enter", "MindWire global 2025-5-25 00:00:02", "🌍🧠", () => tomatoI18n.启用或禁用全局思维导线, false, mindWireGlobalMenu)
 export const MindWire启用或禁用文档思维导线 = winHotkey("ctrl+shift+z", "MindWire doc 2025-5-25 00:00:02", "📜🧠", () => tomatoI18n.启用或禁用文档思维导线, false, mindWireDocMenu)
@@ -104,13 +104,11 @@ class MindWire {
             }
         });
 
-        const handle = setInterval(() => {
+        clearInterval(setGlobal("mind wire", setInterval(() => {
             if (getAllEditor().length == 0) {
                 cleanWire();
             }
-        }, 2000);
-        const old = setGlobal("mind wire", handle)
-        clearInterval(old);
+        }, 2000)));
     }
 }
 

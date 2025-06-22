@@ -21,6 +21,7 @@ import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveVie
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+import { newID } from "stonev5-utils/lib/id";
 
 export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK 2025-5-12 21:37:37", "⚙️", () => tomatoI18n.渐进学习的设置)
 export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn 2025-5-13 13:32:20", "📖", () => tomatoI18n.开始学习)
@@ -356,7 +357,7 @@ class Progressive {
     }
 
     private async addProgressiveReadingDialog(bookID: string, bookName: string, boxID: string) {
-        const id = utils.newID();
+        const id = newID();
         let addBook: AddBook;
         const dialog = new Dialog({
             title: this.plugin.i18n.addProgressiveReading,
@@ -816,7 +817,7 @@ class Progressive {
     }
 
     async viewAllProgressiveBooks() {
-        const id = utils.newID();
+        const id = newID();
         let s: ShowAllBooks;
         const dialog = new Dialog({
             title: this.plugin.i18n.viewAllProgressiveBooks,

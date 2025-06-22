@@ -1,5 +1,5 @@
 import { Dialog, IEventBusMap, IProtyle, Lute, Plugin, Protyle } from "siyuan";
-import { isEditor, newID, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
+import { isEditor, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
 import DigestProgressive from "./DigestProgressive.svelte";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
@@ -12,6 +12,7 @@ import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
 import { addCustomButton } from "../../sy-tomato-plugin/src/exportFiles";
 import { prog } from "./Progressive";
+import { newID } from "stonev5-utils/lib/id";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)

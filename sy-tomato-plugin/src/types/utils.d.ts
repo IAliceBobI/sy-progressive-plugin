@@ -15,6 +15,18 @@ type Overlay = { left: number, top: number, width: number, height: number, angle
 type TSK = keyof TomatoSettings
 
 type TomatoSettings = {
+    floatingballEnable: boolean,
+    floatingballDocList: FloatingDocItem[],
+    floatingballKeyboardList: FloatingKeyboardItem[],
+    exportWhiteList: string[],
+    exportBlackList: string[],
+    exportCleanFilesOn: boolean,
+    exportIntervalSecOn: boolean,
+    markdownExportPics: boolean,
+    markdownExportBoxCheckbox: boolean,
+    exportIntervalSec: string,
+    exportCleanFiles: string,
+    exportPath: string,
     tomato_clocks_audio: string,
     foldTypes: string[],
     foldTypesNODE_HEADING: boolean,
@@ -287,6 +299,10 @@ type AttrType = {
     style?: string,
     md?: string,// for 'Writing' plugin
     content?: string,// for 'Writing' plugin
+    href?: string,
+    src?: string,
+    "data-src"?: string,
+    "data-href"?: string,
     "data-inline-comment"?: string,
     "custom-tomato-key-comment"?: string,
     "custom-tomato-comment"?: string,
@@ -595,3 +611,21 @@ type ClubeColumn = {
     new?: boolean;
 }
 
+type FloatingDocItem = {
+    enableMobile?: boolean;
+    enable?: boolean;
+    docName?: string;
+    docID?: string;
+    docIcon?: string;
+    openDocType?: number;
+}
+
+type FloatingKeyboardItem = {
+    enableMobile?: boolean;
+    enable?: boolean;
+    keyIcon?: string;
+    key?: string;
+    altKey?: boolean;
+    shiftKey?: boolean;
+    ctrlKey?: boolean;
+}

@@ -1,193 +1,262 @@
 import { TomatoI18nABC } from "./libs/text1";
 
 export class TomatoI18n extends TomatoI18nABC {
-    public get 间隔x分钟检查所有闪卡加上默认优先级() {
+    public get 悬浮球() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "每多少分钟，扫描所有闪卡，补上默认优先级，0为不扫描";
-            case "es_ES": return "Cada cuántos minutos, escanear todas las tarjetas flash y añadir prioridad predeterminada (0 para desactivar)";
-            case "fr_FR": return "Toutes les X minutes, scanner toutes les cartes mémoire et ajouter la priorité par défaut (0 pour désactiver)";
-            case "ja_JP": return "何分ごとにすべてのフラッシュカードをスキャンし、デフォルトの優先度を追加するか（0でスキャンしない）";
-            case "zh_CHT": return "每多少分鐘，掃描所有閃卡，補上默認優先級，0為不掃描";
-            case "it_IT": return "Ogni quanti minuti, scansiona tutte le flashcard e aggiungi la priorità predefinita (0 per disabilitare)";
-            case "de_DE": return "Alle X Minuten alle Karteikarten scannen und Standardpriorität hinzufügen (0 deaktiviert)";
-            case "he_IL": return "כל כמה דקות, סרוק את כל הכרטיסיות והוסף עדיפות ברירת מחדל (0 כדי לכבות)";
-            case "ru_RU": return "Каждые сколько минут сканировать все карточки и добавлять приоритет по умолчанию (0 для отключения)";
-            case "pl_PL": return "Co ile minut skanować wszystkie fiszki i dodawać domyślny priorytet (0 aby wyłączyć)";
+            case "zh_CN": return "悬浮球";
+            case "es_ES": return "Bola flotante";
+            case "fr_FR": return "Boule flottante";
+            case "ja_JP": return "フローティングボール";
+            case "zh_CHT": return "懸浮球";
+            case "it_IT": return "Sfera fluttuante";
+            case "de_DE": return "Schwebende Kugel";
+            case "he_IL": return "כדור צף";
+            case "ru_RU": return "Плавающий шар";
+            case "pl_PL": return "Pływająca kula";
             case "en_US":
-            default: return "Scan all flashcards and add default priority every X minutes (0 to disable)";
+            default: return "Floating ball";
         }
     }
-
-    public get 打开批注页签() {
+    public get 使用小窗打开() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "打开批注页签";
-            case "es_ES": return "Abrir pestaña de anotaciones";
-            case "fr_FR": return "Ouvrir l'onglet d'annotation";
-            case "ja_JP": return "注釈タブを開く";
-            case "zh_CHT": return "打開批註頁籤";
-            case "it_IT": return "Apri scheda annotazioni";
-            case "de_DE": return "Annotationen-Tab öffnen";
-            case "he_IL": return "פתח את לשונית ההערות";
-            case "ru_RU": return "Открыть вкладку аннотаций";
-            case "pl_PL": return "Otwórz zakładkę adnotacji";
+            case "zh_CN": return "使用小窗打开";
+            case "es_ES": return "Abrir en ventana pequeña";
+            case "fr_FR": return "Ouvrir dans une petite fenêtre";
+            case "ja_JP": return "小さいウィンドウで開く";
+            case "zh_CHT": return "使用小窗打開";
+            case "it_IT": return "Apri in finestra piccola";
+            case "de_DE": return "Im kleinen Fenster öffnen";
+            case "he_IL": return "פתח בחלון קטן";
+            case "ru_RU": return "Открыть в маленьком окне";
+            case "pl_PL": return "Otwórz w małym oknie";
             case "en_US":
-            default: return "Open annotation tab";
+            default: return "Open in small window";
         }
     }
-
-    public get 所有原文都加引用() {
+    public get 图标() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "所有原文都加引用";
-            case "es_ES": return "Añadir cita a todos los textos originales";
-            case "fr_FR": return "Ajouter une citation à tous les textes originaux";
-            case "ja_JP": return "すべての原文に引用を追加";
-            case "zh_CHT": return "所有原文都加引用";
-            case "it_IT": return "Aggiungi citazione a tutti i testi originali";
-            case "de_DE": return "Zitat zu allen Originaltexten hinzufügen";
-            case "he_IL": return "הוסף ציטוט לכל הטקסטים המקוריים";
-            case "ru_RU": return "Добавить цитирование ко всем исходным текстам";
-            case "pl_PL": return "Dodaj cytat do wszystkich oryginalnych tekstów";
+            case "zh_CN": return "图标";
+            case "es_ES": return "Icono";
+            case "fr_FR": return "Icône";
+            case "ja_JP": return "アイコン";
+            case "zh_CHT": return "圖標";
+            case "it_IT": return "Icona";
+            case "de_DE": return "Symbol";
+            case "he_IL": return "סמל";
+            case "ru_RU": return "Иконка";
+            case "pl_PL": return "Ikona";
             case "en_US":
-            default: return "Add citation to all original texts";
+            default: return "Icon";
         }
     }
-
-    public get 块折叠助手() {
+    public get 文档名() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "块折叠助手";
-            case "es_ES": return "Asistente de plegado de bloques";
-            case "fr_FR": return "Assistant de repliement de blocs";
-            case "ja_JP": return "ブロック折りたたみヘルパー";
-            case "zh_CHT": return "塊折疊助手";
-            case "it_IT": return "Assistente piegatura blocchi";
-            case "de_DE": return "Block-Falt-Hilfe";
-            case "he_IL": return "עוזר קיפול בלוקים";
-            case "ru_RU": return "Помощник сворачивания блоков";
-            case "pl_PL": return "Pomocnik zwijania bloków";
+            case "zh_CN": return "文档名";
+            case "es_ES": return "Nombre del documento";
+            case "fr_FR": return "Nom du document";
+            case "ja_JP": return "ドキュメント名";
+            case "zh_CHT": return "文件名";
+            case "it_IT": return "Nome del documento";
+            case "de_DE": return "Dokumentenname";
+            case "he_IL": return "שם מסמך";
+            case "ru_RU": return "Имя документа";
+            case "pl_PL": return "Nazwa dokumentu";
             case "en_US":
-            default: return "Block folding helper";
+            default: return "Document name";
         }
     }
-
-    public get 超级块() {
+    public get 快捷键() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "超级块";
-            case "es_ES": return "Super bloque";
-            case "fr_FR": return "Super bloc";
-            case "ja_JP": return "スーパーブロック";
-            case "zh_CHT": return "超級塊";
-            case "it_IT": return "Super blocco";
-            case "de_DE": return "Super-Block";
-            case "he_IL": return "בלוק על";
-            case "ru_RU": return "Супер блок";
-            case "pl_PL": return "Super blok";
+            case "zh_CN": return "快捷键";
+            case "es_ES": return "Atajo de teclado";
+            case "fr_FR": return "Raccourci clavier";
+            case "ja_JP": return "ショートカットキー";
+            case "zh_CHT": return "快捷鍵";
+            case "it_IT": return "Tasto di scelta rapida";
+            case "de_DE": return "Tastenkürzel";
+            case "he_IL": return "קיצור מקשים";
+            case "ru_RU": return "Горячая клавиша";
+            case "pl_PL": return "Skrót klawiszowy";
             case "en_US":
-            default: return "Super block";
+            default: return "Shortcut key";
         }
     }
-
-    public get 表格() {
+    public get 找不到文档() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "表格";
-            case "es_ES": return "Tabla";
-            case "fr_FR": return "Tableau";
-            case "ja_JP": return "表";
-            case "zh_CHT": return "表格";
-            case "it_IT": return "Tabella";
-            case "de_DE": return "Tabelle";
-            case "he_IL": return "טבלה";
-            case "ru_RU": return "Таблица";
-            case "pl_PL": return "Tabela";
+            case "zh_CN": return "找不到文档";
+            case "es_ES": return "No se encontró el documento";
+            case "fr_FR": return "Document introuvable";
+            case "ja_JP": return "ドキュメントが見つかりません";
+            case "zh_CHT": return "找不到文件";
+            case "it_IT": return "Documento non trovato";
+            case "de_DE": return "Dokument nicht gefunden";
+            case "he_IL": return "המסמך לא נמצא";
+            case "ru_RU": return "Документ не найден";
+            case "pl_PL": return "Nie znaleziono dokumentu";
             case "en_US":
-            default: return "Table";
+            default: return "Document not found";
         }
     }
-
-    public get 列表块() {
+    public get 绑定文档到悬浮按钮() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "列表块";
-            case "es_ES": return "Bloque de lista";
-            case "fr_FR": return "Bloc de liste";
-            case "ja_JP": return "リストブロック";
-            case "zh_CHT": return "列表塊";
-            case "it_IT": return "Blocco elenco";
-            case "de_DE": return "Listenblock";
-            case "he_IL": return "בלוק רשימה";
-            case "ru_RU": return "Блок списка";
-            case "pl_PL": return "Blok listy";
+            case "zh_CN": return "绑定文档到悬浮按钮";
+            case "es_ES": return "Vincular documento al botón flotante";
+            case "fr_FR": return "Lier le document au bouton flottant";
+            case "ja_JP": return "ドキュメントをフローティングボタンにバインド";
+            case "zh_CHT": return "綁定文件到懸浮按鈕";
+            case "it_IT": return "Associa documento al pulsante flottante";
+            case "de_DE": return "Dokument an Schwebeschaltfläche binden";
+            case "he_IL": return "קשר מסמך לכפתור הצף";
+            case "ru_RU": return "Привязать документ к плавающей кнопке";
+            case "pl_PL": return "Powiąż dokument z przyciskiem pływającym";
             case "en_US":
-            default: return "List block";
+            default: return "Bind document to floating button";
         }
     }
-
-    public get 引述块() {
+    public get 绑定快捷键到悬浮按钮() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "引述块";
-            case "es_ES": return "Bloque de cita";
-            case "fr_FR": return "Bloc de citation";
-            case "ja_JP": return "引用ブロック";
-            case "zh_CHT": return "引述塊";
-            case "it_IT": return "Blocco citazione";
-            case "de_DE": return "Zitatblock";
-            case "he_IL": return "בלוק ציטוט";
-            case "ru_RU": return "Блок цитирования";
-            case "pl_PL": return "Blok cytatu";
+            case "zh_CN": return "绑定快捷键到悬浮按钮";
+            case "es_ES": return "Vincular atajo al botón flotante";
+            case "fr_FR": return "Lier le raccourci au bouton flottant";
+            case "ja_JP": return "ショートカットキーをフローティングボタンにバインド";
+            case "zh_CHT": return "綁定快捷鍵到懸浮按鈕";
+            case "it_IT": return "Associa scorciatoia al pulsante flottante";
+            case "de_DE": return "Tastenkürzel an Schwebeschaltfläche binden";
+            case "he_IL": return "קשר קיצור מקשים לכפתור הצף";
+            case "ru_RU": return "Привязать горячую клавишу к плавающей кнопке";
+            case "pl_PL": return "Powiąż skrót z przyciskiem pływającym";
             case "en_US":
-            default: return "Quote block";
+            default: return "Bind shortcut key to floating button";
         }
     }
-
-    public get 在块的右上角显示折叠图标() {
+    public get 键() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "在块的右上角显示折叠图标";
-            case "es_ES": return "Mostrar el icono de plegar en la esquina superior derecha del bloque";
-            case "fr_FR": return "Afficher l'icône de réduction dans le coin supérieur droit du bloc";
-            case "ja_JP": return "ブロックの右上に折りたたみアイコンを表示";
-            case "zh_CHT": return "在區塊的右上角顯示折疊圖示";
-            case "it_IT": return "Mostra l'icona di compressione nell'angolo in alto a destra del blocco";
-            case "de_DE": return "Minimieren-Symbol in der oberen rechten Ecke des Blocks anzeigen";
-            case "he_IL": return "הצג את סמל הקיפול בפינה הימנית העליונה של הבלוק";
-            case "ru_RU": return "Показать значок сворачивания в правом верхнем углу блока";
-            case "pl_PL": return "Pokaż ikonę zwijania w prawym górnym rogu bloku";
+            case "zh_CN": return "键";
+            case "es_ES": return "Tecla";
+            case "fr_FR": return "Touche";
+            case "ja_JP": return "キー";
+            case "zh_CHT": return "鍵";
+            case "it_IT": return "Tasto";
+            case "de_DE": return "Taste";
+            case "he_IL": return "מקש";
+            case "ru_RU": return "Клавиша";
+            case "pl_PL": return "Klawisz";
             case "en_US":
-            default: return "Show collapse icon at the top right corner of the block";
+            default: return "Key";
         }
     }
-
-    public get 标题() {
+    public get 桌面端() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "标题";
-            case "es_ES": return "Título";
-            case "fr_FR": return "Titre";
-            case "ja_JP": return "タイトル";
-            case "zh_CHT": return "標題";
-            case "it_IT": return "Titolo";
-            case "de_DE": return "Titel";
-            case "he_IL": return "כותרת";
-            case "ru_RU": return "Заголовок";
-            case "pl_PL": return "Tytuł";
+            case "zh_CN": return "桌面端";
+            case "es_ES": return "Escritorio";
+            case "fr_FR": return "Bureau";
+            case "ja_JP": return "デスクトップ";
+            case "zh_CHT": return "桌面端";
+            case "it_IT": return "Desktop";
+            case "de_DE": return "Desktop";
+            case "he_IL": return "שולחן עבודה";
+            case "ru_RU": return "Десктоп";
+            case "pl_PL": return "Pulpit";
             case "en_US":
-            default: return "Title";
+            default: return "Desktop";
         }
     }
-
-    public get 时间到播放声音() {
+    public get 移动端() {
         switch (this.conf.appearance.lang) {
-            case "zh_CN": return "时间到播放声音（可以是网络url或者本地路径c:\\abc.mp3）";
-            case "es_ES": return "Reproducir sonido cuando termine el tiempo (puede ser una URL o una ruta local como c:\\abc.mp3)";
-            case "fr_FR": return "Jouer un son à la fin du temps (peut être une URL ou un chemin local comme c:\\abc.mp3)";
-            case "ja_JP": return "時間になったら音を再生（URLまたはローカルパスc:\\abc.mp3が使用可能）";
-            case "zh_CHT": return "時間到播放聲音（可以是網路url或本地路徑c:\\abc.mp3）";
-            case "it_IT": return "Riproduci suono allo scadere del tempo (può essere un URL o un percorso locale come c:\\abc.mp3)";
-            case "de_DE": return "Ton abspielen, wenn die Zeit abgelaufen ist (kann eine URL oder ein lokaler Pfad wie c:\\abc.mp3 sein)";
-            case "he_IL": return "נגן צליל כאשר הזמן נגמר (יכול להיות כתובת URL או נתיב מקומי כמו c:\\abc.mp3)";
-            case "ru_RU": return "Воспроизвести звук по окончании времени (может быть URL или локальный путь, например c:\\abc.mp3)";
-            case "pl_PL": return "Odtwórz dźwięk po upływie czasu (może to być adres URL lub lokalna ścieżka, np. c:\\abc.mp3)";
+            case "zh_CN": return "移动端";
+            case "es_ES": return "Móvil";
+            case "fr_FR": return "Mobile";
+            case "ja_JP": return "モバイル";
+            case "zh_CHT": return "移動端";
+            case "it_IT": return "Mobile";
+            case "de_DE": return "Mobil";
+            case "he_IL": return "נייד";
+            case "ru_RU": return "Мобильный";
+            case "pl_PL": return "Mobilny";
             case "en_US":
-            default: return "Play sound when time is up (can be a URL or local path like c:\\abc.mp3)";
+            default: return "Mobile";
         }
     }
-
+    public get 特殊绑定当天日志() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "特殊：绑定当天日志";
+            case "es_ES": return "Especial: vincular el registro del día";
+            case "fr_FR": return "Spécial : lier le journal du jour";
+            case "ja_JP": return "特別：当日のログをバインド";
+            case "zh_CHT": return "特殊：綁定當天日誌";
+            case "it_IT": return "Speciale: associa il registro del giorno";
+            case "de_DE": return "Speziell: Tagesprotokoll binden";
+            case "he_IL": return "מיוחד: קישור יומן היום";
+            case "ru_RU": return "Особое: привязать журнал за день";
+            case "pl_PL": return "Specjalne: powiąż dziennik dnia";
+            case "en_US":
+            default: return "Special: bind today's log";
+        }
+    }
+    public 非VIP上限为x个(x: number, unit: string) {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return `非VIP上限为${x}个${unit}`;
+            case "es_ES": return `El límite para no VIP es de ${x} ${unit}`;
+            case "fr_FR": return `La limite pour les non VIP est de ${x} ${unit}`;
+            case "ja_JP": return `非VIPの上限は${x}${unit}です`;
+            case "zh_CHT": return `非VIP上限為${x}個${unit}`;
+            case "it_IT": return `Il limite per i non VIP è di ${x} ${unit}`;
+            case "de_DE": return `Das Limit für Nicht-VIPs beträgt ${x} ${unit}`;
+            case "he_IL": return `המגבלה ללא VIP היא ${x} ${unit}`;
+            case "ru_RU": return `Лимит для не-VIP составляет ${x} ${unit}`;
+            case "pl_PL": return `Limit dla nie-VIP to ${x} ${unit}`;
+            case "en_US":
+            default: return `Non-VIP limit is ${x} ${unit}`;
+        }
+    }
+    public get 文档正引说明() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "展示当前文档中所有正引内容";
+            case "es_ES": return "Mostrar todo el contenido citado positivamente en el documento actual";
+            case "fr_FR": return "Afficher tout le contenu cité positivement dans le document actuel";
+            case "ja_JP": return "現在のドキュメント内のすべての正引用内容を表示";
+            case "zh_CHT": return "展示當前文件中所有正引內容";
+            case "it_IT": return "Mostra tutti i contenuti citati positivamente nel documento corrente";
+            case "de_DE": return "Alle positiv zitierten Inhalte im aktuellen Dokument anzeigen";
+            case "he_IL": return "הצג את כל התוכן המצוטט באופן חיובי במסמך הנוכחי";
+            case "ru_RU": return "Показать все положительно цитируемое содержимое в текущем документе";
+            case "pl_PL": return "Pokaż całą pozytywnie cytowaną treść w bieżącym dokumencie";
+            case "en_US":
+            default: return "Show all positively cited content in the current document";
+        }
+    }
+    public get 在当前文档中定位() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "在当前文档中定位";
+            case "es_ES": return "Localizar en el documento actual";
+            case "fr_FR": return "Localiser dans le document actuel";
+            case "ja_JP": return "現在のドキュメントで位置を特定";
+            case "zh_CHT": return "在當前文件中定位";
+            case "it_IT": return "Individua nel documento corrente";
+            case "de_DE": return "Im aktuellen Dokument lokalisieren";
+            case "he_IL": return "אתר במסמך הנוכחי";
+            case "ru_RU": return "Найти в текущем документе";
+            case "pl_PL": return "Zlokalizuj w bieżącym dokumencie";
+            case "en_US":
+            default: return "Locate in current document";
+        }
+    }
+    public get vip功能() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "VIP功能";
+            case "es_ES": return "Función VIP";
+            case "fr_FR": return "Fonction VIP";
+            case "ja_JP": return "VIP機能";
+            case "zh_CHT": return "VIP功能";
+            case "it_IT": return "Funzione VIP";
+            case "de_DE": return "VIP-Funktion";
+            case "he_IL": return "פונקציית VIP";
+            case "ru_RU": return "Функция VIP";
+            case "pl_PL": return "Funkcja VIP";
+            case "en_US":
+            default: return "VIP feature";
+        }
+    }
     public get aaa() {
         // tyepscript: 翻译为各国语言。写入case的return中。
         // 不要改属性名字，不要添加其他代码，不要改错，就改当前代码片段。en_US与default返回语言一致。

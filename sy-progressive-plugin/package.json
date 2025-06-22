@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@types/uuid": "^9.0.8",
+    "stonev5-utils": "*",
     "uuid": "^9.0.1"
   }
 }

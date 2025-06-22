@@ -26,6 +26,10 @@ export const DocAttrShowKey = "tomato-virtual-doc-attr"
 export const DATA_AV_ID = "data-av-id"
 export const TOMATO_ATTR_BAR = "tomato_attr_bar"
 export const COMMENT_SUPERBLOCK_FOLD = "custom-comment-superblock-fold"
+export const TomatoPluginInstance = "TomatoPluginInstance 2025-06-14 16:33:26"
+export const TomatoPluginConfig = "TomatoPluginConfig 2025-06-22 09:33:00"
+export const ProgressivePluginInstance = "ProgressivePluginInstance 2025-06-14 16:33:21"
+export const ProgressivePluginConfig = "ProgressivePluginConfig 2025-06-22 09:33:04"
 
 export const settingStyle = (txt: string) => {
     return `<span style="color:var(--b3-font-color11)">${txt}</span>`;
@@ -74,6 +78,11 @@ export const BlockTypeNoContent: readonly string[] = [
 // 	"NodeLinkDest": "link_dest",
 // 	"NodeTextMark": "textmark",
 // }
+
+export const FloatingBallNotVIPLimit = 3;
+export const FloatingBallDocType_tab = { txt: "页签tab", id: 1 };
+export const FloatingBallDocType_dialog = { txt: "对话框dialog", id: 2 };
+export const FloatingBallDocType_float = { txt: "悬浮窗float", id: 3 };
 
 export enum BlockNodeEnum {
     DATA_HREF = "data-href",

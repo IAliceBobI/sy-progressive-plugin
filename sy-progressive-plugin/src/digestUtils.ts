@@ -12,6 +12,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { getDailyPath } from "./FlashBox";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
+import { zipNways } from "../../sy-tomato-plugin/src/libs/functional";
 
 async function addPlusLnk(selected: HTMLElement[], digestID: string, lute: Lute) {
     const div = selected[selected.length - 1];
@@ -210,6 +211,16 @@ export class DigestBuilder {
             const lnk = `${line.join(" -> ")}\n{: id="${NewNodeID()}"}\n{: id="${NewNodeID()}"}`;
             return { lnk, id: list[0]["custom-pdigest-last-id"] };
         });
+
+        await siyuan.getRows(lines.map(l => l.id), "id,ial", true, [`ial like "%custom-progref%"`], true)
+            .then(rows => {
+                for (const [row, line] of zipNways(rows, lines)) {
+                    const attr = parseIAL(row?.ial)
+                    if (attr["custom-progref"]) {
+                        line.id = attr["custom-progref"]
+                    }
+                }
+            });
 
         const extContents = (await taskContents).map(c => {
             const list = [];

@@ -1,6 +1,6 @@
 import { adaptHotkey, Custom, Dialog, Dock, IProtyle, openTab, openWindow } from "siyuan";
 import { events, EventType } from "./libs/Events";
-import { add_ref, convertMinutesToTimeFormat, doubleSupRows, isMainWin, newID, NewNodeID, setTimeouts, siyuan, sleep, timeUtil, } from "./libs/utils";
+import { add_ref, convertMinutesToTimeFormat, doubleSupRows, isMainWin, NewNodeID, setTimeouts, siyuan, sleep, timeUtil, } from "./libs/utils";
 import NoteBoxSvelte from "./NoteBox.svelte";
 import { TOMATO_IDEA_QUEUE } from "./libs/gconst";
 import { DestroyManager } from "./libs/destroyer";
@@ -12,6 +12,7 @@ import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { verifyKeyTomato } from "./libs/user";
 import { DomSuperBlockBuilder, domNewLine } from "./libs/sydom";
 import { winHotkey } from "./libs/winHotkey";
+import { newID } from "stonev5-utils/lib/id";
 
 const DOCK_TYPE = "dock_NoteBox";
 const TAB_TYPE = "custom_tab_NoteBox";
@@ -301,14 +302,14 @@ class NoteBox {
         });
     }
 
-    private async showInDialog() {
+    async showInDialog() {
         const dm = new DestroyManager();
         const id = newID();
         const dialog = new Dialog({
             title: tomatoI18n.拍照闪念,
             content: `<div id="${id}"></div>`,
             width: events.isMobile ? "90vw" : "500px",
-            height: events.isMobile ? "100vw" : "500px",
+            height: events.isMobile ? "150vw" : "500px",
             destroyCallback: () => {
                 dm.destroyBy("1")
             },

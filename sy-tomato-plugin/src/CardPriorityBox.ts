@@ -15,7 +15,7 @@ export const CardPriorityBox分散推迟闪卡 = winHotkey("⌘⇧8", "delay all
 export const CardPriorityBox推迟闪卡 = winHotkey("⌘F9", "delay all cards 2025-5-10 12:31:04")
 export const CardPriority恢复所有暂停的闪卡 = winHotkey("⇧⌥Y", "resume all cards 2025-5-10 12:31:04")
 import { winHotkey } from "./libs/winHotkey";
-import { setGlobal } from "./libs/globalUtils";
+import { setGlobal } from "stonev5-utils";
 
 class CardPriorityBox {
     plugin: BaseTomatoPlugin;
@@ -67,13 +67,11 @@ class CardPriorityBox {
         this.plugin = plugin;
         this.beforeReview = new Map();
 
-        const interval = parseInt(cardPrioritySetPriInterval.get())
+        const interval = parseFloat(cardPrioritySetPriInterval.get())
         if (interval > 0) {
-            const h = setInterval(() => {
+            clearInterval(setGlobal("scanCard2addPriority 2025-6-7 00:03:48", setInterval(() => {
                 this.scanCard2addPriority();
-            }, interval * 60 * 1000);
-            const old = setGlobal("scanCard2addPriority 2025-6-7 00:03:48", h)
-            clearInterval(old);
+            }, interval * 60 * 1000)));
         }
 
         const cardPrioritySet = async () => {

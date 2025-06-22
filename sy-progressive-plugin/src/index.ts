@@ -7,7 +7,7 @@ import { pieceMovingBox } from "./PieceMovingBox";
 import { pieceSummaryBox } from "./PieceSummaryBox";
 import { writingCompareBox } from "./WritingCompareBox";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
-import { getPluginSpec, isObject, newID, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
+import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, btnCleanOriginText, btnDelCard, btnDeleteBack, btnDeleteExit, btnDeleteNext, btnFullfilContent, btnIgnoreBook, btnNext, btnNextBook, btnOpenFlashcardTab, btnPrevious, btnSaveCard, btnSplitByPunctuations, btnSplitByPunctuationsList, btnSplitByPunctuationsListCheck, btnStop, btnViewContents, cardAppendTime, cardUnderPiece, digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, doubleClick2DigestDesktop, doubleClick2DigestMobile, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, getAllPieceNotesEnable, hideBtnsInFlashCard, hideVIP, makeCardEnable, makeCardHereEnable, markOriginText, markOriginTextBG, merg2newBookEnable, multilineMarkEnable, openCardsOnOpenPiece, PieceMovingDown, PieceMovingUp, pieceNoBacktraceLink, piecesmenu, PieceSummaryBoxmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, send2compareNoteEnable, send2dailyCardEnable, send2dailyCardNoRefEnable, send2exctract2bottomEnable, send2exctractNoteEnable, send2removeNoteColor, summary2dailynote, userID, userToken, windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
@@ -15,7 +15,9 @@ import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlug
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import Settings from "./Settings.svelte"
 import { resetKey, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { setGlobal } from "../../sy-tomato-plugin/src/libs/globalUtils";
+import { newID } from "stonev5-utils/lib/id";
+import { ProgressivePluginConfig, ProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gconst";
+import { setGlobal } from "stonev5-utils";
 
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
@@ -108,22 +110,22 @@ export default class ThePlugin extends BaseTomatoPlugin {
 
             this.global.prog_zZmqus5PtYRi.pluginConfig = this.settingCfg;
             loadStore(this);
+            setGlobal(ProgressivePluginConfig, this.settingCfg)
             return this.settingCfg;
         });
+        setGlobal(ProgressivePluginInstance, this)
         tryFixCfg(this.name, STORAGE_Prog_SETTINGS);
     }
 
     async onLayoutReady() {
         await this.taskCfg;
 
-        const handle = setInterval(() => {
+        clearInterval(setGlobal("prog index", setInterval(() => {
             const id = Siyuan?.user?.userId;
             if (id && userID.get() !== id) {
                 userID.write(id);
             }
-        }, 2000);
-        const old = setGlobal("prog index", handle)
-        clearInterval(old);
+        }, 2000)));
 
         if (userID.get()) {
             resetKey();
@@ -159,6 +161,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             const save = document.createElement("button") as HTMLButtonElement;
             save.setAttribute('onclick', 'globalThis.tomato_zZmqus5PtYRi.save()')
             save.classList.add("b3-button")
+            save.classList.add("b3-button--outline")
             save.textContent = tomatoI18n.保存并退出;
 
             const div = document.createElement("div") as HTMLDivElement;
