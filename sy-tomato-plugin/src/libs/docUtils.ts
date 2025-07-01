@@ -727,7 +727,7 @@ export function calcWords(content: string) {
     return count;
 }
 
-export async function getDocTracer() {
+export async function getDocTracer(): Promise<DocTracer> {
     function get() {
         return (globalThis as unknown as TomatoGlobal).tomato_zZmqus5PtYRi_doc_tracer;
     }
@@ -752,6 +752,9 @@ export class DocTracer {
     private timestamp = "";
     private docMap: Map<string, Block> = new Map(); // id->block
     private contentMap: DefaultMap<string, Set<string>> = new DefaultMap(() => new Set()); // content->ids
+    getDocMap(): ReadonlyMap<string, Block> {
+        return this.docMap as ReadonlyMap<string, Block>;
+    }
     match(text: string) {
         const matched = new Map<string, Block>()
         text = text?.trim()?.toLocaleLowerCase();
@@ -804,19 +807,26 @@ export class DocTracer {
             b.titles.forEach(c => this.contentMap.get(c).add(b.id))
         }
     }
+    async tryGetDocs(docID: string) {
+        const rows = await siyuan.sql(`select * from blocks where type='d' and id="${docID}"`)
+        this.update(rows);
+    }
+    private async update(rows: Block[], updateTime = false) {
+        rows.forEach(row => {
+            if (updateTime && row.updated > this.timestamp) {
+                this.timestamp = row.updated;
+            }
+            row.attrs = parseIAL(row.ial)
+            delete row.attrs["title-img"];
+            this.docMap.set(row.id, row);
+            this.setBlock(row);
+        });
+    }
     private async getDocs() {
         await navigator.locks.request("DocTracer 2024-12-1 23:48:00", async (lock) => {
             if (lock) {
-                const rows = await siyuan.sql(`select * from blocks where type='d' and updated>'${this.timestamp}' limit 99999999999`)
-                rows.forEach(row => {
-                    if (row.updated > this.timestamp) {
-                        this.timestamp = row.updated;
-                    }
-                    row.attrs = parseIAL(row.ial)
-                    delete row.attrs["title-img"];
-                    this.docMap.set(row.id, row);
-                    this.setBlock(row);
-                });
+                const rows = await siyuan.sql(`select * from blocks where type='d' and updated>'${this.timestamp}' limit 999999999`)
+                this.update(rows, true);
             }
         });
     }
@@ -840,7 +850,7 @@ export class DocTracer {
             }
             switch (detail.cmd) {
                 case "removeDoc":
-                    detail.data?.ids?.forEach(id => this.docMap.delete(id))
+                    detail.data?.ids?.forEach(id => this.removeDoc(id))
                     break;
                 case "create":
                     setTimeout(() => {
@@ -858,6 +868,9 @@ export class DocTracer {
                     break;
             }
         });
+    }
+    removeDoc(id: string) {
+        return this.docMap.delete(id);
     }
 }
 

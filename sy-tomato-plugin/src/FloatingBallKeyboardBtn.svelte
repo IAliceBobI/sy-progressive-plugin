@@ -72,7 +72,9 @@
 </script>
 
 <div class="floating-button" bind:this={div}>
-    {SPACE}
+    {#if events.isMobile}
+        {SPACE.repeat(2)}
+    {/if}
     <button
         on:mousedown={(event) => {
             btnHelper.handleMouseDown(event);
@@ -85,7 +87,9 @@
     >
         {shortcut.keyIcon}
     </button>
-    {SPACE}
+    {#if events.isMobile}
+        {SPACE.repeat(2)}
+    {/if}
 </div>
 
 <style>

@@ -273,6 +273,134 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Unbind floating ball from document";
         }
     }
+    public get 创建闪卡时添加所有虚拟引用到第一行() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "创建闪卡时，添加所有虚拟引用，到第一行";
+            case "es_ES": return "Al crear una tarjeta, añade todas las referencias virtuales a la primera línea";
+            case "fr_FR": return "Lors de la création d'une carte, ajoutez toutes les références virtuelles à la première ligne";
+            case "ja_JP": return "フラッシュカード作成時、すべての仮想参照を最初の行に追加します";
+            case "zh_CHT": return "建立閃卡時，將所有虛擬引用添加到第一行";
+            case "it_IT": return "Quando crei una flashcard, aggiungi tutti i riferimenti virtuali alla prima riga";
+            case "de_DE": return "Beim Erstellen einer Karte alle virtuellen Verweise in die erste Zeile einfügen";
+            case "he_IL": return "בעת יצירת כרטיס פלאש, הוסף את כל ההפניות הווירטואליות לשורה הראשונה";
+            case "ru_RU": return "При создании карточки добавьте все виртуальные ссылки в первую строку";
+            case "pl_PL": return "Podczas tworzenia fiszki dodaj wszystkie wirtualne odnośniki do pierwszego wiersza";
+            case "en_US":
+            default: return "When creating a flashcard, add all virtual references to the first line";
+        }
+    }
+    public get 移动内容到dailynote后原文改为链接() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "移动内容到 dailynote 后，原文改为链接";
+            case "es_ES": return "Después de mover el contenido a dailynote, el texto original se convierte en un enlace";
+            case "fr_FR": return "Après avoir déplacé le contenu vers dailynote, le texte original devient un lien";
+            case "ja_JP": return "内容をdailynoteに移動した後、元のテキストはリンクに変更されます";
+            case "zh_CHT": return "移動內容到 dailynote 後，原文改為連結";
+            case "it_IT": return "Dopo aver spostato il contenuto su dailynote, il testo originale viene trasformato in un link";
+            case "de_DE": return "Nach dem Verschieben des Inhalts zu dailynote wird der Originaltext zu einem Link";
+            case "he_IL": return "לאחר העברת התוכן ל-dailynote, הטקסט המקורי הופך לקישור";
+            case "ru_RU": return "После перемещения содержимого в dailynote исходный текст становится ссылкой";
+            case "pl_PL": return "Po przeniesieniu treści do dailynote oryginalny tekst zostaje zamieniony na link";
+            case "en_US":
+            default: return "After moving content to dailynote, the original text becomes a link";
+        }
+    }
+    public get 前缀文档树() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "前缀文档树";
+            case "es_ES": return "Árbol de documentos de prefijo";
+            case "fr_FR": return "Arbre de documents préfixés";
+            case "ja_JP": return "プレフィックスドキュメントツリー";
+            case "zh_CHT": return "前綴文件樹";
+            case "it_IT": return "Albero dei documenti prefisso";
+            case "de_DE": return "Präfix-Dokumentbaum";
+            case "he_IL": return "עץ מסמכים עם קידומת";
+            case "ru_RU": return "Дерево документов с префиксом";
+            case "pl_PL": return "Drzewo dokumentów z prefiksem";
+            case "en_US":
+            default: return "Prefix document tree";
+        }
+    }
+    public get 阅读点保存到指定文档() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "阅读点保存到指定文档";
+            case "es_ES": return "Guardar punto de lectura en el documento especificado";
+            case "fr_FR": return "Enregistrer le point de lecture dans le document spécifié";
+            case "ja_JP": return "読書ポイントを指定したドキュメントに保存";
+            case "zh_CHT": return "閱讀點保存到指定文件";
+            case "it_IT": return "Salva il punto di lettura nel documento specificato";
+            case "de_DE": return "Lesepunkt im angegebenen Dokument speichern";
+            case "he_IL": return "שמור נקודת קריאה במסמך שצוין";
+            case "ru_RU": return "Сохранить точку чтения в указанном документе";
+            case "pl_PL": return "Zapisz punkt czytania w wybranym dokumencie";
+            case "en_US":
+            default: return "Save reading point to specified document";
+        }
+    }
+    public get 文档数量() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "文档数量";
+            case "es_ES": return "Cantidad de documentos";
+            case "fr_FR": return "Nombre de documents";
+            case "ja_JP": return "ドキュメント数";
+            case "zh_CHT": return "文件數量";
+            case "it_IT": return "Numero di documenti";
+            case "de_DE": return "Anzahl der Dokumente";
+            case "he_IL": return "כמות מסמכים";
+            case "ru_RU": return "Количество документов";
+            case "pl_PL": return "Liczba dokumentów";
+            case "en_US":
+            default: return "Document count";
+        }
+    }
+    public get 最大列出的文件数量() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "最大列出的文件数量";
+            case "es_ES": return "Cantidad máxima de archivos listados";
+            case "fr_FR": return "Nombre maximal de fichiers listés";
+            case "ja_JP": return "一覧表示されるファイルの最大数";
+            case "zh_CHT": return "最大列出的檔案數量";
+            case "it_IT": return "Numero massimo di file elencati";
+            case "de_DE": return "Maximal aufgelistete Dateianzahl";
+            case "he_IL": return "המספר המרבי של קבצים שמוצגים";
+            case "ru_RU": return "Максимальное количество перечисленных файлов";
+            case "pl_PL": return "Maksymalna liczba wyświetlanych plików";
+            case "en_US":
+            default: return "Maximum number of listed files";
+        }
+    }
+    public get 使用当前文档名字的前缀() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "使用当前文档名字的前缀";
+            case "es_ES": return "Usar el prefijo del nombre del documento actual";
+            case "fr_FR": return "Utiliser le préfixe du nom du document actuel";
+            case "ja_JP": return "現在のドキュメント名のプレフィックスを使用";
+            case "zh_CHT": return "使用當前文件名字的前綴";
+            case "it_IT": return "Usa il prefisso del nome del documento corrente";
+            case "de_DE": return "Präfix des aktuellen Dokumentnamens verwenden";
+            case "he_IL": return "השתמש בקידומת שם המסמך הנוכחי";
+            case "ru_RU": return "Использовать префикс имени текущего документа";
+            case "pl_PL": return "Użyj prefiksu nazwy bieżącego dokumentu";
+            case "en_US":
+            default: return "Use the prefix of the current document name";
+        }
+    }
+    public get 把批注保存在子文档否则保存在日记中() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "把批注保存在子文档，否则保存在日记中";
+            case "es_ES": return "Guarda las anotaciones en el subdocumento, de lo contrario en el diario";
+            case "fr_FR": return "Enregistrez les annotations dans le sous-document, sinon dans le journal";
+            case "ja_JP": return "注釈はサブドキュメントに保存し、そうでなければ日記に保存します";
+            case "zh_CHT": return "將批註保存在子文件，否則保存在日誌中";
+            case "it_IT": return "Salva le annotazioni nel sottodocumento, altrimenti nel diario";
+            case "de_DE": return "Speichere Anmerkungen im Unterdokument, sonst im Tagebuch";
+            case "he_IL": return "שמור הערות במסמך המשנה, אחרת ביומן";
+            case "ru_RU": return "Сохраняйте аннотации в поддокументе, иначе в дневнике";
+            case "pl_PL": return "Zapisz adnotacje w poddokumencie, w przeciwnym razie w dzienniku";
+            case "en_US":
+            default: return "Save annotations in the subdocument, otherwise in the journal";
+        }
+    }
     public get aaa() {
         // tyepscript: 翻译为各国语言。写入case的return中。
         // 不要改属性名字，不要添加其他代码，不要改错，就改当前代码片段。en_US与default返回语言一致。

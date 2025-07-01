@@ -67,6 +67,7 @@
         noteBoxAllKinds,
         noteBoxCheckbox,
         readingAdd2Card,
+        readingAdd2DocName,
         readingPointBoxCheckbox,
         readingPointWithEnv,
         readingSaveFile,
@@ -183,6 +184,12 @@
         floatingballDocList,
         floatingballKeyboardList,
         floatingballDocMenu,
+        prefixArticlesEnable,
+        prefixArticlesMenu,
+        dailyNoteMoveLeaveLnk,
+        prefixArticlesSoftLimit,
+        fastNoteBoxDocPrefix,
+        commentBoxSaveUnderDoc,
     } from "./libs/stores";
     import { STORAGE_SETTINGS } from "./constants";
     import { tomatoI18n } from "./tomatoI18n";
@@ -285,6 +292,7 @@
     import { ScheduleCopyID } from "./Schedule";
     import {
         BlockNodeEnum,
+        FloatingBallDocType_autoclose,
         FloatingBallDocType_dialog,
         FloatingBallDocType_float,
         FloatingBallDocType_tab,
@@ -318,6 +326,7 @@
     import { events } from "./libs/Events";
     import { shortcut2string } from "./libs/keyboard";
     import { FloatingBall添加文档, linkDoc2floatBall } from "./FloatingBall";
+    import { PrefixArticles前缀文档树 } from "./PrefixArticles";
     export let dm: DestroyManager;
     export let plugin: BaseTomatoPlugin;
     let addDocSettings: HTMLElement;
@@ -359,8 +368,12 @@
             searchSettings(settingsDiv, searchKey);
         }
         searchInput.focus();
-        addDocSettings.style.display = "none";
-        addShortcutSettings.style.display = "none";
+        if (addDocSettings?.style?.display) {
+            addDocSettings.style.display = "none";
+        }
+        if (addShortcutSettings?.style?.display) {
+            addShortcutSettings.style.display = "none";
+        }
     });
 
     async function active() {
@@ -393,6 +406,9 @@
                 break;
             case FloatingBallDocType_dialog.id:
                 docTypeStr = FloatingBallDocType_dialog.txt;
+                break;
+            case FloatingBallDocType_autoclose.id:
+                docTypeStr = FloatingBallDocType_autoclose.txt;
                 break;
             case FloatingBallDocType_float.id:
                 docTypeStr = FloatingBallDocType_float.txt;
@@ -788,6 +804,43 @@
             </label>
         </div>
     </div>
+    <!-- 前缀文档树 -->
+    <div class="settingBox">
+        <div>
+            <input
+                type="checkbox"
+                class="b3-switch"
+                bind:checked={$prefixArticlesEnable}
+            />
+            {tomatoI18n.前缀文档树}
+            <strong>
+                <a
+                    href="https://awx9773btw.feishu.cn/docx/WD3Nd8WCxozzE4xXIJucpFBPn9a?from=from_copylink"
+                >
+                    {tomatoI18n.帮助}</a
+                >
+            </strong>
+        </div>
+        {#if $prefixArticlesEnable}
+            <div>{tomatoI18n.menu不显示菜单不影响快捷键的使用}</div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$prefixArticlesMenu}
+                />
+                {tomatoI18n.menu添加右键菜单}: {PrefixArticles前缀文档树.langText()}
+                <strong>{PrefixArticles前缀文档树.w()}</strong>
+            </div>
+            <div>
+                <input
+                    class="b3-text-field"
+                    bind:value={$prefixArticlesSoftLimit}
+                />
+                {tomatoI18n.最大列出的文件数量}
+            </div>
+        {/if}
+    </div>
     <!-- 悬浮球 -->
     <div class="settingBox">
         <div>
@@ -911,7 +964,7 @@
                 </button>
             </div>
             <!-- 绑定文档配置 -->
-            <div bind:this={addDocSettings}>
+            <div bind:this={addDocSettings} style="display: none;">
                 <div class="spacetop">
                     <input
                         placeholder={addDoc_docName}
@@ -948,6 +1001,15 @@
                         <input
                             type="radio"
                             name="addDoc_openType"
+                            value={FloatingBallDocType_autoclose.id}
+                            bind:group={addDoc_useDialog}
+                        />
+                        {FloatingBallDocType_autoclose.txt}
+                    </label>
+                    <label class="space">
+                        <input
+                            type="radio"
+                            name="addDoc_openType"
                             value={FloatingBallDocType_float.id}
                             bind:group={addDoc_useDialog}
                         />
@@ -976,7 +1038,7 @@
                 </button>
             </div>
             <!-- 绑定快捷键配置 -->
-            <div bind:this={addShortcutSettings}>
+            <div bind:this={addShortcutSettings} style="display: none;">
                 <div class="spacetop">
                     <input
                         placeholder={addDoc_keyboardpreview}
@@ -1400,6 +1462,14 @@
                     bind:checked={$commentBoxAddUnderline}
                 />
                 {tomatoI18n.批注添加下划线}
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$commentBoxSaveUnderDoc}
+                />
+                {tomatoI18n.把批注保存在子文档否则保存在日记中}
             </div>
             <div>
                 <input
@@ -1954,6 +2024,11 @@
                 />
                 {tomatoI18n.阅读点加入闪卡}
             </div>
+
+            <div>
+                <input class="b3-text-field" bind:value={$readingAdd2DocName} />
+                {tomatoI18n.阅读点保存到指定文档}
+            </div>
         {/if}
     </div>
     <!-- 复制为图片 -->
@@ -2026,15 +2101,13 @@
                     >{CardBox用选中的行创建超级块超级块制卡取消制卡.w()}</strong
                 >
             </div>
-            <div class:codeNotValid>
+            <div>
                 <input
-                    disabled={codeNotValid}
-                    class:codeNotValid
                     type="checkbox"
                     class="b3-switch"
                     bind:checked={$cardBoxAddConcepts}
                 />
-                {tomatoI18n.创建超级块时添加相关匹配到的引用}<TomatoVIP
+                {tomatoI18n.创建闪卡时添加所有虚拟引用到第一行}<TomatoVIP
                     {codeValid}
                 ></TomatoVIP>
             </div>
@@ -2437,6 +2510,14 @@
                 />
                 {tomatoI18n.menu添加右键菜单}： {DailyNoteBox移动内容到dailynote.langText()}
                 <strong>{DailyNoteBox移动内容到dailynote.w()}</strong>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$dailyNoteMoveLeaveLnk}
+                />
+                {tomatoI18n.移动内容到dailynote后原文改为链接}
             </div>
             <div class:codeNotValid>
                 <input
@@ -3055,6 +3136,15 @@
                 />
                 {tomatoI18n.删除所选段落}
                 <TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$fastNoteBoxDocPrefix}
+                />
+                {tomatoI18n.使用当前文档名字的前缀}
             </div>
         {/if}
     </div>

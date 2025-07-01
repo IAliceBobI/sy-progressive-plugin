@@ -1,5 +1,4 @@
 import { confirm, ICardData, IEventBusMap, Protyle } from "siyuan";
-import "./index.scss";
 import { getAttribute, getID, isValidNumber, siyuan, stringToNumber, timeUtil, versionGreaterEqual, } from "./libs/utils";
 import { CARD_PRIORITY_STOP, CUSTOM_RIFF_DECKS, TOMATO_CONTROL_ELEMENT } from "./libs/gconst";
 import { DialogText } from "./libs/DialogText";
@@ -28,7 +27,7 @@ class CardPriorityBox {
     }
 
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
-        if (!this.plugin) return;
+        if (!cardPriorityBoxCheckbox.get()) return;
         const cards = detail?.blockElements?.filter(e => getAttribute(e, "custom-riff-decks"))
         if (cards?.length > 0) {
             detail.menu.addItem({

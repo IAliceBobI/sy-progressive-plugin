@@ -1,5 +1,4 @@
 import { getTomatoPluginInstance, siyuan, } from "./libs/utils";
-import "./index.scss";
 import { events } from "./libs/Events";
 import { DATA_NODE_ID } from "./libs/gconst";
 import { findListTypeByElement } from "./libs/listUtils";
@@ -38,7 +37,7 @@ class Schedule {
         //             // 示例：每分钟的第30秒执行
         //             const cron = '30 * * * * *';
         //             const nextTimestamps = getNextCronTimestamps(prompt, 2);
-        //             console.log(nextTimestamps.map(t => timeUtil.getYYYYMMDDHHmmss(t)));
+        //             console.11(nextTimestamps.map(t => timeUtil.getYYYYMMDDHHmmss(t)));
         //         });
         //     }
         // });

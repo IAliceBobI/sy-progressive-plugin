@@ -167,7 +167,7 @@ class CommentBox {
     }
 
     blockIconEvent(detail: any) {
-        if (!this.plugin) return;
+        if (!commentBoxCheckbox.get()) return;
         if (commentBoxMenu.get()) {
             const protyle: IProtyle = detail.protyle;
             detail.menu.addItem({

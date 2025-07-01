@@ -6,6 +6,7 @@
     import ProtyleSv4Dialog from "./libs/ProtyleSv4Dialog.svelte";
     import { ClickHelper } from "./libs/ClickHelper";
     import {
+        FloatingBallDocType_autoclose,
         FloatingBallDocType_dialog,
         FloatingBallDocType_tab,
         SPACE,
@@ -14,14 +15,22 @@
     import { newID } from "stonev5-utils/lib/id";
     import { events } from "./libs/Events";
     import { OpenSyFile2 } from "./libs/docUtils";
-    import { closeTab, siyuan, getTomatoPluginInstance } from "./libs/utils";
+    import {
+        closeTab,
+        siyuan,
+        getTomatoPluginInstance,
+        getNotebookFirstOne,
+    } from "./libs/utils";
     import { dialog2floating } from "./libs/DialogText";
     import {
         getFloatingBallDocBtn,
         getFloatingBallProtyle,
     } from "./FloatingBall";
     import { tomatoI18n } from "./tomatoI18n";
-    import { floatingballDocList } from "./libs/stores";
+    import {
+        floatingballDocList,
+        storeNoteBox_selectedNotebook,
+    } from "./libs/stores";
 
     export let dm: DestroyManager;
     export let key: string;
@@ -38,7 +47,19 @@
     export async function toggleOpen(_event: MouseEvent) {
         item.docID = "";
         if (item.docName === "$$dailynote") {
-            item.docID = (await siyuan.createDailyNote(events.boxID)).id;
+            if (storeNoteBox_selectedNotebook.get()) {
+                item.docID = (
+                    await siyuan.createDailyNote(
+                        storeNoteBox_selectedNotebook.get(),
+                    )
+                ).id;
+            } else {
+                item.docID = (
+                    await siyuan.createDailyNote(
+                        getNotebookFirstOne()?.id ?? events.boxID,
+                    )
+                ).id;
+            }
         }
         if (events.isMobile) {
             if (dialog != null) {
@@ -73,6 +94,14 @@
                         openByDialog();
                     }
                     break;
+                case FloatingBallDocType_autoclose.id:
+                    if (dialog != null) {
+                        dialog.destroy();
+                        dialog = null;
+                    } else {
+                        openByDialog(true);
+                    }
+                    break;
                 default:
                     getFloatingBallProtyle(item);
                     item.openOnCreate = true;
@@ -85,7 +114,7 @@
         }
     }
 
-    function openByDialog() {
+    function openByDialog(autoclose = false) {
         const dm = new DestroyManager();
         const id = newID();
         dialog = new Dialog({
@@ -97,10 +126,10 @@
                 dm.destroyBy();
             },
             transparent: true,
-            disableClose: events.isMobile ? false : true,
+            disableClose: events.isMobile || autoclose ? false : true,
             hideCloseIcon: false,
         });
-        if (!events.isMobile) {
+        if (!events.isMobile && !autoclose) {
             dialog2floating(dialog, ballHelper.getPosition());
             dialog.element.style.zIndex = "10";
         }

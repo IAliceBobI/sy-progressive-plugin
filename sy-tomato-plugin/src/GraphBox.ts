@@ -17,13 +17,12 @@ const DOCK_TYPE = "dock_GraphBox"
 const TAB_TYPE = "custom_tab_GraphBox"
 
 export const GraphBox定位到图中的节点 = winHotkey("⌘⌥E", "graphLocateNode2024-11-5 08:29:27", "", () => tomatoI18n.定位到图中的节点)
-export const GraphBox打开块关系图 = winHotkey("⇧⌥E", "graphLocateNode open 2024-12-16 14:56:28", "", () => tomatoI18n.打开块关系图)
+export const GraphBox打开块关系图 = winHotkey("⇧⌥E", "graphLocateNode open 2024-12-16 14:56:28", "iconGraphTomato", () => tomatoI18n.打开块关系图)
 
 class GraphBox {
     plugin: BaseTomatoPlugin;
     private customTab: () => Custom;
     private dock: Dock;
-
     onload(plugin: BaseTomatoPlugin) {
         if (plugin.initCfg()) {
             this._onload(plugin)
@@ -103,7 +102,7 @@ class GraphBox {
     }
 
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
-        if (!this.plugin) return;
+        if (!graphBoxCheckbox.get()) return;
         this.locateNodeMenu(detail as any);
     }
 
