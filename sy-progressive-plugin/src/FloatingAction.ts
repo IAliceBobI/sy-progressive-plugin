@@ -1,7 +1,8 @@
 import { Plugin } from "siyuan";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-import FloatingButton from "./FloatingButton.svelte"
+import FloatingButtonSvelte from "./FloatingButton.svelte"
 import { FloatingBall } from "../../sy-tomato-plugin/src/FloatingBall";
+import { mount } from "svelte";
 
 const address = "progressive menu";
 
@@ -16,7 +17,7 @@ export function createFloatingBtn(plugin: Plugin, settings: TomatoSettings) {
     } else {
         const dm = FloatingBall.newProgFloatingDm(address);
         new FloatingBall(address, dm, (target) => {
-            return new FloatingButton({
+            return mount(FloatingButtonSvelte, {
                 target,
                 props: {
                     plugin,

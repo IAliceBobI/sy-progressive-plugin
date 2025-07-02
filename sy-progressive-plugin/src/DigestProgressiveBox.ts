@@ -1,6 +1,6 @@
 import { Dialog, IEventBusMap, IProtyle, Lute, Plugin, Protyle } from "siyuan";
 import { isEditor, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
-import DigestProgressive from "./DigestProgressive.svelte";
+import DigestProgressiveSvelte from "./DigestProgressive.svelte";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -13,6 +13,7 @@ import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
 import { addCustomButton } from "../../sy-tomato-plugin/src/exportFiles";
 import { prog } from "./Progressive";
 import { newID } from "stonev5-utils/lib/id";
+import { mount } from "svelte";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)
@@ -192,7 +193,7 @@ class DigestProgressiveBox {
             },
             transparent: true,
         });
-        const d = new DigestProgressive({
+        const d = mount(DigestProgressiveSvelte, {
             target: dialog.element.querySelector("#" + id),
             props: {
                 dm,
@@ -202,7 +203,7 @@ class DigestProgressiveBox {
             }
         });
         dm.add("1", () => dialog.destroy())
-        dm.add("2", () => d.$destroy())
+        dm.add("2", () => d.destroy())
         dm.add("3", () => digestProgressiveBox.digestCallback = null)
         dm.add("4", () => this.dialogOpened = false)
     }

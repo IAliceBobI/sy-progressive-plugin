@@ -110,6 +110,10 @@
     } from "./Progressive";
     import { searchSettings } from "../../sy-tomato-plugin/src/libs/ui";
 
+    export function destroy() {
+        dm.destroyBy("2");
+        localStorage.setItem(SearchKeyItemKey, searchKey);
+    }
     export let dm: DestroyManager;
     export let plugin: BaseTomatoPlugin;
     let settingsDiv: HTMLElement;
@@ -121,10 +125,7 @@
     const SearchKeyItemKey =
         "progressive_settings_SearchKeyItemKey_RfrUm9VLS4GehTzg5ygRrNT";
 
-    onDestroy(() => {
-        dm.destroyBy("2");
-        localStorage.setItem(SearchKeyItemKey, searchKey);
-    });
+    onDestroy(destroy);
 
     onMount(async () => {
         plugin.global.tomato_zZmqus5PtYRi.save = save;
@@ -176,7 +177,7 @@
                     bind:value={$userToken}
                     placeholder="1656000000123_22000101_ldID_siyuanTomatoCode_3044022018c8d8bca......"
                     spellcheck="false"
-                />
+                ></textarea>
             </label>
             <button class="b3-button b3-button--outline" on:click={active}>
                 {tomatoI18n.激活}
@@ -809,7 +810,9 @@
     </div>
 
     <div class="settingBox">
-        <button class="b3-button b3-button--outline" on:click={save}>{tomatoI18n.保存}</button>
+        <button class="b3-button b3-button--outline" on:click={save}
+            >{tomatoI18n.保存}</button
+        >
     </div>
 </div>
 

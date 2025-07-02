@@ -10,12 +10,17 @@
     import { MarkBookKey } from "../../sy-tomato-plugin/src/libs/gconst";
     import { getDocBlocks } from "../../sy-tomato-plugin/src/libs/docUtils";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+    import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 
     export let bookID: string;
     export let bookName: string;
     export let boxID: string;
     export let dialog: Dialog;
     export let plugin: Plugin;
+    export let dm: DestroyManager;
+    export function destroy() {
+        dm.destroyBy();
+    }
 
     boxID;
     plugin;

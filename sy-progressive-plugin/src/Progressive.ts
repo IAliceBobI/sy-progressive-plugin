@@ -11,8 +11,8 @@ import {
     PARAGRAPH_INDEX, PROG_ORIGIN_TEXT, PROG_PIECE_PREVIOUS, RefIDKey
 } from "../../sy-tomato-plugin/src/libs/gconst";
 import { SplitSentence } from "./SplitSentence";
-import AddBook from "./AddBook.svelte";
-import ShowAllBooks from "./ShowAllBooks.svelte";
+import AddBookSvelte from "./AddBook.svelte";
+import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { Storage } from "./Storage";
 import { HtmlCBType } from "./constants";
 import { getDocBlocks, isMultiLineElement, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
@@ -22,6 +22,8 @@ import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { newID } from "stonev5-utils/lib/id";
+import { mount } from "svelte";
+import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 
 export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK 2025-5-12 21:37:37", "⚙️", () => tomatoI18n.渐进学习的设置)
 export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn 2025-5-13 13:32:20", "📖", () => tomatoI18n.开始学习)
@@ -358,23 +360,24 @@ class Progressive {
 
     private async addProgressiveReadingDialog(bookID: string, bookName: string, boxID: string) {
         const id = newID();
-        let addBook: AddBook;
+        const dm = new DestroyManager()
         const dialog = new Dialog({
             title: this.plugin.i18n.addProgressiveReading,
             content: `<div class="b3-dialog__content" id="${id}"></div>`,
             width: events.isMobile ? "90vw" : "700px",
             height: events.isMobile ? "180vw" : null,
             destroyCallback() {
-                addBook?.$destroy();
-                addBook = undefined;
+                dm.destroyBy()
             },
         });
-        addBook = new AddBook({
+        const addBook = mount(AddBookSvelte, {
             target: dialog.element.querySelector("#" + id),
             props: {
-                bookID, bookName, boxID, dialog, plugin: this.plugin,
+                bookID, bookName, boxID, dialog, plugin: this.plugin, dm,
             }
         });
+        dm.add("svelte", () => addBook.destroy())
+        dm.add("dialog", () => dialog.destroy())
     }
 
     async readThisPiece(blockID?: string) {
@@ -818,23 +821,25 @@ class Progressive {
 
     async viewAllProgressiveBooks() {
         const id = newID();
-        let s: ShowAllBooks;
+        const dm = new DestroyManager();
         const dialog = new Dialog({
             title: this.plugin.i18n.viewAllProgressiveBooks,
             content: `<div class="b3-dialog__content" id='${id}'></div>`,
             width: events.isMobile ? "90vw" : "700px",
             height: events.isMobile ? "180vw" : "800px",
             destroyCallback: () => {
-                s?.$destroy();
-                s = undefined;
+                dm.destroyBy();
             }
         });
-        s = new ShowAllBooks({
+        const s = mount(ShowAllBooksSvelte, {
             target: dialog.element.querySelector("#" + id),
             props: {
                 dialog,
+                dm,
             }
         });
+        dm.add("dialog", () => dialog.destroy())
+        dm.add("svelte", () => s.destroy())
     }
 }
 

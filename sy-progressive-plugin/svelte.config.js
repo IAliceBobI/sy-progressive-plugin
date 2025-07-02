@@ -1,4 +1,4 @@
-import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 const NoWarns = new Set([
   "a11y-click-events-have-key-events",
@@ -6,8 +6,8 @@ const NoWarns = new Set([
   "a11y-no-noninteractive-element-interactions"
 ]);
 
-export default {
-  // Consult https://svelte.dev/docs#compile-time-svelte-preprocess
+const config = {
+  // Consult https://svelte.dev/docs/kit/integrations
   // for more information about preprocessors
   preprocess: vitePreprocess(),
   onwarn: (warning, handler) => {
@@ -16,3 +16,5 @@ export default {
     handler(warning);
   }
 };
+
+export default config;

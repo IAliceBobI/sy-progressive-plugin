@@ -13,11 +13,12 @@ import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, btnCleanOriginText, btnDel
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-import Settings from "./Settings.svelte"
+import SettingsSvelte from "./Settings.svelte"
 import { resetKey, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { newID } from "stonev5-utils/lib/id";
 import { ProgressivePluginConfig, ProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gconst";
 import { setGlobal } from "stonev5-utils";
+import { mount } from "svelte";
 
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
@@ -189,7 +190,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             },
             hideCloseIcon: true,
         });
-        const d = new Settings({
+        const d = mount(SettingsSvelte, {
             target: dialog.element.querySelector("#" + id),
             props: {
                 plugin: this,
@@ -197,7 +198,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             }
         });
         dm.add("1", () => { dialog.destroy() })
-        dm.add("2", () => { d.$destroy() })
+        dm.add("2", () => { d.destroy() })
     }
 
     onload() {

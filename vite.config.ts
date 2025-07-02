@@ -4,7 +4,6 @@ import minimist from "minimist";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import livereload from "rollup-plugin-livereload";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import zipPack from "vite-plugin-zip-pack";
 import fg from "fast-glob";
 
 const args = minimist(process.argv.slice(2));
@@ -13,7 +12,7 @@ const isWatch = args.watch || args.w || false;
 // const distDir = isWatch ? devDistDir : "./dist";
 // console.info("isWatch=>", isWatch);
 // console.info("distDir=>", distDir);
-const devDistDir = process.env.SYPLUGINDIR + "/sy-progressive-plugin";
+const devDistDir = process.env.SYPLUGINDIR ? process.env.SYPLUGINDIR + "/sy-progressive-plugin" : "build";
 const distDir = devDistDir;
 
 export default defineConfig({
@@ -71,7 +70,7 @@ export default defineConfig({
     // 设置为 false 可以禁用最小化混淆
     // 或是用来指定是应用哪种混淆器
     // boolean | 'terser' | 'esbuild'
-    minify: isWatch ? false : "esbuild", // "terser",
+    minify: isWatch ? false : "esbuild",
 
     lib: {
       // Could also be a dictionary or array of multiple entry points

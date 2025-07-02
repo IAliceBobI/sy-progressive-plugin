@@ -160,7 +160,7 @@
 
     onDestroy(destroy);
 
-    function destroy() {
+    export function destroy() {
         dm?.destroyBy("2");
     }
 

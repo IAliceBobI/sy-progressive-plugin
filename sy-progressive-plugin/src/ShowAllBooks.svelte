@@ -4,6 +4,7 @@
     import { chunks, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { prog } from "./Progressive";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+    import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 
     type TaskType = {
         bookID: string;
@@ -15,6 +16,10 @@
     const MAXBOOKNAME = 10;
 
     export let dialog: Dialog;
+    export let dm: DestroyManager;
+    export function destroy() {
+        dm.destroyBy();
+    }
 
     let books: TaskType[];
 
@@ -45,7 +50,7 @@
         });
     }
 
-    onDestroy(async () => {});
+    onDestroy(destroy);
 
     async function btnStartToLearn(bookID: string) {
         await prog.startToLearnWithLock(bookID);
