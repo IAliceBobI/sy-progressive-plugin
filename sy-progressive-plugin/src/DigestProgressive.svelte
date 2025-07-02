@@ -25,22 +25,32 @@
     import { getProgFloatingDm } from "./FloatingAction";
     import { ClickHelper } from "../../sy-tomato-plugin/src/libs/ClickHelper";
 
-    export let protyle: IProtyle = null;
-    export let dm: DestroyManager = null;
-    export let isFloating: boolean = false;
-    export let settings: TomatoSettings;
-    export let plugin: Plugin;
+    interface Props {
+        protyle?: IProtyle;
+        dm?: DestroyManager;
+        isFloating?: boolean;
+        settings: TomatoSettings;
+        plugin: Plugin;
+    }
 
-    let tableTools: HTMLElement;
-    let tableSelect: HTMLElement;
-    let di: DigestBuilder;
-    let word = new WordBuilder(settings);
-    let selectionMl: SelectionML;
-    let cardMode = "2";
-    let seletedText = "";
-    let firstID = "";
-    let anchorID = "";
-    let selectedInfo: ReturnType<typeof events.selectedDivsSync> = null;
+    let {
+        protyle = $bindable(null),
+        dm = null,
+        isFloating = false,
+        settings,
+        plugin
+    }: Props = $props();
+
+    let tableTools: HTMLElement = $state();
+    let tableSelect: HTMLElement = $state();
+    let di: DigestBuilder = $state();
+    let word = $state(new WordBuilder(settings));
+    let selectionMl: SelectionML = $state();
+    let cardMode = $state("2");
+    let seletedText = $state("");
+    let firstID = $state("");
+    let anchorID = $state("");
+    let selectedInfo: ReturnType<typeof events.selectedDivsSync> = $state(null);
     let btnHelper = new ClickHelper();
 
     function hideFlationBtn() {
@@ -204,10 +214,10 @@
         <tr>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, () => {
                             selectionMl?.selectUp();
                         });
@@ -219,10 +229,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, () => {
                             selectionMl?.selectDown();
                         });
@@ -234,10 +244,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, () => {
                             selectionMl?.cancelLast();
                         });
@@ -251,10 +261,10 @@
         <tr>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             await di.digest();
@@ -268,10 +278,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             if (protyle) {
                                 const id = await addFlashCard(
@@ -292,10 +302,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, () => {
                             hideTr();
                         });
@@ -307,10 +317,10 @@
             {#if isFloating}
                 <td>
                     <button
-                        on:mousedown={(event) => {
+                        onmousedown={(event) => {
                             btnHelper.handleMouseDown(event);
                         }}
-                        on:mouseup={(event) => {
+                        onmouseup={(event) => {
                             btnHelper.handleMouseUp(event, () => {
                                 hideFlationBtn();
                             });
@@ -330,10 +340,10 @@
         <tr>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             await di.digest();
@@ -347,10 +357,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             await di.digest(true);
@@ -364,10 +374,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             await di.getDigestLnk();
@@ -381,10 +391,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, () => {
                             hideTr();
                         });
@@ -397,10 +407,10 @@
         <tr>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initWord();
                             destroy();
@@ -414,10 +424,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initWord();
                             destroy();
@@ -431,10 +441,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initWord();
                             destroy();
@@ -450,10 +460,10 @@
         <tr>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             await di.gotoDigest("<", "desc");
@@ -467,10 +477,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             await di.gotoDigest(">", "asc");
@@ -484,10 +494,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             await di.cleanDigest();
@@ -503,10 +513,10 @@
         <tr>
             <td colspan="2">
                 <select
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             di.cardMode = cardMode;
@@ -534,10 +544,10 @@
             </td>
             <td>
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initDigest();
                             if (di.ctime) {
@@ -559,10 +569,10 @@
         <tr>
             <td colspan="3">
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             let { md } = await getDigestMd(
@@ -587,10 +597,10 @@
                     class="b3-button b3-button--outline">✂👇</button
                 >
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             const { md } = await getDigestMd(
@@ -619,10 +629,10 @@
         <tr>
             <td colspan="3">
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             await splitParagph();
@@ -634,10 +644,10 @@
                     class="b3-button b3-button--outline">✂📄</button
                 >
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             await mergeParagph();
@@ -653,10 +663,10 @@
         <tr
             ><td colspan="3">
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             const { onePY, allPY } = pinyinAll(
@@ -675,10 +685,10 @@
                     class="b3-button b3-button--outline">pīn</button
                 >
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             openBrowser(seletedText);
@@ -690,10 +700,10 @@
                     class="b3-button b3-button--outline">🌐</button
                 >
                 <button
-                    on:mousedown={(event) => {
+                    onmousedown={(event) => {
                         btnHelper.handleMouseDown(event);
                     }}
-                    on:mouseup={(event) => {
+                    onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             window.open(

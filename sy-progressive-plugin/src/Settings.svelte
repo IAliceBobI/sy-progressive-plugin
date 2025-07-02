@@ -114,14 +114,18 @@
         dm.destroyBy("2");
         localStorage.setItem(SearchKeyItemKey, searchKey);
     }
-    export let dm: DestroyManager;
-    export let plugin: BaseTomatoPlugin;
-    let settingsDiv: HTMLElement;
-    let searchInput: HTMLElement;
-    let buyDIV: HTMLElement;
-    let searchKey = "";
-    let codeValid = false;
-    $: codeNotValid = !codeValid;
+    interface Props {
+        dm: DestroyManager;
+        plugin: BaseTomatoPlugin;
+    }
+
+    let { dm, plugin = $bindable() }: Props = $props();
+    let settingsDiv: HTMLElement = $state();
+    let searchInput: HTMLElement = $state();
+    let buyDIV: HTMLElement = $state();
+    let searchKey = $state("");
+    let codeValid = $state(false);
+    let codeNotValid = $derived(!codeValid);
     const SearchKeyItemKey =
         "progressive_settings_SearchKeyItemKey_RfrUm9VLS4GehTzg5ygRrNT";
 
@@ -179,12 +183,12 @@
                     spellcheck="false"
                 ></textarea>
             </label>
-            <button class="b3-button b3-button--outline" on:click={active}>
+            <button class="b3-button b3-button--outline" onclick={active}>
                 {tomatoI18n.激活}
             </button>
             <button
                 class="b3-button b3-button--outline"
-                on:click={() => {
+                onclick={() => {
                     if (buyDIV.style.display) buyDIV.style.display = "";
                     else buyDIV.style.display = "none";
                 }}
@@ -207,7 +211,7 @@
             class="b3-text-field"
             bind:this={searchInput}
             bind:value={searchKey}
-            on:input={() => searchSettings(settingsDiv, searchKey)}
+            oninput={() => searchSettings(settingsDiv, searchKey)}
         />
         {tomatoI18n.search搜索配置}
     </div>
@@ -810,7 +814,7 @@
     </div>
 
     <div class="settingBox">
-        <button class="b3-button b3-button--outline" on:click={save}
+        <button class="b3-button b3-button--outline" onclick={save}
             >{tomatoI18n.保存}</button
         >
     </div>

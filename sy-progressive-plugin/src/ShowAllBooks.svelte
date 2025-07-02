@@ -15,13 +15,17 @@
 
     const MAXBOOKNAME = 10;
 
-    export let dialog: Dialog;
-    export let dm: DestroyManager;
+    interface Props {
+        dialog: Dialog;
+        dm: DestroyManager;
+    }
+
+    let { dialog, dm }: Props = $props();
     export function destroy() {
         dm.destroyBy();
     }
 
-    let books: TaskType[];
+    let books: TaskType[] = $state();
 
     onMount(async () => {
         await loadBooks();
@@ -129,7 +133,7 @@
                         <input
                             type="checkbox"
                             bind:checked={book.bookInfo.ignored}
-                            on:click={() =>
+                            onclick={() =>
                                 prog.storage.setIgnoreBook(
                                     book.bookID,
                                     !book.bookInfo.ignored,
@@ -145,7 +149,7 @@
                         <input
                             type="checkbox"
                             bind:checked={book.bookInfo.autoCard}
-                            on:click={() =>
+                            onclick={() =>
                                 prog.storage.toggleAutoCard(book.bookID)}
                         />
                     </td>
@@ -158,7 +162,7 @@
                         <input
                             type="checkbox"
                             bind:checked={book.bookInfo.addIndex2paragraph}
-                            on:click={() =>
+                            onclick={() =>
                                 prog.storage.setAddingIndex2paragraph(
                                     book.bookID,
                                     !book.bookInfo.addIndex2paragraph,
@@ -174,7 +178,7 @@
                         <input
                             type="checkbox"
                             bind:checked={book.bookInfo.showLastBlock}
-                            on:click={() =>
+                            onclick={() =>
                                 prog.storage.setShowLastBlock(
                                     book.bookID,
                                     !book.bookInfo.showLastBlock,
@@ -190,7 +194,7 @@
                         <input
                             type="checkbox"
                             bind:checked={book.bookInfo.autoSplitSentenceP}
-                            on:click={() =>
+                            onclick={() =>
                                 prog.storage.setAutoSplitSentence(
                                     book.bookID,
                                     !book.bookInfo.autoSplitSentenceP,
@@ -207,7 +211,7 @@
                         <input
                             type="checkbox"
                             bind:checked={book.bookInfo.autoSplitSentenceT}
-                            on:click={() =>
+                            onclick={() =>
                                 prog.storage.setAutoSplitSentence(
                                     book.bookID,
                                     !book.bookInfo.autoSplitSentenceT,
@@ -224,7 +228,7 @@
                         <input
                             type="checkbox"
                             bind:checked={book.bookInfo.autoSplitSentenceI}
-                            on:click={() =>
+                            onclick={() =>
                                 prog.storage.setAutoSplitSentence(
                                     book.bookID,
                                     !book.bookInfo.autoSplitSentenceI,
@@ -237,7 +241,7 @@
                         <button
                             title="《{book.row.content}》"
                             class="prog-style__button"
-                            on:click={() => btnStartToLearn(book.bookID)}
+                            onclick={() => btnStartToLearn(book.bookID)}
                             >📖</button
                         >
                     </td>
@@ -245,7 +249,7 @@
                         <button
                             title="{tomatoI18n.重新分片}《{book.row.content}》"
                             class="prog-style__button"
-                            on:click={() =>
+                            onclick={() =>
                                 btnAddProgressiveReadingWithLock(book.bookID)}
                             >🍕</button
                         >
@@ -255,7 +259,7 @@
                             title="{tomatoI18n.删除}《{book.row
                                 .content}》（{tomatoI18n.不删除已经产生的分片等文件}）"
                             class="prog-style__button"
-                            on:click={() =>
+                            onclick={() =>
                                 btnConfirm(book.bookID, book.row.content)}
                             >🗑️</button
                         >

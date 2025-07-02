@@ -418,7 +418,7 @@ export async function getHierarchyConcepts(docName: string) {
 function hierarchyArr(text: string) {
     const set = new Set<string>();
     if (text) {
-        const pathList = text.split("|").map(i => i.trim()).filter(i => i.length > 0);
+        const pathList = text.replaceAll("丨", "|").split("|").map(i => i.trim()).filter(i => i.length > 0);
         constructPath(pathList.slice());
         constructPath(pathList.slice().reverse());
         pathList.forEach(i => set.add(i));
@@ -811,7 +811,7 @@ export class DocTracer {
         const rows = await siyuan.sql(`select * from blocks where type='d' and id="${docID}"`)
         this.update(rows);
     }
-    private async update(rows: Block[], updateTime = false) {
+    async update(rows: Block[], updateTime = false) {
         rows.forEach(row => {
             if (updateTime && row.updated > this.timestamp) {
                 this.timestamp = row.updated;

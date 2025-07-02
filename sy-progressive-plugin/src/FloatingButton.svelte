@@ -6,11 +6,20 @@
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
     import { FloatingBallHelper } from "../../sy-tomato-plugin/src/libs/FloatingBallHelper";
 
-    export let settings: TomatoSettings;
-    export let plugin: Plugin;
-    export let dm: DestroyManager;
-    export let key: string;
-    let div: HTMLElement;
+    interface Props {
+        settings: TomatoSettings;
+        plugin: Plugin;
+        dm: DestroyManager;
+        key: string;
+    }
+
+    let {
+        settings,
+        plugin,
+        dm,
+        key
+    }: Props = $props();
+    let div: HTMLElement = $state();
 
     onMount(() => {
         new FloatingBallHelper(key, div, dm);

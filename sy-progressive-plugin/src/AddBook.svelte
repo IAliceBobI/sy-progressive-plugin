@@ -12,12 +12,23 @@
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 
-    export let bookID: string;
-    export let bookName: string;
-    export let boxID: string;
-    export let dialog: Dialog;
-    export let plugin: Plugin;
-    export let dm: DestroyManager;
+    interface Props {
+        bookID: string;
+        bookName: string;
+        boxID: string;
+        dialog: Dialog;
+        plugin: Plugin;
+        dm: DestroyManager;
+    }
+
+    let {
+        bookID,
+        bookName,
+        boxID,
+        dialog,
+        plugin,
+        dm
+    }: Props = $props();
     export function destroy() {
         dm.destroyBy();
     }
@@ -25,18 +36,18 @@
     boxID;
     plugin;
 
-    let wordCount = 0;
-    let textLen = 0;
-    let headCount = 1;
-    let headingsText = "1";
-    let showLastBlock = false;
-    let autoCard = false;
-    let addIndex = false;
-    let splitWordNum = 0;
-    let splitType: AsList = "no" as any;
-    let disabled = true;
-    let contentBlocks: WordCountType[] = [];
-    $: contentBlockLen = contentBlocks.length === 0 ? 1 : contentBlocks.length;
+    let wordCount = $state(0);
+    let textLen = $state(0);
+    let headCount = $state(1);
+    let headingsText = $state("1");
+    let showLastBlock = $state(false);
+    let autoCard = $state(false);
+    let addIndex = $state(false);
+    let splitWordNum = $state(0);
+    let splitType: AsList = $state("no" as any);
+    let disabled = $state(true);
+    let contentBlocks: WordCountType[] = $state([]);
+    let contentBlockLen = $derived(contentBlocks.length === 0 ? 1 : contentBlocks.length);
 
     onMount(doCount);
 
@@ -217,7 +228,7 @@
         </label><br />
     {/each}
     <div class="fn__hr"></div>
-    <button class="prog-style__button" on:click={process}
+    <button class="prog-style__button" onclick={process}
         >{prog.plugin.i18n.addOrReaddDoc}</button
     >
     <div class="fn__hr"></div>
