@@ -4,6 +4,7 @@ import { Plugin } from "siyuan";
 import { prog } from "./Progressive";
 import { isMultiLineElement, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { progStorage } from "./ProgressiveStorage";
 
 export class SplitSentence {
     private asList: AsList;
@@ -39,7 +40,7 @@ export class SplitSentence {
     }
 
     async splitByIDs(chilrenIDs: string[]) {
-        const bookInfo = await prog.storage.booksInfo(this.bookID);
+        const bookInfo = await progStorage.booksInfo(this.bookID);
         const rows = (await siyuan.getRows(chilrenIDs, "id, content, ial, type, markdown", true, [
             // "type NOT IN ('html', 't', 's')",
             "content != ''",

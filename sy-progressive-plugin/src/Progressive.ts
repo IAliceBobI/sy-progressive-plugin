@@ -1,29 +1,27 @@
-import { Dialog, Menu, Plugin, openTab, confirm, Lute, IProtyle, Protyle } from "siyuan";
+import { Menu, Plugin, openTab, confirm, IProtyle, Protyle } from "siyuan";
 import "./index.scss";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
-import { addCardSetDueTime, closeTabByTitle, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { closeTabByTitle, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import * as help from "./helper";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import * as constants from "./constants";
 import {
-    BlockNodeEnum, CONTENT_EDITABLE, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey,
-    PARAGRAPH_INDEX, PROG_ORIGIN_TEXT, PROG_PIECE_PREVIOUS, RefIDKey
+    BlockNodeEnum, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey,
+    PARAGRAPH_INDEX, RefIDKey
 } from "../../sy-tomato-plugin/src/libs/gconst";
-import { SplitSentence } from "./SplitSentence";
 import AddBookSvelte from "./AddBook.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
-import { Storage } from "./Storage";
+import { progStorage } from "./ProgressiveStorage";
 import { HtmlCBType } from "./constants";
-import { getDocBlocks, isMultiLineElement, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { addClickEvent, btn, getContentPrefix, getReadingBtns1, getReadingBtns2, getReadingBtns3 } from "./ProgressiveBtn";
+import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
+import { addClickEvent, btn, getContentPrefix } from "./ProgressiveBtn";
 import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
-import { newID } from "stonev5-utils/lib/id";
-import { mount } from "svelte";
+import { mount, unmount } from "svelte";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
+import { fullfilContent } from "./helper";
 
 export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK 2025-5-12 21:37:37", "⚙️", () => tomatoI18n.渐进学习的设置)
 export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn 2025-5-13 13:32:20", "📖", () => tomatoI18n.开始学习)
@@ -36,9 +34,7 @@ export const Progressive添加当前文档到渐进阅读分片模式 = winHotke
 
 class Progressive {
     plugin: Plugin;
-    storage: Storage;
     settings: TomatoSettings;
-    private lute: Lute;
     private docID: string;
     private observer: MutationObserver;
     private welement: any;
@@ -73,11 +69,8 @@ class Progressive {
 
     async onload(plugin: Plugin, settings: TomatoSettings) {
         this.plugin = plugin;
-        this.lute = utils.NewLute();
         this.settings = settings;
-        this.storage = new Storage(plugin);
 
-        await this.storage.onLayoutReady();
         this.plugin.addCommand({
             langKey: Progressive开始学习.langKey,
             langText: Progressive开始学习.langText(),
@@ -106,13 +99,13 @@ class Progressive {
             langKey: Progressive上一页.langKey,
             langText: Progressive上一页.langText(),
             hotkey: Progressive上一页.m,
-            callback: () => this.movePage(-1),
+            callback: () => this.gotoPage(-1),
         });
         this.plugin.addCommand({
             langKey: Progressive下一页.langKey,
             langText: Progressive下一页.langText(),
             hotkey: Progressive下一页.m,
-            callback: () => this.movePage(1),
+            callback: () => this.gotoPage(1),
         });
         this.plugin.addCommand({
             langKey: Progressive跳到分片或回到原文.langKey,
@@ -215,10 +208,10 @@ class Progressive {
         });
     }
 
-    private async movePage(step: number) {
+    private async gotoPage(step: number) {
         const docID = events.docID
         const { bookID, pieceNum } = await getBookID(docID)
-        await this.storage.gotoBlock(bookID, pieceNum + step);
+        await progStorage.gotoBlock(bookID, pieceNum + step);
         await this.startToLearnWithLock(bookID);
         this.closePeices(bookID);
     }
@@ -238,7 +231,7 @@ class Progressive {
                             || a == BlockNodeEnum.NODE_BLOCKQUOTE
                             || a == BlockNodeEnum.NODE_CODE_BLOCK;
                     }).forEach(e => {
-                        const { ref, idx, bIdx } = findBack(e) || findForward(e);
+                        const { ref, idx, bIdx } = help.findBack(e) || help.findForward(e);
                         if (ref) {
                             const attr = {} as AttrType;
                             attr["custom-progref"] = ref;
@@ -334,7 +327,7 @@ class Progressive {
     async addProgressiveReadingWithLock(bookID?: string) {
         return navigator.locks.request(constants.AddProgressiveReadingLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
-                await this.addProgressiveReading(bookID, events.boxID);
+                await this.addProgressiveReading(bookID);
                 await utils.sleep(constants.IndexTime2Wait);
             } else {
                 await siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit + " [1]");
@@ -342,7 +335,7 @@ class Progressive {
         });
     }
 
-    private async addProgressiveReading(bookID: string = "", boxID: string = "") {
+    private async addProgressiveReading(bookID: string = "") {
         if (!bookID) {
             bookID = events.docID;
         }
@@ -355,29 +348,18 @@ class Progressive {
             siyuan.pushMsg(this.plugin.i18n.maybeBookRemoved.replace("{bookID}", bookID));
             return;
         }
-        await this.addProgressiveReadingDialog(bookID, row["content"], boxID);
+        await this.addProgressiveReadingDialog(bookID, row["content"]);
     }
 
-    private async addProgressiveReadingDialog(bookID: string, bookName: string, boxID: string) {
-        const id = newID();
+    private async addProgressiveReadingDialog(bookID: string, bookName: string,) {
         const dm = new DestroyManager()
-        const dialog = new Dialog({
-            title: this.plugin.i18n.addProgressiveReading,
-            content: `<div class="b3-dialog__content" id="${id}"></div>`,
-            width: events.isMobile ? "90vw" : "700px",
-            height: events.isMobile ? "180vw" : null,
-            destroyCallback() {
-                dm.destroyBy()
-            },
-        });
         const addBook = mount(AddBookSvelte, {
-            target: dialog.element.querySelector("#" + id),
+            target: document.body,
             props: {
-                bookID, bookName, boxID, dialog, plugin: this.plugin, dm,
+                bookID, bookName, dm,
             }
         });
-        dm.add("svelte", () => addBook.destroy())
-        dm.add("dialog", () => dialog.destroy())
+        dm.add("svelte", () => unmount(addBook))
     }
 
     async readThisPiece(blockID?: string) {
@@ -386,7 +368,7 @@ class Progressive {
         const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
         if (row) {
             const bookID = row["root_id"];
-            const idx = await this.storage.loadBookIndexIfNeeded(bookID);
+            const idx = await progStorage.loadBookIndexIfNeeded(bookID);
             if (idx?.length <= 0) {
                 // not a book
                 for (const div of document.querySelectorAll(`div[${DATA_NODE_ID}="${blockID}"]`)) {
@@ -401,7 +383,7 @@ class Progressive {
                 for (let i = 0; i < idx.length; i++) {
                     for (let j = 0; j < idx[i].length; j++) {
                         if (blockID === idx[i][j]) {
-                            await this.storage.gotoBlock(bookID, i);
+                            await progStorage.gotoBlock(bookID, i);
                             await this.startToLearnWithLock(bookID);
                             setTimeout(async () => {
                                 const pieceBlockID = await this.getPiecesByRefID(blockID)
@@ -488,10 +470,10 @@ class Progressive {
             return;
         }
         bookID = bookInfo.bookID;
-        const bookIndex = await this.storage.loadBookIndexIfNeeded(bookInfo.bookID);
-        let point = (await this.storage.booksInfo(bookInfo.bookID)).point;
-        if (isRand) point = utils.getRandInt0tox(bookIndex.length);
-        await this.storage.updateBookInfoTime(bookID);
+        const bookIndex = await progStorage.loadBookIndexIfNeeded(bookInfo.bookID);
+        let point = (await progStorage.booksInfo(bookInfo.bookID)).point;
+        if (isRand) point = utils.getRandInt0tox(bookIndex.length); // 随机创建书籍的某个分片，适用于单词集合。
+        await progStorage.updateBookInfoTime(bookID);
         if (point >= bookIndex.length) {
             await siyuan.pushMsg(this.plugin.i18n.thisIsLastPage);
             return;
@@ -499,29 +481,12 @@ class Progressive {
             await siyuan.pushMsg(this.plugin.i18n.thisIsFirstPage);
             return;
         }
-        const piecePre = bookIndex[point - 1] ?? [];
-        const piece = bookIndex[point];
-        noteID = await help.findPieceDoc(bookInfo.bookID, point);
         let openPiece = false;
+        noteID = await help.createPiece(bookInfo, bookIndex, point)
         if (noteID) {
-            await OpenSyFile2(this.plugin, noteID)
             events.setDocID(noteID);
             openPiece = true;
-        } else {
-            noteID = await help.createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
-            if (noteID) {
-                await this.addReadingBtns(bookID, noteID, point);
-                await this.fullfilContent(point, bookInfo.bookID, piecePre, piece, noteID, null);
-                await OpenSyFile2(this.plugin, noteID, null, null, () => {
-                    if (bookInfo.autoCard) {
-                        addCardSetDueTime(noteID, 1000, 60 * 60 * 24)
-                    }
-                })
-                events.setDocID(noteID);
-                openPiece = true;
-            } else {
-                return false;
-            }
+            await OpenSyFile2(this.plugin, noteID)
         }
         if (openPiece && this.settings.openCardsOnOpenPiece) {
             let hpath = "";
@@ -564,12 +529,12 @@ class Progressive {
     private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         switch (cbType) {
             case HtmlCBType.previous:
-                await this.storage.gotoBlock(bookID, point - 1);
+                await progStorage.gotoBlock(bookID, point - 1);
                 await this.startToLearnWithLock(bookID);
                 this.closePeices(bookID);
                 break;
             case HtmlCBType.next:
-                await this.storage.gotoBlock(bookID, point + 1);
+                await progStorage.gotoBlock(bookID, point + 1);
                 await this.startToLearnWithLock(bookID);
                 this.closePeices(bookID);
                 break;
@@ -582,7 +547,7 @@ class Progressive {
             case HtmlCBType.deleteAndBack:
                 confirm("⚠️", this.plugin.i18n.DeleteAndBack, async () => {
                     await siyuan.removeRiffCards([noteID]);
-                    await this.storage.gotoBlock(bookID, point - 1);
+                    await progStorage.gotoBlock(bookID, point - 1);
                     await this.startToLearnWithLock(bookID);
                     siyuan.removeDocByID(noteID);
                     this.closePeices(bookID);
@@ -591,7 +556,7 @@ class Progressive {
             case HtmlCBType.deleteAndNext:
                 confirm("⚠️", this.plugin.i18n.DeleteAndNext, async () => {
                     await siyuan.removeRiffCards([noteID]);
-                    await this.storage.gotoBlock(bookID, point + 1);
+                    await progStorage.gotoBlock(bookID, point + 1);
                     await this.startToLearnWithLock(bookID);
                     siyuan.removeDocByID(noteID);
                     this.closePeices(bookID);
@@ -613,13 +578,13 @@ class Progressive {
                 await siyuan.removeRiffCards([noteID]);
                 break;
             case HtmlCBType.ignoreBook:
-                await this.storage.setIgnoreBook(bookID);
+                await progStorage.setIgnoreBook(bookID);
                 break;
             case HtmlCBType.fullfilContent: {
-                const index = await this.storage.loadBookIndexIfNeeded(bookID);
+                const index = await progStorage.loadBookIndexIfNeeded(bookID);
                 const piecePre = index[point - 1] ?? [];
                 const piece = index[point] ?? [];
-                await this.fullfilContent(point, bookID, piecePre, piece, noteID, null);
+                await fullfilContent(point, bookID, piecePre, piece, noteID, null);
                 break;
             }
             case HtmlCBType.cleanOriginText:
@@ -634,26 +599,26 @@ class Progressive {
                 break;
             case HtmlCBType.splitByPunctuations: {
                 await help.cleanNote(noteID);
-                const index = await this.storage.loadBookIndexIfNeeded(bookID);
+                const index = await progStorage.loadBookIndexIfNeeded(bookID);
                 const piece = index[point] ?? [];
                 const piecePre = index[point - 1] ?? [];
-                await this.fullfilContent(point, bookID, piecePre, piece, noteID, "p");
+                await fullfilContent(point, bookID, piecePre, piece, noteID, "p");
                 break;
             }
             case HtmlCBType.splitByPunctuationsList: {
                 await help.cleanNote(noteID);
-                const index = await this.storage.loadBookIndexIfNeeded(bookID);
+                const index = await progStorage.loadBookIndexIfNeeded(bookID);
                 const piece = index[point] ?? [];
                 const piecePre = index[point - 1] ?? [];
-                await this.fullfilContent(point, bookID, piecePre, piece, noteID, "i");
+                await fullfilContent(point, bookID, piecePre, piece, noteID, "i");
                 break;
             }
             case HtmlCBType.splitByPunctuationsListCheck: {
                 await help.cleanNote(noteID);
-                const index = await this.storage.loadBookIndexIfNeeded(bookID);
+                const index = await progStorage.loadBookIndexIfNeeded(bookID);
                 const piece = index[point] ?? [];
                 const piecePre = index[point - 1] ?? [];
-                await this.fullfilContent(point, bookID, piecePre, piece, noteID, "t");
+                await fullfilContent(point, bookID, piecePre, piece, noteID, "t");
                 break;
             }
             default:
@@ -661,148 +626,11 @@ class Progressive {
         }
     }
 
-    private async splitAndInsert(bookID: string, noteID: string, t: AsList, ids: string[]) {
-        if (lastVerifyResult()) {
-            const s = new SplitSentence(bookID, this.plugin, noteID, t);
-            if (ids?.length > 0) {
-                await s.splitByIDs(ids);
-                await s.insert(false);
-            }
-            return true
-        } else {
-            await siyuan.pushMsg(tomatoI18n.此功能需要激活VIP)
-        }
-        return false;
-    }
-
-    private async addReadingBtns(bookID: string, noteID: string, point: number) {
-        const btns = [];
-        btns.push(help.tempContent("---"));
-        btns.push(help.tempContent(getReadingBtns1(bookID, noteID, point)));
-        btns.push(help.tempContent(getReadingBtns2(bookID, noteID, point)));
-        btns.push(help.tempContent(getReadingBtns3(bookID, noteID, point)));
-        await siyuan.appendBlock(btns.join("\n"), noteID);
-    }
-
-    private async fullfilContent(point: number, bookID: string, piecePre: string[], piece: string[], noteID: string, stype: AsList) {
-        this.storage.updateBookInfoTime(bookID);
-        const info = await this.storage.booksInfo(bookID);
-
-        const allContent = [];
-        if (info.showLastBlock && piecePre.length > 0) {
-            const lastID = piecePre[piecePre.length - 1];
-            const { div } = await utils.getBlockDiv(lastID);
-            allContent.push(await this.copyBlock(point - 1, info, lastID, div, [PROG_PIECE_PREVIOUS]));
-        }
-
-        let splited = false
-        if (stype) {
-            splited = await this.splitAndInsert(bookID, noteID, stype, piece);
-        } else if (info.autoSplitSentenceP) {
-            splited = await this.splitAndInsert(bookID, noteID, "p", piece);
-        } else if (info.autoSplitSentenceI) {
-            splited = await this.splitAndInsert(bookID, noteID, "i", piece);
-        } else if (info.autoSplitSentenceT) {
-            splited = await this.splitAndInsert(bookID, noteID, "t", piece);
-        }
-
-        if (!splited) {
-            const idx: { i: number } = { i: 1 };
-            const rows = (await siyuan.getRows(piece, "markdown,ial,type")).filter(row => !!row.markdown);
-            for (const { id, markdown, ial, type } of rows) {
-                const attrs = utils.parseIAL(ial);
-                delete attrs.id;
-                delete attrs.updated;
-                attrs["custom-prog-origin-text"] = "1";
-                allContent.push(await this.fastCopyBlock(point, info, id, markdown, type, attrs, idx));
-            }
-        }
-
-        if (allContent.length > 0) {
-            await siyuan.insertBlockAsChildOf(allContent.filter(i => !!i).join("\n\n"), noteID);
-        }
-    }
-
-    private async fastCopyBlock(point: number, info: BookInfo, id: string, markdown: string, type: string, attrs: AttrType, idx?: { i: number }) {
-        if (idx) {
-            attrs["custom-in-book-index"] = `${point}#${idx.i}`;
-            attrs["custom-paragraph-index"] = String(idx.i);
-            if (info.addIndex2paragraph) {
-                if (markdown.startsWith("#")
-                    || markdown.startsWith("!")
-                    || markdown.startsWith("[")
-                    || markdown.startsWith("*")
-                    || isMultiLineElement(markdown)
-                ) {
-                    //
-                } else {
-                    markdown = `[${idx.i}]` + markdown;
-                }
-            }
-            idx.i++;
-        }
-        attrs["custom-progref"] = id;
-        if (markdown.startsWith("<div>")) {
-            return markdown;
-        } else if (isMultiLineElement(markdown)) {
-            markdown = utils.replaceRef2Lnk(markdown)
-            return `${markdown}\n${utils.ial2str(attrs)}`;
-        } else if (type === "l") {
-            const { div } = await utils.getBlockDiv(id);
-            allListItemlnk2self(div, attrs);
-            utils.cleanDivOnly(div);
-            markdown = this.lute.BlockDOM2Md(div.outerHTML);
-            markdown = utils.replaceRef2Lnk(markdown)
-            const parts = markdown.trim().split("\n")
-            parts.pop();
-            markdown = parts.join("\n")
-            markdown = `${markdown}\n${utils.ial2str(attrs)}`;
-            return markdown;
-        } else {
-            markdown = utils.replaceRef2Lnk(markdown)
-            return `${markdown}${utils.get_siyuan_lnk_md(id, "  *  ", this.settings.pieceNoBacktraceLink)} \n${utils.ial2str(attrs)}`;
-        }
-    }
-
-    private async copyBlock(point: number, info: BookInfo, id: string, tempDiv: HTMLDivElement, mark: string[] = [], idx?: { i: number }) {
-        if (!tempDiv) return "";
-        if (tempDiv.getAttribute(MarkKey)) return "";
-        const editableDiv = utils.getContenteditableElement(tempDiv);
-        if (editableDiv) {
-            if (!this.settings.pieceNoBacktraceLink) {
-                const spanStar = editableDiv.appendChild(document.createElement("span")) as HTMLSpanElement;
-                utils.set_href(spanStar, id, "  *  ");
-            }
-
-            if (idx && tempDiv.getAttribute(DATA_TYPE) != BlockNodeEnum.NODE_HEADING) {
-                tempDiv.setAttribute(PARAGRAPH_INDEX, String(idx.i));
-                tempDiv.setAttribute(IN_BOOK_INDEX, `${point}#${idx.i}`);
-                if (info.addIndex2paragraph) {
-                    const idxSpan = editableDiv.insertBefore(document.createElement("span"), editableDiv.firstChild) as HTMLSpanElement;
-                    if (idxSpan) {
-                        idxSpan.setAttribute(DATA_TYPE, "text");
-                        // idxSpan.style.backgroundColor = "var(--b3-font-background3)";
-                        // idxSpan.style.color = "var(--b3-font-color7)";
-                        idxSpan.textContent = `[${idx.i}]`;
-                    }
-                }
-            }
-            if (idx) idx.i++;
-        }
-        const txt = this.lute.BlockDOM2StdMd(tempDiv.outerHTML).replace(/\u200B/g, "").trim();
-        if (!txt || txt == "*") return "";
-        utils.cleanDivOnly(tempDiv);
-        tempDiv.setAttribute(RefIDKey, id);
-        mark.forEach(m => tempDiv.setAttribute(m, "1"));
-        const md = this.lute.BlockDOM2Md(tempDiv.outerHTML);
-        return md.trim();
-    }
-
     private async getBook2Learn(bookID?: string): Promise<BookInfo> {
         if (bookID) {
-            return this.storage.booksInfo(bookID);
+            return progStorage.booksInfo(bookID);
         }
-        const infos = this.storage.booksInfos();
+        const infos = progStorage.booksInfos();
         let miniTime = Number.MAX_SAFE_INTEGER;
         let miniID = "";
         for (const id in infos) {
@@ -814,74 +642,22 @@ class Progressive {
             }
         }
         if (miniID) {
-            return this.storage.booksInfo(miniID);
+            return progStorage.booksInfo(miniID);
         }
         return {} as any;
     }
 
     async viewAllProgressiveBooks() {
-        const id = newID();
         const dm = new DestroyManager();
-        const dialog = new Dialog({
-            title: this.plugin.i18n.viewAllProgressiveBooks,
-            content: `<div class="b3-dialog__content" id='${id}'></div>`,
-            width: events.isMobile ? "90vw" : "700px",
-            height: events.isMobile ? "180vw" : "800px",
-            destroyCallback: () => {
-                dm.destroyBy();
-            }
-        });
         const s = mount(ShowAllBooksSvelte, {
-            target: dialog.element.querySelector("#" + id),
+            target: document.body,
             props: {
-                dialog,
                 dm,
             }
         });
-        dm.add("dialog", () => dialog.destroy())
-        dm.add("svelte", () => s.destroy())
+        dm.add("svelte", () => unmount(s))
     }
 }
 
 export const prog = new Progressive();
 
-function allListItemlnk2self(div: HTMLDivElement, attrs?: AttrType) {
-    div.querySelectorAll(`div[${CONTENT_EDITABLE}]`).forEach((e: HTMLElement) => {
-        const n = e.parentElement;
-        if (n) {
-            const id = n.getAttribute(DATA_NODE_ID);
-            if (attrs) {
-                for (const k in attrs) {
-                    n.setAttribute(k, attrs[k]);
-                }
-            }
-            if (id) {
-                if (!prog.settings.pieceNoBacktraceLink) {
-                    utils.add_href(e, id, "*");
-                }
-                n.setAttribute(PROG_ORIGIN_TEXT, "1");
-                n.setAttribute(RefIDKey, id);
-            }
-        }
-    });
-}
-
-function findBack(e: Element) {
-    for (let i = 0; i < 1000 && e; i++, e = e.previousElementSibling) {
-        const ref = e.getAttribute(RefIDKey);
-        const idx = e.getAttribute(PARAGRAPH_INDEX) ?? "";
-        const bIdx = e.getAttribute(IN_BOOK_INDEX) ?? "";
-        if (ref) return { ref, idx, bIdx };
-    }
-    return {};
-}
-
-function findForward(e: Element) {
-    for (let i = 0; i < 1000 && e; i++, e = e.nextElementSibling) {
-        const ref = e.getAttribute(RefIDKey);
-        const idx = e.getAttribute(PARAGRAPH_INDEX) ?? "";
-        const bIdx = e.getAttribute(IN_BOOK_INDEX) ?? "";
-        if (ref) return { ref, idx, bIdx };
-    }
-    return {};
-}

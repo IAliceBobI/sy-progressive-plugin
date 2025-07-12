@@ -223,7 +223,7 @@
                         });
                     }}
                     disabled={selectionMl == null}
-                    class="b3-button b3-button--outline"
+                    class="b3-button b3-button--outline tomato-button"
                     title={tomatoI18n.向上选择}>⏫</button
                 >
             </td>
@@ -238,7 +238,7 @@
                         });
                     }}
                     disabled={selectionMl == null}
-                    class="b3-button b3-button--outline"
+                    class="b3-button b3-button--outline tomato-button"
                     title={tomatoI18n.向下选择}>⏬</button
                 >
             </td>
@@ -253,7 +253,7 @@
                         });
                     }}
                     disabled={selectionMl == null}
-                    class="b3-button b3-button--outline"
+                    class="b3-button b3-button--outline tomato-button"
                     title={tomatoI18n.取消最后一次选择的内容}>✖️</button
                 >
             </td>
@@ -273,7 +273,7 @@
                     }}
                     disabled={selectionMl == null}
                     title="{tomatoI18n.执行摘抄}(Alt+Z)"
-                    class="b3-button b3-button--outline">🍕</button
+                    class="b3-button b3-button--outline tomato-button">🍕</button
                 >
             </td>
             <td>
@@ -297,7 +297,7 @@
                     }}
                     disabled={selectionMl == null}
                     title="{tomatoI18n.用选中的行创建超级块超级块制卡取消制卡}(Alt+Z)"
-                    class="b3-button b3-button--outline">💳</button
+                    class="b3-button b3-button--outline tomato-button">💳</button
                 >
             </td>
             <td>
@@ -310,7 +310,7 @@
                             hideTr();
                         });
                     }}
-                    class="b3-button b3-button--outline"
+                    class="b3-button b3-button--outline tomato-button"
                     title={tomatoI18n.显示与隐藏工具}>🔧</button
                 >
             </td>
@@ -325,7 +325,7 @@
                                 hideFlationBtn();
                             });
                         }}
-                        class="b3-button b3-button--outline"
+                        class="b3-button b3-button--outline tomato-button"
                         title={tomatoI18n.关闭悬浮按钮双击可以再次打开}
                         >{@html icon("iconQuit", 5)}</button
                     >
@@ -352,7 +352,7 @@
                     }}
                     disabled={selectionMl == null}
                     title="{tomatoI18n.执行摘抄}(Alt+Z)"
-                    class="b3-button b3-button--outline">🍕</button
+                    class="b3-button b3-button--outline tomato-button">🍕</button
                 >
             </td>
             <td>
@@ -369,7 +369,7 @@
                     }}
                     disabled={selectionMl == null}
                     title="{tomatoI18n.执行摘抄}&{tomatoI18n.断句}"
-                    class="b3-button b3-button--outline">✂</button
+                    class="b3-button b3-button--outline tomato-button">✂</button
                 >
             </td>
             <td>
@@ -386,7 +386,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.查看摘抄轨迹链}
-                    class="b3-button b3-button--outline">🌲</button
+                    class="b3-button b3-button--outline tomato-button">🌲</button
                 >
             </td>
             <td>
@@ -399,7 +399,7 @@
                             hideTr();
                         });
                     }}
-                    class="b3-button b3-button--outline"
+                    class="b3-button b3-button--outline tomato-button"
                     title={tomatoI18n.显示与隐藏工具}>🔧</button
                 >
             </td>
@@ -419,7 +419,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.摘录单词}
-                    class="b3-button b3-button--outline">🔤</button
+                    class="b3-button b3-button--outline tomato-button">🔤</button
                 >
             </td>
             <td>
@@ -436,7 +436,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.摘录单词并加入闪卡}
-                    class="b3-button b3-button--outline">🗂️</button
+                    class="b3-button b3-button--outline tomato-button">🗂️</button
                 >
             </td>
             <td>
@@ -453,7 +453,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.摘录单词并加入闪卡并用AI解释}
-                    class="b3-button b3-button--outline">🤖</button
+                    class="b3-button b3-button--outline tomato-button">🤖</button
                 >
             </td>
         </tr>
@@ -472,7 +472,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.打开前一个摘抄}
-                    class="b3-button b3-button--outline">👈</button
+                    class="b3-button b3-button--outline tomato-button">👈</button
                 >
             </td>
             <td>
@@ -489,7 +489,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.打开下一个摘抄}
-                    class="b3-button b3-button--outline">👉</button
+                    class="b3-button b3-button--outline tomato-button">👉</button
                 >
             </td>
             <td>
@@ -506,7 +506,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.清理已经完成的摘抄}
-                    class="b3-button b3-button--outline">🗑️</button
+                    class="b3-button b3-button--outline tomato-button">🗑️</button
                 >
             </td>
         </tr>
@@ -562,7 +562,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.标记摘抄为完成状态并转移闪卡到其他摘抄}
-                    class="b3-button b3-button--outline">🔨</button
+                    class="b3-button b3-button--outline tomato-button">🔨</button
                 >
             </td>
         </tr>
@@ -594,7 +594,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.按照标点符号断句并插入下方}
-                    class="b3-button b3-button--outline">✂👇</button
+                    class="b3-button b3-button--outline tomato-button">✂👇</button
                 >
                 <button
                     onmousedown={(event) => {
@@ -622,7 +622,7 @@
                     }}
                     disabled={selectionMl == null}
                     title="{tomatoI18n.按照标点符号断句并插入下方}(checkbox)"
-                    class="b3-button b3-button--outline">📌👇</button
+                    class="b3-button b3-button--outline tomato-button">📌👇</button
                 >
             </td>
         </tr>
@@ -641,7 +641,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.按照回车拆分为多个段落块}
-                    class="b3-button b3-button--outline">✂📄</button
+                    class="b3-button b3-button--outline tomato-button">✂📄</button
                 >
                 <button
                     onmousedown={(event) => {
@@ -656,7 +656,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.合并为单个段落块}
-                    class="b3-button b3-button--outline">📦📄</button
+                    class="b3-button b3-button--outline tomato-button">📦📄</button
                 >
             </td>
         </tr>
@@ -682,7 +682,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.在上方插入汉语拼音}
-                    class="b3-button b3-button--outline">pīn</button
+                    class="b3-button b3-button--outline tomato-button">pīn</button
                 >
                 <button
                     onmousedown={(event) => {
@@ -697,7 +697,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={tomatoI18n.上网查询所选内容}
-                    class="b3-button b3-button--outline">🌐</button
+                    class="b3-button b3-button--outline tomato-button">🌐</button
                 >
                 <button
                     onmousedown={(event) => {
@@ -715,7 +715,7 @@
                     }}
                     disabled={selectionMl == null}
                     title={"baidu AI"}
-                    class="b3-button b3-button--outline">AI</button
+                    class="b3-button b3-button--outline tomato-button">AI</button
                 >
             </td>
         </tr>

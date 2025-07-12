@@ -8,7 +8,8 @@
     import { getPrefixDocs } from "./PrefixArticles";
     import { Protyle } from "siyuan";
     import { tomatoI18n } from "./tomatoI18n";
-    import { setGlobal } from "stonev5-utils";
+    import PrefixArticleParts from "./PrefixArticleParts.svelte";
+    import { prefixArticlesTagsShow } from "./libs/stores";
 
     interface Props {
         dockElement?: HTMLElement;
@@ -28,7 +29,6 @@
         prefixDocs = [],
     }: Props = $props();
     export function destroy() {}
-    let forceRefresh = false;
     let showPrefixDialog = $state(false);
     let newPrefix = $state("");
     let oldPrefix = $state("");
@@ -39,14 +39,13 @@
         } else {
             initDialog();
         }
-        clearInterval(
-            setGlobal(
-                "间隔刷新前缀 2025-07-02 14:19:05",
-                setInterval(() => {
-                    forceRefresh = true;
-                }, 5000),
-            ),
-        );
+        dm.setData("refresh1", async () => {
+            prefixDocs = await getPrefixDocs(
+                currentDocID,
+                currentDocName,
+                true,
+            );
+        });
     });
 
     async function initDialog() {
@@ -55,7 +54,7 @@
                 `prefixDoc#${isDock}#${currentDocID}`,
             ) as HTMLButtonElement;
             if (btn) {
-                btn.scrollIntoView();
+                btn.scrollIntoView({ block: "center", behavior: "auto" });
             } else {
                 const tracer = await getDocTracer();
                 tracer.tryGetDocs(currentDocID);
@@ -91,23 +90,16 @@
                 if (lock) {
                     const { docID, name } = events.getInfo(detail.protyle);
                     if (!docID || !name) return;
-                    if (
-                        docID != currentDocID ||
-                        name != currentDocName ||
-                        forceRefresh
-                    ) {
+                    if (docID != currentDocID || name != currentDocName) {
                         currentDocID = docID;
                         currentDocName = name;
-                        forceRefresh = false;
-
                         {
                             let oldName = currentDocName.replaceAll("丨", "|");
                             if (oldName.includes("|")) {
                                 oldName = oldName.split("|").at(0).trim();
                             }
-                            oldPrefix = oldName;
+                            if (!oldPrefix) oldPrefix = oldName;
                         }
-
                         prefixDocs = await getPrefixDocs(docID, name);
                     }
                     await initDialog();
@@ -143,44 +135,87 @@
         siyuan.pushMsg(tomatoI18n.重命名完成);
         siyuan.pushMsg(tomatoI18n.已经创建快照, 1000 * 20);
     }
+
+    async function refresh() {
+        prefixDocs = await getPrefixDocs(currentDocID, currentDocName, true);
+        dm.getFn("refresh2")();
+        await siyuan.pushMsg(tomatoI18n.刷新, 1000);
+    }
 </script>
 
 {#snippet count_and_btn()}
     <div class="kbd">
-        {tomatoI18n.文档数量}：{prefixDocs.length}
+        <span title={tomatoI18n.文档数量}>#{prefixDocs.length}</span>
         <button
-            class="b3-button b3-button--outline"
+            title={tomatoI18n.切换笔记本}
+            class="b3-button b3-button--text tomato-button"
+            onclick={() => window.location.reload()}
+        >
+            📒
+        </button>
+        <button
+            title={tomatoI18n.批量改前缀}
+            class="b3-button b3-button--text tomato-button"
             onclick={() => {
                 showPrefixDialog = !showPrefixDialog;
             }}
         >
-            {tomatoI18n.批量改前缀}
+            ✍️
+        </button>
+        <button
+            title={tomatoI18n.标题内竖线分割出来的标签}
+            class="b3-button b3-button--text tomato-button"
+            onclick={() => {
+                prefixArticlesTagsShow.write(!$prefixArticlesTagsShow);
+            }}
+        >
+            🏷️
+        </button>
+        <button
+            title={tomatoI18n.刷新}
+            class="b3-button b3-button--text tomato-button"
+            onclick={refresh}
+        >
+            🔄
         </button>
     </div>
 {/snippet}
 
 <div>
     {@render count_and_btn()}
-    <DialogSvelte title={tomatoI18n.批量改前缀} bind:show={showPrefixDialog}>
+    <PrefixArticleParts
+        {dm}
+        bind:show={$prefixArticlesTagsShow}
+        bind:docID={currentDocID}
+        bind:docName={currentDocName}
+    ></PrefixArticleParts>
+    <DialogSvelte
+        title={tomatoI18n.批量改前缀}
+        bind:show={showPrefixDialog}
+        savePositionKey="prefix batch modify 2025-07-04 12:06:06"
+    >
         {#snippet dialogInner()}
             <div style="margin-bottom:8px;">{tomatoI18n.请输入原前缀}:</div>
             <input
                 class="b3-text-field"
                 bind:value={oldPrefix}
-                style="width:100%;margin-bottom:8px;"
+                maxlength="25"
+                style="width:25em;margin-bottom:8px;"
             />
             <div style="margin-bottom:8px;">{tomatoI18n.请输入新前缀}:</div>
             <input
                 class="b3-text-field"
                 bind:value={newPrefix}
-                style="width:100%;margin-bottom:12px;"
+                maxlength="25"
+                style="width:25em;margin-bottom:12px;"
             />
             <div style="display:flex;justify-content:flex-end;gap:8px;">
-                <button class="b3-button b3-button--outline" onclick={cancel}
-                    >{tomatoI18n.取消}</button
+                <button
+                    class="b3-button b3-button--outline tomato-button"
+                    onclick={cancel}>{tomatoI18n.取消}</button
                 >
                 <button
-                    class="b3-button b3-button--outline"
+                    class="b3-button b3-button--outline tomato-button"
                     onclick={batchRenamePrefix}>{tomatoI18n.确定}</button
                 >
             </div>

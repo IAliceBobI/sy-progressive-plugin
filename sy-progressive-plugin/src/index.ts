@@ -19,6 +19,9 @@ import { newID } from "stonev5-utils/lib/id";
 import { ProgressivePluginConfig, ProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gconst";
 import { setGlobal } from "stonev5-utils";
 import { mount } from "svelte";
+import { startTaskLoop } from "./ProgressiveTask";
+import { progStorage } from "./ProgressiveStorage";
+import { siyuan, timeUtil } from "../../sy-tomato-plugin/src/libs/utils";
 
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
@@ -110,6 +113,8 @@ export default class ThePlugin extends BaseTomatoPlugin {
             }
 
             this.global.prog_zZmqus5PtYRi.pluginConfig = this.settingCfg;
+            this.global.prog_zZmqus5PtYRi.siyuan = siyuan
+            this.global.prog_zZmqus5PtYRi.timeUtil = timeUtil
             loadStore(this);
             setGlobal(ProgressivePluginConfig, this.settingCfg)
             return this.settingCfg;
@@ -138,7 +143,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
         await pieceSummaryBox.onload(this, this.settingCfg);
         await writingCompareBox.onload(this, this.settingCfg);
         await digestProgressiveBox.onload(this, this.settingCfg);
+        await progStorage.onLayoutReady(this);
         await prog.onload(this, this.settingCfg);
+        startTaskLoop();
     }
 
     onunload(): void {

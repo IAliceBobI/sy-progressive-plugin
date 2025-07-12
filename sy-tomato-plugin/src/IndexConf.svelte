@@ -190,6 +190,7 @@
         prefixArticlesSoftLimit,
         fastNoteBoxDocPrefix,
         commentBoxSaveUnderDoc,
+        floatingballDocTabMenu,
     } from "./libs/stores";
     import { STORAGE_SETTINGS } from "./constants";
     import { tomatoI18n } from "./tomatoI18n";
@@ -325,7 +326,11 @@
     import { pushReplaceBy, pushUniq } from "stonev5-utils";
     import { events } from "./libs/Events";
     import { shortcut2string } from "./libs/keyboard";
-    import { FloatingBall添加文档, linkDoc2floatBall } from "./FloatingBall";
+    import {
+        FloatingBallTab添加文档,
+        FloatingBall添加文档,
+        linkDoc2floatBall,
+    } from "./FloatingBall";
     import { PrefixArticles前缀文档树 } from "./PrefixArticles";
     interface Props {
         dm: DestroyManager;
@@ -457,11 +462,11 @@
                     placeholder="1656000000123_22000101_ldID_siyuanTomatoCode_3044022018c8d8bca......"
                     spellcheck="false"
                 ></textarea>
-                <button class="b3-button b3-button--outline" onclick={active}>
+                <button class="b3-button b3-button--outline tomato-button" onclick={active}>
                     {tomatoI18n.激活}
                 </button>
                 <button
-                    class="b3-button b3-button--outline"
+                    class="b3-button b3-button--outline tomato-button"
                     onclick={() => {
                         if (buyDIV.style.display) buyDIV.style.display = "";
                         else buyDIV.style.display = "none";
@@ -872,6 +877,15 @@
                 />
                 {tomatoI18n.menu添加右键菜单}: {FloatingBall添加文档.langText()}
                 <strong>{FloatingBall添加文档.w()}</strong>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$floatingballDocTabMenu}
+                />
+                {tomatoI18n.menu添加右键菜单}: {FloatingBallTab添加文档.langText()}
+                <strong>{FloatingBallTab添加文档.w()}</strong>
             </div>
             <!-- 列出文档绑定 -->
             <div>
@@ -2129,7 +2143,7 @@
         {/if}
         <div>
             <button
-                class="b3-button b3-button--outline"
+                class="b3-button b3-button--outline tomato-button"
                 onclick={() => {
                     siyuan.removeBrokenCards(tomatoI18n);
                 }}
@@ -2709,7 +2723,7 @@
         {/if}
         <div>
             <button
-                class="b3-button b3-button--outline"
+                class="b3-button b3-button--outline tomato-button"
                 onclick={() => cleanDataview()}
                 >🗑️
             </button>{tomatoI18n.删除失效的数据库}
@@ -3154,7 +3168,7 @@
     </div>
     <!-- save -->
     <div class="settingBox">
-        <button class="b3-button b3-button--outline" onclick={save}
+        <button class="b3-button b3-button--outline tomato-button" onclick={save}
             >{tomatoI18n.保存}</button
         >
     </div>

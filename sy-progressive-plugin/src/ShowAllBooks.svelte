@@ -1,68 +1,79 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
-    import { Dialog, confirm } from "siyuan";
-    import { chunks, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+    import { confirm } from "siyuan";
+    import {
+        getProgressivePluginInstance,
+        siyuan,
+    } from "../../sy-tomato-plugin/src/libs/utils";
     import { prog } from "./Progressive";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
+    import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
+    import { createAllPieces } from "./helper";
+    import DialogSvelte from "../../sy-tomato-plugin/src/libs/DialogSvelte.svelte";
+    import { validateNum, objOverrideNull } from "stonev5-utils";
+    import TomatoVip from "../../sy-tomato-plugin/src/TomatoVIP.svelte";
+    import { NotVIPMaxPlannedBooks } from "./constants";
 
     type TaskType = {
         bookID: string;
         bookInfo: BookInfo;
-        row: Block;
         bookIndex: string[][];
+        row: Block;
     };
 
     const MAXBOOKNAME = 10;
 
     interface Props {
-        dialog: Dialog;
         dm: DestroyManager;
     }
 
-    let { dialog, dm }: Props = $props();
+    let { dm }: Props = $props();
+    let show = $state(true);
+
     export function destroy() {
         dm.destroyBy();
     }
 
-    let books: TaskType[] = $state();
+    let books: TaskType[] = $state([]);
 
     onMount(async () => {
-        await loadBooks();
-    });
-
-    async function loadBooks() {
-        const tasks = Object.entries(prog.storage.booksInfos())
-            .map(([bookID]) => {
-                const bookInfo = prog.storage.booksInfo(bookID);
-                const idx = prog.storage.loadBookIndexIfNeeded(bookID);
+        const tasks = Object.entries(progStorage.booksInfos()).map(
+            ([bookID]) => {
+                const bookInfo = progStorage.booksInfo(bookID);
+                const idx = progStorage.loadBookIndexIfNeeded(bookID);
                 const row = siyuan.sqlOne(
                     `select content from blocks where type='d' and id="${bookID}"`,
                 );
-                return [bookID, bookInfo, idx, row];
-            })
-            .flat();
-        books = chunks(await Promise.all(tasks), 4).map(([a, b, c, d]) => {
+                return { bookID, bookInfo, idx, row };
+            },
+        );
+        books.splice(0, books.length);
+        for (const task of tasks) {
             const ret = {} as TaskType;
-            ret.bookID = a as any;
-            ret.bookInfo = b as any;
-            ret.bookIndex = c as any;
-            ret.row = d as any;
+            ret.bookID = task.bookID;
+            ret.bookInfo = objOverrideNull(
+                await task.bookInfo,
+                ProgressiveStorage.defaultBookInfo(),
+            );
+            ret.bookIndex = await task.idx;
+            ret.row = await task.row;
             if (!ret.row.content)
                 ret.row.content = `(${tomatoI18n.找不到此书籍})`;
-            return ret;
-        });
-    }
+            books.push(ret);
+        }
+        books = books;
+    });
 
     onDestroy(destroy);
 
     async function btnStartToLearn(bookID: string) {
         await prog.startToLearnWithLock(bookID);
-        dialog.destroy();
+        destroy();
     }
     async function btnAddProgressiveReadingWithLock(bookID: string) {
         prog.addProgressiveReadingWithLock(bookID);
-        dialog.destroy();
+        destroy();
     }
 
     async function btnConfirm(bookID: string, name: string) {
@@ -70,7 +81,7 @@
             "⚠️",
             tomatoI18n.只删除记录与辅助数据不删除分片不删除闪卡等删除 + name,
             async () => {
-                await prog.storage.removeIndex(bookID);
+                await progStorage.removeIndex(bookID);
                 const idx = books.findIndex((book) => {
                     if (book.bookID == bookID) return true;
                 });
@@ -83,194 +94,268 @@
     }
 </script>
 
-<!-- https://learn.svelte.dev/tutorial/if-blocks -->
-{#if books}
-    <table>
-        <thead>
-            <tr>
-                <th>NO.</th>
-                <th>{tomatoI18n.书名}</th>
-                <th>{tomatoI18n.进度}</th>
-                <th>{tomatoI18n.忽略}</th>
-                <th>{tomatoI18n.制卡}</th>
-                <th>{tomatoI18n.标号}</th>
-                <th>{tomatoI18n.末尾}</th>
-                <th>{tomatoI18n.断句}p</th>
-                <th>{tomatoI18n.断句}t</th>
-                <th>{tomatoI18n.断句}i</th>
-                <th>{tomatoI18n.阅读}</th>
-                <th>{tomatoI18n.重新分片}</th>
-                <th>{tomatoI18n.删除}</th>
-            </tr>
-        </thead>
-        <tbody>
-            {#each books.slice().reverse() as book, i}
+<DialogSvelte
+    maxHeight={800}
+    maxWidth={800}
+    bind:show
+    useBrowserStorage={true}
+    {dm}
+    title={getProgressivePluginInstance().i18n.viewAllProgressiveBooks}
+    savePositionKey="show all prog docs 2025-07-11 10:19:05"
+>
+    {#snippet dialogInner()}
+        <table>
+            <thead>
                 <tr>
-                    <td class="prog-style__id">
-                        {i + 1}
-                    </td>
-
-                    <td class="prog-style__id" title={book.row.content}>
-                        {book.row.content.slice(
-                            0,
-                            MAXBOOKNAME,
-                        )}{#if book.row.content.length > MAXBOOKNAME}...{/if}
-                    </td>
-
-                    <td class="prog-style__id">
-                        {Math.ceil(
-                            (book.bookInfo.point /
-                                (book.bookIndex.length + 1)) *
-                                100,
-                        )}%
-                    </td>
-
-                    <td
-                        class="prog-style__id"
-                        title={prog.plugin.i18n.ignoreTxt +
-                            !!book.bookInfo.ignored}
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={book.bookInfo.ignored}
-                            onclick={() =>
-                                prog.storage.setIgnoreBook(
-                                    book.bookID,
-                                    !book.bookInfo.ignored,
-                                )}
-                        />
-                    </td>
-
-                    <td
-                        class="prog-style__id"
-                        title={prog.plugin.i18n.autoCard +
-                            !!book.bookInfo.autoCard}
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={book.bookInfo.autoCard}
-                            onclick={() =>
-                                prog.storage.toggleAutoCard(book.bookID)}
-                        />
-                    </td>
-
-                    <td
-                        class="prog-style__id"
-                        title={tomatoI18n.给分片内段落标上序号 +
-                            book.bookInfo.addIndex2paragraph}
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={book.bookInfo.addIndex2paragraph}
-                            onclick={() =>
-                                prog.storage.setAddingIndex2paragraph(
-                                    book.bookID,
-                                    !book.bookInfo.addIndex2paragraph,
-                                )}
-                        />
-                    </td>
-
-                    <td
-                        class="prog-style__id"
-                        title={tomatoI18n.显示上一分片最后一个内容块 +
-                            !!book.bookInfo.showLastBlock}
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={book.bookInfo.showLastBlock}
-                            onclick={() =>
-                                prog.storage.setShowLastBlock(
-                                    book.bookID,
-                                    !book.bookInfo.showLastBlock,
-                                )}
-                        />
-                    </td>
-
-                    <td
-                        class="prog-style__id"
-                        title={tomatoI18n.断句为段落块 +
-                            !!book.bookInfo.autoSplitSentenceP}
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={book.bookInfo.autoSplitSentenceP}
-                            onclick={() =>
-                                prog.storage.setAutoSplitSentence(
-                                    book.bookID,
-                                    !book.bookInfo.autoSplitSentenceP,
-                                    "p",
-                                )}
-                        />
-                    </td>
-
-                    <td
-                        class="prog-style__id"
-                        title={tomatoI18n.断句为任务块 +
-                            !!book.bookInfo.autoSplitSentenceT}
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={book.bookInfo.autoSplitSentenceT}
-                            onclick={() =>
-                                prog.storage.setAutoSplitSentence(
-                                    book.bookID,
-                                    !book.bookInfo.autoSplitSentenceT,
-                                    "t",
-                                )}
-                        />
-                    </td>
-
-                    <td
-                        class="prog-style__id"
-                        title={tomatoI18n.断句为无序表 +
-                            !!book.bookInfo.autoSplitSentenceI}
-                    >
-                        <input
-                            type="checkbox"
-                            bind:checked={book.bookInfo.autoSplitSentenceI}
-                            onclick={() =>
-                                prog.storage.setAutoSplitSentence(
-                                    book.bookID,
-                                    !book.bookInfo.autoSplitSentenceI,
-                                    "i",
-                                )}
-                        />
-                    </td>
-
-                    <td>
-                        <button
-                            title="《{book.row.content}》"
-                            class="prog-style__button"
-                            onclick={() => btnStartToLearn(book.bookID)}
-                            >📖</button
-                        >
-                    </td>
-                    <td>
-                        <button
-                            title="{tomatoI18n.重新分片}《{book.row.content}》"
-                            class="prog-style__button"
-                            onclick={() =>
-                                btnAddProgressiveReadingWithLock(book.bookID)}
-                            >🍕</button
-                        >
-                    </td>
-                    <td>
-                        <button
-                            title="{tomatoI18n.删除}《{book.row
-                                .content}》（{tomatoI18n.不删除已经产生的分片等文件}）"
-                            class="prog-style__button"
-                            onclick={() =>
-                                btnConfirm(book.bookID, book.row.content)}
-                            >🗑️</button
-                        >
-                    </td>
+                    <th>NO.</th>
+                    <th>{tomatoI18n.书名}</th>
+                    <th>{tomatoI18n.进度}</th>
+                    <th>{tomatoI18n.忽略}</th>
+                    <th>{tomatoI18n.制卡}</th>
+                    <th>{tomatoI18n.标号}</th>
+                    <th>{tomatoI18n.末尾}</th>
+                    <th>{tomatoI18n.断句}p</th>
+                    <th>{tomatoI18n.断句}t</th>
+                    <th>{tomatoI18n.断句}i</th>
+                    <th>{tomatoI18n.阅读}</th>
+                    <th>{tomatoI18n.删除}</th>
+                    <th>{tomatoI18n.所有}</th>
+                    <th>{tomatoI18n.天数}</th>
+                    <th>{tomatoI18n.重新分片}</th>
                 </tr>
-            {/each}
-        </tbody>
-    </table>
-{:else}
-    <h1>loading……</h1>
-{/if}
+            </thead>
+            <tbody>
+                {#each books.slice().reverse() as book, i}
+                    <tr
+                        title={book.bookInfo.finishIgnore
+                            ? tomatoI18n.非VIP最多只能激活x个规划学习天数的书籍(
+                                  NotVIPMaxPlannedBooks,
+                              )
+                            : undefined}
+                        class:finishedIgnore={book.bookInfo.finishIgnore}
+                    >
+                        <td>
+                            {#if book.bookInfo.finishIgnore}
+                                <TomatoVip codeValid={false}></TomatoVip>
+                            {:else}
+                                {i + 1}
+                            {/if}
+                        </td>
+
+                        <td title={book.row.content}>
+                            {book.row.content.slice(
+                                0,
+                                MAXBOOKNAME,
+                            )}{#if book.row.content.length > MAXBOOKNAME}...{/if}
+                        </td>
+
+                        <td>
+                            {Math.ceil(
+                                (book.bookInfo.point /
+                                    (book.bookIndex.length + 1)) *
+                                    100,
+                            )}%
+                        </td>
+
+                        <td
+                            title={prog.plugin.i18n.ignoreTxt +
+                                !!book.bookInfo.ignored}
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={book.bookInfo.ignored}
+                                onclick={() =>
+                                    progStorage.setIgnoreBook(
+                                        book.bookID,
+                                        !book.bookInfo.ignored,
+                                    )}
+                            />
+                        </td>
+
+                        <td
+                            title={prog.plugin.i18n.autoCard +
+                                !!book.bookInfo.autoCard}
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={book.bookInfo.autoCard}
+                                onclick={() =>
+                                    progStorage.toggleAutoCard(book.bookID)}
+                            />
+                        </td>
+
+                        <td
+                            title={tomatoI18n.给分片内段落标上序号 +
+                                book.bookInfo.addIndex2paragraph}
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={book.bookInfo.addIndex2paragraph}
+                                onclick={() =>
+                                    progStorage.setAddingIndex2paragraph(
+                                        book.bookID,
+                                        !book.bookInfo.addIndex2paragraph,
+                                    )}
+                            />
+                        </td>
+
+                        <td
+                            title={tomatoI18n.显示上一分片最后一个内容块 +
+                                !!book.bookInfo.showLastBlock}
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={book.bookInfo.showLastBlock}
+                                onclick={() =>
+                                    progStorage.setShowLastBlock(
+                                        book.bookID,
+                                        !book.bookInfo.showLastBlock,
+                                    )}
+                            />
+                        </td>
+
+                        <td
+                            title={tomatoI18n.断句为段落块 +
+                                !!book.bookInfo.autoSplitSentenceP}
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={book.bookInfo.autoSplitSentenceP}
+                                onclick={() =>
+                                    progStorage.setAutoSplitSentence(
+                                        book.bookID,
+                                        !book.bookInfo.autoSplitSentenceP,
+                                        "p",
+                                    )}
+                            />
+                        </td>
+
+                        <td
+                            title={tomatoI18n.断句为任务块 +
+                                !!book.bookInfo.autoSplitSentenceT}
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={book.bookInfo.autoSplitSentenceT}
+                                onclick={() =>
+                                    progStorage.setAutoSplitSentence(
+                                        book.bookID,
+                                        !book.bookInfo.autoSplitSentenceT,
+                                        "t",
+                                    )}
+                            />
+                        </td>
+
+                        <td
+                            title={tomatoI18n.断句为无序表 +
+                                !!book.bookInfo.autoSplitSentenceI}
+                        >
+                            <input
+                                type="checkbox"
+                                bind:checked={book.bookInfo.autoSplitSentenceI}
+                                onclick={() =>
+                                    progStorage.setAutoSplitSentence(
+                                        book.bookID,
+                                        !book.bookInfo.autoSplitSentenceI,
+                                        "i",
+                                    )}
+                            />
+                        </td>
+
+                        <td>
+                            <button
+                                title="《{book.row.content}》"
+                                class="b3-button b3-button--outline"
+                                onclick={() => btnStartToLearn(book.bookID)}
+                                >📖</button
+                            >
+                        </td>
+                        <td>
+                            <button
+                                title="{tomatoI18n.删除}《{book.row
+                                    .content}》（{tomatoI18n.不删除已经产生的分片等文件}）"
+                                class="b3-button b3-button--outline"
+                                onclick={() =>
+                                    btnConfirm(book.bookID, book.row.content)}
+                                >🗑️</button
+                            >
+                        </td>
+                        <td>
+                            <button
+                                title="{tomatoI18n.立刻创建所有的分片}《{book
+                                    .row.content}》"
+                                class="b3-button b3-button--outline"
+                                onclick={() => {
+                                    confirm(
+                                        tomatoI18n.立刻创建所有的分片,
+                                        "⏳",
+                                        () => {
+                                            createAllPieces(book.bookID);
+                                        },
+                                    );
+                                }}>🧩</button
+                            >
+                        </td>
+                        <td>
+                            <button
+                                title="{tomatoI18n.天数}《{book.row.content}》"
+                                class="b3-button b3-button--outline"
+                                onclick={() => {
+                                    book.bookInfo.finishShowInput =
+                                        !book.bookInfo.finishShowInput;
+                                }}
+                                >{book.bookInfo.finishDays
+                                    ? book.bookInfo.finishDays
+                                    : "🗓️"}</button
+                            >
+                            <DialogSvelte
+                                title="{tomatoI18n.天数}《{book.row.content}》"
+                                bind:show={book.bookInfo.finishShowInput}
+                            >
+                                {#snippet dialogInner()}
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        required
+                                        class="b3-text-field"
+                                        bind:value={book.bookInfo.finishDays}
+                                    />
+                                    <button
+                                        class="b3-button b3-button--outline"
+                                        onclick={() => {
+                                            book.bookInfo.finishShowInput = false;
+                                            progStorage.setFinishDays(
+                                                book.bookID,
+                                                validateNum(
+                                                    book.bookInfo.finishDays,
+                                                    0,
+                                                ),
+                                            );
+                                        }}>💾</button
+                                    >
+                                {/snippet}
+                            </DialogSvelte>
+                        </td>
+                        <td>
+                            <button
+                                title="{tomatoI18n.重新分片}《{book.row
+                                    .content}》"
+                                class="b3-button b3-button--outline"
+                                onclick={() =>
+                                    btnAddProgressiveReadingWithLock(
+                                        book.bookID,
+                                    )}>🍕</button
+                            >
+                        </td>
+                    </tr>
+                {/each}
+            </tbody>
+        </table>
+    {/snippet}
+</DialogSvelte>
 
 <style>
+    .finishedIgnore {
+        background-color: var(--b3-font-background8);
+    }
 </style>

@@ -183,11 +183,11 @@
                     spellcheck="false"
                 ></textarea>
             </label>
-            <button class="b3-button b3-button--outline" onclick={active}>
+            <button class="b3-button b3-button--outline tomato-button" onclick={active}>
                 {tomatoI18n.激活}
             </button>
             <button
-                class="b3-button b3-button--outline"
+                class="b3-button b3-button--outline tomato-button"
                 onclick={() => {
                     if (buyDIV.style.display) buyDIV.style.display = "";
                     else buyDIV.style.display = "none";
@@ -814,7 +814,7 @@
     </div>
 
     <div class="settingBox">
-        <button class="b3-button b3-button--outline" onclick={save}
+        <button class="b3-button b3-button--outline tomato-button" onclick={save}
             >{tomatoI18n.保存}</button
         >
     </div>

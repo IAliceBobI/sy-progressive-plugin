@@ -4,14 +4,11 @@ import { Plugin } from "siyuan";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 
-export class Storage {
+export class ProgressiveStorage {
     private plugin: Plugin;
 
-    constructor(plugin: Plugin) {
+    async onLayoutReady(plugin: Plugin) {
         this.plugin = plugin;
-    }
-
-    async onLayoutReady() {
         // load only need once, save many
         await utils.tryFixCfg(this.plugin.name, constants.STORAGE_BOOKS);
         await this.plugin.loadData(constants.STORAGE_BOOKS);
@@ -119,8 +116,40 @@ export class Storage {
         await siyuan.pushMsg(`${tomatoI18n.给分片内段落标上序号}：${opt}`);
     }
 
+    async setFinishDays(bookID: string, opt: number) {
+        await this.updateBookInfo(bookID, { finishDays: opt } as BookInfo);
+        await siyuan.pushMsg(`${tomatoI18n.计划读完本书的天数}：${opt}`);
+    }
+
+    static defaultBookInfo(): BookInfo {
+        return {
+            time: 0,
+            boxID: "",
+            point: 0,
+            bookID: "",
+            ignored: false,
+            autoCard: false,
+            showLastBlock: false,
+            autoSplitSentenceP: false,
+            autoSplitSentenceI: false,
+            autoSplitSentenceT: false,
+            addIndex2paragraph: false,
+            finishDays: 0,
+            finishTimeSecs: 0,
+            finishShowInput: false,
+            finishPieceID: "",
+            finishIgnore: false,
+        }
+    }
+
+    async resetBookInfo(docID: string, opt: BookInfo) {
+        this.booksInfos()[docID] = opt;
+        return this.saveBookInfos();
+    }
+
     private async updateBookInfo(docID: string, opt: BookInfo) {
         if (docID?.length !== "20231218000645-9aaaltd".length) return;
+
         const info = await this.booksInfo(docID);
         if (typeof opt.addIndex2paragraph === "boolean") info.addIndex2paragraph = opt.addIndex2paragraph;
         if (typeof opt.autoCard === "boolean") info.autoCard = opt.autoCard;
@@ -130,6 +159,8 @@ export class Storage {
         if (typeof opt.autoSplitSentenceT === "boolean") info.autoSplitSentenceT = opt.autoSplitSentenceT;
         if (typeof opt.autoSplitSentenceI === "boolean") info.autoSplitSentenceI = opt.autoSplitSentenceI;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
+        if (utils.isValidNumber(opt.finishDays)) info.finishDays = opt.finishDays;
+
         info.time = await siyuan.currentTimeMs();
         this.booksInfos()[docID] = info;
         return this.saveBookInfos();
@@ -139,18 +170,9 @@ export class Storage {
         if (!docID) return {} as BookInfo;
         let info = this.booksInfos()[docID];
         if (!info) {
-            info = {
-                point: 0,
-                bookID: docID,
-                time: await siyuan.currentTimeMs(),
-                ignored: false,
-                showLastBlock: false,
-                autoCard: false,
-                autoSplitSentenceP: false,
-                autoSplitSentenceT: false,
-                autoSplitSentenceI: false,
-                addIndex2paragraph: false,
-            } as BookInfo;
+            info = ProgressiveStorage.defaultBookInfo();
+            info.bookID = docID;
+            info.time = await siyuan.currentTimeMs();
             this.booksInfos()[docID] = info;
         }
         if (!info.boxID) {
@@ -206,6 +228,8 @@ export class Storage {
         return idx.map(i => i.filter(j => j?.length > 0)).filter(i => i?.length > 0);
     }
 }
+
+export const progStorage = new ProgressiveStorage()
 
 export function afterLoad(data: any): string[][] {
     data = data?.data ?? "";

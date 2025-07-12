@@ -1,3 +1,7 @@
+.tomato-button {
+  color: var(--b3-font-color3) !important;
+}
+
 .protyle-wysiwyg div[custom-staticlink],
 .protyle-wysiwyg div[custom-tomato-readingpoint] {
   opacity: 0.65;
@@ -97,10 +101,9 @@
 .protyle-wysiwyg div[data-inline-comment]:hover::before {
   content: attr(data-inline-comment);
   color: var(--b3-font-color2);
-  background-color: var(--b3-font-background2);
-  font-size: 1em;
+  font-size: smaller;
   padding: 4px 8px;
-  left: -35px; // 悬停时加大左偏移
+  left: -50px;
   top: 0;
   transform: translateY(-50%);
 }
@@ -152,50 +155,6 @@
 // .tomato-cmd-box {
 //   animation: tomatoFadeIn 0.3s forwards 3;
 // }
-
-.tomato-style {
-  &__bkContainer {
-    font-size: larger;
-  }
-
-  &__bkContent {
-    padding-left: 30px;
-
-    ul {
-      padding-left: 20px;
-    }
-
-    ul ul {
-      padding-left: 40px;
-    }
-
-    ul ul ul {
-      padding-left: 60px;
-    }
-  }
-
-  &__container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-  }
-
-  &__centered-text {
-    text-align: center;
-    font-size: 30px;
-  }
-
-  &__code {
-    background-color: var(--b3-protyle-code-linenumber-hl);
-    color: var(--b3-font-color5);
-    font-size: small;
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-family: "Courier New", monospace;
-    vertical-align: top;
-  }
-}
 
 #tomato-mind-wire-svg-container {
   position: absolute;

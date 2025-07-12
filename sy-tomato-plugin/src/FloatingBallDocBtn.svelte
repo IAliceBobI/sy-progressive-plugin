@@ -8,10 +8,11 @@
     import {
         FloatingBallDocType_autoclose,
         FloatingBallDocType_dialog,
+        FloatingBallDocType_float,
         FloatingBallDocType_tab,
         SPACE,
     } from "./libs/gconst";
-    import { Dialog } from "siyuan";
+    import { confirm, Dialog } from "siyuan";
     import { newID } from "stonev5-utils/lib/id";
     import { events } from "./libs/Events";
     import { OpenSyFile2 } from "./libs/docUtils";
@@ -24,13 +25,14 @@
     import { dialog2floating } from "./libs/DialogText";
     import {
         getFloatingBallDocBtn,
-        getFloatingBallProtyle,
+        getFloatingBallProtyleDialog,
     } from "./FloatingBall";
     import { tomatoI18n } from "./tomatoI18n";
     import {
         floatingballDocList,
         storeNoteBox_selectedNotebook,
     } from "./libs/stores";
+    import { arrayDeleteFromLeft } from "stonev5-utils";
 
     interface Props {
         dm: DestroyManager;
@@ -51,7 +53,27 @@
 
     export function destroy() {}
 
-    export async function toggleOpen(_event: MouseEvent) {
+    export async function toggleOpen(event: MouseEvent) {
+        if (event) {
+            if (
+                event.ctrlKey ||
+                event.altKey ||
+                event.shiftKey ||
+                event.metaKey
+            ) {
+                confirm(tomatoI18n.解除悬浮球与文档之间的绑定, "⚠️", () => {
+                    arrayDeleteFromLeft($floatingballDocList, (i) => {
+                        return i.docID != item.docID;
+                    });
+                    item.openOnCreate = false;
+                    floatingballDocList.write();
+                    getFloatingBallProtyleDialog(item)?.destroyBy();
+                    getFloatingBallDocBtn(item)?.destroyBy();
+                    return;
+                });
+                return;
+            }
+        }
         item.docID = "";
         if (item.docName === "$$dailynote") {
             if (storeNoteBox_selectedNotebook.get()) {
@@ -109,8 +131,9 @@
                         openByDialog(true);
                     }
                     break;
+                case FloatingBallDocType_float.id:
                 default:
-                    getFloatingBallProtyle(item);
+                    getFloatingBallProtyleDialog(item);
                     item.openOnCreate = true;
                     floatingballDocList.write();
                     getFloatingBallDocBtn(item)?.destroyBy();
@@ -169,8 +192,8 @@
         onmouseup={(event) => {
             btnHelper.handleMouseUp(event, toggleOpen);
         }}
-        title={item.docName}
-        class="b3-button b3-button--outline"
+        title={tomatoI18n.ctrl点击删除按钮 + "@" + item.docName}
+        class="b3-button b3-button--outline tomato-button"
     >
         {item.docIcon}
     </button>

@@ -16,6 +16,8 @@ type TSK = keyof TomatoSettings
 
 type TomatoSettings = {
     prefixArticlesSoftLimit: string,
+    floatingballDocTabMenu: boolean,
+    prefixArticlesTagsShow: boolean,
     fastNoteBoxDocPrefix: boolean,
     commentBoxSaveUnderDoc: boolean,
     dailyNoteMoveLeaveLnk: boolean,
@@ -468,6 +470,8 @@ interface Funding {
 
 interface TomatoGlobal {
     prog_zZmqus5PtYRi: {
+        timeUtil: any;
+        siyuan: any;
         pluginConfig: TomatoSettings;
         save?: () => void;
     },

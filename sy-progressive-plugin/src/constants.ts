@@ -5,6 +5,7 @@ export const AddProgressiveReadingLock = "AddProgressiveReadingLock";
 export const BuildContentsLock = "BuildContentsLock";
 export const StartToLearnLock = "StartToLearnLock";
 export const IndexTime2Wait = 400;
+export const NotVIPMaxPlannedBooks = 4;
 
 export enum HtmlCBType {
     previous = 0,
