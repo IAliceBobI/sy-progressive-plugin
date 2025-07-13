@@ -232,12 +232,15 @@ async function doFindDoc(bookID: string, func: Func, point?: number) {
 export async function createAllPieces(bookID: string) {
     const info = await progStorage.booksInfo(bookID)
     const index = await progStorage.loadBookIndexIfNeeded(bookID)
+    const ids = [];
     for (let i = 0; i < index.length; i++) {
-        await createPiece(info, index, i)
+        const id = await createPiece(info, index, i, info.finishDays <= 0)
+        ids.push(id)
     }
+    return ids;
 }
 
-export async function createPiece(bookInfo: BookInfo, index: string[][], point: number) {
+export async function createPiece(bookInfo: BookInfo, index: string[][], point: number, allowCard = true) {
     if (bookInfo == null || index == null || point == null) return "";
     if (point > index.length - 1) return ""
     if (point < 0) return ""
@@ -253,17 +256,11 @@ export async function createPiece(bookInfo: BookInfo, index: string[][], point: 
     await addReadingBtns(bookInfo.bookID, noteID, point);
     await fullfilContent(point, bookInfo.bookID, piecePre, piece, noteID, null);
 
-    if (bookInfo.autoCard) {
-        if (bookInfo.finishDays <= 0) {
-            addCardSetDueTime(noteID, 1000); // 全加。
-        } else {
-            if (!bookInfo.finishPieceID) {
-                addCardSetDueTime(noteID, 1000); // 只加一次，后续有插件安排。
-            }
-        }
+    if (bookInfo.autoCard && allowCard) {
+        addCardSetDueTime(noteID, 1000);
     }
 
-    if (!bookInfo.finishPieceID) { // 只维护一次，后续有插件安排。
+    if (!bookInfo.finishPieceID) { // 初始化 finishPieceID
         bookInfo.finishPieceID = noteID;
         await progStorage.resetBookInfo(bookInfo.bookID, bookInfo);
     }

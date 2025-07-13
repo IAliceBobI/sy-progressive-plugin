@@ -2,6 +2,7 @@
     import { onDestroy, onMount } from "svelte";
     import { prog } from "./Progressive";
     import {
+        addCardSetDueTime,
         isValidNumber,
         siyuan,
     } from "../../sy-tomato-plugin/src/libs/utils";
@@ -178,7 +179,10 @@
 
         // 实际执行拆分书籍
         if (createPiecesNow) {
-            await createAllPieces(bookID);
+            const ids = await createAllPieces(bookID);
+            if (autoCard && ids.length > 0 && finishDays > 0) {
+                addCardSetDueTime(ids.at(0), 1000);
+            }
         }
         await prog.startToLearnWithLock(bookID);
     }

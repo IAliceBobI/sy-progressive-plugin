@@ -388,10 +388,10 @@ class Progressive {
                     for (let j = 0; j < idx[i].length; j++) {
                         if (blockID === idx[i][j]) {
                             await progStorage.gotoBlock(bookID, i);
-                            await this.startToLearnWithLock(bookID);
+                            await this.startToLearnWithLock(bookID);//创建分片
                             setTimeout(async () => {
                                 const pieceBlockID = await this.getPiecesByRefID(blockID)
-                                if (pieceBlockID) await OpenSyFile2(this.plugin, pieceBlockID);
+                                if (pieceBlockID) await OpenSyFile2(this.plugin, pieceBlockID);//跳到分片内的块
                             }, 1200);
                             return;
                         }

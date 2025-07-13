@@ -1,6 +1,6 @@
 import { objOverrideNull } from "stonev5-utils";
 import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { addCardSetDueTime, siyuan, sleep } from "../../sy-tomato-plugin/src/libs/utils";
+import { siyuan, sleep } from "../../sy-tomato-plugin/src/libs/utils";
 import { createPiece } from "./helper";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { NotVIPMaxPlannedBooks } from "./constants";
@@ -8,7 +8,7 @@ import { NotVIPMaxPlannedBooks } from "./constants";
 export async function startTaskLoop() {
     await verifyKeyProgressive()
     while (true) {
-        await sleep(5000);
+        await sleep(20000);
         try {
             await loopBooks()
         } catch (e) {
@@ -78,6 +78,5 @@ async function createCard(book: BookInfo, bookIdx: string[][]) {
     book.autoCard = true;
     book.finishPieceID = await createPiece(book, bookIdx, book.point);
     book.finishTimeSecs = await siyuan.currentTimeSec();
-    addCardSetDueTime(book.finishPieceID, 1000);
     await progStorage.resetBookInfo(book.bookID, book);
 }
