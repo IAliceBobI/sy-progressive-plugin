@@ -19,9 +19,9 @@ import { addClickEvent, btn, getContentPrefix } from "./ProgressiveBtn";
 import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { mount, unmount } from "svelte";
-import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
+import { mount, } from "svelte";
 import { fullfilContent } from "./helper";
+import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
 
 export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK 2025-5-12 21:37:37", "⚙️", () => tomatoI18n.渐进学习的设置)
 export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn 2025-5-13 13:32:20", "📖", () => tomatoI18n.开始学习)
@@ -352,14 +352,18 @@ class Progressive {
     }
 
     private async addProgressiveReadingDialog(bookID: string, bookName: string,) {
-        const dm = new DestroyManager()
-        const addBook = mount(AddBookSvelte, {
-            target: document.body,
-            props: {
-                bookID, bookName, dm,
-            }
+        showDialog((target, dm) => {
+            return mount(AddBookSvelte, {
+                target,
+                props: {
+                    bookID, bookName, dm,
+                }
+            });
+        }, {
+            title: bookName,
+            width: events.isMobile ? "90vw" : undefined,
+            height: events.isMobile ? "180vw" : undefined,
         });
-        dm.add("svelte", () => unmount(addBook))
     }
 
     async readThisPiece(blockID?: string) {
@@ -648,14 +652,18 @@ class Progressive {
     }
 
     async viewAllProgressiveBooks() {
-        const dm = new DestroyManager();
-        const s = mount(ShowAllBooksSvelte, {
-            target: document.body,
-            props: {
-                dm,
-            }
+        showDialog((target, dm) => {
+            return mount(ShowAllBooksSvelte, {
+                target,
+                props: {
+                    dm,
+                }
+            });
+        }, {
+            title: this.plugin.i18n.viewAllProgressiveBooks,
+            width: events.isMobile ? "90vw" : undefined,
+            height: events.isMobile ? "180vw" : "800px",
         });
-        dm.add("svelte", () => unmount(s))
     }
 }
 

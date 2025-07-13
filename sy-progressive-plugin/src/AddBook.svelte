@@ -12,7 +12,6 @@
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
     import { createAllPieces } from "./helper";
     import { progStorage, ProgressiveStorage } from "./ProgressiveStorage";
-    import DialogSvelte from "../../sy-tomato-plugin/src/libs/DialogSvelte.svelte";
     import { readableDuration, validateNum } from "stonev5-utils";
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
@@ -29,7 +28,6 @@
     onDestroy(destroy);
 
     let hasCalcPiece = $state(false);
-    let show = $state(true);
     let wordCount = $state(0);
     let textLen = $state(0);
     let headCount = $state(1);
@@ -186,176 +184,161 @@
     }
 </script>
 
-<DialogSvelte
-    bind:show
-    title={bookName}
-    {dm}
-    width={500}
-    maxWidth={500}
-    useBrowserStorage={true}
-    savePositionKey="add doc to prog 2025-07-11 10:18:31"
->
-    {#snippet dialogInner()}
-        <div class="container">
-            <div>
-                {tomatoI18n.总字数} : {wordCount}<br />
-                {tomatoI18n.总文本长度} : {textLen}<br />
-                {tomatoI18n.各级标题数} : {headCount}<br />
-                {tomatoI18n.总内容块数} : {contentBlockLen}<br />
-                {tomatoI18n.平均每个标题下有x块(
-                    Math.ceil(contentBlockLen / headCount),
-                )}<br />
-                {tomatoI18n.平均每个块的字数(
-                    Math.ceil(wordCount / contentBlockLen),
-                )}<br />
-                {tomatoI18n.平均每个块的文本长度(
-                    Math.ceil(textLen / contentBlockLen),
-                )}<br />
-                {tomatoI18n.分片数量} : {pieceCount}
-                <button
-                    class="b3-button b3-button--outline tomato-button"
-                    onclick={countPieces}>{tomatoI18n.计算分片数量}</button
-                >
-            </div>
-            {#if disabled}
-                <div>
-                    <p class="notice">🫸🫸🫸{tomatoI18n.请耐心等待}🫷🫷🫷</p>
-                </div>
-            {:else}
-                <!-- 标题拆分 -->
-                <div>
-                    <label>
-                        <p>{prog.plugin.i18n.splitByHeadings}</p>
-                        <input
-                            type="text"
-                            class="b3-text-field"
-                            placeholder="1,2,3,4,5,6,b"
-                            bind:value={headingsText}
-                            oninput={() => (hasCalcPiece = false)}
-                        />
-                    </label>
-                </div>
-                <!-- length拆分 -->
-                <div>
-                    <label>
-                        <p>{tomatoI18n.按文本长度拆分}</p>
-                        <input
-                            type="number"
-                            required
-                            class="b3-text-field"
-                            placeholder="300"
-                            min="0"
-                            bind:value={splitWordNum}
-                            onblur={() =>
-                                (splitWordNum = validateNum(splitWordNum, 0))}
-                            oninput={() => (hasCalcPiece = false)}
-                        />
-                    </label>
-                </div>
-                <!-- 计划阅读 -->
-                {#if autoCard}
-                    <div>
-                        <label>
-                            <p>{tomatoI18n.计划读完本书的天数}</p>
-                            <input
-                                type="number"
-                                required
-                                class="b3-text-field"
-                                placeholder="30"
-                                min="0"
-                                bind:value={finishDays}
-                                onblur={() => {
-                                    finishDays = validateNum(finishDays, 0);
-                                    if (!hasCalcPiece) {
-                                        countPieces();
-                                    }
-                                }}
-                            />
-                            <p class="kbd">{tips}</p>
-                            {#if createPiecesNow && !(finishDays > 0)}
-                                <a
-                                    href="https://awx9773btw.feishu.cn/docx/KwZJdW9BeoHkiRxVg6jcLUnanqf"
-                                    >相关：番茄工具箱的均匀推迟功能，重新规划当前文档和其子文档中，所有闪卡的划复习时间。</a
-                                >
-                            {/if}
-                        </label>
-                    </div>
-                {/if}
-
-                <!-- 开关 -->
-                <div class="container">
-                    <!-- 一次性创建分片 -->
-                    <label>
-                        <input
-                            type="checkbox"
-                            class="b3-switch"
-                            bind:checked={createPiecesNow}
-                        />
-                        {tomatoI18n.立刻创建所有的分片}
-                    </label>
-                    <!-- 闪卡 -->
-                    <label title={prog.plugin.i18n.autoCard}>
-                        <input
-                            type="checkbox"
-                            class="b3-switch"
-                            bind:checked={autoCard}
-                        />
-                        {tomatoI18n.分片都加入闪卡}
-                    </label>
-                    <!-- 末尾块 -->
-                    <label>
-                        <input
-                            type="checkbox"
-                            class="b3-switch"
-                            bind:checked={showLastBlock}
-                        />
-                        {tomatoI18n.显示上一个分片的最后一个块}
-                    </label>
-                    <!-- 标号 -->
-                    <label>
-                        <input
-                            type="checkbox"
-                            class="b3-switch"
-                            bind:checked={addIndex}
-                        />
-                        {tomatoI18n.新建分片时给段落标上序号}
-                    </label>
-                </div>
-
-                <!-- 单选 -->
-                <div class="container">
-                    {#each ["p", "t", "i", "no"] as t}
-                        <label>
-                            <input
-                                type="radio"
-                                name="scoops"
-                                value={t}
-                                bind:group={splitType}
-                            />
-                            {t == "no" ? tomatoI18n.不断句 : ""}
-                            {t == "p" ? tomatoI18n.断句为段落块 : ""}
-                            {t == "t" ? tomatoI18n.断句为任务块 : ""}
-                            {t == "i" ? tomatoI18n.断句为无序表 : ""}
-                        </label>
-                    {/each}
-                </div>
-
-                <!-- 保存 -->
-                <div class="btns">
-                    <button
-                        class="b3-button b3-button--outline tomato-button"
-                        onclick={process}
-                        >{prog.plugin.i18n.addOrReaddDoc}</button
-                    >
-                    <button
-                        class="b3-button b3-button--outline tomato-button"
-                        onclick={destroy}>{tomatoI18n.退出}</button
-                    >
-                </div>
-            {/if}
+<div class="container">
+    <div>
+        {tomatoI18n.总字数} : {wordCount}<br />
+        {tomatoI18n.总文本长度} : {textLen}<br />
+        {tomatoI18n.各级标题数} : {headCount}<br />
+        {tomatoI18n.总内容块数} : {contentBlockLen}<br />
+        {tomatoI18n.平均每个标题下有x块(
+            Math.ceil(contentBlockLen / headCount),
+        )}<br />
+        {tomatoI18n.平均每个块的字数(Math.ceil(wordCount / contentBlockLen))}<br
+        />
+        {tomatoI18n.平均每个块的文本长度(
+            Math.ceil(textLen / contentBlockLen),
+        )}<br />
+        {tomatoI18n.分片数量} : {pieceCount}
+        <button
+            class="b3-button b3-button--outline tomato-button"
+            onclick={countPieces}>{tomatoI18n.计算分片数量}</button
+        >
+    </div>
+    {#if disabled}
+        <div>
+            <p class="notice">🫸🫸🫸{tomatoI18n.请耐心等待}🫷🫷🫷</p>
         </div>
-    {/snippet}
-</DialogSvelte>
+    {:else}
+        <!-- 标题拆分 -->
+        <div>
+            <label>
+                <p>{prog.plugin.i18n.splitByHeadings}</p>
+                <input
+                    type="text"
+                    class="b3-text-field"
+                    placeholder="1,2,3,4,5,6,b"
+                    bind:value={headingsText}
+                    oninput={() => (hasCalcPiece = false)}
+                />
+            </label>
+        </div>
+        <!-- length拆分 -->
+        <div>
+            <label>
+                <p>{tomatoI18n.按文本长度拆分}</p>
+                <input
+                    type="number"
+                    required
+                    class="b3-text-field"
+                    placeholder="300"
+                    min="0"
+                    bind:value={splitWordNum}
+                    onblur={() => (splitWordNum = validateNum(splitWordNum, 0))}
+                    oninput={() => (hasCalcPiece = false)}
+                />
+            </label>
+        </div>
+        <!-- 计划阅读 -->
+        {#if autoCard}
+            <div>
+                <label>
+                    <p>{tomatoI18n.计划读完本书的天数}</p>
+                    <input
+                        type="number"
+                        required
+                        class="b3-text-field"
+                        placeholder="30"
+                        min="0"
+                        bind:value={finishDays}
+                        onblur={() => {
+                            finishDays = validateNum(finishDays, 0);
+                            if (!hasCalcPiece) {
+                                countPieces();
+                            }
+                        }}
+                    />
+                    <p class="kbd">{tips}</p>
+                    {#if createPiecesNow && !(finishDays > 0)}
+                        <a
+                            href="https://awx9773btw.feishu.cn/docx/KwZJdW9BeoHkiRxVg6jcLUnanqf"
+                            >相关：番茄工具箱的均匀推迟功能，重新规划当前文档和其子文档中，所有闪卡的划复习时间。</a
+                        >
+                    {/if}
+                </label>
+            </div>
+        {/if}
+
+        <!-- 开关 -->
+        <div class="container">
+            <!-- 一次性创建分片 -->
+            <label>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={createPiecesNow}
+                />
+                {tomatoI18n.立刻创建所有的分片}
+            </label>
+            <!-- 闪卡 -->
+            <label title={prog.plugin.i18n.autoCard}>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={autoCard}
+                />
+                {tomatoI18n.分片都加入闪卡}
+            </label>
+            <!-- 末尾块 -->
+            <label>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={showLastBlock}
+                />
+                {tomatoI18n.显示上一个分片的最后一个块}
+            </label>
+            <!-- 标号 -->
+            <label>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={addIndex}
+                />
+                {tomatoI18n.新建分片时给段落标上序号}
+            </label>
+        </div>
+
+        <!-- 单选 -->
+        <div class="container">
+            {#each ["p", "t", "i", "no"] as t}
+                <label>
+                    <input
+                        type="radio"
+                        name="scoops"
+                        value={t}
+                        bind:group={splitType}
+                    />
+                    {t == "no" ? tomatoI18n.不断句 : ""}
+                    {t == "p" ? tomatoI18n.断句为段落块 : ""}
+                    {t == "t" ? tomatoI18n.断句为任务块 : ""}
+                    {t == "i" ? tomatoI18n.断句为无序表 : ""}
+                </label>
+            {/each}
+        </div>
+
+        <!-- 保存 -->
+        <div class="btns">
+            <button
+                class="b3-button b3-button--outline tomato-button"
+                onclick={process}>{prog.plugin.i18n.addOrReaddDoc}</button
+            >
+            <button
+                class="b3-button b3-button--outline tomato-button"
+                onclick={destroy}>{tomatoI18n.退出}</button
+            >
+        </div>
+    {/if}
+</div>
 
 <style>
     .btns {
