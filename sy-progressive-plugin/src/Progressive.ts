@@ -22,6 +22,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { mount, } from "svelte";
 import { fullfilContent } from "./helper";
 import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
+import { pressSkip, showCardAnswer } from "../../sy-tomato-plugin/src/libs/cardUtils";
 
 export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK 2025-5-12 21:37:37", "⚙️", () => tomatoI18n.渐进学习的设置)
 export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn 2025-5-13 13:32:20", "📖", () => tomatoI18n.开始学习)
@@ -536,16 +537,22 @@ class Progressive {
                 await progStorage.gotoBlock(bookID, point - 1);
                 await this.startToLearnWithLock(bookID);
                 this.closePeices(bookID);
+                showCardAnswer();
+                pressSkip()
                 break;
             case HtmlCBType.next:
                 await progStorage.gotoBlock(bookID, point + 1);
                 await this.startToLearnWithLock(bookID);
                 this.closePeices(bookID);
+                showCardAnswer();
+                pressSkip()
                 break;
             case HtmlCBType.deleteAndExit:
                 confirm("⚠️", "🏃 🗑", async () => {
                     await siyuan.removeRiffCards([noteID]);
                     siyuan.removeDocByID(noteID);
+                    showCardAnswer();
+                    pressSkip()
                 });
                 break;
             case HtmlCBType.deleteAndBack:
@@ -555,6 +562,8 @@ class Progressive {
                     await this.startToLearnWithLock(bookID);
                     siyuan.removeDocByID(noteID);
                     this.closePeices(bookID);
+                    showCardAnswer();
+                    pressSkip()
                 });
                 break;
             case HtmlCBType.deleteAndNext:
@@ -564,15 +573,21 @@ class Progressive {
                     await this.startToLearnWithLock(bookID);
                     siyuan.removeDocByID(noteID);
                     this.closePeices(bookID);
+                    showCardAnswer();
+                    pressSkip()
                 });
                 break;
             case HtmlCBType.nextBook:
                 await this.startToLearnWithLock();
+                showCardAnswer();
+                pressSkip()
                 break;
             case HtmlCBType.quit: {
                 const t = await OpenSyFile2(this.plugin, noteID);
                 await utils.sleep(200);
                 t?.close();
+                showCardAnswer();
+                pressSkip()
                 break;
             }
             case HtmlCBType.AddDocCard:
@@ -580,6 +595,8 @@ class Progressive {
                 break;
             case HtmlCBType.DelDocCard:
                 await siyuan.removeRiffCards([noteID]);
+                showCardAnswer();
+                pressSkip()
                 break;
             case HtmlCBType.ignoreBook:
                 await progStorage.setIgnoreBook(bookID);

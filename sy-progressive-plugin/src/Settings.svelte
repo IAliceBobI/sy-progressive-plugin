@@ -64,6 +64,7 @@
         add2piecesBtn2lockIcon,
         add2digBtn2lockIcon,
         hideVIP,
+        finishPieceCreateAt,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import TomatoVIP from "../../sy-tomato-plugin/src/TomatoVIP.svelte";
@@ -99,7 +100,7 @@
         PieceMovingBox移动到上一分片内,
         PieceMovingBox移动到下一分片内,
     } from "./PieceMovingBox";
-    import { SPACE } from "../../sy-tomato-plugin/src/libs/gconst";
+    import { FrontEnds, SPACE } from "../../sy-tomato-plugin/src/libs/gconst";
     import {
         Progressive开始学习,
         Progressive开始随机学习,
@@ -183,7 +184,10 @@
                     spellcheck="false"
                 ></textarea>
             </label>
-            <button class="b3-button b3-button--outline tomato-button" onclick={active}>
+            <button
+                class="b3-button b3-button--outline tomato-button"
+                onclick={active}
+            >
                 {tomatoI18n.激活}
             </button>
             <button
@@ -505,6 +509,25 @@
 
     <div class="settingBox">
         <input
+            spellcheck="false"
+            class="b3-text-field"
+            bind:value={$finishPieceCreateAt}
+            onblur={() => {
+                $finishPieceCreateAt = $finishPieceCreateAt.trim();
+                if (!FrontEnds.includes($finishPieceCreateAt)) {
+                    $finishPieceCreateAt = "desktop";
+                }
+            }}
+        />
+        <p>
+            all, desktop, desktop-window, mobile, browser-desktop,
+            browser-mobile
+        </p>
+        {tomatoI18n.计划读书的分片由哪个前端自动创建}
+    </div>
+
+    <div class="settingBox">
+        <input
             type="checkbox"
             class="b3-switch"
             bind:checked={$doubleClick2DigestMobile}
@@ -814,8 +837,9 @@
     </div>
 
     <div class="settingBox">
-        <button class="b3-button b3-button--outline tomato-button" onclick={save}
-            >{tomatoI18n.保存}</button
+        <button
+            class="b3-button b3-button--outline tomato-button"
+            onclick={save}>{tomatoI18n.保存}</button
         >
     </div>
 </div>

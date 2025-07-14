@@ -1,24 +1,28 @@
 import { objOverrideNull } from "stonev5-utils";
 import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { Siyuan, siyuan, sleep } from "../../sy-tomato-plugin/src/libs/utils";
+import { Siyuan, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import { createPiece } from "./helper";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { NotVIPMaxPlannedBooks } from "./constants";
+import { setGlobal } from "stonev5-utils";
+import { finishPieceCreateAt } from "../../sy-tomato-plugin/src/libs/stores";
+import { getFrontend } from "siyuan";
 
 export async function startTaskLoop() {
-    await verifyKeyProgressive()
-    while (true) {
-        await sleep(20000);
-        try {
-            await loopBooks()
-        } catch (e) {
-            console.error(e);
-        }
-        try {
-            await loopBookName()
-        } catch (e) {
-            console.error(e);
-        }
+    if (finishPieceCreateAt.get() == "all" || finishPieceCreateAt.get() == getFrontend()) {
+        await verifyKeyProgressive()
+        clearInterval(setGlobal("loopBooks 2025-07-14 13:12:09", setInterval(async () => {
+            try {
+                await loopBookName()
+            } catch (e) {
+                console.error(e);
+            }
+            try {
+                await loopBooks()
+            } catch (e) {
+                console.error(e);
+            }
+        }, 20000)))
     }
 }
 
