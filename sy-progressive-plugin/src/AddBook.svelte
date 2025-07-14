@@ -169,6 +169,7 @@
         info.showLastBlock = showLastBlock;
         info.addIndex2paragraph = addIndex;
         info.finishDays = finishDays;
+        info.bookName = bookName;
         info.finishTimeSecs = await siyuan.currentTimeSec();
         await progStorage.resetBookInfo(bookID, info);
 

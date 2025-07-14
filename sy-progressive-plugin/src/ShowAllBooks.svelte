@@ -55,7 +55,7 @@
             ret.bookIndex = await task.idx;
             ret.row = await task.row;
             if (!ret.row.content)
-                ret.row.content = `(${tomatoI18n.找不到此书籍})`;
+                ret.row.content = "🚫" + ret.bookInfo.bookName;
             books.push(ret);
         }
         books = books;

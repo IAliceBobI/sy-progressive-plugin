@@ -1,6 +1,6 @@
 import { objOverrideNull } from "stonev5-utils";
 import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { siyuan, sleep } from "../../sy-tomato-plugin/src/libs/utils";
+import { Siyuan, siyuan, sleep } from "../../sy-tomato-plugin/src/libs/utils";
 import { createPiece } from "./helper";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { NotVIPMaxPlannedBooks } from "./constants";
@@ -14,6 +14,21 @@ export async function startTaskLoop() {
         } catch (e) {
             console.error(e);
         }
+        try {
+            await loopBookName()
+        } catch (e) {
+            console.error(e);
+        }
+    }
+}
+
+async function loopBookName() {
+    for (const info of Object.values(progStorage.booksInfos())) {
+        const row = await siyuan.getRowByID(info.bookID)
+        if (row?.content && info.bookName != row.content) {
+            info.bookName = row.content
+            await progStorage.resetBookInfo(info.bookID, info);
+        }
     }
 }
 
@@ -21,62 +36,67 @@ async function loopBooks() {
     let count = NotVIPMaxPlannedBooks;
     if (lastVerifyResult()) count = Number.MAX_SAFE_INTEGER; // VIP
     const planned = Object.values(progStorage.booksInfos())
-        .filter(book => book.finishDays > 0)
-        .filter(book => book.ignored == false)
-        .map(book => {
-            return objOverrideNull(book, ProgressiveStorage.defaultBookInfo());
+        .filter(info => info.finishDays > 0)
+        .filter(info => info.ignored == false)
+        .map(info => {
+            return objOverrideNull(info, ProgressiveStorage.defaultBookInfo());
         });
-    for (const book of planned.slice(count)) {
-        book.finishIgnore = true;
+    for (const info of planned.slice(count)) {
+        info.finishIgnore = true;
     }
-    for (const book of planned.slice(0, count)) {
-        book.finishIgnore = false;
-        const bookIdx = await progStorage.loadBookIndexIfNeeded(book.bookID)
-        if (bookIdx.length > 0) {
-            const secInterval = Math.ceil((book.finishDays * 24 * 60 * 60) / bookIdx.length)
-            const nowSecs = await siyuan.currentTimeSec();
-            if (secInterval + book.finishTimeSecs <= nowSecs) {
-                try {
-                    await tryCreateCard(book, bookIdx)
-                } catch (e) {
-                    console.error(e)
+    for (const info of planned.slice(0, count)) {
+        info.finishIgnore = false;
+        if (await siyuan.checkBlockExist(info.bookID)) {
+            const notebook = Siyuan.notebooks.find(n => n.id == info.boxID);
+            if (notebook && notebook.closed === false) {
+                const bookIdx = await progStorage.loadBookIndexIfNeeded(info.bookID)
+                if (bookIdx.length > 0) {
+                    const secInterval = Math.ceil((info.finishDays * 24 * 60 * 60) / bookIdx.length)
+                    const nowSecs = await siyuan.currentTimeSec();
+                    if (secInterval + info.finishTimeSecs <= nowSecs) {
+                        try {
+                            await tryCreateCard(info, bookIdx)
+                        } catch (e) {
+                            console.error(e)
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-async function tryCreateCard(book: BookInfo, bookIdx: string[][]) {
-    if (!book.finishPieceID) { // 意外，需要创建新分片。
-        await createCard(book, bookIdx);
+async function tryCreateCard(info: BookInfo, bookIdx: string[][]) {
+    if (!info.finishPieceID) { // 意外，需要创建新分片。
+        await createCard(info, bookIdx);
         return;
     }
 
-    if (!(await siyuan.checkBlockExist(book.finishPieceID))) { // 当作复习后被用户删除分片，需要创建新分片。
-        await createCard(book, bookIdx);
+    if (!(await siyuan.checkBlockExist(info.finishPieceID))) { // 当作复习后被用户删除分片，需要创建新分片。
+        await createCard(info, bookIdx);
         return;
     }
 
-    const card = await siyuan.getRiffCardsByBlockIDs([book.finishPieceID])
+    const card = await siyuan.getRiffCardsByBlockIDs([info.finishPieceID])
         .then(m => {
-            return m?.get(book.finishPieceID)?.at(0);
+            return m?.get(info.finishPieceID)?.at(0);
         });
 
     if (card == null || card.riffCard == null || card.riffCard.state == null) { // 当作复习后被用户撤销闪卡，需要创建新分片。
-        await createCard(book, bookIdx);
+        await createCard(info, bookIdx);
         return;
     }
 
     if (card.riffCard.state != 0) { // 老分片用户已经复习过，可以创建新分片。
-        await createCard(book, bookIdx);
+        await createCard(info, bookIdx);
         return;
     }
 }
 
-async function createCard(book: BookInfo, bookIdx: string[][]) {
-    ++book.point;
-    book.autoCard = true;
-    book.finishPieceID = await createPiece(book, bookIdx, book.point);
-    book.finishTimeSecs = await siyuan.currentTimeSec();
-    await progStorage.resetBookInfo(book.bookID, book);
+async function createCard(info: BookInfo, bookIdx: string[][]) {
+    ++info.point;
+    info.autoCard = true;
+    info.finishPieceID = await createPiece(info, bookIdx, info.point);
+    info.finishTimeSecs = await siyuan.currentTimeSec();
+    await progStorage.resetBookInfo(info.bookID, info);
 }

@@ -9,6 +9,7 @@ type BookInfo = {
     boxID?: string,
     point?: number,
     bookID?: string,
+    bookName?: string,
     ignored?: boolean,
     autoCard?: boolean,
     showLastBlock?: boolean,
