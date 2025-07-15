@@ -3,7 +3,6 @@ import { addCardSetDueTime, siyuan } from "../../sy-tomato-plugin/src/libs/utils
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { IProtyle } from "siyuan";
 import { progStorage } from "./ProgressiveStorage";
-import { getReadingBtns1, getReadingBtns2, getReadingBtns3 } from "./ProgressiveBtn";
 import { isMultiLineElement } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -253,7 +252,6 @@ export async function createPiece(bookInfo: BookInfo, index: string[][], point: 
     noteID = await createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
     if (!noteID) return "";
 
-    await addReadingBtns(bookInfo.bookID, noteID, point);
     await fullfilContent(point, bookInfo.bookID, piecePre, piece, noteID, null);
 
     if (bookInfo.autoCard && allowCard) {
@@ -416,15 +414,6 @@ function allListItemlnk2self(div: HTMLDivElement, attrs?: AttrType) {
             }
         }
     });
-}
-
-async function addReadingBtns(bookID: string, noteID: string, point: number) {
-    const btns = [];
-    btns.push(tempContent("---"));
-    btns.push(tempContent(getReadingBtns1(bookID, noteID, point)));
-    btns.push(tempContent(getReadingBtns2(bookID, noteID, point)));
-    btns.push(tempContent(getReadingBtns3(bookID, noteID, point)));
-    await siyuan.appendBlock(btns.join("\n"), noteID);
 }
 
 async function createNote(boxID: string, bookID: string, piece: string[], point: number) {

@@ -15,7 +15,7 @@ import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { progStorage } from "./ProgressiveStorage";
 import { HtmlCBType } from "./constants";
 import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { addClickEvent, btn, getContentPrefix } from "./ProgressiveBtn";
+import { addClickEvent, btn, getContentPrefix, progressiveBtnFloating } from "./ProgressiveBtn";
 import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -203,6 +203,7 @@ class Progressive {
                     const element = protyle?.wysiwyg?.element as HTMLElement;
                     if (lock && element && nextDocID && notebookId) {
                         addClickEvent(element);
+                        await progressiveBtnFloating(protyle);
                     }
                 });
             }

@@ -22,6 +22,7 @@ import { mount } from "svelte";
 import { startTaskLoop } from "./ProgressiveTask";
 import { progStorage } from "./ProgressiveStorage";
 import { siyuan, timeUtil } from "../../sy-tomato-plugin/src/libs/utils";
+import { initProgFloatBtns } from "./ProgressiveBtn";
 
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
@@ -147,6 +148,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         await progStorage.onLayoutReady(this);
         await prog.onload(this, this.settingCfg);
         startTaskLoop();
+        initProgFloatBtns();
     }
 
     onunload(): void {
