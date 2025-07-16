@@ -7,13 +7,15 @@
     import { HtmlCBType } from "./constants";
 
     interface PropsType {
+        zIndexPlus: Writable<boolean>;
         show: Writable<boolean>;
         title: Writable<string>;
         point: Writable<number>;
         noteID: Writable<string>;
         bookID: Writable<string>;
     }
-    let { show, title, point, noteID, bookID }: PropsType = $props();
+    let { zIndexPlus, show, title, point, noteID, bookID }: PropsType =
+        $props();
 </script>
 
 <DialogSvelte
@@ -21,6 +23,7 @@
     title={$title}
     savePositionKey="ProgressiveFloatBtns 2025-07-16 00:06:03"
     isProgressive={true}
+    zIndexPlus={$zIndexPlus}
 >
     {#snippet dialogInner()}
         <div class="container">

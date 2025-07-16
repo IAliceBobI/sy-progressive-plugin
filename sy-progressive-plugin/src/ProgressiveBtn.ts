@@ -19,12 +19,13 @@ let title = writableWithGet("")
 let point = writableWithGet(0)
 let noteID = writableWithGet("")
 let bookID = writableWithGet("")
+let zIndexPlus = writableWithGet(false)
 
 export function initProgFloatBtns() {
     const btns = setGlobal("initProgFloatBtns 2025-07-15 23:47:53", mount(ProgressiveFloatBtns, {
         target: document.body,
         props: {
-            show, title, point, noteID, bookID,
+            show, title, point, noteID, bookID, zIndexPlus,
         }
     }));
     if (btns != null) {
@@ -34,9 +35,11 @@ export function initProgFloatBtns() {
 
 export async function progressiveBtnFloating(protyle: IProtyle) {
     let { attrs, docID, name } = events.getInfo(protyle)
+    zIndexPlus.set(false);
     if (protyle.element.classList.contains("card__block")) {
         attrs = await siyuan.getBlockAttrs(docID)
         name = attrs.title;
+        zIndexPlus.set(true);
     }
     const { _bookID, _point } = into(() => {
         // "插件管理勿改managedByPluginDoNotModify#20240123151020-gpjyj0l,0"
