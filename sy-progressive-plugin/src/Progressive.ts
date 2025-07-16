@@ -203,7 +203,24 @@ class Progressive {
                     const element = protyle?.wysiwyg?.element as HTMLElement;
                     if (lock && element && nextDocID && notebookId) {
                         addClickEvent(element);
-                        await progressiveBtnFloating(protyle);
+                    }
+                });
+            }
+        });
+
+        events.addListener("ProgressiveBox 2025-07-16 10:33:25", (eventType, detail: Protyle) => {
+            if (eventType == EventType.loaded_protyle_static
+                || eventType == EventType.loaded_protyle_dynamic
+                || eventType == EventType.destroy_protyle
+                || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                navigator.locks.request("ProgressiveBox 2025-07-16 10:33:20", { ifAvailable: true }, async (lock) => {
+                    const protyle: IProtyle = detail.protyle;
+                    if (!protyle) return;
+                    const notebookId = protyle.notebookId;
+                    const nextDocID = protyle?.block?.rootID;
+                    const element = protyle?.wysiwyg?.element as HTMLElement;
+                    if (lock && element && nextDocID && notebookId) {
+                        await progressiveBtnFloating(protyle, eventType == EventType.destroy_protyle);
                     }
                 });
             }

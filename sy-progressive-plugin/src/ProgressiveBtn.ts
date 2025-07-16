@@ -33,7 +33,7 @@ export function initProgFloatBtns() {
     }
 }
 
-export async function progressiveBtnFloating(protyle: IProtyle) {
+export async function progressiveBtnFloating(protyle: IProtyle, closed = false) {
     let { attrs, docID, name } = events.getInfo(protyle)
     zIndexPlus.set(false);
     if (protyle.element.classList.contains("card__block")) {
@@ -46,6 +46,13 @@ export async function progressiveBtnFloating(protyle: IProtyle) {
         const [_bookID, idxStr] = attrs?.["custom-progmark"]?.split("#")?.at(1)?.split(",") ?? []
         return { _bookID, _point: parseInt(idxStr) }
     });
+
+    if (closed) {
+        if (docID == noteID.get()) {
+            show.set(false)
+        }
+        return;
+    }
 
     if (_bookID != null && docID != null && Number.isInteger(_point)) {
         show.set(true)
