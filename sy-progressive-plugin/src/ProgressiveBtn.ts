@@ -7,7 +7,7 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { into, setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
-import { writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { hideBtnsInFlashCard, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
 
 const Prog_BUTTON = "custom-prog-button";
 const Prog_BUTTON_NoteID = "custom-prog-button-noteID";
@@ -37,6 +37,10 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     let { attrs, docID, name } = events.getInfo(protyle)
     zIndexPlus.set(false);
     if (protyle.element.classList.contains("card__block")) {
+        if (events.isMobile || hideBtnsInFlashCard.get()) {
+            show.set(false);
+            return;
+        }
         attrs = await siyuan.getBlockAttrs(docID)
         name = attrs.title;
         zIndexPlus.set(true);

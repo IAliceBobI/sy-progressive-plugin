@@ -174,11 +174,6 @@ class Progressive {
                     const welement = protyle?.wysiwyg?.element as HTMLElement;
                     const element = protyle?.element as HTMLElement;
                     if (!protyle || !welement || !element) return;
-                    if (this.settings.hideBtnsInFlashCard && element.classList.contains("card__block")) {
-                        element.querySelectorAll(`[${MarkKey}][${DATA_NODE_ID}]`).forEach((e: HTMLElement) => {
-                            e.style.display = "none";
-                        });
-                    }
                     const nextDocID = protyle?.block?.rootID;
                     const { isPiece } = help.isProtylePiece(protyle);
                     if (lock && nextDocID && isPiece) {

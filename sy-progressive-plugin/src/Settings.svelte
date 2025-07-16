@@ -704,7 +704,7 @@
             class="b3-switch"
             bind:checked={$hideBtnsInFlashCard}
         />
-        {tomatoI18n.在闪卡内复习整个分片时隐藏分片下方按钮}
+        {tomatoI18n.复习闪卡时隐藏分片按钮组}
     </div>
 
     <div class="settingBox">
