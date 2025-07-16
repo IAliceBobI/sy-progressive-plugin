@@ -1,6 +1,6 @@
 import { IProtyle } from "siyuan";
 import { CONTENT_EDITABLE, } from "../../sy-tomato-plugin/src/libs/gconst";
-import { getContenteditableElement, getSyElement, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { getContenteditableElement, getSyElement, isEditor, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { HtmlCBType } from "./constants";
 import { prog } from "./Progressive";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
@@ -44,6 +44,10 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         attrs = await siyuan.getBlockAttrs(docID)
         name = attrs.title;
         zIndexPlus.set(true);
+    } else {
+        if (!isEditor(protyle)) {
+            return;
+        }
     }
     const { _bookID, _point } = into(() => {
         // "插件管理勿改managedByPluginDoNotModify#20240123151020-gpjyj0l,0"
