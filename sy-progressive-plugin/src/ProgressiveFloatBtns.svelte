@@ -254,7 +254,7 @@
                             HtmlCBType.splitByPunctuations,
                             $point,
                         );
-                    }}>✂📜👑</button
+                    }}>✂📜</button
                 >
             {/if}
 

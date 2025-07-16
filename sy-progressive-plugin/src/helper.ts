@@ -340,7 +340,7 @@ export async function copyBlock(point: number, info: BookInfo, id: string, tempD
 }
 
 export async function splitAndInsert(bookID: string, noteID: string, t: AsList, ids: string[]) {
-    if (lastVerifyResult()) {
+    if (lastVerifyResult() || t == 'p') {
         const s = new SplitSentence(bookID, utils.getProgressivePluginInstance(), noteID, t);
         if (ids?.length > 0) {
             await s.splitByIDs(ids);
