@@ -260,7 +260,7 @@ export class DigestBuilder {
         const { idx, md } = await getDigestMd(this.settings, this.selected, this.protyle, split, true, false, this.attrs);
         if (md.length == 0) return;
         const digestID = await this.newDigestDoc(idx, md.join("\n"));
-        await this.otab.open(digestID, windowOpenStyle.get() as any);
+        await this.otab.open(digestID, windowOpenStyle.get() as any, this.ids.at(0));
         await this.setDigestCard(digestID);
         if (digestProgressiveBox.settings.markOriginText && !(await events.isDocReadonly(this.protyle, this.attrs))) {
             addPlusLnk(this.selected, digestID, digestProgressiveBox.lute);
