@@ -9,6 +9,7 @@ import { DomSuperBlockBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+import { into } from "stonev5-utils";
 
 type BlockContent = {
     ial?: AttrType, id?: string, markdown?: string, content?: string,
@@ -22,6 +23,7 @@ export const WC提取所有分片的笔记 = winHotkey("⌘F4", "提取所有分
 export const WC提取笔记到底部 = winHotkey("shift+alt+r", "提取笔记到底部 2025-5-13 09:34:24", "iconCopy", () => tomatoI18n.提取笔记到底部, true, send2exctract2bottomEnable)
 export const WC提取笔记 = winHotkey("⌘F5", "提取笔记 2025-5-13 09:34:24", "iconCopy", () => tomatoI18n.提取笔记)
 export const WC去除笔记颜色 = winHotkey("⌥⌘F5", "去除笔记颜色 2025-5-13 09:34:24", "iconTheme", () => tomatoI18n.去除笔记颜色, true, send2removeNoteColor)
+export const WC恢复笔记颜色 = winHotkey("⌥⌘F6", "恢复笔记颜色 2025-5-13 09:34:25", "iconTheme", () => tomatoI18n.恢复笔记颜色, true, send2removeNoteColor)
 export const WC合并所有分片到新文件 = winHotkey("⌥⌘F6", "合并所有分片到新文件 2025-5-13 09:34:21", "iconCopy", () => tomatoI18n.合并所有分片到新文件, true, merg2newBookEnable)
 export const WC对比原文 = winHotkey("⌘F6", "对比原文 2025-5-13 09:34:24", "iconEye", () => tomatoI18n.对比原文)
 
@@ -102,6 +104,14 @@ class WritingCompareBox {
                 if (WC去除笔记颜色.cmd()) await this.noColor(protyle);
             },
         });
+        this.plugin.addCommand({
+            langKey: WC恢复笔记颜色.langKey,
+            langText: WC恢复笔记颜色.langText(),
+            hotkey: WC恢复笔记颜色.m,
+            editorCallback: async (protyle) => {
+                if (WC恢复笔记颜色.cmd()) await this.noColor(protyle, false);
+            },
+        });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const protyle: IProtyle = detail.protyle;
             const { isPiece, markKey } = isProtylePiece(protyle);
@@ -148,6 +158,16 @@ class WritingCompareBox {
                         accelerator: WC去除笔记颜色.m,
                         click: async () => {
                             await this.noColor(protyle);
+                        },
+                    });
+                }
+                if (WC恢复笔记颜色.menu()) {
+                    menu.addItem({
+                        label: WC恢复笔记颜色.langText(),
+                        icon: WC恢复笔记颜色.icon,
+                        accelerator: WC恢复笔记颜色.m,
+                        click: async () => {
+                            await this.noColor(protyle, false);
                         },
                     });
                 }
@@ -207,10 +227,16 @@ class WritingCompareBox {
         OpenSyFile2(this.plugin, su.id);
     }
 
-    private async noColor(protyle: IProtyle) {
+    private async noColor(protyle: IProtyle, rm = true) {
         const { docID } = events.getInfo(protyle)
         const { root } = await getDocBlocks(docID, "", false, true, 1)
-        const attrs: AttrType = { "custom-prog-key-no-color": "1" };
+        const attrs: AttrType = into(() => {
+            if (rm) {
+                return { "custom-prog-key-no-color": "1" };
+            } else {
+                return { "custom-prog-key-no-color": "" };
+            }
+        });
         const param = root.children
             .filter(c => !getAttribute(c.div, "custom-prog-origin-text"))
             .map(c => {

@@ -71,6 +71,11 @@ class Events {
         return b == "darwin" || b == "ios";
     }
 
+    public get isWindows(): boolean {
+        const b = getBackend();
+        return b == "windows";
+    }
+
     private _isBrowser: boolean;
     public get isBrowser(): boolean {
         return this._isBrowser;

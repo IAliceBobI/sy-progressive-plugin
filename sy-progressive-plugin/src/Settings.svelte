@@ -95,6 +95,7 @@
         WC提取笔记,
         WC去除笔记颜色,
         WC合并所有分片到新文件,
+        WC恢复笔记颜色,
     } from "./WritingCompareBox";
     import {
         PieceMovingBox移动到上一分片内,
@@ -454,8 +455,12 @@
                 bind:checked={$send2removeNoteColor}
             />
             {tomatoI18n.menu添加右键菜单}:
-            {WC去除笔记颜色.langText()}<TomatoVIP {codeValid}
-            ></TomatoVIP><strong>{WC去除笔记颜色.w()}</strong>
+            {WC去除笔记颜色.langText()}
+            <TomatoVIP {codeValid}></TomatoVIP>
+            <strong>{WC去除笔记颜色.w()}</strong>
+            {WC恢复笔记颜色.langText()}
+            <TomatoVIP {codeValid}></TomatoVIP>
+            <strong>{WC恢复笔记颜色.w()}</strong>
         </div>
         <div class:codeNotValid>
             <input
