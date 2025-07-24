@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+          cache-dependency-path: |
+            sy-tomato-plugin/package-lock.json
+            sy-progressive-plugin/package-lock.json
 
       - name: Install dependencies
         run: |
