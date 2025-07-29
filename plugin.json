@@ -2,7 +2,7 @@
   "name": "sy-progressive-plugin",
   "author": "IAliceBobI",
   "url": "https://github.com/IAliceBobI/sy-progressive-plugin",
-  "version": "2.1.22",
+  "version": "2.1.23",
   "minAppVersion": "2.12.6",
   "backends": [
     "all"
@@ -15,8 +15,8 @@
     "zh_CN": "渐进学习"
   },
   "description": {
-    "default": "Excerpt-based progressive learning, chunk-based progressive learning, multi-line selection on mobile, double-tap to show menu on mobile, word highlighting with explanations, sentence splitting, split block by pressing Enter, merge blocks, word flashcards, multi-line cloze deletion, multi-line card creation, Daily Card, display pinyin for content",
-    "zh_CN": "【已开源】摘抄式渐进学习、分片式渐进学习、移动端双击多行选择、划词解释、断句拆分、按回车拆分块、合并块、单词闪卡、多行挖空、多行制卡、Daily Card、显示拼音"
+    "default": "[🔓Open Source] [🛡️GitHub Online Compilation] Excerpt-based progressive learning, chunk-based progressive learning, multi-line selection via double-tap on mobile, word highlighting with explanations, sentence splitting, split block by pressing Enter, merge blocks, word flashcards, multi-line cloze deletion, multi-line card creation, Daily Card, display pinyin for content",
+    "zh_CN": "【🔓已开源】【🛡️Github在线编译】摘抄式渐进学习、分片式渐进学习、移动端双击多行选择、划词解释、断句拆分、按回车拆分块、合并块、单词闪卡、多行挖空、多行制卡、Daily Card、显示拼音"
   },
   "readme": {
     "default": "README.md",

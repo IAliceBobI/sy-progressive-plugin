@@ -70,13 +70,7 @@ export class SplitSentence {
                 if (bookInfo?.addIndex2paragraph && !ps[0].startsWith("[")) {
                     ps[0] = `[${i}]` + ps[0];
                 }
-                for (const s of "\n。！？；：") ps = spliyBy(ps, s);
-                // ps = spliyBy(ps, ". ");
-                // ps = spliyBy(ps, ": ");
-                ps = spliyBy(ps, "……");
-                ps = spliyBy(ps, "! ");
-                ps = spliyBy(ps, "? ");
-                ps = spliyBy(ps, "; ");
+                ps = splitLines(ps);
                 let blocks: { text: string, id: string }[];
                 if (this.asList == "p") {
                     blocks = ps.map(i => i.trim())
@@ -108,6 +102,17 @@ export class SplitSentence {
         }
         return true;
     }
+}
+
+export function splitLines(ps: string[]) {
+    for (const s of "\n。！？；：") ps = splitBy(ps, s);
+    // ps = spliyBy(ps, ". ");
+    // ps = spliyBy(ps, ": ");
+    ps = splitBy(ps, "……");
+    ps = splitBy(ps, "! ");
+    ps = splitBy(ps, "? ");
+    ps = splitBy(ps, "; ");
+    return ps;
 }
 
 function getAttrLine(ref: string, idx: string) {
@@ -161,10 +166,10 @@ function movePunctuations(a: string, b: string) {
     return [a, b];
 }
 
-export function spliyBy(content: string[], s: string) {
+export function splitBy(content: string[], s: string) {
     const sentences: string[] = [];
     for (const c of content.filter(i => i.length > 0)) {
-        const parts = c.split(new RegExp("\\" + s, "g"));
+        const parts = c.split(s);
         for (let i = 0; i < parts.length; i++) {
             if (i < parts.length - 1) {
                 parts[i] += s;

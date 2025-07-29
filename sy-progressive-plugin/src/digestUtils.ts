@@ -4,7 +4,7 @@ import { cleanDiv, get_siyuan_lnk_md, getContenteditableElement, NewNodeID, pars
 import { getHPathByDocID, getTraceDoc } from "./helper";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
-import { spliyBy } from "./SplitSentence";
+import { splitLines } from "./SplitSentence";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
@@ -326,13 +326,7 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
             const attrLine = parts.pop();
             const edit = getAllContentEditableText(cloned, "\n");
             let ps = [edit];
-            for (const s of "\n。！？；：") ps = spliyBy(ps, s);
-            // ps = spliyBy(ps, ". ");
-            // ps = spliyBy(ps, ": ");
-            ps = spliyBy(ps, "……");
-            ps = spliyBy(ps, "! ");
-            ps = spliyBy(ps, "? ");
-            ps = spliyBy(ps, "; ");
+            ps = splitLines(ps);
             ps.map(p => replaceAll(p, "\u200b", "").trim())
                 .filter(p => !!p)
                 .filter(p => p != "@")
