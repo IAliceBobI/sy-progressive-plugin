@@ -26,7 +26,7 @@
     zIndexPlus={$zIndexPlus}
 >
     {#snippet dialogInner()}
-        <div class="container">
+        <div class="container" title={tomatoI18n.如果无法拖动}>
             <!-- ${btn(HtmlCBType.viewContents, "📜", tomatoI18n.打开目录, bookID, noteID, point, prog.settings.btnViewContents)} -->
             {#if getProgressivePluginConfig().btnViewContents}
                 <button

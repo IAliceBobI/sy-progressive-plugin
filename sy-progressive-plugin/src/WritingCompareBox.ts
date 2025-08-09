@@ -204,8 +204,7 @@ class WritingCompareBox {
         siyuan.pushMsg(tomatoI18n.提取笔记到底部, 1000);
         const docInfo = events.getInfo(protyle);
         const { root } = await getDocBlocks(docInfo.docID, docInfo.name, true, false, 1);
-        let lastID: string = root.children.find(c => getAttribute(c.div, "custom-progmark"))?.id
-        if (!lastID) lastID = await siyuan.getDocLastID(docInfo.docID)
+        const lastID = await siyuan.getDocLastID(docInfo.docID)
         const su = new DomSuperBlockBuilder();
         root.children
             .filter(c => !getAttribute(c.div, "custom-prog-origin-text"))

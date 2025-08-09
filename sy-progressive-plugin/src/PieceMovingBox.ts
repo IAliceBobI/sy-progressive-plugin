@@ -1,9 +1,9 @@
 import { IProtyle, Plugin } from "siyuan";
 import { getDocIalPieces, isProtylePiece } from "./helper";
-import { getAttribute, isValidNumber, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { isValidNumber, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
+import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { PieceMovingDown, PieceMovingUp } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
@@ -117,7 +117,7 @@ class PieceMovingBox {
                 const row = await siyuan.sqlOne(`select id from blocks where type='d' and ial like "%${getDocIalPieces(bookID, newPiece)}%"`);
                 if (row?.id) {
                     if (delta < 0) {
-                        const id = await getInsertPoint(row.id)
+                        const id = await siyuan.getDocLastID(row.id);
                         if (id) {
                             await siyuan.moveBlocksAfter(ids, id);
                             await OpenSyFile2(this.plugin, ids.at(0));
@@ -128,17 +128,6 @@ class PieceMovingBox {
                     }
                 }
             }
-        }
-    }
-}
-
-async function getInsertPoint(docID: string) {
-    const { root } = await getDocBlocks(docID, "", false, true, 1);
-    for (let i = 0; i < root.children.length; i++) {
-        const c = root.children.at(i);
-        const m = getAttribute(c.div, "custom-progmark")
-        if ((c.type === 'tb' || c.type === "s") && m) {
-            return root.children.at(i - 1)?.id
         }
     }
 }
