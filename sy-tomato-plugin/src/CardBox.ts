@@ -94,7 +94,7 @@ class CardBox {
             langKey: CardBox复习时跳过当前闪卡.langKey,
             langText: CardBox复习时跳过当前闪卡.langText(),
             hotkey: CardBox复习时跳过当前闪卡.m,
-            callback: async () => this.skip()
+            callback: pressSkip,
         });
         this.plugin.addCommand({
             langKey: CardBox清理所有失效的闪卡.langKey,
@@ -152,16 +152,29 @@ class CardBox {
                 clearInterval(setGlobal("tomato open card 2025-07-24 10:07:05",
                     setInterval(async () => {
                         if (!document.querySelector(`.card__action`)) {
-                            const cards = await siyuan.getRiffDueCards()
-                            const num = cards?.unreviewedCount || 0;
-                            if (num > 0) {
-                                await openTab({
-                                    app: this.plugin.app,
-                                    card: { type: "all" },
-                                    keepCursor: true,
-                                    removeCurrentTab: false,
-                                    openNewTab: true,
-                                });
+                            const existsCard = document.querySelectorAll(`li[data-initdata]`)
+                                .values()
+                                .toArray()
+                                .map(li => li.getAttribute('data-initdata'))
+                                .map(str => {
+                                    try {
+                                        return JSON.parse(str)
+                                    } catch (e) { }
+                                })
+                                .filter(json => json?.["customModelType"] == "siyuan-card")
+                                .length > 0;
+                            if (!existsCard) {
+                                const cards = await siyuan.getRiffDueCards()
+                                const num = cards?.unreviewedCount || 0;
+                                if (num > 0) {
+                                    await openTab({
+                                        app: this.plugin.app,
+                                        card: { type: "all" },
+                                        keepCursor: true,
+                                        removeCurrentTab: false,
+                                        openNewTab: true,
+                                    });
+                                }
                             }
                         }
                     }, 20000)
@@ -208,14 +221,9 @@ class CardBox {
                 await deleteBlock(cardID);
             }
             if (showCardAnswer()) await sleep(300);
-            pressSkip();
+            await pressSkip();
             await siyuan.pushMsg(tomatoI18n.取消制卡);
         }
-    }
-
-    private async skip() {
-        if (showCardAnswer()) await sleep(300);
-        pressSkip();
     }
 
     private getHK() {
@@ -241,7 +249,7 @@ class CardBox {
             nextBtn.style.minWidth = btnPrevious.style.minWidth;
             nextBtn.style.display = btnPrevious.style.display;
             nextBtn.innerHTML = `Skip${WEB_SPACE}<svg><use xlink:href="#iconRight"></use></svg>`;
-            nextBtn.addEventListener("click", () => this.skip());
+            nextBtn.addEventListener("click", pressSkip);
         }
     }
 

@@ -105,8 +105,8 @@ export default class ThePlugin extends BaseTomatoPlugin {
         super(options)
         this.loadProgStore = loadStore;
 
-        if (this.global.prog_zZmqus5PtYRi == null)
-            this.global.prog_zZmqus5PtYRi = {} as any
+        if (window.prog_zZmqus5PtYRi == null)
+            window.prog_zZmqus5PtYRi = {} as any
 
         this.taskCfg = this.loadData(STORAGE_Prog_SETTINGS).then(cfg => {
             this.settingCfg = cfg;
@@ -114,9 +114,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 this.settingCfg = {} as TomatoSettings;
             }
 
-            this.global.prog_zZmqus5PtYRi.pluginConfig = this.settingCfg;
-            this.global.prog_zZmqus5PtYRi.siyuan = siyuan
-            this.global.prog_zZmqus5PtYRi.timeUtil = timeUtil
+            window.prog_zZmqus5PtYRi.pluginConfig = this.settingCfg;
+            window.prog_zZmqus5PtYRi.siyuan = siyuan
+            window.prog_zZmqus5PtYRi.timeUtil = timeUtil
             loadStore(this);
             setGlobal(ProgressivePluginConfig, this.settingCfg)
             return this.settingCfg;

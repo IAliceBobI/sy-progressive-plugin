@@ -24,6 +24,8 @@
     savePositionKey="ProgressiveFloatBtns 2025-07-16 00:06:03"
     isProgressive={true}
     zIndexPlus={$zIndexPlus}
+    minHeight={50}
+    minWidth={50}
 >
     {#snippet dialogInner()}
         <div class="container" title={tomatoI18n.如果无法拖动}>
@@ -299,5 +301,7 @@
 <style>
     .container {
         flex: auto;
+        min-width: 50px;
+        min-height: 50px;
     }
 </style>
