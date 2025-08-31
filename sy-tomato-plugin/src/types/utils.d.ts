@@ -17,11 +17,17 @@ type TSK = keyof TomatoSettings
 type TomatoSettings = {
     finishPieceCreateAt: "all | desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browser-mobile",
     prefixArticlesSoftLimit: string,
+    toolbarTidyExt: string,
+    superRefBoxGlobalLnkMenu: boolean,
+    superRefBoxGlobalFixMenu: boolean,
+    superRefBoxCheckBox: boolean,
+    deleteBlocksMenu: boolean,
     floatingballDocTabMenu: boolean,
     cardBoxCardtab: boolean,
     cardBoxSettingsShow: boolean,
     prefixArticlesTagsShow: boolean,
     fastNoteBoxDocPrefix: boolean,
+    foldTypesNODE_listITEM: boolean,
     commentBoxSaveUnderDoc: boolean,
     dailyNoteMoveLeaveLnk: boolean,
     prefixArticlesMenu: boolean,
@@ -302,6 +308,8 @@ type TomatoSettings = {
 };
 
 type AttrType = {
+    "custom-ref-id"?: string,
+    "custom-ref-snapshot-"?: string,
     title?: string,
     alias?: string, // comma separated
     memo?: string,
@@ -621,4 +629,13 @@ type Config = {
 type Size = {
     height: number;
     width: number;
+}
+
+type Tag = {
+    name: string;
+    label: string;
+    children: null;
+    type: string;
+    depth: number;
+    count: number;
 }
