@@ -1,5 +1,7 @@
 // https://app.quicktype.io/?l=ts
 
+declare module "*.scss";
+
 type AsList = "p" | "i" | "t";
 
 type WordCountType = { id: string; count: number; type: string; subType: string, div: HTMLElement };

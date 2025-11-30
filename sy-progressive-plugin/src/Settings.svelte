@@ -34,6 +34,7 @@
         flashcardUseLink,
         getAllPieceNotesEnable,
         hideBtnsInFlashCard,
+        initProgFloatBtnsDisable,
         makeCardEnable,
         makeCardHereEnable,
         digestmenu,
@@ -529,6 +530,15 @@
             browser-mobile
         </p>
         {tomatoI18n.计划读书的分片由哪个前端自动创建}
+    </div>
+
+    <div class="settingBox">
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$initProgFloatBtnsDisable}
+        />
+        {tomatoI18n.禁用初始化渐进学习浮动按钮}
     </div>
 
     <div class="settingBox">

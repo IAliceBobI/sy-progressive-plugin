@@ -12,6 +12,7 @@ import { DestroyManager } from "./destroyer";
 import { parseCustomTag } from "./ial";
 import { BaseTomatoPlugin } from "./BaseTomatoPlugin";
 import { getGlobal } from "stonev5-utils";
+import { IUILayoutTabSearchConfigTypes } from "./types";
 
 export function closeTab(title: string) {
     return closeTabByTitle([{ title, id: "1" }], "2");
@@ -507,7 +508,7 @@ export async function getPluginSpec(name: string): Promise<PluginSpec> {
 
 export async function tryFixCfg(pluginName: string, fileName: string) {
     try {
-        const path = `data\\storage\\petal\\${pluginName}\\${fileName}`;
+        const path = `data/storage/petal/${pluginName}/${fileName}`;
         const ret = await siyuan.getJson(path);
         if (!ret) {
             await siyuan.removeFile(path)
@@ -599,9 +600,31 @@ export function setFocusToEditableDiv(editableDiv: HTMLElement) {
     selection.addRange(range);
 }
 
-export function moveCursor2Tail(id: string) {
-    const newDIV = document.querySelector(`div[${gconst.DATA_NODE_ID}="${id}"] div[contenteditable="true"]`);
+export function moveCursor2HeadProtyle(protyle: IProtyle, id: string) {
+    const newDIV = protyle.element.querySelector(`div[data-node-id="${id}"]`)
+    if (newDIV) {
+        document.getSelection().collapse(newDIV, 0);
+    }
+}
+
+export function moveCursor2TailInProtyle(protyle: IProtyle, id: string) {
+    const newDIV = protyle.element.querySelector(`div[data-node-id="${id}"]`)
+    if (newDIV) {
+        if (getAttribute(newDIV.nextElementSibling, "data-node-id")) {
+            document.getSelection().collapse(newDIV.nextElementSibling, 0)
+        } else {
+            document.getSelection().collapse(newDIV, 1);
+        }
+    }
+}
+
+export function moveCursor2TailByDiv(newDIV: HTMLElement) {
     if (newDIV) document.getSelection().collapse(newDIV, 1);
+}
+
+export function moveCursor2Tail4List(id: string) {
+    const newDIV = document.querySelector(`div[${gconst.DATA_NODE_ID}="${id}"] > div[contenteditable="true"]`);
+    if (newDIV) document.getSelection().collapse(newDIV, 0);
 }
 
 export function extractLinksFromElement(div: HTMLElement) {
@@ -2404,6 +2427,57 @@ export const siyuan = {
     },
     async updateEmbedBlock(id: string, content: string) {
         return siyuan.call("/api/search/updateEmbedBlock", { id, content });
+    },
+    async fullTextSearchBlock(
+        /**
+         * 搜索传入的查询内容
+         */
+        query?: string,
+        /**
+         * Grouping strategy
+         * - `0`: No grouping
+         * - `1`: Group by document
+         */
+        groupBy?: number,
+        /**
+         * Search in the specified paths
+         */
+        paths?: string[],
+        /**
+         * Search scheme
+         * - `0`: Keyword (default)
+         * - `1`: Query syntax
+         * - `2`: SQL
+         * - `3`: Regular expression
+         * @default 0
+         */
+        method?: number,
+        /**
+         * Current page number
+         */
+        page?: number,
+        /**
+         * Search result sorting scheme
+         * - `0`: Block type (default)
+         * - `1`: Ascending by creation time
+         * - `2`: Descending by creation time
+         * - `3`: Ascending by update time
+         * - `4`: Descending by update time
+         * - `5`: By content order (only valid when grouping by document)
+         * - `6`: Ascending by relevance
+         * - `7`: Descending by relevance
+         * @default 0
+         */
+        orderBy?: number,
+        types?: IUILayoutTabSearchConfigTypes,
+    ): Promise<FullTextSearchBlockRet> {
+        return siyuan.call("/api/search/fullTextSearchBlock", {
+            query, method, types,
+            paths,
+            groupBy,
+            orderBy,
+            page,
+        });
     },
     async findListType(thisID: string) {
         let theUpperestListID = "";

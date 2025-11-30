@@ -7,7 +7,7 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { into, setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
-import { hideBtnsInFlashCard, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
 
 const Prog_BUTTON = "custom-prog-button";
 const Prog_BUTTON_NoteID = "custom-prog-button-noteID";
@@ -22,6 +22,9 @@ let bookID = writableWithGet("")
 let zIndexPlus = writableWithGet(false)
 
 export function initProgFloatBtns() {
+    if (initProgFloatBtnsDisable.get()) {
+        return;
+    }
     const btns = setGlobal("initProgFloatBtns 2025-07-15 23:47:53", mount(ProgressiveFloatBtns, {
         target: document.body,
         props: {

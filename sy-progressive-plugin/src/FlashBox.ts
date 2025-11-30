@@ -266,7 +266,7 @@ class FlashBox {
         if (ids.length > 0) { // multilines
             await this.insertCard(protyle, divs, t, ids[ids.length - 1], path);
         } else {
-            const blockID = events.lastBlockID;
+            const blockID = events.lastBlockID; // getCursorElement
             const range = document.getSelection()?.getRangeAt(0);
             const blank = range?.cloneContents()?.textContent ?? "";
             if (blockID) {

@@ -255,6 +255,24 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Hide fragment buttons group when reviewing flashcards";
         }
     }
+    public get 禁用初始化渐进学习浮动按钮() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "禁用初始化渐进学习浮动按钮";
+            case "es_ES": return "Deshabilitar inicialización de botones flotantes de aprendizaje progresivo";
+            case "fr_FR": return "Désactiver l'initialisation des boutons flottants d'apprentissage progressif";
+            case "ja_JP": return "段階的学習フローティングボタンの初期化を無効化";
+            case "zh_CHT": return "禁用初始化漸進學習浮動按鈕";
+            case "it_IT": return "Disabilita inizializzazione pulsanti fluttuanti apprendimento progressivo";
+            case "de_DE": return "Initialisierung der schwebenden Buttons für progressives Lernen deaktivieren";
+            case "he_IL": return "השבת אתחול כפתורים צפים של למידה הדרגתית";
+            case "ru_RU": return "Отключить инициализацию плавающих кнопок прогрессивного обучения";
+            case "pl_PL": return "Wyłącz inicjalizację pływających przycisków progresywnego uczenia się";
+            case "ar_SA": return "تعطيل تهيئة أزرار التعلم التدريجي العائمة";
+            case "pt_BR": return "Desabilitar inicialização de botões flutuantes de aprendizado progressivo";
+            case "en_US":
+            default: return "Disable initialization of progressive learning floating buttons";
+        }
+    }
     public get 恢复笔记颜色() {
         switch (this.conf.appearance.lang) {
             case "zh_CN": return "恢复笔记颜色";
@@ -493,6 +511,157 @@ export class TomatoI18n extends TomatoI18nABC {
             case "pt_BR": return "Excluir link bidirecional";
             case "en_US":
             default: return "Delete Bidirectional Link";
+        }
+    }
+
+    public get 块编辑器() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "块编辑器";
+            case "es_ES": return "Editor de bloques";
+            case "fr_FR": return "Éditeur de blocs";
+            case "ja_JP": return "ブロックエディター";
+            case "zh_CHT": return "塊編輯器";
+            case "it_IT": return "Editor di blocchi";
+            case "de_DE": return "Block-Editor";
+            case "he_IL": return "עורך בלוקים";
+            case "ru_RU": return "Редактор блоков";
+            case "pl_PL": return "Edytor bloków";
+            case "ar_SA": return "محرر الكتل";
+            case "pt_BR": return "Editor de blocos";
+            case "en_US":
+            default: return "Block Editor";
+        }
+    }
+
+    public get 白名单为空请先在文档树中右键添加文档() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "白名单为空，请在文档树中右键添加文件夹或文档";
+            case "es_ES": return "La lista blanca está vacía, haga clic derecho en el árbol de documentos para agregar carpetas o documentos";
+            case "fr_FR": return "La liste blanche est vide, faites un clic droit sur l'arbre des documents pour ajouter des dossiers ou des documents";
+            case "ja_JP": return "ホワイトリストが空です。ドキュメントツリーで右クリックして、フォルダーまたはドキュメントを追加してください";
+            case "zh_CHT": return "白名單為空，請在文件樹中右鍵添加資料夾或文件";
+            case "it_IT": return "La whitelist è vuota, fare clic con il tasto destro sull'albero dei documenti per aggiungere cartelle o documenti";
+            case "de_DE": return "Die Whitelist ist leer. Klicken Sie mit der rechten Maustaste auf den Dokumentbaum, um Ordner oder Dokumente hinzuzufügen";
+            case "he_IL": return "הרשימה הלבנה ריקה, לחץ לחיצה ימנית על עץ המסמכים כדי להוסיף תיקיות או מסמכים";
+            case "ru_RU": return "Белый список пуст, щелкните правой кнопкой мыши по дереву документов, чтобы добавить папки или документы";
+            case "pl_PL": return "Biała lista jest pusta, kliknij prawym przyciskiem myszy drzewo dokumentów, aby dodać foldery lub dokumenty";
+            case "ar_SA": return "القائمة البيضاء فارغة، يرجى النقر بزر الماوس الأيمن على شجرة المستندات لإضافة مجلدات أو مستندات";
+            case "pt_BR": return "A lista branca está vazia, clique com o botão direito na árvore de documentos para adicionar pastas ou documentos";
+            case "en_US":
+            default: return "Whitelist is empty, please right-click in the document tree to add folders or documents";
+        }
+    }
+    public get 黑名单为空可在文档树中右键添加() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "黑名单为空，可在文档树中右键添加文件夹或文档";
+            case "es_ES": return "La lista negra está vacía, haga clic derecho en el árbol de documentos para agregar carpetas o documentos";
+            case "fr_FR": return "La liste noire est vide, faites un clic droit sur l'arbre des documents pour ajouter des dossiers ou des documents";
+            case "ja_JP": return "ブラックリストが空です。ドキュメントツリーで右クリックして、フォルダーまたはドキュメントを追加してください";
+            case "zh_CHT": return "黑名單為空，可在文件樹中右鍵添加資料夾或文件";
+            case "it_IT": return "La blacklist è vuota, fare clic con il tasto destro sull'albero dei documenti per aggiungere cartelle o documenti";
+            case "de_DE": return "Die Blacklist ist leer, klicken Sie mit der rechten Maustaste auf den Dokumentbaum, um Ordner oder Dokumente hinzuzufügen";
+            case "he_IL": return "הרשימה השחורה ריקה, לחץ לחיצה ימנית על עץ המסמכים כדי להוסיף תיקיות או מסמכים";
+            case "ru_RU": return "Черный список пуст, щелкните правой кнопкой мыши по дереву документов, чтобы добавить папки или документы";
+            case "pl_PL": return "Czarna lista jest pusta, kliknij prawym przyciskiem myszy drzewo dokumentów, aby dodać foldery lub dokumenty";
+            case "ar_SA": return "القائمة السوداء فارغة، يرجى النقر بزر الماوس الأيمن على شجرة المستندات لإضافة مجلدات أو مستندات";
+            case "pt_BR": return "A lista negra está vazia, clique com o botão direito na árvore de documentos para adicionar pastas ou documentos";
+            case "en_US":
+            default: return "Blacklist is empty, you can right-click in the document tree to add folders or documents";
+        }
+    }
+
+    public get 导出所有文件() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "导出所有文件";
+            case "es_ES": return "Exportar todos los archivos";
+            case "fr_FR": return "Exporter tous les fichiers";
+            case "ja_JP": return "すべてのファイルをエクスポート";
+            case "zh_CHT": return "導出所有文件";
+            case "it_IT": return "Esporta tutti i file";
+            case "de_DE": return "Alle Dateien exportieren";
+            case "he_IL": return "ייצא את כל הקבצים";
+            case "ru_RU": return "Экспортировать все файлы";
+            case "pl_PL": return "Eksportuj wszystkie pliki";
+            case "ar_SA": return "تصدير جميع الملفات";
+            case "pt_BR": return "Exportar todos os arquivos";
+            case "en_US": return "Export all files";
+            default: return "Export all files";
+        }
+    }
+
+    public get 导入markdownOrText() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "导入markdown或者文本文件";
+            case "es_ES": return "Importar archivos markdown o de texto";
+            case "fr_FR": return "Importer des fichiers markdown ou texte";
+            case "ja_JP": return "Markdownまたはテキストファイルをインポート";
+            case "zh_CHT": return "匯入markdown或者文字檔案";
+            case "it_IT": return "Importa file markdown o di testo";
+            case "de_DE": return "Markdown- oder Textdateien importieren";
+            case "he_IL": return "ייבוא קובצי markdown או טקסט";
+            case "ru_RU": return "Импорт markdown или текстовых файлов";
+            case "pl_PL": return "Importuj pliki markdown lub tekstowe";
+            case "ar_SA": return "استيراد ملفات markdown أو النص";
+            case "pt_BR": return "Importar arquivos markdown ou de texto";
+            case "en_US":
+            default: return "Import markdown or text files";
+        }
+    }
+
+    public get 确认() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "确认";
+            case "es_ES": return "Confirmar";
+            case "fr_FR": return "Confirmer";
+            case "ja_JP": return "確認";
+            case "zh_CHT": return "確認";
+            case "it_IT": return "Conferma";
+            case "de_DE": return "Bestätigen";
+            case "he_IL": return "אישור";
+            case "ru_RU": return "Подтвердить";
+            case "pl_PL": return "Potwierdź";
+            case "ar_SA": return "تأكيد";
+            case "pt_BR": return "Confirmar";
+            case "en_US":
+            default: return "Confirm";
+        }
+    }
+
+    public get utf8Encoding() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "文件编码必须是utf8";
+            case "es_ES": return "La codificación del archivo debe ser UTF-8";
+            case "fr_FR": return "L'encodage du fichier doit être UTF-8";
+            case "ja_JP": return "ファイルのエンコーディングはUTF-8である必要があります";
+            case "zh_CHT": return "文件編碼必須是utf8";
+            case "it_IT": return "La codifica del file deve essere UTF-8";
+            case "de_DE": return "Die Dateikodierung muss UTF-8 sein";
+            case "he_IL": return "קידוד הקובץ חייב להיות UTF-8";
+            case "ru_RU": return "Кодировка файла должна быть UTF-8";
+            case "pl_PL": return "Kodowanie pliku musi być UTF-8";
+            case "ar_SA": return "يجب أن يكون ترميز الملف UTF-8";
+            case "pt_BR": return "A codificação do arquivo deve ser UTF-8";
+            case "en_US":
+            default: return "File encoding must be UTF-8";
+        }
+    }
+
+    public get 请填写文件的路径() {
+        switch (this.conf.appearance.lang) {
+            case "zh_CN": return "请填写文件的路径";
+            case "es_ES": return "Por favor, rellene la ruta del archivo";
+            case "fr_FR": return "Veuillez remplir le chemin du fichier";
+            case "ja_JP": return "ファイルのパスを入力してください";
+            case "zh_CHT": return "請填寫文件的路徑";
+            case "it_IT": return "Per favore, inserisci il percorso del file";
+            case "de_DE": return "Bitte geben Sie den Dateipfad ein";
+            case "he_IL": return "אנא מלא את נתיב הקובץ";
+            case "ru_RU": return "Пожалуйста, заполните путь к файлу";
+            case "pl_PL": return "Proszę wypełnić ścieżkę pliku";
+            case "ar_SA": return "يرجى ملء مسار الملف";
+            case "pt_BR": return "Por favor, preencha o caminho do arquivo";
+            case "en_US":
+            default: return "Please fill in the file path";
         }
     }
 

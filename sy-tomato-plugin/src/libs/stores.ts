@@ -5,6 +5,7 @@ import { siyuan } from "./utils";
 import { zipNways } from "./functional";
 import { events } from "./Events";
 import { BaseTomatoPlugin } from "./BaseTomatoPlugin";
+import { getGlobal, setGlobal } from "stonev5-utils";
 
 export function writableWithGet<T>(t: T) {
     const store = writable(t);
@@ -304,7 +305,9 @@ const settingFactory = <T>(key: TSK, defaultValue: T, file: string, _void: TSK) 
             }
             if (value != null) {
                 save(value);
-                plugin.saveData(file, plugin.settingCfg);
+                if (plugin && plugin.settingCfg) {
+                    plugin.saveData(file, plugin.settingCfg);
+                }
             }
         }
     };
@@ -329,6 +332,7 @@ export const foldTypesNODE_HEADING = settingFactory("foldTypesNODE_HEADING", fal
 export const addSelectionBtnsMobile = settingFactory("addSelectionBtnsMobile", true, STORAGE_SETTINGS, null as TSK);
 export const addSelectionBtnsDesktop = settingFactory("addSelectionBtnsDesktop", true, STORAGE_SETTINGS, null as TSK);
 export const cssRefStyle = settingFactory("cssRefStyle", false, STORAGE_SETTINGS, null as TSK);
+export const exportWL4All = settingFactory("exportWL4All", false, STORAGE_SETTINGS, null as TSK);
 export const exportWhiteList = settingFactory("exportWhiteList", [], STORAGE_SETTINGS, null as TSK);
 export const exportBlackList = settingFactory("exportBlackList", [], STORAGE_SETTINGS, null as TSK);
 export const showDocAttrs = settingFactory("showDocAttrs", false, STORAGE_SETTINGS, null as TSK);
@@ -381,6 +385,7 @@ export const cardBoxCardtab = settingFactory("cardBoxCardtab", false, STORAGE_SE
 export const cardBoxSuperCard = settingFactory("cardBoxSuperCard", false, STORAGE_SETTINGS, null as TSK);
 export const cardBoxAddConcepts = settingFactory("cardBoxAddConcepts", false, STORAGE_SETTINGS, null as TSK);
 export const cardBoxSpradEvenlyPostpone = settingFactory("cardBoxSpradEvenlyPostpone", true, STORAGE_SETTINGS, null as TSK);
+export const cardBoxDelayDays = settingFactory("cardBoxDelayDays", 0.1, STORAGE_SETTINGS, null as TSK);
 export const cardBoxSettingsShow = settingFactory("cardBoxSettingsShow", false, STORAGE_SETTINGS, null as TSK);
 export const cardPriorityBoxCheckbox = settingFactory("cardPriorityBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const cardPrioritySetPriInterval = settingFactory("cardPrioritySetPriInterval", "0", STORAGE_SETTINGS, null as TSK);
@@ -395,6 +400,8 @@ export const card_priority_stopBtn_hide = settingFactory("card_priority_stopBtn_
 export const cpBoxCheckbox = settingFactory("cpBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const superRefBoxCheckBox = settingFactory("superRefBoxCheckBox", false, STORAGE_SETTINGS, null as TSK);
 export const superRefBoxGlobalLnkMenu = settingFactory("superRefBoxGlobalLnkMenu", true, STORAGE_SETTINGS, null as TSK);
+export const blockEditorBox = settingFactory("blockEditorBox", false, STORAGE_SETTINGS, null as TSK);
+export const blockEditorMenu = settingFactory("blockEditorMenu", true, STORAGE_SETTINGS, null as TSK);
 export const superRefBoxGlobalFixMenu = settingFactory("superRefBoxGlobalFixMenu", true, STORAGE_SETTINGS, null as TSK);
 export const linkBoxCheckbox = settingFactory("linkBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const linkBoxBilinkMenu = settingFactory("linkBoxBilinkMenu", true, STORAGE_SETTINGS, null as TSK);
@@ -587,3 +594,15 @@ export const btnIgnoreBook = settingFactory("btnIgnoreBook", false, STORAGE_Prog
 export const btnSplitByPunctuations = settingFactory("btnSplitByPunctuations", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const btnSplitByPunctuationsListCheck = settingFactory("btnSplitByPunctuationsListCheck", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const btnSplitByPunctuationsList = settingFactory("btnSplitByPunctuationsList", false, STORAGE_Prog_SETTINGS, null as TSK);
+export const initProgFloatBtnsDisable = settingFactory("initProgFloatBtnsDisable", false, STORAGE_Prog_SETTINGS, null as TSK);
+
+// ---------------
+export const navSourceBlock = settingFactory("navSourceBlock", true, STORAGE_SETTINGS, null as TSK);
+
+export function getNavSourceBlock(): ReturnType<typeof settingFactory> {
+    const KEY = "navSourceBlock"
+    const n = getGlobal(KEY) as any;
+    if (n != null) return n;
+    setGlobal(KEY, navSourceBlock)
+    return navSourceBlock;
+}

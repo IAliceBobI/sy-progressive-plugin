@@ -18,6 +18,10 @@ type TomatoSettings = {
     finishPieceCreateAt: "all | desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browser-mobile",
     prefixArticlesSoftLimit: string,
     toolbarTidyExt: string,
+    blockEditorBox: boolean,
+    navSourceBlock: boolean,
+    exportWL4All: boolean,
+    blockEditorMenu: boolean,
     superRefBoxGlobalLnkMenu: boolean,
     superRefBoxGlobalFixMenu: boolean,
     superRefBoxCheckBox: boolean,
@@ -145,6 +149,7 @@ type TomatoSettings = {
     cardUnderPiece: boolean,
     openCardsOnOpenPiece: boolean,
     hideBtnsInFlashCard: boolean,
+    initProgFloatBtnsDisable: boolean,
     markOriginTextBG: boolean,
     markOriginText: boolean,
     summary2dailynote: boolean,
@@ -187,6 +192,7 @@ type TomatoSettings = {
     cardBoxCheckbox: boolean,
     cardBoxAddConcepts: boolean,
     cardBoxSpradEvenlyPostpone: boolean,
+    cardBoxDelayDays: number,
     cardRemoveBoxCheckbox: boolean,
     cardAddListBoxCheckbox: boolean,
     cardPriorityBoxCheckbox: boolean,
@@ -308,6 +314,7 @@ type TomatoSettings = {
 };
 
 type AttrType = {
+    "custom-block-editor"?: string,
     "custom-ref-id"?: string,
     "custom-ref-snapshot-"?: string,
     title?: string,
@@ -511,6 +518,55 @@ interface WsMain {
     code: number;
     msg: string;
     data: WsMainData;
+}
+
+interface ProtyleWs {
+    cmd: string;
+    reqId: number;
+    app: string;
+    sid: string;
+    pushMode: number;
+    callback: string;
+    code: number;
+    msg: string;
+    data: Datum[];
+}
+
+interface Datum {
+    timestamp: number;
+    doOperations: DoOperation[];
+    undoOperations: DoOperation[];
+}
+
+interface DoOperation {
+    action: string;
+    data: string;
+    id: string;
+    parentID: string;
+    previousID: string;
+    nextID: string;
+    retData: string;
+    blockIDs: string;
+    blockID: string;
+    deckID: string;
+    avID: string;
+    srcIDs: string;
+    srcs: string;
+    isDetached: boolean;
+    name: string;
+    type: string;
+    format: string;
+    keyID: string;
+    rowID: string;
+    isTwoWay: boolean;
+    backRelationKeyID: string;
+    removeDest: boolean;
+    layout: string;
+    groupID: string;
+    targetGroupID: string;
+    viewID: string;
+    ignoreDefaultFill: boolean;
+    context: string;
 }
 
 interface WsMainData {

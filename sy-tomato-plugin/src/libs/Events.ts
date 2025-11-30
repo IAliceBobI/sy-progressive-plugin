@@ -1,6 +1,7 @@
 import { Plugin, getFrontend, Protyle, IProtyle, IEventBusMap, getBackend } from "siyuan";
 import { getCursorElement, getID, getNotebookFirstOne, siyuan } from "./utils";
 import { DATA_NODE_ID, PROTYLE_WYSIWYG_SELECT } from "./gconst";
+import { writableWithGet } from "./stores";
 
 export enum EventType {
     click_editorcontent = "click-editorcontent",
@@ -120,6 +121,11 @@ class Events {
                 this._boxID = this.protyle?.protyle?.notebookId ?? "";
                 this._title = this.protyle?.protyle?.title?.editElement?.textContent?.trim() ?? "";
                 this._docID = this.protyle?.protyle?.block.rootID ?? "";
+                if (currentBockEditorDocID.get() != this._docID) {
+                    currentBockEditorDocID.set(this._docID);
+                    currentBockEditorDocName.set(this._title);
+                    currentProtyle.set(this._protyle);
+                }
                 if (this.docID) {
                     this._readingPointMap.set(this.docID, {
                         docID: this.docID,
@@ -275,5 +281,9 @@ class Events {
         return { selected, ids, rangeText, range, cursorOnly };
     }
 }
+
+export const currentBockEditorDocID = writableWithGet<string>("");
+export const currentBockEditorDocName = writableWithGet<string>("");
+export const currentProtyle = writableWithGet<Protyle>(null);
 
 export const events = new Events();
