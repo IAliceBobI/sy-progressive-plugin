@@ -249,7 +249,7 @@ export class DigestBuilder {
         attr["custom-pdigest-parent-id"] = this.docID;
         attr["custom-pdigest-last-id"] = this.anchorID;
         attr["custom-pdigest-ctime"] = `${this.bookID}#${ct}`;
-        attr["custom-card-priority"] = "60";
+        attr["custom-card-priority"] = this.attrs["custom-card-priority"] ?? "60";
         attr["custom-off-tomatobacklink"] = "1";
         attr["custom-progmark"] = `${TEMP_CONTENT}#${this.bookID},${ct}`;
         const digestID = await siyuan.createDocWithMd(this.boxID, `${hpath}/[${idx}]${this.allText.slice(0, 10)}`, md, "", attr);
@@ -323,7 +323,12 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
             md.push(m);
         } else {
             const parts = m.trim().split("\n");
-            const attrLine = parts.pop();
+            let attrLine = parts.pop();
+            // 确保 attrLine 是有效的属性行格式，否则恢复内容
+            if (!attrLine || !attrLine.startsWith("{:")) {
+                if (attrLine) parts.push(attrLine);
+                attrLine = '{: id=""}';
+            }
             const edit = getAllContentEditableText(cloned, "\n");
             let ps = [edit];
             ps = splitLines(ps);

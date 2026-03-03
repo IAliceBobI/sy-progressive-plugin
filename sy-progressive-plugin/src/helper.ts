@@ -341,11 +341,17 @@ export async function copyBlock(point: number, info: BookInfo, id: string, tempD
 
 export async function splitAndInsert(bookID: string, noteID: string, t: AsList, ids: string[]) {
     if (lastVerifyResult() || t == 'p') {
-        const s = new SplitSentence(bookID, utils.getProgressivePluginInstance(), noteID, t);
-        if (ids?.length > 0) {
-            await s.splitByIDs(ids);
-            await s.insert(false);
+        if (!ids?.length) {
+            // 如果没有内容需要断句，返回 false 让调用者执行默认逻辑
+            return false;
         }
+        const s = new SplitSentence(bookID, utils.getProgressivePluginInstance(), noteID, t);
+        const success = await s.splitByIDs(ids);
+        if (!success) {
+            // 如果断句失败，返回 false 让调用者执行默认逻辑
+            return false;
+        }
+        await s.insert(false);
         return true
     } else {
         await siyuan.pushMsg(tomatoI18n.此功能需要激活VIP)
@@ -385,7 +391,11 @@ export async function fastCopyBlock(point: number, info: BookInfo, id: string, m
         markdown = lute.BlockDOM2Md(div.outerHTML);
         markdown = utils.replaceRef2Lnk(markdown)
         const parts = markdown.trim().split("\n")
-        parts.pop();
+        const lastPart = parts.pop();
+        // 只有当最后一行是属性行时才移除，否则恢复内容
+        if (lastPart && !lastPart.startsWith("{:")) {
+            parts.push(lastPart);
+        }
         markdown = parts.join("\n")
         markdown = `${markdown}\n${utils.ial2str(attrs)}`;
         return markdown;

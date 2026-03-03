@@ -39,7 +39,7 @@ export class SplitSentence {
         });
     }
 
-    async splitByIDs(chilrenIDs: string[]) {
+    async splitByIDs(chilrenIDs: string[]): Promise<boolean> {
         const bookInfo = await progStorage.booksInfo(this.bookID);
         const rows = (await siyuan.getRows(chilrenIDs, "id, content, ial, type, markdown", true, [
             // "type NOT IN ('html', 't', 's')",
@@ -49,6 +49,7 @@ export class SplitSentence {
         this.textAreas = [];
         if (rows.length == 0) {
             await siyuan.pushMsg(tomatoI18n.找不到分片内容);
+            return false;
         }
         let i = 1;
         for (const row of rows) {

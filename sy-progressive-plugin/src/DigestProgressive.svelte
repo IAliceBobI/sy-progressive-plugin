@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { IProtyle, Plugin, Protyle } from "siyuan";
+    import { Plugin, Protyle } from "siyuan";
     import { onDestroy, onMount } from "svelte";
     import { events, EventType } from "../../sy-tomato-plugin/src/libs/Events";
     import { DigestBuilder, getDigestMd } from "./digestUtils";
@@ -33,18 +33,19 @@
         plugin: Plugin;
     }
 
-    let {
-        protyle = $bindable(null),
-        dm = null,
-        isFloating = false,
-        settings,
-        plugin,
-    }: Props = $props();
+    let props: Props = $props();
 
     let tableTools: HTMLElement = $state();
     let tableSelect: HTMLElement = $state();
+    let currentProtyle: IProtyle = $state();
     let di: DigestBuilder = $state();
-    let word = $state(new WordBuilder(settings));
+    let word: WordBuilder = $state();
+    $effect(() => {
+        word = new WordBuilder(props.settings);
+    });
+    $effect(() => {
+        currentProtyle = props.protyle;
+    });
     let selectionMl: SelectionML = $state();
     let cardMode = $state("2");
     let seletedText = $state("");
@@ -71,8 +72,8 @@
     }
 
     onMount(async () => {
-        if (protyle) {
-            const s = events.selectedDivsSync(protyle);
+        if (currentProtyle) {
+            const s = events.selectedDivsSync(currentProtyle);
             selectionMl = new SelectionML(s);
             await initSelMl();
             digestProgressiveBox.digestCallback = async () => {
@@ -82,7 +83,7 @@
             };
         }
 
-        if (isFloating) {
+        if (props.isFloating) {
             tableSelect.style.display = null;
             tableTools.style.display = "none";
         } else {
@@ -106,7 +107,7 @@
                             if (lock) {
                                 const nextProtyle: IProtyle = detail.protyle;
                                 if (!nextProtyle) return;
-                                protyle = nextProtyle;
+                                currentProtyle = nextProtyle;
                                 selectionMl = null;
                                 initSelMl();
                             }
@@ -118,13 +119,13 @@
     });
 
     async function initDigest() {
-        selectedInfo = events.selectedDivsSync(protyle);
-        di = await initDi(selectedInfo, protyle, settings);
+        selectedInfo = events.selectedDivsSync(currentProtyle);
+        di = await initDi(selectedInfo, currentProtyle, props.settings);
         cardMode = di.cardMode;
     }
 
     async function initText() {
-        selectedInfo = events.selectedDivsSync(protyle);
+        selectedInfo = events.selectedDivsSync(currentProtyle);
         firstID = selectedInfo.ids.at(0);
         anchorID = selectedInfo.ids.at(-1);
         const text = selectedInfo.rangeText.trim();
@@ -148,7 +149,7 @@
     }
 
     async function initSelMl() {
-        selectedInfo = events.selectedDivsSync(protyle);
+        selectedInfo = events.selectedDivsSync(currentProtyle);
         if (selectedInfo.ids.length <= 0) return;
         selectionMl = new SelectionML(selectedInfo);
 
@@ -171,7 +172,7 @@
     onDestroy(destroy);
 
     export function destroy() {
-        dm?.destroyBy("2");
+        props.dm?.destroyBy("2");
     }
 
     function openBrowser(t: string) {
@@ -285,11 +286,11 @@
                     }}
                     onmouseup={(event) => {
                         btnHelper.handleMouseUp(event, async () => {
-                            if (protyle) {
+                            if (currentProtyle) {
                                 const id = await addFlashCard(
-                                    protyle,
+                                    currentProtyle,
                                     await getDocTracer(),
-                                    plugin,
+                                    props.plugin,
                                     await verifyKeyProgressive(),
                                 );
                                 if (id) await siyuan.addRiffCards([id]);
@@ -317,7 +318,7 @@
                     title={tomatoI18n.显示与隐藏工具}>🔧</button
                 >
             </td>
-            {#if isFloating}
+            {#if props.isFloating}
                 <td>
                     <button
                         onmousedown={(event) => {
@@ -589,9 +590,9 @@
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             let { md } = await getDigestMd(
-                                settings,
+                                props.settings,
                                 selectedInfo.selected,
-                                protyle,
+                                currentProtyle,
                                 true,
                                 false,
                             );
@@ -618,9 +619,9 @@
                         btnHelper.handleMouseUp(event, async () => {
                             await initText();
                             const { md } = await getDigestMd(
-                                settings,
+                                props.settings,
                                 selectedInfo.selected,
-                                protyle,
+                                currentProtyle,
                                 true,
                                 false,
                                 true,

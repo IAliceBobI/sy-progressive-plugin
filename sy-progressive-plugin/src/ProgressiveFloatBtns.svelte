@@ -1,6 +1,6 @@
 <script lang="ts">
     import DialogSvelte from "../../sy-tomato-plugin/src/libs/DialogSvelte.svelte";
-    import { Writable } from "svelte/store";
+    import type { Writable } from "svelte/store";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { getProgressivePluginConfig } from "../../sy-tomato-plugin/src/libs/utils";
     import { prog } from "./Progressive";

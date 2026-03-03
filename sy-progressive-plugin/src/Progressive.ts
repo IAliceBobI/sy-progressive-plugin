@@ -538,7 +538,7 @@ class Progressive {
     private closePeices(bookID: string) {
         const tabs = utils.getOpenedEditors()
         for (const tab of tabs.map(t => t.ial)) {
-            if (tab["custom-progmark"]?.includes(bookID)) {
+            if (tab?.["custom-progmark"]?.includes(bookID)) {
                 closeTabByTitle([tab], events.docID)
             }
         }
@@ -632,26 +632,50 @@ class Progressive {
                 await this.openContentsLock(bookID);
                 break;
             case HtmlCBType.splitByPunctuations: {
-                await help.cleanNote(noteID);
                 const index = await progStorage.loadBookIndexIfNeeded(bookID);
-                const piece = index[point] ?? [];
-                const piecePre = index[point - 1] ?? [];
+                let piece = index[point] ?? [];
+                let piecePre = index[point - 1] ?? [];
+
+                // 如果 piece 为空（可能是因为 point 是时间戳而不是索引），从摘抄文档自身获取内容块
+                // 注意：必须在 cleanNote 之前获取，否则内容会被删除
+                if (piece.length === 0) {
+                    const blocks = await siyuan.getChildBlocks(noteID);
+                    piece = blocks
+                        .filter((b: Block) => b.type !== "d" && b.content)
+                        .map((b: Block) => b.id);
+                }
+
+                await help.cleanNote(noteID);
                 await fullfilContent(point, bookID, piecePre, piece, noteID, "p");
                 break;
             }
             case HtmlCBType.splitByPunctuationsList: {
-                await help.cleanNote(noteID);
                 const index = await progStorage.loadBookIndexIfNeeded(bookID);
-                const piece = index[point] ?? [];
-                const piecePre = index[point - 1] ?? [];
+                let piece = index[point] ?? [];
+                let piecePre = index[point - 1] ?? [];
+                // 如果 piece 为空，从摘抄文档自身获取内容块（必须在 cleanNote 之前）
+                if (piece.length === 0) {
+                    const blocks = await siyuan.getChildBlocks(noteID);
+                    piece = blocks
+                        .filter((b: Block) => b.type !== "d" && b.content)
+                        .map((b: Block) => b.id);
+                }
+                await help.cleanNote(noteID);
                 await fullfilContent(point, bookID, piecePre, piece, noteID, "i");
                 break;
             }
             case HtmlCBType.splitByPunctuationsListCheck: {
-                await help.cleanNote(noteID);
                 const index = await progStorage.loadBookIndexIfNeeded(bookID);
-                const piece = index[point] ?? [];
-                const piecePre = index[point - 1] ?? [];
+                let piece = index[point] ?? [];
+                let piecePre = index[point - 1] ?? [];
+                // 如果 piece 为空，从摘抄文档自身获取内容块（必须在 cleanNote 之前）
+                if (piece.length === 0) {
+                    const blocks = await siyuan.getChildBlocks(noteID);
+                    piece = blocks
+                        .filter((b: Block) => b.type !== "d" && b.content)
+                        .map((b: Block) => b.id);
+                }
+                await help.cleanNote(noteID);
                 await fullfilContent(point, bookID, piecePre, piece, noteID, "t");
                 break;
             }
