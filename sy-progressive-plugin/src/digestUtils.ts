@@ -67,7 +67,13 @@ export class DigestBuilder {
         this.bookID = bookID;
 
         this.attrs = await siyuan.getBlockAttrs(this.bookID);
+        // 获取当前文档的属性，用于继承优先级等设置
+        const currentDocAttrs = await siyuan.getBlockAttrs(this.docID);
         this.cardMode = this.attrs["custom-book-single-card"] ?? digestGlobalSigle.get();
+        // 优先继承当前文档的优先级（如果在分片/摘抄文档内）
+        if (currentDocAttrs["custom-card-priority"]) {
+            this.attrs["custom-card-priority"] = currentDocAttrs["custom-card-priority"];
+        }
     }
 
     async getDigest(bIdx: string, ctime: string, arrow: string, order: string) {
@@ -258,8 +264,21 @@ export class DigestBuilder {
 
     async digest(split = false) {
         const { idx, md } = await getDigestMd(this.settings, this.selected, this.protyle, split, true, false, this.attrs);
-        if (md.length == 0) return;
-        const digestID = await this.newDigestDoc(idx, md.join("\n"));
+        // 过滤空内容：移除空字符串、纯空白字符或仅包含属性行的条目
+        const validMd = md.filter(m => {
+            if (!m || !m.trim()) return false;
+            // 检查是否仅包含属性行（如 {: id="xxx" }）
+            const lines = m.trim().split('\n').filter(line => line.trim());
+            if (lines.length === 0) return false;
+            // 如果只有一行且是属性行，则视为无效
+            if (lines.length === 1 && lines[0].startsWith('{:')) return false;
+            return true;
+        });
+        if (validMd.length == 0) {
+            siyuan.pushMsg(tomatoI18n.没有有效的摘抄内容);
+            return;
+        }
+        const digestID = await this.newDigestDoc(idx, validMd.join("\n"));
         await this.otab.open(digestID, windowOpenStyle.get() as any, this.ids.at(0));
         await this.setDigestCard(digestID);
         if (digestProgressiveBox.settings.markOriginText && !(await events.isDocReadonly(this.protyle, this.attrs))) {
