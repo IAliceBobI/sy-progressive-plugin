@@ -1,6 +1,6 @@
 <script lang="ts">
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-    import { onDestroy, onMount } from "svelte";
+    import { onDestroy, onMount, tick } from "svelte";
     import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
     import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
     import {
@@ -145,9 +145,13 @@
             true,
         );
 
-        if (localStorage.getItem(SearchKeyItemKey)) {
-            searchKey = localStorage.getItem(SearchKeyItemKey);
-            searchSettings(settingsDiv, searchKey);
+        const savedSearchKey = localStorage.getItem(SearchKeyItemKey);
+        if (savedSearchKey) {
+            searchKey = savedSearchKey;
+            await tick();
+            if (settingsDiv) {
+                searchSettings(settingsDiv, searchKey);
+            }
         }
         searchInput.focus();
     });
@@ -217,7 +221,10 @@
             class="b3-text-field"
             bind:this={searchInput}
             bind:value={searchKey}
-            oninput={() => searchSettings(settingsDiv, searchKey)}
+            oninput={() => {
+                localStorage.setItem(SearchKeyItemKey, searchKey);
+                searchSettings(settingsDiv, searchKey);
+            }}
         />
         {tomatoI18n.search搜索配置}
     </div>
