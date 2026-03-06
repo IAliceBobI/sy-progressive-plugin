@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Plugin, Protyle } from "siyuan";
+    import type { IProtyle } from "siyuan";
     import { onDestroy, onMount } from "svelte";
     import { events, EventType } from "../../sy-tomato-plugin/src/libs/Events";
     import { DigestBuilder, getDigestMd } from "./digestUtils";
