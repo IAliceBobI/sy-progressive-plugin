@@ -29,9 +29,11 @@
     import dagre from "@dagrejs/dagre";
     import GraphControl from "./GraphControl.svelte";
     import GraphMenu from "./GraphMenu.svelte";
+    import EdgeWithLabel from "./EdgeWithLabel.svelte";
     import { BlockTypeNoContent } from "./libs/gconst";
     import {
         graphClick2Locate,
+        graphHideStructEdges,
         graphMaxAllBlocks,
         graphMaxPBlocks,
     } from "./libs/stores";
@@ -58,6 +60,7 @@
     let lastDocID = "";
     let stop = false;
     let isVertical = false;
+    const edgeTypes = { labeledEdge: EdgeWithLabel };
     export function destroy() {}
 
     // https://svelteflow.dev/examples/nodes/easy-connect
@@ -79,14 +82,14 @@
                     ) as HTMLButtonElement;
                     await sleep(1);
                 }
-                btn.addEventListener("click", () => {
+                btn.addEventListener("click", async () => {
                     isVertical = !isVertical;
                     if (lastDocID) {
                         siyuan.setBlockAttrs(lastDocID, {
                             "custom-graph-isVertical": String(isVertical),
                         });
                     }
-                    relayout();
+                    await relayout();
                 });
             })();
         } else {
@@ -171,17 +174,21 @@
         });
         const set = new Set<string>();
         links.forEach((link) => {
-            const id1 = link.block_id + "-" + link.def_block_id;
-            const id2 = link.def_block_id + "-" + link.block_id;
-            if (set.has(id1) || set.has(id2)) return;
-            set.add(id1);
-            set.add(id2);
+            if (graphHideStructEdges.get() && !link.isRef) return;
+            const id = link.block_id + "-" + link.def_block_id;
+            if (set.has(id)) return;
+            set.add(id);
             addEdge(link);
         });
+        spreadEdgeLabels($edges);
         await taskLayoutDirection;
-        relayout();
-        if (docID != lastDocID && data()?.locateID) {
+        // 先设置 lastDocID，这样 relayout 才能正确加载保存的位置
+        const isNewDoc = docID != lastDocID;
+        if (isNewDoc) {
             lastDocID = docID;
+        }
+        await relayout();
+        if (isNewDoc && data()?.locateID) {
             data()?.locateID($nodes.at(0)?.id);
         }
     }
@@ -197,6 +204,46 @@
         }
     }
 
+    // 从文档属性读取已保存的位置
+    async function loadNodePositions(docID: string): Promise<Record<string, { x: number; y: number }>> {
+        const attr = await siyuan.getBlockAttrs(docID);
+        const posStr = attr["custom-graph-node-positions"];
+        if (posStr) {
+            try {
+                return JSON.parse(posStr);
+            } catch (e) {
+                console.warn("[GraphBox] Failed to parse positions:", e);
+            }
+        }
+        return {};
+    }
+
+    // 保存节点位置到文档属性
+    async function saveNodePositions(docID: string, nodes: Node[]) {
+        const positions: Record<string, { x: number; y: number }> = {};
+        nodes.forEach(node => {
+            if (node.data?.isFixed) {
+                positions[node.id] = { x: node.position.x, y: node.position.y };
+            }
+        });
+        await siyuan.setBlockAttrs(docID, {
+            "custom-graph-node-positions": JSON.stringify(positions)
+        });
+    }
+
+    // 节点拖拽结束事件处理
+    async function onNodeDragStop({ targetNode }: { targetNode: Node }) {
+        // 标记节点为手动固定
+        const n = $nodes.find(n => n.id === targetNode.id);
+        if (n) {
+            n.data = { ...n.data, isFixed: true };
+        }
+        // 保存位置
+        if (lastDocID) {
+            await saveNodePositions(lastDocID, $nodes);
+        }
+    }
+
     function addEdge(link: Ref) {
         const id = link.block_id + "-" + link.def_block_id;
         let label = link.content?.trim() ?? "";
@@ -206,19 +253,50 @@
             source: link.block_id,
             target: link.def_block_id,
             label,
+            type: label ? "labeledEdge" : undefined,
         });
     }
 
-    function relayout() {
-        getLayoutedElements($nodes, $edges, isVertical);
+    function spreadEdgeLabels(edges: Edge[]) {
+        const srcIdx = new Map<string, number>();
+        for (const e of edges) {
+            if (!e.label) continue;
+            const idx = srcIdx.get(e.source) ?? 0;
+            srcIdx.set(e.source, idx + 1);
+            // Labels stay near source (t=0.1, 0.3, 0.5...).
+            // Edges from different sources are spatially separated even when paths cross.
+            (e as any).data = { ...((e as any).data ?? {}), labelT: 0.1 + idx * 0.2 };
+        }
+    }
+
+    async function relayout() {
+        const savedPositions = lastDocID ? await loadNodePositions(lastDocID) : {};
+        getLayoutedElements($nodes, $edges, isVertical, savedPositions);
         $nodes = $nodes;
         $edges = $edges;
+    }
+
+    // 检测两个节点是否重叠
+    function isOverlapping(
+        pos1: { x: number; y: number },
+        pos2: { x: number; y: number },
+        width: number,
+        height: number,
+        padding: number
+    ): boolean {
+        return !(
+            pos1.x + width + padding < pos2.x ||
+            pos1.x > pos2.x + width + padding ||
+            pos1.y + height + padding < pos2.y ||
+            pos1.y > pos2.y + height + padding
+        );
     }
 
     function getLayoutedElements(
         nodes: Node[],
         edges: Edge[],
         isVertical: boolean,
+        savedPositions: Record<string, { x: number; y: number }> = {},
     ) {
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -246,10 +324,19 @@
 
         nodes.forEach((node) => {
             const nodeWithPosition = dagreGraph.node(node.id);
-            node.position = {
+            const dagrePos = {
                 x: nodeWithPosition.x - nodeWidth / 2,
                 y: nodeWithPosition.y - nodeHeight / 2,
             };
+
+            // 如果有保存的位置，使用保存的位置，否则用 dagre 计算的位置
+            if (savedPositions[node.id]) {
+                node.position = savedPositions[node.id];
+                node.data = { ...node.data, isFixed: true };
+            } else {
+                node.position = dagrePos;
+            }
+
             if (isVertical) {
                 node.targetPosition = Position.Top;
                 node.sourcePosition = Position.Bottom;
@@ -258,23 +345,50 @@
                 node.sourcePosition = Position.Right;
             }
         });
-        // 出入链接调整一下，不然会拧巴着.
+
+        // 碰撞检测：新节点避免与固定节点重叠
+        const fixedNodes = nodes.filter(n => savedPositions[n.id]);
+        const newNodes = nodes.filter(n => !savedPositions[n.id]);
+        const padding = 20; // 节点间距
+
+        for (const newNode of newNodes) {
+            let hasOverlap = true;
+            let attempts = 0;
+            const maxAttempts = 100;
+
+            while (hasOverlap && attempts < maxAttempts) {
+                hasOverlap = false;
+                for (const fixedNode of fixedNodes) {
+                    if (isOverlapping(newNode.position, fixedNode.position, nodeWidth, nodeHeight, padding)) {
+                        hasOverlap = true;
+                        // 向布局方向偏移
+                        if (isVertical) {
+                            newNode.position.y += nodeHeight + padding;
+                        } else {
+                            newNode.position.x += nodeWidth + padding;
+                        }
+                        break;
+                    }
+                }
+                attempts++;
+            }
+        }
+        // 回边处理：不交换 source/target，直接标记 isBackEdge，弧线从右边出接左边入
         edges.forEach((edge) => {
             const s = nodeMap.get(edge.source);
             const t = nodeMap.get(edge.target);
             if (s && t) {
-                if (isVertical) {
-                    if (s.position.y > t.position.y) {
-                        const tmp = edge.source;
-                        edge.source = edge.target;
-                        edge.target = tmp;
-                    }
-                } else {
-                    if (s.position.x > t.position.x) {
-                        const tmp = edge.source;
-                        edge.source = edge.target;
-                        edge.target = tmp;
-                    }
+                const isBackEdge = isVertical
+                    ? s.position.y > t.position.y
+                    : s.position.x > t.position.x;
+                if (isBackEdge) {
+                    const oldData: any = (edge as any).data ?? {};
+                    (edge as any).data = {
+                        ...oldData,
+                        isBackEdge: true,
+                        backEdgeDir: isVertical ? "left" : "down",
+                    };
+                    edge.type = "labeledEdge";
                 }
             }
         });
@@ -325,7 +439,7 @@
         if (id1 && id2) {
             const [div1, div2] = await pmapNullVO([id1, id2], getBlockDiv);
             await linkTwoElements(div1?.div, div2?.div);
-            relayout();
+            await relayout();
         }
     }
     async function nodeclick({ node, event }) {
@@ -353,6 +467,7 @@
             id={newID()}
             {colorMode}
             {snapGrid}
+            {edgeTypes}
             fitView
             {ondelete}
             {onconnect}
@@ -362,6 +477,7 @@
                 event;
             }}
             onnodeclick={nodeclick}
+            onnodedragstop={onNodeDragStop}
         >
             <Controls showLock={true} />
             <Background />
@@ -383,5 +499,8 @@
     .container {
         width: 800px;
         height: 800px;
+    }
+    :global(.svelte-flow__edges) {
+        z-index: 1001 !important;
     }
 </style>

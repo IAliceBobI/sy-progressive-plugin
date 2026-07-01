@@ -162,6 +162,7 @@ type TomatoSettings = {
     flashcardAddRefs: boolean,
     //------------------
     graphClick2Locate: boolean,
+    graphHideStructEdges: boolean,
     graphMaxAllBlocks: string,
     graphMaxPBlocks: string,
     graphBoxCheckbox: string,
@@ -408,6 +409,7 @@ type AttrType = {
     "custom-bkMenDocCount"?: string,
     "custom-bkRefDocCount"?: string,
     "custom-graph-isVertical"?: string,
+    "custom-graph-node-positions"?: string,
     "custom-super-list"?: string,
     "custom-tomato-reflink"?: string,
     "custom-sync-block-id"?: string,
@@ -475,7 +477,7 @@ interface PluginSpec {
 
 interface Description {
     default: string;
-    zh_CN: string;
+    "zh-CN": string;
 }
 
 interface Funding {

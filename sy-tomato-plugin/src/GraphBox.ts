@@ -1,7 +1,7 @@
 import { Custom, Dock, IEventBusMap, IProtyle, openTab } from "siyuan";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { graphAddTopbarIcon, graphBoxCheckbox, graph定位到图中的节点Menu, graph打开块关系图Menu } from "./libs/stores";
-import { siyuan, } from "./libs/utils";
+import { siyuan, getDoOperations } from "./libs/utils";
 import { events, EventType } from "./libs/Events";
 import GraphBoxSvelte from "./GraphBox.svelte";
 import { tomatoI18n } from "./tomatoI18n";
@@ -24,6 +24,11 @@ class GraphBox {
     plugin: BaseTomatoPlugin;
     private customTab: () => Custom;
     private dock: Dock;
+    // 智能刷新相关
+    private lastRefreshedDocID: string = "";   // 上次刷新的文档 ID
+    private lastRefreshedUpdated: string = ""; // 上次刷新时的文档 updated 时间戳
+    private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private pollTimer: ReturnType<typeof setInterval> | null = null; // 3秒轮询定时器
     onload(plugin: BaseTomatoPlugin) {
         if (plugin.initCfg()) {
             this._onload(plugin)
@@ -68,11 +73,35 @@ class GraphBox {
         events.addListener("tomato-graph-box-2024-07-01 17:16:01", (eventType, detail) => {
             if (eventType == EventType.loaded_protyle_static
                 || eventType == EventType.loaded_protyle_dynamic
-                || eventType == EventType.click_editorcontent
                 || eventType == EventType.switch_protyle
             ) {
-                this.getData()?.changeDoc(detail?.protyle);
+                // 切换文档：直接刷新图（内容完全不同，无需时间戳比对）
+                const newDocID = detail?.protyle?.block?.rootID;
+                if (newDocID) {
+                    this.lastRefreshedDocID = newDocID;
+                    this.lastRefreshedUpdated = ""; // 重置时间戳，下次轮询/编辑时会重新获取
+                    this.getData()?.changeDoc(detail?.protyle);
+                }
             }
+        });
+        // 3秒轮询检查文档更新（走防抖）
+        this.pollTimer = setInterval(() => {
+            this.scheduleRefresh();
+        }, 3000);
+        // 自动刷新：WebSocket 事件走防抖
+        events.addWsListener("tomato-graph-auto-refresh-2025", (wsData: WsMain) => {
+            const ops = getDoOperations(wsData);
+            if (ops.length === 0) return;
+            const currentDocID = events.docID;
+            if (!currentDocID) return;
+
+            const related = ops.some(op =>
+                op.id === currentDocID ||
+                op.parentID === currentDocID
+            );
+            if (!related) return;
+
+            this.scheduleRefresh();
         });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             this.locateNodeMenu(detail as any);
@@ -105,6 +134,52 @@ class GraphBox {
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
         if (!graphBoxCheckbox.get()) return;
         this.locateNodeMenu(detail as any);
+    }
+
+    // 统一防抖入口：所有刷新请求都走这里
+    private scheduleRefresh() {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+        this.debounceTimer = setTimeout(() => {
+            this.debounceTimer = null;
+            const currentDocID = events.docID;
+            if (currentDocID) {
+                this.checkAndRefresh(currentDocID);
+            }
+        }, 300); // 300ms 防抖
+    }
+
+    // 检查文档 updated 时间戳，决定是否需要刷新
+    private async checkAndRefresh(docID: string) {
+        try {
+            // 查询文档当前的 updated 时间戳
+            const row = await siyuan.sqlOne(`SELECT updated FROM blocks WHERE id = "${docID}" AND type = "d"`);
+            const currentUpdated = row?.updated;
+
+            // 如果时间戳没有变化，跳过刷新
+            if (currentUpdated && currentUpdated === this.lastRefreshedUpdated) {
+                return;
+            }
+
+            // 时间戳有变化，执行刷新
+            this.lastRefreshedUpdated = currentUpdated || "";
+            this.getData()?.changeDoc(events.protyle?.protyle);
+        } catch (e) {
+            console.warn("[GraphBox] checkAndRefresh error:", e);
+        }
+    }
+
+    // 清理定时器
+    destroy() {
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = null;
+        }
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+            this.debounceTimer = null;
+        }
     }
 
     async openGraphTab() {
@@ -428,6 +503,7 @@ export async function getData(docID: string, docName: string, maxPBlocks: number
             refs = await taskRefs;
             const ids = refs
                 .map((r) => {
+                    r.isRef = true;
                     r.content = r.content?.slice(0, 4) ?? "";
                     return [
                         r.root_id,
