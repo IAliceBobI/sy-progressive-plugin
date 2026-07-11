@@ -23,6 +23,8 @@ import { startTaskLoop } from "./ProgressiveTask";
 import { progStorage } from "./ProgressiveStorage";
 import { siyuan, timeUtil } from "../../sy-tomato-plugin/src/libs/utils";
 import { initProgFloatBtns } from "./ProgressiveBtn";
+import { buildContentBlocks, computePieceIndex, runSplit } from "./Split2Pieces";
+import { createPiece, fullfilContent } from "./helper";
 
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
@@ -119,6 +121,15 @@ export default class ThePlugin extends BaseTomatoPlugin {
             window.prog_zZmqus5PtYRi.siyuan = siyuan
             window.prog_zZmqus5PtYRi.timeUtil = timeUtil
             window.prog_zZmqus5PtYRi.pluginInstance = this;
+            window.prog_zZmqus5PtYRi.split = {
+                buildContentBlocks,
+                computePieceIndex,
+                saveIndex: (bookID: string, groups: WordCountType[][]) => progStorage.saveIndex(bookID, groups),
+                loadIndex: (bookID: string) => progStorage.loadBookIndexIfNeeded(bookID),
+                createPiece,
+                fullfilContent,
+                runSplit,
+            };
             loadStore(this);
             setGlobal(ProgressivePluginConfig, this.settingCfg)
             return this.settingCfg;

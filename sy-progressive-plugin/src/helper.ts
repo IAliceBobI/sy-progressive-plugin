@@ -249,6 +249,9 @@ export async function createPiece(bookInfo: BookInfo, index: string[][], point: 
 
     const piecePre = index.at(point - 1) ?? []
     const piece = index.at(point) ?? []
+    // 修复根因 2：piece 为空说明索引未就绪（或 point 越界），不创建空文档，
+    // 返回 "" 让 startToLearn 的重试循环（Progressive.ts:431）能感知失败并重试。
+    if (piece.length === 0) return "";
     noteID = await createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
     if (!noteID) return "";
 

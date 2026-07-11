@@ -106,3 +106,50 @@ export class HeadingGroup {
         return this.group;
     }
 }
+
+import { getDocBlocks } from "../../sy-tomato-plugin/src/libs/docUtils";
+
+// 步骤 1：取书的块 + 算 WordCountType —— 纯逻辑 + siyuan 调用。
+// 从 AddBook.svelte 的 doCount() 提取。headCount 的副作用不在此处（留在组件）。
+export async function buildContentBlocks(bookID: string, bookName: string): Promise<WordCountType[]> {
+    const { root } = await getDocBlocks(bookID, bookName, false, true, 1);
+    return root.children.map((block) => ({
+        id: block.id,
+        count: block.div.textContent.length,
+        type: block.type,
+        subType: block.subtype,
+        div: block.div,
+    }));
+}
+
+// 步骤 2：计算分片索引 —— 纯逻辑（核心可测逻辑，这一轮先导出不写单测）。
+// 从 AddBook.svelte 的 countPieces() 的分片编排部分提取。headings 校验由调用方负责。
+export async function computePieceIndex(
+    contentBlocks: WordCountType[],
+    headings: string[],
+    bookID: string,
+    splitWordNum: number,
+): Promise<WordCountType[][]> {
+    let groups = (await new HeadingGroup(contentBlocks, headings, bookID).init()).split();
+    if (splitWordNum > 0) {
+        groups = new ContentLenGroup(groups, splitWordNum).split();
+    }
+    return groups;
+}
+
+import { progStorage } from "./ProgressiveStorage";
+import { createPiece } from "./helper";
+
+// 端到端编排：给定书 + point，跑完整分片流程，返回 noteID。
+// 供 window.prog_zZmqus5PtYRi.split.runSplit 调用，让 agent-browser 能逐步调试验证 bug。
+// 保守策略：只用已保存索引（loadBookIndexIfNeeded）；索引为空时抛错而非静默返回空，
+// 让外部调用方能明确区分"索引未就绪"和"createPiece 失败"。
+export async function runSplit(bookID: string, point: number, bookName?: string): Promise<string> {
+    void bookName; // 预留参数（未来索引重算路径会用），当前保守路径只用已保存索引。
+    const index = await progStorage.loadBookIndexIfNeeded(bookID);
+    if (index.length === 0) {
+        throw new Error(`runSplit: book ${bookID} index empty (not ready or not split yet)`);
+    }
+    const info = await progStorage.booksInfo(bookID);
+    return createPiece(info, index, point);
+}

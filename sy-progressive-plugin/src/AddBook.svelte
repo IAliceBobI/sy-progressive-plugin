@@ -6,7 +6,7 @@
         isValidNumber,
         siyuan,
     } from "../../sy-tomato-plugin/src/libs/utils";
-    import { ContentLenGroup, HeadingGroup } from "./Split2Pieces";
+    import { buildContentBlocks, computePieceIndex } from "./Split2Pieces";
     import { MarkBookKey } from "../../sy-tomato-plugin/src/libs/gconst";
     import { getDocBlocks } from "../../sy-tomato-plugin/src/libs/docUtils";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -82,23 +82,10 @@
         siyuan.getBlocksWordCount([bookID]).then((c) => {
             wordCount = c.stat.wordCount;
         });
-        const { root, div } = await getDocBlocks(
-            bookID,
-            bookName,
-            false,
-            true,
-            1,
-        );
-        contentBlocks = root.children.map((block) => {
-            if (block.type == "h") headCount++;
-            return {
-                id: block.id,
-                count: block.div.textContent.length,
-                type: block.type,
-                subType: block.subtype,
-                div: block.div,
-            };
-        });
+        contentBlocks = await buildContentBlocks(bookID, bookName);
+        // headCount 是 UI 派生状态，副作用留在组件（不放纯函数里）。
+        headCount = 1 + contentBlocks.filter(b => b.type == "h").length;
+        const { div } = await getDocBlocks(bookID, bookName, false, true, 1);
         textLen = div.textContent.length;
     }
 
@@ -132,14 +119,7 @@
         }
 
         // heading
-        let groups = (
-            await new HeadingGroup(contentBlocks, headings, bookID).init()
-        ).split();
-
-        // word num
-        if (splitWordNum > 0) {
-            groups = new ContentLenGroup(groups, splitWordNum).split();
-        }
+        const groups = await computePieceIndex(contentBlocks, headings, bookID, splitWordNum);
         pieceCount = groups.length;
         hasCalcPiece = true;
         return groups;

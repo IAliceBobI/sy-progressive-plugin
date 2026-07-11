@@ -223,7 +223,15 @@ export class ProgressiveStorage {
         let idx: string[][] = this.plugin.data[bookCacheKey(bookID)];
         if (!idx) {
             idx = afterLoad(await this.plugin.loadData(bookID));
-            this.plugin.data[bookCacheKey(bookID)] = idx;
+            // 修复根因 1：首次 load 到空/残缺索引时不缓存。
+            // 用与返回时相同的过滤逻辑判定"是否真的有分片"——
+            // afterLoad("") 返回 [[""]]（非 []），直接看 .length 会误判，必须先 filter。
+            const cleaned = idx
+                .map(i => i.filter(j => j?.length > 0))
+                .filter(i => i?.length > 0);
+            if (cleaned.length > 0) {
+                this.plugin.data[bookCacheKey(bookID)] = idx;
+            }
         }
         return idx.map(i => i.filter(j => j?.length > 0)).filter(i => i?.length > 0);
     }
