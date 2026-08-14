@@ -322,13 +322,14 @@ class FlashBox {
             }
         }
 
-        ops.push(siyuan.transAddRiffCards([cardID]))
         ops.push(siyuan.transDoUpdateUpdated(cardID))
         await siyuan.transactions(ops).then(() => {
             if (t !== CardType.Here) {
                 OpenSyFile2(this.plugin, cardID, windowOpenStyle.get() as any, null, null, lastSelectedID);
             }
-            siyuan.addRiffCards([cardID]) // for UI refresh only
+            // SiYuan 3.8.0 起事务会校验 addFlashcards 的目标块已存在于块树，新卡片块不能在同一事务内注册；
+            // /api/transactions 返回前事务已落盘（FlushTxQueue），此处注册安全
+            siyuan.addRiffCards([cardID])
             siyuan.pushMsg("⚡🗃" + text, 2000);
         })
     }
