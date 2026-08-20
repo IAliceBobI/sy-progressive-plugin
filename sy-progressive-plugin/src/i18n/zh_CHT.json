@@ -54,6 +54,7 @@
     "youFoundAPiece": "你發現了一個閱讀分片！",
     "maybeBookRemoved": "似乎{bookID}已經被刪除",
     "openingDocPieceForYou": "正在為您打開文檔片段，請耐心等待……",
+    "pieceNotAvailable": "該分片內容已失效（源塊已被刪除），已跳過",
     "cannotFindTheBox": "找不到文檔對應的筆記本：",
     "openAdocFirst": "請先打開一個文檔",
     "progressiveReadingMenu": "漸進學習菜單",

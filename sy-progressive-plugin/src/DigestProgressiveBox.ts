@@ -12,7 +12,7 @@ import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
 import { addCustomButton } from "../../sy-tomato-plugin/src/exportFiles";
 import { prog } from "./Progressive";
-import { newID } from "stonev5-utils/lib/id";
+import { newID } from "stonev5-utils";
 import { mount } from "svelte";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)

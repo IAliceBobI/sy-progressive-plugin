@@ -3,7 +3,7 @@ import { Dialog, ICardData, Setting } from "siyuan";
 import { ICONS } from "./icons";
 import { linkBox } from "./LinkBox";
 import { schedule } from "./Schedule";
-import { newID } from "stonev5-utils/lib/id";
+import { newID } from "stonev5-utils";
 import { readingPointBox } from "./ReadingPointBox";
 import { EventType, events } from "./libs/Events";
 import { STORAGE_SETTINGS } from "./constants";

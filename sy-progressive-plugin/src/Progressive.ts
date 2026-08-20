@@ -505,6 +505,10 @@ class Progressive {
             events.setDocID(noteID);
             openPiece = true;
             await OpenSyFile2(this.plugin, noteID)
+        } else {
+            // 分片源块全部失效（索引残留的已删除块），明确提示而非停留在"正在为您打开"
+            await siyuan.pushMsg(this.plugin.i18n.pieceNotAvailable);
+            return;
         }
         if (openPiece && this.settings.openCardsOnOpenPiece) {
             let hpath = "";

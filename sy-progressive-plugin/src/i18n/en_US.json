@@ -54,6 +54,7 @@
   "youFoundAPiece": "You Found a Reading Piece!",
   "maybeBookRemoved": "It Seems {bookID} Has Been Removed",
   "openingDocPieceForYou": "Opening Document Piece for You, Please Wait...",
+  "pieceNotAvailable": "This Piece Is Unavailable (Source Blocks Deleted), Skipped",
   "cannotFindTheBox": "Cannot Find the Notebook Corresponding to the Document:",
   "openAdocFirst": "Please Open a Document First",
   "progressiveReadingMenu": "Progressive Reading Menu",

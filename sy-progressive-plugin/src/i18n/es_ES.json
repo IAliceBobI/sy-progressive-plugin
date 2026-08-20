@@ -54,6 +54,7 @@
     "youFoundAPiece": "¡has encontrado un fragmento de lectura!",
     "maybeBookRemoved": "parece que {bookID} ha sido eliminado",
     "openingDocPieceForYou": "abriendo el fragmento del documento para ti, por favor ten paciencia...",
+    "pieceNotAvailable": "este fragmento no está disponible (bloques de origen eliminados), omitido",
     "cannotFindTheBox": "no se puede encontrar la libreta correspondiente al documento:",
     "openAdocFirst": "por favor, abra primero un documento",
     "progressiveReadingMenu": "menú de aprendizaje progresivo",

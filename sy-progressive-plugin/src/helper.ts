@@ -248,9 +248,11 @@ export async function createPiece(bookInfo: BookInfo, index: string[][], point: 
     if (noteID) return noteID;
 
     const piecePre = index.at(point - 1) ?? []
-    const piece = index.at(point) ?? []
     // 修复根因 2：piece 为空说明索引未就绪（或 point 越界），不创建空文档，
     // 返回 "" 让 startToLearn 的重试循环（Progressive.ts:431）能感知失败并重试。
+    // 块存在性校验：书被编辑后索引会残留已删除块的 ID（悬空 ID），
+    // 过滤后全部悬空则跳过该 point，否则会创建只有标题没有内容的空分片。
+    const piece = (await siyuan.getRows(index.at(point) ?? [], "id")).map(r => r.id);
     if (piece.length === 0) return "";
     noteID = await createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
     if (!noteID) return "";
@@ -436,9 +438,12 @@ async function createNote(boxID: string, bookID: string, piece: string[], point:
     if (!dir || !bookName) return "";
 
     let content: string;
+    let hasContent = false;
     // 读取第一行的内容用于创建文件名
     for (const blockID of piece) {
         const mc = await siyuan.getBlockMarkdownAndContent(blockID);
+        // markdown 非空即块存在且有内容（含图片等 content 为空的块）
+        if (mc?.markdown) hasContent = true;
         if (mc?.markdown?.startsWith("<div>")) {
             content = utils.dom2div(content).textContent ?? "";
         } else {
@@ -447,6 +452,8 @@ async function createNote(boxID: string, bookID: string, piece: string[], point:
         }
         if (content) break;
     }
+    // piece 中所有块都查无 markdown（索引残留的已删除块或空段落），不创建空分片
+    if (!hasContent) return "";
 
     const attr = {} as AttrType;
     attr["custom-card-priority"] = "50";

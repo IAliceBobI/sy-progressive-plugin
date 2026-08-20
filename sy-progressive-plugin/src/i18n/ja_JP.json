@@ -54,6 +54,7 @@
     "youFoundAPiece": "あなたは読書シャープを見つけました！",
     "maybeBookRemoved": "{bookID}は削除された可能性があります",
     "openingDocPieceForYou": "ドキュメントのシャープを開いています、お待ちください……",
+    "pieceNotAvailable": "このシャープは無効です（元ブロックが削除済み）、スキップしました",
     "cannotFindTheBox": "対応するノートブックが見つかりません：",
     "openAdocFirst": "まずドキュメントを開いてください",
     "progressiveReadingMenu": "漸進学習メニュー",

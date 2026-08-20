@@ -15,7 +15,7 @@ import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlug
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import SettingsSvelte from "./Settings.svelte"
 import { resetKey, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { newID } from "stonev5-utils/lib/id";
+import { newID } from "stonev5-utils";
 import { ProgressivePluginConfig, ProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gconst";
 import { setGlobal } from "stonev5-utils";
 import { mount } from "svelte";

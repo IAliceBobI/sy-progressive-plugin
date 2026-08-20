@@ -54,6 +54,7 @@
     "youFoundAPiece": "Vous avez trouvé une pièce de lecture !",
     "maybeBookRemoved": "Il semble que {bookID} ait été supprimé",
     "openingDocPieceForYou": "Ouverture de la pièce de document pour vous, veuillez patienter...",
+    "pieceNotAvailable": "cette pièce est indisponible (blocs sources supprimés), ignorée",
     "cannotFindTheBox": "Impossible de trouver le cahier correspondant au document :",
     "openAdocFirst": "Veuillez d'abord ouvrir un document",
     "progressiveReadingMenu": "Menu d'apprentissage progressif",
