@@ -1,4 +1,8 @@
 import { Dialog, Setting } from "siyuan";
+import { openChangelogDialog } from "../../sy-tomato-plugin/src/libs/changelogDialog";
+import changelog from "./changelog.json";
+import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
+import helpDocs from "./help.json";
 import { ICONS } from "./icons";
 import { prog, progSettingsOpenHK } from "./Progressive";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
@@ -171,19 +175,23 @@ export default class ThePlugin extends BaseTomatoPlugin {
     private openSettings() {
         const getTitle = (version: string) => {
             const help = document.createElement("button") as HTMLButtonElement;
-            help.setAttribute('onclick', 'window.location.href = "https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink"')
+            help.addEventListener("click", () => {
+                openHelpDialog("https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink", helpDocs);
+            });
             help.classList.add("b3-button")
             help.classList.add("b3-button--text")
             help.textContent = 'Help帮助'
 
             const log = document.createElement("button") as HTMLButtonElement;
-            log.setAttribute('onclick', 'window.location.href = "https://awx9773btw.feishu.cn/docx/Cm7nd2G9KoJhOjxGACycvJU6nRg?from=from_copylink"')
+            log.addEventListener("click", () => openChangelogDialog(changelog));
             log.classList.add("b3-button")
             log.classList.add("b3-button--text")
-            log.textContent = 'LOG日志'
+            log.textContent = '更新日志'
 
             const save = document.createElement("button") as HTMLButtonElement;
-            save.setAttribute('onclick', 'globalThis.tomato_zZmqus5PtYRi.save()')
+            save.addEventListener("click", () => {
+                (globalThis as any).tomato_zZmqus5PtYRi.save();
+            });
             save.classList.add("b3-button")
             save.classList.add("b3-button--outline")
             save.textContent = tomatoI18n.保存并退出;
@@ -204,7 +212,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         const dm = new DestroyManager();
         const id = newID();
         const dialog = new Dialog({
-            title: getTitle(this.pluginSpec?.version).outerHTML,
+            title: " ", // 占位保住 header，真实标题按钮组创建后以节点形式挂入
             content: `<div id="${id}"></div>`,
             width: events.isMobile ? "90vw" : "700px",
             height: events.isMobile ? "180svw" : "700px",
@@ -213,6 +221,8 @@ export default class ThePlugin extends BaseTomatoPlugin {
             },
             hideCloseIcon: true,
         });
+        dialog.element.querySelector(".b3-dialog__header")
+            .replaceChildren(getTitle(this.pluginSpec?.version));
         const d = mount(SettingsSvelte, {
             target: dialog.element.querySelector("#" + id),
             props: {

@@ -15,6 +15,8 @@
     import { progStorage, ProgressiveStorage } from "./ProgressiveStorage";
     import { readableDuration, validateNum } from "stonev5-utils";
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+    import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
+    import helpDocs from "./help.json";
 
     interface Props {
         bookID: string;
@@ -246,7 +248,12 @@
                     {#if createPiecesNow && !(finishDays > 0)}
                         <a
                             href="https://awx9773btw.feishu.cn/docx/KwZJdW9BeoHkiRxVg6jcLUnanqf"
-                            >相关：番茄工具箱的均匀推迟功能，重新规划当前文档和其子文档中，所有闪卡的划复习时间。</a
+                            onclick={(e) => {
+                                if (e.metaKey || e.ctrlKey) return;
+                                e.preventDefault();
+                                openHelpDialog((e.currentTarget as HTMLAnchorElement).href,
+                                    helpDocs);
+                            }}>相关：番茄工具箱的均匀推迟功能，重新规划当前文档和其子文档中，所有闪卡的划复习时间。</a
                         >
                     {/if}
                 </label>
