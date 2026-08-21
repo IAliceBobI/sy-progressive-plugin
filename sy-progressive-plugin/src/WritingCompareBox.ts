@@ -294,6 +294,7 @@ class WritingCompareBox {
             const taskClear = siyuan.clearAll(cmpDocID);
             const mdList: string[] = [];
 
+            const keyPidx = new Map<string, string>();
             const keyNoteMap = siyuan.getChildBlocks(keyNoteID)
                 .then(keyNoteChildren => siyuan.getRows(keyNoteChildren.map(b => b.id), "ial,markdown,content", true, [
                     "content is not null", 'content != ""'
@@ -305,6 +306,8 @@ class WritingCompareBox {
                     const ref = row.ial["custom-progref"];
                     if (ref) {
                         lastRef = ref;
+                        const pidx = row.ial["custom-paragraph-index"];
+                        if (pidx) keyPidx.set(ref, pidx);
                     } else if (lastRef) {
                         row.ial["custom-progref"] = lastRef;
                     }
@@ -330,7 +333,21 @@ class WritingCompareBox {
                     return obj;
                 }, { ids: [] as string[], m: new Map<string, BlockContent[]>() }))
 
-            for (const id of [... new Set(ids)]) {
+            const pieceRefs = new Set(ids);
+            const pidx2ref = new Map<string, string>();
+            for (const rows of pieceMap.values()) {
+                for (const { ial } of rows) {
+                    const p = ial["custom-paragraph-index"];
+                    if (p && ial["custom-progref"]) pidx2ref.set(p, ial["custom-progref"]);
+                }
+            }
+            // keys 小标题的 progref 可能指向列表项等非顶层块，匹配不上原文段时用段落索引兜底归段
+            const keyNotes = new Map<string, BlockContent[]>();
+            for (const [k, rows] of await keyNoteMap) {
+                const target = pieceRefs.has(k) ? k : (pidx2ref.get(keyPidx.get(k) ?? "") ?? k);
+                keyNotes.set(target, [...(keyNotes.get(target) ?? []), ...rows]);
+            }
+            for (const id of [...pieceRefs]) {
                 for (const row of pieceMap.get(id) ?? []) {
                     delete row.ial.id;
                     delete row.ial.updated;
@@ -338,18 +355,30 @@ class WritingCompareBox {
                     mdList.push(`${row.markdown}\n${ial2str(row.ial)}`);
                 }
                 let w = false;
-                for (const row of (await keyNoteMap).get(id) ?? []) {
+                for (const row of keyNotes.get(id) ?? []) {
                     delete row.ial.id;
                     delete row.ial.updated;
                     w = true;
-                    mdList.push(`((${row.id} '${row.content}'))\n${ial2str(row.ial)}`);
+                    mdList.push(`${row.markdown}\n${ial2str(row.ial)}`);
+                }
+                if (w) mdList.push("---");
+            }
+            // 仍匹配不到原文段的 keys 内容附加到末尾，避免静默丢失
+            for (const [k, rows] of keyNotes) {
+                if (pieceRefs.has(k)) continue;
+                let w = false;
+                for (const row of rows) {
+                    delete row.ial.id;
+                    delete row.ial.updated;
+                    w = true;
+                    mdList.push(`${row.markdown}\n${ial2str(row.ial)}`);
                 }
                 if (w) mdList.push("---");
             }
             await taskClear;
             await siyuan.insertBlockAsChildOf(mdList.join("\n"), cmpDocID);
             siyuan.pushMsg("compare notes finished")
-            OpenSyFile2(this.plugin, cmpDocID, windowOpenStyle.get() as any);
+            OpenSyFile2(this.plugin, cmpDocID, "front");
         }
     }
 
@@ -420,7 +449,7 @@ class WritingCompareBox {
             const cs = await siyuan.getChildBlocks(pieceID);
             const ids = cs.map(b => b.id);
             const rows = await siyuan.getRows(ids,
-                "content,ial", true, [
+                "content,ial,markdown", true, [
                 `ial not like "%${PROG_ORIGIN_TEXT}%"`,
                 `ial not like "%${MarkKey}%"`,
                 "content IS NOT NULL",
@@ -432,7 +461,7 @@ class WritingCompareBox {
 
         const mdList: string[] = [];
         let lastIdx: string;
-        for (const { id, ial, content } of contents) {
+        for (const { ial, content, markdown } of contents) {
             if (!content) continue;
             delete ial.id;
             delete ial.updated;
@@ -442,14 +471,14 @@ class WritingCompareBox {
                 lastIdx = thisIdx;
             }
             ial["custom-prog-key-note"] = "1";
-            mdList.push(`((${id} '${content}'))\n${ial2str(ial)}`);
+            mdList.push(`${markdown}\n${ial2str(ial)}`);
             noteMap.get(thisIdx)?.forEach(note => {
                 mdList.push(note.content);
             })
         }
         await siyuan.clearAll(keysDocID);
         await siyuan.insertBlockAsChildOf(mdList.join("\n"), keysDocID);
-        OpenSyFile2(this.plugin, keysDocID, windowOpenStyle.get() as any);
+        OpenSyFile2(this.plugin, keysDocID, "front");
     }
 }
 
