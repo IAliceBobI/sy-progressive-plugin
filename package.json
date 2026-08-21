@@ -37,5 +37,10 @@
   "dependencies": {
     "stonev5-utils": "^1.2.0",
     "uuid": "^9.0.1"
+  },
+  "allowScripts": {
+    "@parcel/watcher": true,
+    "esbuild": true,
+    "fsevents": true
   }
 }
