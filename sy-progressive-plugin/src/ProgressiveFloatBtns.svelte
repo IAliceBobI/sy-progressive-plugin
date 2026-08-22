@@ -26,6 +26,7 @@
     zIndexPlus={$zIndexPlus}
     minHeight={50}
     minWidth={50}
+    onClose={() => show.set(false)}
 >
     {#snippet dialogInner()}
         <div class="container" title={tomatoI18n.如果无法拖动}>
