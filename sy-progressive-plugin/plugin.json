@@ -2,7 +2,7 @@
   "name": "sy-progressive-plugin",
   "author": "IAliceBobI",
   "url": "https://github.com/IAliceBobI/sy-progressive-plugin",
-  "version": "2.1.47",
+  "version": "2.1.48",
   "minAppVersion": "2.12.6",
   "disabledInPublish": false,
   "backends": [
@@ -22,14 +22,6 @@
   "readme": {
     "default": "README.md",
     "zh_CN": "README_zh_CN.md"
-  },
-  "funding": {
-    "openCollective": "",
-    "patreon": "",
-    "github": "",
-    "custom": [
-      "https://afdian.com/a/playerv5"
-    ]
   },
   "keywords": [
     "Learning",

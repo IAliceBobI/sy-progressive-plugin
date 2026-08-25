@@ -143,7 +143,7 @@
                 </td>
 
                 <td
-                    title={prog.plugin.i18n.ignoreTxt + !!book.bookInfo.ignored}
+                    title={tomatoI18n.忽略 + !!book.bookInfo.ignored}
                 >
                     <input
                         type="checkbox"
@@ -157,7 +157,7 @@
                 </td>
 
                 <td
-                    title={prog.plugin.i18n.autoCard + !!book.bookInfo.autoCard}
+                    title={tomatoI18n.自动制卡 + !!book.bookInfo.autoCard}
                 >
                     <input
                         type="checkbox"

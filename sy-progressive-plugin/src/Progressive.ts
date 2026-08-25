@@ -1,7 +1,7 @@
 import { Menu, Plugin, openTab, confirm, IProtyle, Protyle } from "siyuan";
 import "./index.scss";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
-import { closeTabByTitle, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { closeTabByTitle, getActiveDocID, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import * as help from "./helper";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
@@ -43,7 +43,7 @@ class Progressive {
     addTopbar(plugin: Plugin, position: "left" | "right") {
         const tb = plugin.addTopBar({
             icon: "iconFilesRoot",
-            title: plugin.i18n.progressiveReadingMenu,
+            title: tomatoI18n.渐进学习菜单,
             position,
             callback: () => {
                 if (events.isMobile) {
@@ -344,22 +344,24 @@ class Progressive {
                 await this.addProgressiveReading(bookID);
                 await utils.sleep(constants.IndexTime2Wait);
             } else {
-                await siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit + " [1]");
+                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [1]");
             }
         });
     }
 
     private async addProgressiveReading(bookID: string = "") {
         if (!bookID) {
-            bookID = events.docID;
+            // events.docID 只在点击编辑器内容后更新——从文档树点开文档还没点内容时
+            // 取不到，先取当前激活页签的文档（用户眼前的文档）
+            bookID = getActiveDocID() || events.docID;
         }
         if (!bookID) {
-            await siyuan.pushMsg(this.plugin.i18n.openAdocFirst);
+            await siyuan.pushMsg(tomatoI18n.请先打开一个文档);
             return;
         }
         const row = await siyuan.sqlOne(`select content from blocks where type='d' and id='${bookID}'`);
         if (!row) {
-            siyuan.pushMsg(this.plugin.i18n.maybeBookRemoved.replace("{bookID}", bookID));
+            siyuan.pushMsg(tomatoI18n.似乎书本已被删除.replace("{bookID}", bookID));
             return;
         }
         await this.addProgressiveReadingDialog(bookID, row["content"]);
@@ -396,7 +398,7 @@ class Progressive {
                         return;
                     }
                 }
-                await siyuan.pushMsg(this.plugin.i18n.addThisDocFirst);
+                await siyuan.pushMsg(tomatoI18n.请先将此文档加入渐进学习列表);
             } else {
                 for (let i = 0; i < idx.length; i++) {
                     for (let j = 0; j < idx[i].length; j++) {
@@ -414,7 +416,7 @@ class Progressive {
                 await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
             }
         } else {
-            await siyuan.pushMsg(this.plugin.i18n.cannotFindDocWaitForIndex);
+            await siyuan.pushMsg(tomatoI18n.未找到文档请等待索引);
         }
     }
 
@@ -426,14 +428,14 @@ class Progressive {
     async startToLearnWithLock(bookID = "", isRand = false) {
         return navigator.locks.request(constants.StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
-                await siyuan.pushMsg(this.plugin.i18n.openingDocPieceForYou);
+                await siyuan.pushMsg(tomatoI18n.正在为您打开文档片段);
                 let i = 0;
                 while (await this.startToLearn(bookID, isRand) === false) {
                     if (i++ > 30) break;
                 }
                 await utils.sleep(constants.IndexTime2Wait);
             } else {
-                await siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit + " [2]");
+                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [2]");
             }
         });
     }
@@ -484,7 +486,7 @@ class Progressive {
         let noteID = "";
         const bookInfo = await this.getBook2Learn(bookID);
         if (!bookInfo.bookID) {
-            siyuan.pushMsg(this.plugin.i18n.AddADocFirst);
+            siyuan.pushMsg(tomatoI18n.您还没添加任何文档);
             return;
         }
         bookID = bookInfo.bookID;
@@ -493,10 +495,10 @@ class Progressive {
         if (isRand) point = utils.getRandInt0tox(bookIndex.length); // 随机创建书籍的某个分片，适用于单词集合。
         await progStorage.updateBookInfoTime(bookID);
         if (point >= bookIndex.length) {
-            await siyuan.pushMsg(this.plugin.i18n.thisIsLastPage);
+            await siyuan.pushMsg(tomatoI18n.已经是最后一页了);
             return;
         } else if (point < 0) {
-            await siyuan.pushMsg(this.plugin.i18n.thisIsFirstPage);
+            await siyuan.pushMsg(tomatoI18n.已经是第一页了);
             return;
         }
         let openPiece = false;
@@ -507,7 +509,7 @@ class Progressive {
             await OpenSyFile2(this.plugin, noteID)
         } else {
             // 分片源块全部失效（索引残留的已删除块），明确提示而非停留在"正在为您打开"
-            await siyuan.pushMsg(this.plugin.i18n.pieceNotAvailable);
+            await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
             return;
         }
         if (openPiece && this.settings.openCardsOnOpenPiece) {
@@ -534,7 +536,7 @@ class Progressive {
                 await this.htmlBlockReadNextPeiceInLock(bookID, noteID, cbType, point);
                 await utils.sleep(constants.IndexTime2Wait);
             } else {
-                await siyuan.pushMsg(this.plugin.i18n.slowDownALittleBit + " [3]");
+                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [3]");
             }
         });
     }
@@ -573,7 +575,7 @@ class Progressive {
                 });
                 break;
             case HtmlCBType.deleteAndBack:
-                confirm("⚠️", this.plugin.i18n.DeleteAndBack, async () => {
+                confirm("⚠️", tomatoI18n.删除并返回, async () => {
                     await siyuan.removeRiffCards([noteID]);
                     await progStorage.gotoBlock(bookID, point - 1);
                     await this.startToLearnWithLock(bookID);
@@ -584,7 +586,7 @@ class Progressive {
                 });
                 break;
             case HtmlCBType.deleteAndNext:
-                confirm("⚠️", this.plugin.i18n.DeleteAndNext, async () => {
+                confirm("⚠️", tomatoI18n.删除并下一个, async () => {
                     await siyuan.removeRiffCards([noteID]);
                     await progStorage.gotoBlock(bookID, point + 1);
                     await this.startToLearnWithLock(bookID);
@@ -718,7 +720,7 @@ class Progressive {
                 }
             });
         }, {
-            title: this.plugin.i18n.viewAllProgressiveBooks,
+            title: tomatoI18n.查看所有渐进学习文档,
             width: events.isMobile ? "90vw" : undefined,
             height: events.isMobile ? "180vw" : "800px",
         });

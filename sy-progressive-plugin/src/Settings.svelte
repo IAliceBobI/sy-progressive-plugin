@@ -3,6 +3,9 @@
     import { onDestroy, onMount, tick } from "svelte";
     import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
     import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
+    // 番茄工具箱设置页同款卡片体系（conf-group/section-title/kbd 键帽），根节点挂
+    // .tomato-settings-dialog 类启用；样式按该类作用域限定，不会泄漏（2026-08-24 对齐改造）
+    import "../../sy-tomato-plugin/src/IndexConf.css";
     import {
         btnCleanOriginText,
         btnDelCard,
@@ -48,7 +51,6 @@
         send2dailyCardEnable,
         send2dailyCardNoRefEnable,
         summary2dailynote,
-        userToken,
         windowOpenStyle,
         words2dailycard,
         PieceMovingDown,
@@ -64,17 +66,13 @@
         digestAddReadingpoint,
         add2piecesBtn2lockIcon,
         add2digBtn2lockIcon,
-        hideVIP,
         finishPieceCreateAt,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+    import HotkeyCap from "../../sy-tomato-plugin/src/HotkeyCap.svelte";
     import TomatoVIP from "../../sy-tomato-plugin/src/TomatoVIP.svelte";
-    import BuyTomato from "../../sy-tomato-plugin/src/BuyTomato.svelte";
-    import {
-        expStore,
-        resetKey,
-        verifyKeyProgressive,
-    } from "../../sy-tomato-plugin/src/libs/user";
+    import ActivationCard from "../../sy-tomato-plugin/src/ActivationCard.svelte";
+    import DevDeactivate from "../../sy-tomato-plugin/src/DevDeactivate.svelte";
     import { saveRestorePagePosition } from "../../sy-tomato-plugin/src/libs/utils";
     import {
         digest渐进阅读摘抄模式,
@@ -125,7 +123,6 @@
     let { dm, plugin = $bindable() }: Props = $props();
     let settingsDiv: HTMLElement = $state();
     let searchInput: HTMLElement = $state();
-    let buyDIV: HTMLElement = $state();
     let searchKey = $state("");
     let codeValid = $state(false);
     let codeNotValid = $derived(!codeValid);
@@ -136,8 +133,6 @@
 
     onMount(async () => {
         window.tomato_zZmqus5PtYRi.save = save;
-        codeValid = await verifyKeyProgressive();
-
         saveRestorePagePosition(
             "progressive_settings_scrollPosition_YELnPikKNirXyQqzIHNB",
             dm,
@@ -156,15 +151,6 @@
         searchInput.focus();
     });
 
-    async function active() {
-        resetKey();
-        codeValid = await verifyKeyProgressive();
-        await plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg);
-        if (codeValid) {
-            window.location.reload();
-        }
-    }
-
     async function save() {
         dm.destroyBy();
         await plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg);
@@ -172,693 +158,663 @@
     }
 </script>
 
-<div class="container" bind:this={settingsDiv}>
-    {#if codeNotValid || !$hideVIP}
-        <div class="alert contentCenter" data-hide>
-            <span>
-                {tomatoI18n.大部分功能不需要激活}
-            </span>
-        </div>
-
-        <div class="settingBox" data-hide>
-            <label>
-                {tomatoI18n.激活码}
-                <textarea
-                    class="b3-text-field activeCode"
-                    bind:value={$userToken}
-                    placeholder="1656000000123_22000101_ldID_siyuanTomatoCode_3044022018c8d8bca......"
-                    spellcheck="false"
-                ></textarea>
-            </label>
-            <button
-                class="b3-button b3-button--outline tomato-button"
-                onclick={active}
-            >
-                {tomatoI18n.激活}
-            </button>
-            <button
-                class="b3-button b3-button--outline tomato-button"
-                onclick={() => {
-                    if (buyDIV.style.display) buyDIV.style.display = "";
-                    else buyDIV.style.display = "none";
-                }}
-            >
-                {tomatoI18n.购买}
-            </button>
-            <TomatoVIP {codeValid}></TomatoVIP>
-            <span title={tomatoI18n.过期时间 + ": " + $expStore}>
-                {$expStore.replaceAll(" ", "")}
-            </span>
-            <div bind:this={buyDIV} style="display: none;">
-                <BuyTomato isTomato={false}></BuyTomato>
-            </div>
+<div class="container tomato-settings-dialog" bind:this={settingsDiv}>
+    <!-- 激活/购买共享卡（阶段 0+1）：verify 收进组件，结果经 bind:codeValid 回传父 -->
+    <ActivationCard
+        product="progressive"
+        bind:codeValid
+        showBuy={true}
+        onActivated={() => plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg)}
+    ></ActivationCard>
+    <!-- 开发者（isMe）专属取消激活入口：已激活后激活卡整卡隐藏，此处是唯一退出通道，
+         普通用户不可见（2026-08-24 B 方案） -->
+    {#if codeValid}
+        <div class="settingBox dev-row">
+            <DevDeactivate />
         </div>
     {/if}
 
-    <!-- search -->
+    <!-- search：placeholder 化（对齐番茄），输入框宽度由 IndexConf.css 拉满自适应 -->
     <div class="settingBox search-bar" data-search>
         <input
             class="b3-text-field"
             bind:this={searchInput}
             bind:value={searchKey}
+            placeholder={tomatoI18n.search搜索配置}
             oninput={() => {
                 localStorage.setItem(SearchKeyItemKey, searchKey);
                 searchSettings(settingsDiv, searchKey);
             }}
         />
-        {tomatoI18n.search搜索配置}
     </div>
 
-    <div class="settingBox">
-        <div>{tomatoI18n.快捷键如有冲突请调整}</div>
-        <div>
-            {progSettingsOpenHK.icon}
-            {progSettingsOpenHK.langText()}<strong
-                >{progSettingsOpenHK.w()}</strong
-            >
+    <!-- 快捷键 -->
+    <section class="conf-group">
+        <div class="settingBox">
+            <div class="section-title">{tomatoI18n.快捷键如有冲突请调整}</div>
+            <div>
+                {progSettingsOpenHK.icon}
+                {progSettingsOpenHK.langText()}<HotkeyCap hk={progSettingsOpenHK} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                {Progressive开始随机学习.icon}
+                {Progressive开始随机学习.langText()}<HotkeyCap hk={Progressive开始随机学习} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                {digest执行摘抄.icon}
+                {digest执行摘抄.langText()}<HotkeyCap hk={digest执行摘抄} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                {digest执行摘抄并断句.icon}
+                {digest执行摘抄并断句.langText()}<HotkeyCap hk={digest执行摘抄并断句} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
         </div>
-        <div>
-            {Progressive开始随机学习.icon}
-            {Progressive开始随机学习.langText()}<strong
-                >{Progressive开始随机学习.w()}</strong
-            >
+    </section>
+
+    <!-- 右键菜单 -->
+    <section class="conf-group">
+        <div class="settingBox">
+            <div class="section-title">{tomatoI18n.右键菜单}</div>
+            <div>{tomatoI18n.menu不显示菜单不影响快捷键的使用}</div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$piecesmenu}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {Progressive添加当前文档到渐进阅读分片模式.langText()}<HotkeyCap hk={Progressive添加当前文档到渐进阅读分片模式} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$digestmenu}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {digest渐进阅读摘抄模式.langText()}<HotkeyCap hk={digest渐进阅读摘抄模式} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$PieceSummaryBoxmenu}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {PieceSummaryBox收集内容到文件.langText()}
+                <TomatoVIP {codeValid}></TomatoVIP><HotkeyCap hk={PieceSummaryBox收集内容到文件} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$summary2dailynote}
+                />
+                {tomatoI18n.收集内容到文件功能总是收集到dailynote}<TomatoVIP
+                    {codeValid}
+                ></TomatoVIP>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$ProgressiveViewAllMenu}
+                />
+                {tomatoI18n.menu添加右键菜单}:{Progressive查看所有渐进学习文档.icon}
+                {Progressive查看所有渐进学习文档.langText()}
+                <HotkeyCap hk={Progressive查看所有渐进学习文档} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$ProgressiveStart2learn}
+                />
+                {tomatoI18n.menu添加右键菜单}:{Progressive开始学习.icon}
+                {Progressive开始学习.langText()}
+                <HotkeyCap hk={Progressive开始学习} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$ProgressiveJumpMenu}
+                />
+                {tomatoI18n.menu添加右键菜单}:{Progressive跳到分片或回到原文.icon}
+                {Progressive跳到分片或回到原文.langText()}
+                <HotkeyCap hk={Progressive跳到分片或回到原文} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$PieceMovingUp}
+                />
+                {tomatoI18n.menu添加右键菜单}:{PieceMovingBox移动到上一分片内.icon}
+                {PieceMovingBox移动到上一分片内.langText()}
+                <TomatoVIP {codeValid}></TomatoVIP><HotkeyCap hk={PieceMovingBox移动到上一分片内} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$PieceMovingDown}
+                />
+                {tomatoI18n.menu添加右键菜单}:{PieceMovingBox移动到下一分片内.icon}
+                {PieceMovingBox移动到下一分片内.langText()}
+                <TomatoVIP {codeValid}></TomatoVIP><HotkeyCap hk={PieceMovingBox移动到下一分片内} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$makeCardEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:{flashBox制卡.icon}
+                {flashBox制卡.langText()}<HotkeyCap hk={flashBox制卡} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$makeCardHereEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:{flashBox原地制卡.icon}
+                {flashBox原地制卡.langText()}<HotkeyCap hk={flashBox原地制卡} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$send2dailyCardEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:{flashBox制卡并发到dailycard.icon}
+                {flashBox制卡并发到dailycard.langText() + SPACE}<HotkeyCap hk={flashBox制卡并发到dailycard} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$send2dailyCardNoRefEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:{flashBox制卡并发到dailycard无引用.icon}
+                {flashBox制卡并发到dailycard无引用.langText()}<TomatoVIP {codeValid}
+                ></TomatoVIP><HotkeyCap hk={flashBox制卡并发到dailycard无引用} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$multilineMarkEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:{flashBox多行标记.icon}
+                {flashBox多行标记.langText()}<HotkeyCap hk={flashBox多行标记} pluginName="sy-progressive-plugin"></HotkeyCap>（{tomatoI18n.二次使用为取消效果}）
+            </div>
+            <div class:codeNotValid>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    bind:checked={$getAllPieceNotesEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {WC提取所有分片的笔记.langText()}<TomatoVIP {codeValid}
+                ></TomatoVIP><HotkeyCap hk={WC提取所有分片的笔记} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$send2exctract2bottomEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {WC提取笔记到底部.langText()}<TomatoVIP {codeValid}
+                ></TomatoVIP><HotkeyCap hk={WC提取笔记到底部} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$send2removeNoteColor}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {WC去除笔记颜色.langText()}
+                <TomatoVIP {codeValid}></TomatoVIP>
+                <HotkeyCap hk={WC去除笔记颜色} pluginName="sy-progressive-plugin"></HotkeyCap>
+                {WC恢复笔记颜色.langText()}
+                <TomatoVIP {codeValid}></TomatoVIP>
+                <HotkeyCap hk={WC恢复笔记颜色} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$merg2newBookEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {WC合并所有分片到新文件.langText()}<TomatoVIP {codeValid}
+                ></TomatoVIP><HotkeyCap hk={WC合并所有分片到新文件} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$send2exctractNoteEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {WC提取笔记.langText()}<HotkeyCap hk={WC提取笔记} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$send2compareNoteEnable}
+                />
+                {tomatoI18n.menu添加右键菜单}:
+                {WC对比原文.langText()}<HotkeyCap hk={WC对比原文} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
         </div>
-        <div>
-            {digest执行摘抄.icon}
-            {digest执行摘抄.langText()}<strong>{digest执行摘抄.w()}</strong>
+    </section>
+
+    <!-- 基础设置 -->
+    <section class="conf-group">
+        <div class="settingBox">
+            <div class="section-title">{tomatoI18n.基础设置}</div>
+            <div>
+                <input
+                    spellcheck="false"
+                    class="b3-text-field"
+                    bind:value={$windowOpenStyle}
+                />
+                {tomatoI18n.新开窗口如何打开}
+            </div>
+
+            <div>
+                <input
+                    spellcheck="false"
+                    class="b3-text-field"
+                    bind:value={$flashcardNotebook}
+                />
+                {tomatoI18n.新闪卡存入的笔记本ID}
+            </div>
+
+            <div>
+                <input
+                    spellcheck="false"
+                    class="b3-text-field"
+                    bind:value={$finishPieceCreateAt}
+                    onblur={() => {
+                        $finishPieceCreateAt = $finishPieceCreateAt.trim();
+                        if (!FrontEnds.includes($finishPieceCreateAt)) {
+                            $finishPieceCreateAt = "desktop";
+                        }
+                    }}
+                />
+                <p>
+                    all, desktop, desktop-window, mobile, browser-desktop,
+                    browser-mobile
+                </p>
+                {tomatoI18n.计划读书的分片由哪个前端自动创建}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$initProgFloatBtnsDisable}
+                />
+                {tomatoI18n.禁用初始化渐进学习浮动按钮}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$doubleClick2DigestMobile}
+                />
+                {tomatoI18n.移动端编辑器右上角添加多行选择菜单}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$doubleClick2DigestDesktop}
+                />
+                {tomatoI18n.桌面端编辑器右上角添加多行选择菜单}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$add2piecesBtn2lockIcon}
+                />
+                {tomatoI18n.在编辑器右上角添加加入渐进阅读分片模式按钮}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$add2digBtn2lockIcon}
+                />
+                {tomatoI18n.在编辑器右上角添加摘抄按钮}
+            </div>
         </div>
-        <div>
-            {digest执行摘抄并断句.icon}
-            {digest执行摘抄并断句.langText()}<strong
-                >{digest执行摘抄并断句.w()}</strong
-            >
+    </section>
+
+    <!-- 摘抄与制卡 -->
+    <section class="conf-group">
+        <div class="settingBox">
+            <div class="section-title">{tomatoI18n.摘抄与制卡}</div>
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$flashcardAddRefs}
+                />
+                {tomatoI18n.卡片最上面添加相关概念}<TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$flashcardUseLink}
+                />
+                {tomatoI18n.闪卡的回溯使用链接}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$pieceNoBacktraceLink}
+                />
+                {tomatoI18n.分片不加入回溯链接}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$digestNoBacktraceLink}
+                />
+                {tomatoI18n.摘抄不加入回溯链接}
+            </div>
+
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$words2dailycard}
+                />
+                {tomatoI18n.摘抄的单词加入到dailycard中}<TomatoVIP {codeValid}
+                ></TomatoVIP>
+            </div>
+
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$digest2dailycard}
+                />
+                {tomatoI18n.摘抄加入到dailycard当天目录下}<TomatoVIP {codeValid}
+                ></TomatoVIP>
+            </div>
+
+            <div class:codeNotValid>
+                <input
+                    disabled={codeNotValid}
+                    class:codeNotValid
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$digest2Trace}
+                />
+                {tomatoI18n.摘抄时生成摘抄轨迹}<TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$markOriginText}
+                />
+                {tomatoI18n.制卡摘抄在原文处做标记}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$markOriginTextBG}
+                />
+                {tomatoI18n.制卡摘抄改变原文背景}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$digestAddReadingpoint}
+                />
+                {tomatoI18n.摘抄后加入阅读点}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$cardAppendTime}
+                />
+                {tomatoI18n.制卡后追加时间与标题路径}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$flashcardMultipleLnks}
+                />
+                {tomatoI18n.对分片制卡额外链接到分片}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$openCardsOnOpenPiece}
+                />
+                {tomatoI18n.打开分片的同时打开cards文档}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$cardUnderPiece}
+                />
+                {tomatoI18n.分片内制卡放于分片的子文档内}
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$hideBtnsInFlashCard}
+                />
+                {tomatoI18n.复习闪卡时隐藏分片按钮组}
+            </div>
         </div>
-        <div class:codeNotValid>
-            <input
-                type="checkbox"
-                disabled={codeNotValid}
-                class:codeNotValid
-                class="b3-switch"
-                bind:checked={$hideVIP}
-            />
-            {tomatoI18n.隐藏vip图标}<TomatoVIP {codeValid}></TomatoVIP>
+    </section>
+
+    <!-- 分片按钮组 -->
+    <section class="conf-group">
+        <div class="settingBox">
+            <div class="section-title">{tomatoI18n.分片按钮组}</div>
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnViewContents}
+                />
+                {tomatoI18n.打开目录}📜
+            </div>
+
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$btnPrevious} />
+                {tomatoI18n.上一个分片}⬅
+            </div>
+
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$btnNext} />
+                {tomatoI18n.下一个分片}➡
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnCleanOriginText}
+                />
+                {tomatoI18n.删除原文}🧹
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnFullfilContent}
+                />
+                {tomatoI18n.重新插入分片内容}⬇
+            </div>
+
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$btnStop} />
+                {tomatoI18n.关闭分片}🕺
+            </div>
+
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$btnNextBook} />
+                {tomatoI18n.换一本书看}📚📖
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnOpenFlashcardTab}
+                />
+                {tomatoI18n.打开本书的闪卡}⚡
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnDeleteBack}
+                />
+                {tomatoI18n.删除分片看上一个分片}⬅🗑
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnDeleteNext}
+                />
+                {tomatoI18n.删除分片看下一个分片}🗑➡
+            </div>
+
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$btnSaveCard} />
+                {tomatoI18n.将文档加入闪卡}＋🗃
+            </div>
+
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$btnDelCard} />
+                {tomatoI18n.删除文档闪卡}－🗃
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnDeleteExit}
+                />
+                {tomatoI18n.删除分片并退出}🗑🕺
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnIgnoreBook}
+                />
+                {tomatoI18n.不再推送本书}🚫
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnSplitByPunctuations}
+                />
+                {tomatoI18n.按标点断句}✂📜<TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnSplitByPunctuationsListCheck}
+                />
+                {tomatoI18n.按标点断句Checkbox}✂✅<TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$btnSplitByPunctuationsList}
+                />
+                {tomatoI18n.按标点断句列表}✂📌<TomatoVIP {codeValid}></TomatoVIP>
+            </div>
         </div>
-    </div>
-    <div class="settingBox">
-        <div>{tomatoI18n.menu不显示菜单不影响快捷键的使用}</div>
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$piecesmenu}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {Progressive添加当前文档到渐进阅读分片模式.langText()}<strong
-                >{Progressive添加当前文档到渐进阅读分片模式.w()}</strong
-            >
-        </div>
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$digestmenu}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {digest渐进阅读摘抄模式.langText()}<strong
-                >{digest渐进阅读摘抄模式.w()}</strong
-            >
-        </div>
+    </section>
 
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$PieceSummaryBoxmenu}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {PieceSummaryBox收集内容到文件.langText()}
-            <TomatoVIP {codeValid}></TomatoVIP><strong
-                >{PieceSummaryBox收集内容到文件.w()}</strong
-            >
-        </div>
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$summary2dailynote}
-            />
-            {tomatoI18n.收集内容到文件功能总是收集到dailynote}<TomatoVIP
-                {codeValid}
-            ></TomatoVIP>
-        </div>
-
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$ProgressiveViewAllMenu}
-            />
-            {tomatoI18n.menu添加右键菜单}:{Progressive查看所有渐进学习文档.icon}
-            {Progressive查看所有渐进学习文档.langText()}
-            <strong>{Progressive查看所有渐进学习文档.w()}</strong>
-        </div>
-
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$ProgressiveStart2learn}
-            />
-            {tomatoI18n.menu添加右键菜单}:{Progressive开始学习.icon}
-            {Progressive开始学习.langText()}
-            <strong>{Progressive开始学习.w()}</strong>
-        </div>
-
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$ProgressiveJumpMenu}
-            />
-            {tomatoI18n.menu添加右键菜单}:{Progressive跳到分片或回到原文.icon}
-            {Progressive跳到分片或回到原文.langText()}
-            <strong>{Progressive跳到分片或回到原文.w()}</strong>
-        </div>
-
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$PieceMovingUp}
-            />
-            {tomatoI18n.menu添加右键菜单}:{PieceMovingBox移动到上一分片内.icon}
-            {PieceMovingBox移动到上一分片内.langText()}
-            <TomatoVIP {codeValid}></TomatoVIP><strong
-                >{PieceMovingBox移动到上一分片内.w()}</strong
-            >
-        </div>
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$PieceMovingDown}
-            />
-            {tomatoI18n.menu添加右键菜单}:{PieceMovingBox移动到下一分片内.icon}
-            {PieceMovingBox移动到下一分片内.langText()}
-            <TomatoVIP {codeValid}></TomatoVIP><strong
-                >{PieceMovingBox移动到下一分片内.w()}</strong
-            >
-        </div>
-
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$makeCardEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:{flashBox制卡.icon}
-            {flashBox制卡.langText()}<strong>{flashBox制卡.w()}</strong>
-        </div>
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$makeCardHereEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:{flashBox原地制卡.icon}
-            {flashBox原地制卡.langText()}<strong>{flashBox原地制卡.w()}</strong>
-        </div>
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$send2dailyCardEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:{flashBox制卡并发到dailycard.icon}
-            {flashBox制卡并发到dailycard.langText() + SPACE}<strong
-                >{flashBox制卡并发到dailycard.w()}</strong
-            >
-        </div>
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$send2dailyCardNoRefEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:{flashBox制卡并发到dailycard无引用.icon}
-            {flashBox制卡并发到dailycard无引用.langText()}<TomatoVIP {codeValid}
-            ></TomatoVIP><strong>{flashBox制卡并发到dailycard无引用.w()}</strong
-            >
-        </div>
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$multilineMarkEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:{flashBox多行标记.icon}
-            {flashBox多行标记.langText()}<strong>{flashBox多行标记.w()}</strong
-            >（{tomatoI18n.二次使用为取消效果}）
-        </div>
-        <div class:codeNotValid>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                disabled={codeNotValid}
-                class:codeNotValid
-                bind:checked={$getAllPieceNotesEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {WC提取所有分片的笔记.langText()}<TomatoVIP {codeValid}
-            ></TomatoVIP><strong>{WC提取所有分片的笔记.w()}</strong>
-        </div>
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$send2exctract2bottomEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {WC提取笔记到底部.langText()}<TomatoVIP {codeValid}
-            ></TomatoVIP><strong>{WC提取笔记到底部.w()}</strong>
-        </div>
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$send2removeNoteColor}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {WC去除笔记颜色.langText()}
-            <TomatoVIP {codeValid}></TomatoVIP>
-            <strong>{WC去除笔记颜色.w()}</strong>
-            {WC恢复笔记颜色.langText()}
-            <TomatoVIP {codeValid}></TomatoVIP>
-            <strong>{WC恢复笔记颜色.w()}</strong>
-        </div>
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                class:codeNotValid
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$merg2newBookEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {WC合并所有分片到新文件.langText()}<TomatoVIP {codeValid}
-            ></TomatoVIP><strong>{WC合并所有分片到新文件.w()}</strong>
-        </div>
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$send2exctractNoteEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {WC提取笔记.langText()}<strong>{WC提取笔记.w()}</strong>
-        </div>
-        <div>
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$send2compareNoteEnable}
-            />
-            {tomatoI18n.menu添加右键菜单}:
-            {WC对比原文.langText()}<strong>{WC对比原文.w()}</strong>
-        </div>
-    </div>
-
-    <div class="settingBox">
-        <input
-            spellcheck="false"
-            class="b3-text-field"
-            bind:value={$windowOpenStyle}
-        />
-        {tomatoI18n.新开窗口如何打开}
-    </div>
-
-    <div class="settingBox">
-        <input
-            spellcheck="false"
-            class="b3-text-field"
-            bind:value={$flashcardNotebook}
-        />
-        {tomatoI18n.新闪卡存入的笔记本ID}
-    </div>
-
-    <div class="settingBox">
-        <input
-            spellcheck="false"
-            class="b3-text-field"
-            bind:value={$finishPieceCreateAt}
-            onblur={() => {
-                $finishPieceCreateAt = $finishPieceCreateAt.trim();
-                if (!FrontEnds.includes($finishPieceCreateAt)) {
-                    $finishPieceCreateAt = "desktop";
-                }
-            }}
-        />
-        <p>
-            all, desktop, desktop-window, mobile, browser-desktop,
-            browser-mobile
-        </p>
-        {tomatoI18n.计划读书的分片由哪个前端自动创建}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$initProgFloatBtnsDisable}
-        />
-        {tomatoI18n.禁用初始化渐进学习浮动按钮}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$doubleClick2DigestMobile}
-        />
-        {tomatoI18n.移动端编辑器右上角添加多行选择菜单}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$doubleClick2DigestDesktop}
-        />
-        {tomatoI18n.桌面端编辑器右上角添加多行选择菜单}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$add2piecesBtn2lockIcon}
-        />
-        {tomatoI18n.在编辑器右上角添加加入渐进阅读分片模式按钮}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$add2digBtn2lockIcon}
-        />
-        {tomatoI18n.在编辑器右上角添加摘抄按钮}
-    </div>
-
-    <div class:codeNotValid class="settingBox">
-        <input
-            disabled={codeNotValid}
-            class:codeNotValid
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$flashcardAddRefs}
-        />
-        {tomatoI18n.卡片最上面添加相关概念}<TomatoVIP {codeValid}></TomatoVIP>
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$flashcardUseLink}
-        />
-        {tomatoI18n.闪卡的回溯使用链接}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$pieceNoBacktraceLink}
-        />
-        {tomatoI18n.分片不加入回溯链接}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$digestNoBacktraceLink}
-        />
-        {tomatoI18n.摘抄不加入回溯链接}
-    </div>
-
-    <div class:codeNotValid class="settingBox">
-        <input
-            disabled={codeNotValid}
-            class:codeNotValid
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$words2dailycard}
-        />
-        {tomatoI18n.摘抄的单词加入到dailycard中}<TomatoVIP {codeValid}
-        ></TomatoVIP>
-    </div>
-
-    <div class:codeNotValid class="settingBox">
-        <input
-            disabled={codeNotValid}
-            class:codeNotValid
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$digest2dailycard}
-        />
-        {tomatoI18n.摘抄加入到dailycard当天目录下}<TomatoVIP {codeValid}
-        ></TomatoVIP>
-    </div>
-
-    <div class:codeNotValid class="settingBox">
-        <input
-            disabled={codeNotValid}
-            class:codeNotValid
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$digest2Trace}
-        />
-        {tomatoI18n.摘抄时生成摘抄轨迹}<TomatoVIP {codeValid}></TomatoVIP>
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$markOriginText}
-        />
-        {tomatoI18n.制卡摘抄在原文处做标记}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$markOriginTextBG}
-        />
-        {tomatoI18n.制卡摘抄改变原文背景}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$digestAddReadingpoint}
-        />
-        {tomatoI18n.摘抄后加入阅读点}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$cardAppendTime}
-        />
-        {tomatoI18n.制卡后追加时间与标题路径}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$flashcardMultipleLnks}
-        />
-        {tomatoI18n.对分片制卡额外链接到分片}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$openCardsOnOpenPiece}
-        />
-        {tomatoI18n.打开分片的同时打开cards文档}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$cardUnderPiece}
-        />
-        {tomatoI18n.分片内制卡放于分片的子文档内}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$hideBtnsInFlashCard}
-        />
-        {tomatoI18n.复习闪卡时隐藏分片按钮组}
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnViewContents}
-        />
-        {tomatoI18n.打开目录}📜
-    </div>
-
-    <div class="settingBox">
-        <input type="checkbox" class="b3-switch" bind:checked={$btnPrevious} />
-        {tomatoI18n.上一个分片}⬅
-    </div>
-
-    <div class="settingBox">
-        <input type="checkbox" class="b3-switch" bind:checked={$btnNext} />
-        {tomatoI18n.下一个分片}➡
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnCleanOriginText}
-        />
-        {tomatoI18n.删除原文}🧹
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnFullfilContent}
-        />
-        {tomatoI18n.重新插入分片内容}⬇
-    </div>
-
-    <div class="settingBox">
-        <input type="checkbox" class="b3-switch" bind:checked={$btnStop} />
-        {tomatoI18n.关闭分片}🕺
-    </div>
-
-    <div class="settingBox">
-        <input type="checkbox" class="b3-switch" bind:checked={$btnNextBook} />
-        {tomatoI18n.换一本书看}📚📖
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnOpenFlashcardTab}
-        />
-        {tomatoI18n.打开本书的闪卡}⚡
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnDeleteBack}
-        />
-        {tomatoI18n.删除分片看上一个分片}⬅🗑
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnDeleteNext}
-        />
-        {tomatoI18n.删除分片看下一个分片}🗑➡
-    </div>
-
-    <div class="settingBox">
-        <input type="checkbox" class="b3-switch" bind:checked={$btnSaveCard} />
-        {tomatoI18n.将文档加入闪卡}＋🗃
-    </div>
-
-    <div class="settingBox">
-        <input type="checkbox" class="b3-switch" bind:checked={$btnDelCard} />
-        {tomatoI18n.删除文档闪卡}－🗃
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnDeleteExit}
-        />
-        {tomatoI18n.删除分片并退出}🗑🕺
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnIgnoreBook}
-        />
-        {tomatoI18n.不再推送本书}🚫
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnSplitByPunctuations}
-        />
-        {tomatoI18n.按标点断句}✂📜<TomatoVIP {codeValid}></TomatoVIP>
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnSplitByPunctuationsListCheck}
-        />
-        {tomatoI18n.按标点断句Checkbox}✂✅<TomatoVIP {codeValid}></TomatoVIP>
-    </div>
-
-    <div class="settingBox">
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$btnSplitByPunctuationsList}
-        />
-        {tomatoI18n.按标点断句列表}✂📌<TomatoVIP {codeValid}></TomatoVIP>
-    </div>
-
-    <div class="settingBox">
+    <!-- save -->
+    <div class="settingBox save-row">
         <button
             class="b3-button b3-button--outline tomato-button"
             onclick={save}>{tomatoI18n.保存}</button
@@ -867,46 +823,12 @@
 </div>
 
 <style>
-    .search-bar {
-        position: sticky;
-        top: 0;
-        background-color: var(--b3-theme-surface);
-        z-index: 10;
-    }
-    .settingBox {
-        margin: 5px;
-        padding: 5px;
-    }
+    /* 仅保留渐进特有壳样式；search-bar/settingBox/kbd/conf-group/codeNotValid 等
+       通用样式全部来自 IndexConf.css（.tomato-settings-dialog 作用域），勿在此重复 */
     .container {
         margin: 2px;
         flex: auto;
         display: flex;
         flex-direction: column;
-    }
-    .activeCode {
-        width: 50%;
-        line-height: 2;
-    }
-    .codeNotValid {
-        pointer-events: none;
-        opacity: 30%;
-    }
-    .contentCenter {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    .alert {
-        padding: 2px 4px;
-        font:
-            /* 75% Consolas, */ "Liberation Mono", Menlo, Courier,
-            monospace, var(--b3-font-family);
-        line-height: 1;
-        color: var(--b3-theme-on-surface);
-        vertical-align: middle;
-        background-color: var(--b3-theme-surface);
-        border: solid 1px var(--b3-theme-surface-lighter);
-        border-radius: var(--b3-border-radius);
-        box-shadow: inset 0 -1px 0 var(--b3-theme-surface-lighter);
     }
 </style>

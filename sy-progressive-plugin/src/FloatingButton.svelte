@@ -1,10 +1,9 @@
 <!-- FloatingActionButton.svelte -->
 <script lang="ts">
-    import { onMount } from "svelte";
     import DigestProgressive from "./DigestProgressive.svelte";
     import { Plugin } from "siyuan";
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-    import { FloatingBallHelper } from "../../sy-tomato-plugin/src/libs/FloatingBallHelper";
+    import FloatBar from "../../sy-tomato-plugin/src/libs/FloatBar.svelte";
 
     interface Props {
         settings: TomatoSettings;
@@ -13,32 +12,15 @@
         key: string;
     }
 
+    // dm/key 由 FloatingAction.ts 传入（Props 接口保留），本组件已不再使用：
+    // 摘抄浮条改由 FloatBar 自管位置，卸载清理走 FloatingBall 的 dm("sv"/"div")
     let {
         settings,
-        plugin,
-        dm,
-        key
+        plugin
     }: Props = $props();
-    let div: HTMLElement = $state();
-
-    onMount(() => {
-        new FloatingBallHelper(key, div, dm);
-    });
 </script>
 
-<div class="floating-button" bind:this={div}>
+<FloatBar posKey="prog-digest-floatbar-pos">
     <DigestProgressive {settings} {plugin} isFloating={true}
     ></DigestProgressive>
-</div>
-
-<style>
-    .floating-button {
-        z-index: 10;
-        position: fixed;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-    }
-</style>
+</FloatBar>

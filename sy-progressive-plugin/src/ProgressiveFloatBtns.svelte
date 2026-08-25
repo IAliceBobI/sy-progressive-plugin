@@ -1,5 +1,5 @@
 <script lang="ts">
-    import DialogSvelte from "../../sy-tomato-plugin/src/libs/DialogSvelte.svelte";
+    import FloatBar from "../../sy-tomato-plugin/src/libs/FloatBar.svelte";
     import type { Writable } from "svelte/store";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { getProgressivePluginConfig } from "../../sy-tomato-plugin/src/libs/utils";
@@ -18,18 +18,14 @@
         $props();
 </script>
 
-<DialogSvelte
-    show={$show}
-    title={$title}
-    savePositionKey="ProgressiveFloatBtns 2025-07-16 00:06:03"
-    isProgressive={true}
-    zIndexPlus={$zIndexPlus}
-    minHeight={50}
-    minWidth={50}
-    onClose={() => show.set(false)}
->
-    {#snippet dialogInner()}
-        <div class="container" title={tomatoI18n.如果无法拖动}>
+{#if $show}
+    <FloatBar
+        posKey="prog-piece-floatbar-pos"
+        title={$title}
+        zIndex={$zIndexPlus ? 999 : 12}
+        onClose={() => show.set(false)}
+    >
+        <div class="container">
             <!-- ${btn(HtmlCBType.viewContents, "📜", tomatoI18n.打开目录, bookID, noteID, point, prog.settings.btnViewContents)} -->
             {#if getProgressivePluginConfig().btnViewContents}
                 <button
@@ -296,8 +292,8 @@
                 >
             {/if}
         </div>
-    {/snippet}
-</DialogSvelte>
+    </FloatBar>
+{/if}
 
 <style>
     .container {

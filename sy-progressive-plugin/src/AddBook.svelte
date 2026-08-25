@@ -199,7 +199,7 @@
         <!-- 标题拆分 -->
         <div>
             <label>
-                <p>{prog.plugin.i18n.splitByHeadings}</p>
+                <p>{tomatoI18n.按标题拆分}</p>
                 <input
                     type="text"
                     class="b3-text-field"
@@ -272,7 +272,7 @@
                 {tomatoI18n.立刻创建所有的分片}
             </label>
             <!-- 闪卡 -->
-            <label title={prog.plugin.i18n.autoCard}>
+            <label title={tomatoI18n.自动制卡}>
                 <input
                     type="checkbox"
                     class="b3-switch"
@@ -322,7 +322,7 @@
         <div class="btns">
             <button
                 class="b3-button b3-button--outline tomato-button"
-                onclick={process}>{prog.plugin.i18n.addOrReaddDoc}</button
+                onclick={process}>{tomatoI18n.添加文档到渐进阅读}</button
             >
             <button
                 class="b3-button b3-button--outline tomato-button"

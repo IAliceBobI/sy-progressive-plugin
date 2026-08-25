@@ -183,7 +183,7 @@ class DigestProgressiveBox {
         const id = newID();
         const dm = new DestroyManager()
         const dialog = new Dialog({
-            title: this.plugin.i18n.digestProgressive,
+            title: tomatoI18n.渐进阅读摘抄模式,
             content: `<div id='${id}'></div>`,
             width: null,
             height: null,

@@ -11,9 +11,10 @@ import { pieceMovingBox } from "./PieceMovingBox";
 import { pieceSummaryBox } from "./PieceSummaryBox";
 import { writingCompareBox } from "./WritingCompareBox";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
+import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, btnCleanOriginText, btnDelCard, btnDeleteBack, btnDeleteExit, btnDeleteNext, btnFullfilContent, btnIgnoreBook, btnNext, btnNextBook, btnOpenFlashcardTab, btnPrevious, btnSaveCard, btnSplitByPunctuations, btnSplitByPunctuationsList, btnSplitByPunctuationsListCheck, btnStop, btnViewContents, cardAppendTime, cardUnderPiece, digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, doubleClick2DigestDesktop, doubleClick2DigestMobile, finishPieceCreateAt, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, getAllPieceNotesEnable, hideBtnsInFlashCard, hideVIP, initProgFloatBtnsDisable, makeCardEnable, makeCardHereEnable, markOriginText, markOriginTextBG, merg2newBookEnable, multilineMarkEnable, openCardsOnOpenPiece, PieceMovingDown, PieceMovingUp, pieceNoBacktraceLink, piecesmenu, PieceSummaryBoxmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, send2compareNoteEnable, send2dailyCardEnable, send2dailyCardNoRefEnable, send2exctract2bottomEnable, send2exctractNoteEnable, send2removeNoteColor, summary2dailynote, userID, userToken, windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
+import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, btnCleanOriginText, btnDelCard, btnDeleteBack, btnDeleteExit, btnDeleteNext, btnFullfilContent, btnIgnoreBook, btnNext, btnNextBook, btnOpenFlashcardTab, btnPrevious, btnSaveCard, btnSplitByPunctuations, btnSplitByPunctuationsList, btnSplitByPunctuationsListCheck, btnStop, btnViewContents, cardAppendTime, cardUnderPiece, digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, doubleClick2DigestDesktop, doubleClick2DigestMobile, finishPieceCreateAt, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, getAllPieceNotesEnable, hideBtnsInFlashCard, initProgFloatBtnsDisable, makeCardEnable, makeCardHereEnable, markOriginText, markOriginTextBG, merg2newBookEnable, multilineMarkEnable, openCardsOnOpenPiece, PieceMovingDown, PieceMovingUp, pieceNoBacktraceLink, piecesmenu, PieceSummaryBoxmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, send2compareNoteEnable, send2dailyCardEnable, send2dailyCardNoRefEnable, send2exctract2bottomEnable, send2exctractNoteEnable, send2removeNoteColor, summary2dailynote, userID, userToken, licenseCloudSynced, windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -33,7 +34,7 @@ import { createPiece, fullfilContent } from "./helper";
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
     userID.load(plugin);
-    hideVIP.load(plugin);
+    licenseCloudSynced.load(plugin);
     finishPieceCreateAt.load(plugin);
     add2digBtn2lockIcon.load(plugin);
     add2piecesBtn2lockIcon.load(plugin);
@@ -197,14 +198,25 @@ export default class ThePlugin extends BaseTomatoPlugin {
             save.textContent = tomatoI18n.保存并退出;
 
             const div = document.createElement("div") as HTMLDivElement;
-            div.appendChild(document.createTextNode("v" + version + "p"));
+            const name = document.createElement("span") as HTMLSpanElement;
+            name.textContent = tomatoI18n.渐进学习 + " · " + tomatoI18n.设置;
+            name.style.fontWeight = "600";
+            name.style.whiteSpace = "nowrap";
+            div.appendChild(name);
+            const versionSpan = document.createElement("span") as HTMLSpanElement;
+            versionSpan.textContent = "v" + version + "p";
+            versionSpan.style.fontSize = "12px";
+            versionSpan.style.alignSelf = "center";
+            div.appendChild(versionSpan);
             div.appendChild(help);
             div.appendChild(log);
             div.appendChild(save);
             div.style.display = "flex"
             div.style.flexDirection = "row"
             div.style.justifyContent = "space-between"
+            div.style.alignItems = "center"
             div.style.flexWrap = "nowrap"
+            div.style.gap = "8px"
             div.style.width = "100%"
             return div;
         }
@@ -265,6 +277,17 @@ export default class ThePlugin extends BaseTomatoPlugin {
             hotkey: progSettingsOpenHK.m,
             callback: () => {
                 this.openSettings();
+            },
+        });
+
+        // 购买弹框命令入口（阶段 1.5）：老用户/已激活用户可随时通过命令面板回顾购买页
+        this.addCommand({
+            langKey: "openProgressiveBuyDialog",
+            langText: tomatoI18n.打开渐进学习购买页,
+            callback: async () => {
+                // 主动验证而非读懒缓存：冷启动后无人触发过验证时 lastVerifyResult()
+                // 是 null，购买页会误按未激活态渲染（含 isMe 取消激活按钮丢失）
+                openBuyDialog("progressive", tomatoI18n.购买页, (await verifyKeyProgressive()) === true);
             },
         });
 

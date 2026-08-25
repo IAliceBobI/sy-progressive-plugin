@@ -37,17 +37,17 @@ export class ProgressiveStorage {
             const info = await this.booksInfo(bookID);
             if (!info.ignored) {
                 await this.updateBookInfo(bookID, { ignored: true } as any);
-                await siyuan.pushMsg(this.plugin.i18n.msgIgnoreBook);
+                await siyuan.pushMsg(tomatoI18n.已经忽略本书);
             } else {
                 await this.updateBookInfo(bookID, { ignored: false } as any);
-                await siyuan.pushMsg(this.plugin.i18n.msgPushBook);
+                await siyuan.pushMsg(tomatoI18n.重新推送本书);
             }
         } else {
             await this.updateBookInfo(bookID, { ignored: v } as any);
             if (v) {
-                await siyuan.pushMsg(this.plugin.i18n.msgIgnoreBook);
+                await siyuan.pushMsg(tomatoI18n.已经忽略本书);
             } else {
-                await siyuan.pushMsg(this.plugin.i18n.msgPushBook);
+                await siyuan.pushMsg(tomatoI18n.重新推送本书);
             }
         }
     }
@@ -103,10 +103,10 @@ export class ProgressiveStorage {
         } else {
             if (!info.autoCard) {
                 await this.updateBookInfo(bookID, { autoCard: true } as any);
-                await siyuan.pushMsg(this.plugin.i18n.msgAutoCard);
+                await siyuan.pushMsg(tomatoI18n.自动文档制卡);
             } else {
                 await this.updateBookInfo(bookID, { autoCard: false } as any);
-                await siyuan.pushMsg(this.plugin.i18n.msgNotAutoCard);
+                await siyuan.pushMsg(tomatoI18n.取消自动文档制卡);
             }
         }
     }
@@ -178,7 +178,7 @@ export class ProgressiveStorage {
         if (!info.boxID) {
             const row = await siyuan.sqlOne(`select box from blocks where id="${docID}"`);
             if (!row) {
-                siyuan.pushMsg(this.plugin.i18n.cannotFindTheBoxs + docID); // maybe the index is building
+                siyuan.pushMsg(tomatoI18n.找不到文档对应的笔记本 + docID); // maybe the index is building
                 info.boxID = "";
             } else {
                 info.boxID = row["box"];

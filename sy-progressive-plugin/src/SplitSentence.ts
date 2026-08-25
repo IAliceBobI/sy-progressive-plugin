@@ -5,6 +5,7 @@ import { prog } from "./Progressive";
 import { isMultiLineElement, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { progStorage } from "./ProgressiveStorage";
+import { splitBySentencePeriod } from "./splitEn";
 
 export class SplitSentence {
     private asList: AsList;
@@ -107,12 +108,11 @@ export class SplitSentence {
 
 export function splitLines(ps: string[]) {
     for (const s of "\n。！？；：") ps = splitBy(ps, s);
-    // ps = spliyBy(ps, ". ");
-    // ps = spliyBy(ps, ": ");
     ps = splitBy(ps, "……");
     ps = splitBy(ps, "! ");
     ps = splitBy(ps, "? ");
     ps = splitBy(ps, "; ");
+    ps = splitBySentencePeriod(ps);
     return ps;
 }
 
