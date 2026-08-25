@@ -1,6 +1,8 @@
 <script lang="ts">
     import FloatBar from "../../sy-tomato-plugin/src/libs/FloatBar.svelte";
+    import PieceTopBar from "./PieceTopBar.svelte";
     import type { Writable } from "svelte/store";
+    import { getFrontend } from "siyuan";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { getProgressivePluginConfig } from "../../sy-tomato-plugin/src/libs/utils";
     import { prog } from "./Progressive";
@@ -16,15 +18,18 @@
     }
     let { zIndexPlus, show, title, point, noteID, bookID }: PropsType =
         $props();
+
+    // 与 events.isMobile 同源（getFrontend 的移动分支）；app 会话内不变，顶层求一次即可。
+    // 不 import events 单例——progressive 组件多引入 tomato 内部模块会扰动 bundle 模块序
+    // （2026-08-25 实测：经 events 判分叉后移动端浮条不渲染），siyuan 官方导出无此问题。
+    const isMobile = getFrontend() === "mobile" || getFrontend() === "browser-mobile";
+
+    // 移动端形态开关（默认 true 顶部固定；false 回退可拖拽浮条）。配置改动经设置面板
+    // 确认后整页 reload 生效，顶层读一次即可。
+    const useTopBar = isMobile && getProgressivePluginConfig().mobileTopBar !== false;
 </script>
 
-{#if $show}
-    <FloatBar
-        posKey="prog-piece-floatbar-pos"
-        title={$title}
-        zIndex={$zIndexPlus ? 999 : 12}
-        onClose={() => show.set(false)}
-    >
+{#snippet btns()}
         <div class="container">
             <!-- ${btn(HtmlCBType.viewContents, "📜", tomatoI18n.打开目录, bookID, noteID, point, prog.settings.btnViewContents)} -->
             {#if getProgressivePluginConfig().btnViewContents}
@@ -244,7 +249,7 @@
                 >
             {/if}
 
-            <!-- ${btn(HtmlCBType.splitByPunctuations, "✂📜👑", tomatoI18n.按标点断句 + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuations)} -->
+            <!-- ${btn(HtmlCBType.splitByPunctuations, "✂", tomatoI18n.按标点断句 + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuations)} -->
             {#if getProgressivePluginConfig().btnSplitByPunctuations}
                 <button
                     title={`《${$title}》${tomatoI18n.按标点断句 + "VIP"}`}
@@ -256,11 +261,11 @@
                             HtmlCBType.splitByPunctuations,
                             $point,
                         );
-                    }}>✂📜</button
+                    }}>✂</button
                 >
             {/if}
 
-            <!-- ${btn(HtmlCBType.splitByPunctuationsListCheck, "✂✅👑", tomatoI18n.按标点断句Checkbox + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuationsListCheck)} -->
+            <!-- ${btn(HtmlCBType.splitByPunctuationsListCheck, "✂✅", tomatoI18n.按标点断句Checkbox + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuationsListCheck)} -->
             {#if getProgressivePluginConfig().btnSplitByPunctuationsListCheck}
                 <button
                     title={`《${$title}》${tomatoI18n.按标点断句Checkbox + "VIP"}`}
@@ -272,11 +277,11 @@
                             HtmlCBType.splitByPunctuationsListCheck,
                             $point,
                         );
-                    }}>✂✅👑</button
+                    }}>✂✅</button
                 >
             {/if}
 
-            <!-- ${btn(HtmlCBType.splitByPunctuationsList, "✂📌👑", tomatoI18n.按标点断句列表 + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuationsList)} -->
+            <!-- ${btn(HtmlCBType.splitByPunctuationsList, "✂📌", tomatoI18n.按标点断句列表 + "VIP", bookID, noteID, point, prog.settings.btnSplitByPunctuationsList)} -->
             {#if getProgressivePluginConfig().btnSplitByPunctuationsList}
                 <button
                     title={`《${$title}》${tomatoI18n.按标点断句列表 + "VIP"}`}
@@ -288,11 +293,28 @@
                             HtmlCBType.splitByPunctuationsList,
                             $point,
                         );
-                    }}>✂📌👑</button
+                    }}>✂📌</button
                 >
             {/if}
         </div>
-    </FloatBar>
+{/snippet}
+
+{#if $show}
+    {#if useTopBar}
+        <!-- 移动端：顶部固定栏钉在思源标题栏下 + 顶开正文（2026-08-25 防遮挡）；
+             桌面浮条的拖拽/位置存储/clamp 在此形态不存在。
+             snippet 传法用 prop 引用（children={btns}）——标签体内 {btns()} 调用式
+             会丢渲染锚点（Svelte 5 实测抛 "reading 'before'"，两分支同崩） -->
+        <PieceTopBar onClose={() => show.set(false)} children={btns} />
+    {:else}
+        <FloatBar
+            posKey="prog-piece-floatbar-pos"
+            title={$title}
+            zIndex={$zIndexPlus ? 999 : 12}
+            onClose={() => show.set(false)}
+            children={btns}
+        />
+    {/if}
 {/if}
 
 <style>

@@ -59,3 +59,13 @@
 .tomato-button {
   color: var(--b3-font-color3);
 }
+
+// 移动端分片顶栏（PieceTopBar）：body 类驱动编辑宿主 #editor 顶开。#editor 本身是
+// protyle 宿主容器而非滚动内容，padding 压外壳使滚动区整体下移——滚到任何位置都不进
+// 顶栏底下；高度与顶栏同源 CSS 变量（一处改两处生效，顶栏 border-box 52px 含下边框）。
+:root {
+  --prog-topbar-h: 44px;
+}
+body.prog-topbar-on #editor {
+  padding-top: var(--prog-topbar-h);
+}

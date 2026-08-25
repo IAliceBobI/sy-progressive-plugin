@@ -253,7 +253,7 @@
                                 e.preventDefault();
                                 openHelpDialog((e.currentTarget as HTMLAnchorElement).href,
                                     helpDocs);
-                            }}>相关：番茄工具箱的均匀推迟功能，重新规划当前文档和其子文档中，所有闪卡的划复习时间。</a
+                            }}>相关：番茄工具箱的均匀推迟功能，重新规划当前文档和其子文档中，所有闪卡的复习时间。</a
                         >
                     {/if}
                 </label>

@@ -21,6 +21,7 @@
         btnSaveCard,
         btnSplitByPunctuations,
         btnSplitByPunctuationsList,
+        mobileTopBar,
         btnSplitByPunctuationsListCheck,
         btnStop,
         btnViewContents,
@@ -809,6 +810,15 @@
                     bind:checked={$btnSplitByPunctuationsList}
                 />
                 {tomatoI18n.按标点断句列表}✂📌<TomatoVIP {codeValid}></TomatoVIP>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$mobileTopBar}
+                />
+                {tomatoI18n.移动端浮条固定顶部}
             </div>
         </div>
     </section>

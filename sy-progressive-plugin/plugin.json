@@ -2,7 +2,7 @@
   "name": "sy-progressive-plugin",
   "author": "IAliceBobI",
   "url": "https://github.com/IAliceBobI/sy-progressive-plugin",
-  "version": "2.1.48",
+  "version": "2.1.49",
   "minAppVersion": "2.12.6",
   "disabledInPublish": false,
   "backends": [
@@ -16,18 +16,26 @@
     "zh_CN": "渐进学习"
   },
   "description": {
-    "default": "[🔓Open Source] [🛡️GitHub Online Compilation] Excerpt-based progressive learning, chunk-based progressive learning, multi-line selection via double-tap on mobile, word highlighting with explanations, sentence splitting, split block by pressing Enter, merge blocks, word flashcards, multi-line cloze deletion, multi-line card creation, Daily Card, display pinyin for content",
-    "zh_CN": "【🔓已开源】【🛡️Github在线编译】摘抄式渐进学习、分片式渐进学习、移动端双击多行选择、划词解释、断句拆分、按回车拆分块、合并块、单词闪卡、多行挖空、多行制卡、Daily Card、显示拼音"
+    "default": "🔓 Open source · Finally finish what you read: excerpt & piece-based progressive reading with sentence splitting, cloze deletion, word flashcards and Daily Card — a full loop from reading to review.",
+    "zh_CN": "🔓 已开源 · 让长文真正读得完：摘抄式与分片式渐进阅读，断句拆分、多行挖空、单词闪卡、Daily Card——从阅读输入到闪卡复习的完整闭环"
   },
   "readme": {
     "default": "README.md",
     "zh_CN": "README_zh_CN.md"
   },
   "keywords": [
-    "Learning",
-    "Progressive",
-    "Progressive Learning",
+    "渐进学习",
+    "渐进阅读",
     "Progressive Reading",
-    "Progressive Writing"
+    "挖空",
+    "Cloze",
+    "闪卡",
+    "Flashcard",
+    "摘抄",
+    "断句",
+    "Sentence Split",
+    "拼音",
+    "Pinyin",
+    "Daily Card"
   ]
 }
