@@ -5,45 +5,15 @@ import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { PieceMovingDown, PieceMovingUp } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
-export const PieceMovingBox移动到上一分片内 = winHotkey("ctrl+alt+u", "移动到上一分片内 2025-5-13 11:27:32", "🚚⬆️", () => tomatoI18n.移动到上一分片内, true, PieceMovingUp)
-export const PieceMovingBox移动到下一分片内 = winHotkey("ctrl+alt+i", "移动到下一分片内 2025-5-13 11:27:26", "🚚⬇️", () => tomatoI18n.移动到下一分片内, true, PieceMovingDown)
+export const PieceMovingBox移动到上一分片内 = winHotkey("ctrl+alt+u", "移动到上一分片内", "🚚⬆️", () => tomatoI18n.移动到上一分片内) // □14 拍板免费（挪片=核心阅读流，不设门）
+export const PieceMovingBox移动到下一分片内 = winHotkey("ctrl+alt+i", "移动到下一分片内", "🚚⬇️", () => tomatoI18n.移动到下一分片内) // □14 拍板免费（挪片=核心阅读流，不设门）
 
 class PieceMovingBox {
     private plugin: Plugin;
     settings: TomatoSettings;
-
-    blockIconEvent(detail: any) {
-        if (!this.plugin) return;
-
-        const protyle: IProtyle = detail.protyle;
-        const { isPiece } = isProtylePiece(protyle);
-        if (isPiece) {
-            if (PieceMovingBox移动到上一分片内.menu()) {
-                detail.menu.addItem({
-                    iconHTML: PieceMovingBox移动到上一分片内.icon,
-                    label: PieceMovingBox移动到上一分片内.langText(),
-                    accelerator: PieceMovingBox移动到上一分片内.m,
-                    click: () => {
-                        this.move(protyle, -1);
-                    }
-                });
-            }
-            if (PieceMovingBox移动到下一分片内.menu()) {
-                detail.menu.addItem({
-                    iconHTML: PieceMovingBox移动到下一分片内.icon,
-                    label: PieceMovingBox移动到下一分片内.langText(),
-                    accelerator: PieceMovingBox移动到下一分片内.m,
-                    click: () => {
-                        this.move(protyle, 1);
-                    }
-                });
-            }
-        }
-    }
 
     async onload(plugin: Plugin, settings: TomatoSettings) {
         this.plugin = plugin;
@@ -76,37 +46,10 @@ class PieceMovingBox {
                 }
             },
         });
-
-        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
-            const protyle: IProtyle = detail.protyle;
-            const { isPiece } = isProtylePiece(protyle);
-            if (isPiece) {
-                const menu = detail.menu;
-                if (PieceMovingBox移动到上一分片内.menu()) {
-                    menu.addItem({
-                        iconHTML: PieceMovingBox移动到上一分片内.icon,
-                        label: PieceMovingBox移动到上一分片内.langText(),
-                        accelerator: PieceMovingBox移动到上一分片内.m,
-                        click: () => {
-                            this.move(protyle, -1);
-                        },
-                    });
-                }
-                if (PieceMovingBox移动到下一分片内.menu()) {
-                    menu.addItem({
-                        iconHTML: PieceMovingBox移动到下一分片内.icon,
-                        label: PieceMovingBox移动到下一分片内.langText(),
-                        accelerator: PieceMovingBox移动到下一分片内.m,
-                        click: () => {
-                            this.move(protyle, 1);
-                        },
-                    });
-                }
-            }
-        });
     }
 
-    private async move(protyle: IProtyle, delta: number) {
+    /** v5 □7：入口收进浮条 [+] 高级功能 + 命令面板（右键菜单/块图标菜单退役） */
+    async move(protyle: IProtyle, delta: number) {
         if (delta == 0) return;
         const { ids } = await events.selectedDivs(protyle)
         if (!ids || ids.length == 0) return;

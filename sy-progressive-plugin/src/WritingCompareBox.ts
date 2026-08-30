@@ -1,9 +1,9 @@
 import { IProtyle, Plugin } from "siyuan";
 import { add_href, attrNewLine, cloneCleanDiv, getAttribute, ial2str, isValidNumber, parseIAL, removeAttribute, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
-import { findAllInOneKeyDoc, findCompareDoc, findKeysDoc, findNewBookDoc, findPieceDoc, getAllInOneKeyDoc, getCompareDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtyleKeyDoc, isProtylePiece } from "./helper";
+import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece } from "./helper";
 import { MarkKey, PROG_ORIGIN_TEXT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { getAllPieceNotesEnable, merg2newBookEnable, send2compareNoteEnable, send2exctract2bottomEnable, send2exctractNoteEnable, send2removeNoteColor, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { DomSuperBlockBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -19,13 +19,14 @@ function b2c(row: Block): BlockContent {
     return { ial: parseIAL(row.ial), id: row.id, markdown: row.markdown, content: row.content };
 }
 
-export const WC提取所有分片的笔记 = winHotkey("⌘F4", "提取所有分片的笔记 2025-5-13 09:34:21", "iconCopy", () => tomatoI18n.提取所有分片的笔记, true, getAllPieceNotesEnable)
-export const WC提取笔记到底部 = winHotkey("shift+alt+r", "提取笔记到底部 2025-5-13 09:34:24", "iconCopy", () => tomatoI18n.提取笔记到底部, true, send2exctract2bottomEnable)
-export const WC提取笔记 = winHotkey("⌘F5", "提取笔记 2025-5-13 09:34:24", "iconCopy", () => tomatoI18n.提取笔记)
-export const WC去除笔记颜色 = winHotkey("⌥⌘F5", "去除笔记颜色 2025-5-13 09:34:24", "iconTheme", () => tomatoI18n.去除笔记颜色, true, send2removeNoteColor)
-export const WC恢复笔记颜色 = winHotkey("⌥⌘F6", "恢复笔记颜色 2025-5-13 09:34:25", "iconTheme", () => tomatoI18n.恢复笔记颜色, true, send2removeNoteColor)
-export const WC合并所有分片到新文件 = winHotkey("⌥⌘F6", "合并所有分片到新文件 2025-5-13 09:34:21", "iconCopy", () => tomatoI18n.合并所有分片到新文件, true, merg2newBookEnable)
-export const WC对比原文 = winHotkey("⌘F6", "对比原文 2025-5-13 09:34:24", "iconEye", () => tomatoI18n.对比原文)
+export const WC提取所有分片的笔记 = winHotkey("⌘F4", "提取所有分片的笔记", "iconCopy", () => tomatoI18n.提取所有分片的笔记, true) // □14 收费门恢复（提取整理族，Pro）
+export const WC提取笔记到底部 = winHotkey("shift+alt+r", "提取笔记到底部", "iconCopy", () => tomatoI18n.提取笔记到底部, true) // □14 收费门恢复（提取整理族，Pro）
+export const WC提取笔记 = winHotkey("⌘F5", "提取笔记", "iconCopy", () => tomatoI18n.提取笔记, true) // □30 补漏：提取整理族 Pro（□14 恢复门禁时漏标第五参，浮条钮漏灰档+命令通道漏拦）
+export const WC去除笔记颜色 = winHotkey("⌥⌘F5", "去除笔记颜色", "iconTheme", () => tomatoI18n.去除笔记颜色, true) // □14 收费门恢复（提取整理族，Pro）
+export const WC恢复笔记颜色 = winHotkey("⌥⌘F6", "恢复笔记颜色", "iconTheme", () => tomatoI18n.恢复笔记颜色, true) // □14 收费门恢复（提取整理族，Pro）
+// v5 □7 修撞键：原 ⌥⌘F6 与「恢复笔记颜色」双绑（winHotkey 重复检测当时被注释未报），挪至 ⌥⌘F7
+export const WC合并所有分片到新文件 = winHotkey("⌥⌘F7", "合并所有分片到新文件", "iconCopy", () => tomatoI18n.合并所有分片到新文件, true) // □14 收费门恢复（合并导出型，Pro）
+// 「对比原文」（⌘F6）已退役（2026-08-29 浮条 UX 重设计 □9）：仿写对比由 recite 接管，keys 精读文档仍是可读写笔记容器
 
 class WritingCompareBox {
     private plugin: Plugin;
@@ -66,9 +67,12 @@ class WritingCompareBox {
             langText: WC提取笔记.langText(),
             hotkey: WC提取笔记.m,
             editorCallback: async (protyle) => {
-                const { isPiece, markKey } = isProtylePiece(protyle);
-                if (isPiece) {
-                    await this.extractNotes(protyle.block?.rootID, protyle.notebookId, markKey);
+                // □30 补漏：vip 补标时成对漏掉的 cmd() 守卫（未激活 ⌘F5 曾照跑全功能）
+                if (WC提取笔记.cmd()) {
+                    const { isPiece, markKey } = isProtylePiece(protyle);
+                    if (isPiece) {
+                        await this.extractNotes(protyle.block?.rootID, protyle.notebookId, markKey);
+                    }
                 }
             },
         });
@@ -82,17 +86,6 @@ class WritingCompareBox {
                     if (isPiece) {
                         await this.extractAsBook(protyle.notebookId, protyle.block?.rootID, protyle.notebookId, markKey);
                     }
-                }
-            },
-        });
-        this.plugin.addCommand({
-            langKey: WC对比原文.langKey,
-            langText: WC对比原文.langText(),
-            hotkey: WC对比原文.m,
-            editorCallback: async (protyle) => {
-                const { isKeyDoc, keyDocAttr } = isProtyleKeyDoc(protyle);
-                if (isKeyDoc) {
-                    await this.compareNotes(protyle.block?.rootID, protyle.notebookId, keyDocAttr);
                 }
             },
         });
@@ -112,95 +105,11 @@ class WritingCompareBox {
                 if (WC恢复笔记颜色.cmd()) await this.noColor(protyle, false);
             },
         });
-        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
-            const protyle: IProtyle = detail.protyle;
-            const { isPiece, markKey } = isProtylePiece(protyle);
-
-            if (isPiece) {
-                const menu = detail.menu;
-                if (WC提取所有分片的笔记.menu()) {
-                    menu.addItem({
-                        label: WC提取所有分片的笔记.langText(),
-                        icon: WC提取所有分片的笔记.icon,
-                        accelerator: WC提取所有分片的笔记.m,
-                        click: async () => {
-                            await this.extractAllNotes(protyle, markKey);
-                        },
-                    });
-                }
-                if (WC提取笔记到底部.menu()) {
-                    menu.addItem({
-                        label: WC提取笔记到底部.langText(),
-                        icon: WC提取笔记到底部.icon,
-                        accelerator: WC提取笔记到底部.m,
-                        click: async () => {
-                            const { isPiece } = isProtylePiece(protyle);
-                            if (isPiece) {
-                                await this.extractNotes2bottom(protyle);
-                            }
-                        },
-                    });
-                }
-                if (send2exctractNoteEnable.get()) {
-                    menu.addItem({
-                        label: WC提取笔记.langText(),
-                        icon: WC提取笔记.icon,
-                        accelerator: WC提取笔记.m,
-                        click: async () => {
-                            await this.extractNotes(protyle.block?.rootID, protyle.notebookId, markKey);
-                        },
-                    });
-                }
-                if (WC去除笔记颜色.menu()) {
-                    menu.addItem({
-                        label: WC去除笔记颜色.langText(),
-                        icon: WC去除笔记颜色.icon,
-                        accelerator: WC去除笔记颜色.m,
-                        click: async () => {
-                            await this.noColor(protyle);
-                        },
-                    });
-                }
-                if (WC恢复笔记颜色.menu()) {
-                    menu.addItem({
-                        label: WC恢复笔记颜色.langText(),
-                        icon: WC恢复笔记颜色.icon,
-                        accelerator: WC恢复笔记颜色.m,
-                        click: async () => {
-                            await this.noColor(protyle, false);
-                        },
-                    });
-                }
-                if (WC合并所有分片到新文件.menu()) {
-                    menu.addItem({
-                        label: WC合并所有分片到新文件.langText(),
-                        icon: WC合并所有分片到新文件.icon,
-                        accelerator: WC合并所有分片到新文件.m,
-                        click: async () => {
-                            await this.extractAsBook(protyle.notebookId, protyle.block?.rootID, protyle.notebookId, markKey);
-                        },
-                    });
-                }
-            } else {
-                if (send2compareNoteEnable.get()) {
-                    const { isKeyDoc, keyDocAttr } = isProtyleKeyDoc(protyle);
-                    if (isKeyDoc) {
-                        const menu = detail.menu;
-                        menu.addItem({
-                            label: WC对比原文.langText(),
-                            icon: WC对比原文.icon,
-                            accelerator: WC对比原文.m,
-                            click: async () => {
-                                await this.compareNotes(protyle.block?.rootID, protyle.notebookId, keyDocAttr);
-                            },
-                        });
-                    }
-                }
-            }
-        });
     }
 
-    private async extractNotes2bottom(protyle: IProtyle) {
+    // v5 □7：提取/整理族入口收进浮条 [+] 高级功能 + 命令面板（右键菜单退役），方法转 public 供浮条调用
+
+    async extractNotes2bottom(protyle: IProtyle) {
         siyuan.pushMsg(tomatoI18n.提取笔记到底部, 1000);
         const docInfo = events.getInfo(protyle);
         const { root } = await getDocBlocks(docInfo.docID, docInfo.name, true, false, 1);
@@ -226,7 +135,7 @@ class WritingCompareBox {
         OpenSyFile2(this.plugin, su.id);
     }
 
-    private async noColor(protyle: IProtyle, rm = true) {
+    async noColor(protyle: IProtyle, rm = true) {
         const { docID } = events.getInfo(protyle)
         const { root } = await getDocBlocks(docID, "", false, true, 1)
         const attrs: AttrType = into(() => {
@@ -244,7 +153,7 @@ class WritingCompareBox {
         await siyuan.batchSetBlockAttrs(param);
     }
 
-    private async extractAllNotes(protyle: IProtyle, markKey: string) {
+    async extractAllNotes(protyle: IProtyle, markKey: string) {
         siyuan.pushMsg(tomatoI18n.提取所有分片的笔记)
         const docInfo = events.getInfo(protyle);
 
@@ -273,116 +182,7 @@ class WritingCompareBox {
         OpenSyFile2(this.plugin, keysDocID, windowOpenStyle.get() as any);
     }
 
-    private async compareNotes(keyNoteID: string, notebookId: string, keyDocAttr: string) {
-        if (!keyNoteID || !notebookId || !keyDocAttr) return;
-        siyuan.pushMsg("compare notes")
-
-        const parts = keyDocAttr.split("#").pop()?.split(",");
-        if (parts.length == 2) {
-            const point = Number(parts[1]);
-            if (!isValidNumber(point)) return;
-            const pieceID = await findPieceDoc(parts[0], point);
-            if (!pieceID) return;
-            let cmpDocID = await findCompareDoc(parts[0], point);
-            if (!cmpDocID) {
-                const hpath = await getHPathByDocID(pieceID, "compare");
-                if (hpath) {
-                    cmpDocID = await getCompareDoc(parts[0], point, notebookId, hpath);
-                }
-            }
-            if (!cmpDocID) return;
-            const taskClear = siyuan.clearAll(cmpDocID);
-            const mdList: string[] = [];
-
-            const keyPidx = new Map<string, string>();
-            const keyNoteMap = siyuan.getChildBlocks(keyNoteID)
-                .then(keyNoteChildren => siyuan.getRows(keyNoteChildren.map(b => b.id), "ial,markdown,content", true, [
-                    "content is not null", 'content != ""'
-                ]))
-                .then(keyNoteData => keyNoteData.map(row => {
-                    return { ial: parseIAL(row.ial), id: row.id, markdown: row.markdown, content: row.content } as BlockContent;
-                }).reduce(({ lastRef, all }, row) => {
-                    all.push(row);
-                    const ref = row.ial["custom-progref"];
-                    if (ref) {
-                        lastRef = ref;
-                        const pidx = row.ial["custom-paragraph-index"];
-                        if (pidx) keyPidx.set(ref, pidx);
-                    } else if (lastRef) {
-                        row.ial["custom-progref"] = lastRef;
-                    }
-                    return { lastRef, all };
-                }, { lastRef: "", all: [] as BlockContent[] }).all
-                    .filter(b => !b.ial["custom-prog-key-note"])
-                    .reduce((m, b) => {
-                        const k = b.ial["custom-progref"];
-                        if (!m.has(k)) m.set(k, []);
-                        m.get(k).push(b);
-                        return m;
-                    }, new Map<string, BlockContent[]>()))
-
-            const { ids, m: pieceMap } = await siyuan.getChildBlocks(pieceID)
-                .then(pieceChildren => siyuan.getRows(pieceChildren.map(b => b.id), "ial,markdown", true, [`ial like "%${PROG_ORIGIN_TEXT}%"`]))
-                .then(pieceData => pieceData.map(row => {
-                    return { ial: parseIAL(row.ial), id: row.id, markdown: row.markdown } as BlockContent;
-                }).reduce((obj, b) => {
-                    const k = b.ial["custom-progref"];
-                    obj.ids.push(k);
-                    if (!obj.m.has(k)) obj.m.set(k, []);
-                    obj.m.get(k).push(b);
-                    return obj;
-                }, { ids: [] as string[], m: new Map<string, BlockContent[]>() }))
-
-            const pieceRefs = new Set(ids);
-            const pidx2ref = new Map<string, string>();
-            for (const rows of pieceMap.values()) {
-                for (const { ial } of rows) {
-                    const p = ial["custom-paragraph-index"];
-                    if (p && ial["custom-progref"]) pidx2ref.set(p, ial["custom-progref"]);
-                }
-            }
-            // keys 小标题的 progref 可能指向列表项等非顶层块，匹配不上原文段时用段落索引兜底归段
-            const keyNotes = new Map<string, BlockContent[]>();
-            for (const [k, rows] of await keyNoteMap) {
-                const target = pieceRefs.has(k) ? k : (pidx2ref.get(keyPidx.get(k) ?? "") ?? k);
-                keyNotes.set(target, [...(keyNotes.get(target) ?? []), ...rows]);
-            }
-            for (const id of [...pieceRefs]) {
-                for (const row of pieceMap.get(id) ?? []) {
-                    delete row.ial.id;
-                    delete row.ial.updated;
-                    row.ial["custom-prog-key-note"] = "1";
-                    mdList.push(`${row.markdown}\n${ial2str(row.ial)}`);
-                }
-                let w = false;
-                for (const row of keyNotes.get(id) ?? []) {
-                    delete row.ial.id;
-                    delete row.ial.updated;
-                    w = true;
-                    mdList.push(`${row.markdown}\n${ial2str(row.ial)}`);
-                }
-                if (w) mdList.push("---");
-            }
-            // 仍匹配不到原文段的 keys 内容附加到末尾，避免静默丢失
-            for (const [k, rows] of keyNotes) {
-                if (pieceRefs.has(k)) continue;
-                let w = false;
-                for (const row of rows) {
-                    delete row.ial.id;
-                    delete row.ial.updated;
-                    w = true;
-                    mdList.push(`${row.markdown}\n${ial2str(row.ial)}`);
-                }
-                if (w) mdList.push("---");
-            }
-            await taskClear;
-            await siyuan.insertBlockAsChildOf(mdList.join("\n"), cmpDocID);
-            siyuan.pushMsg("compare notes finished")
-            OpenSyFile2(this.plugin, cmpDocID, "front");
-        }
-    }
-
-    private async extractAsBook(boxID: string, pieceID: string, notebookId: string, markKey: string) {
+    async extractAsBook(boxID: string, pieceID: string, notebookId: string, markKey: string) {
         if (!pieceID || !notebookId || !markKey) return;
         siyuan.pushMsg(tomatoI18n.合并所有分片到新文件)
 
@@ -406,7 +206,7 @@ class WritingCompareBox {
         OpenSyFile2(this.plugin, newBookID, windowOpenStyle.get() as any);
     }
 
-    private async extractNotes(pieceID: string, notebookId: string, markKey: string) {
+    async extractNotes(pieceID: string, notebookId: string, markKey: string) {
         if (!pieceID || !notebookId || !markKey) return;
         siyuan.pushMsg("extract notes")
 

@@ -8,30 +8,34 @@ import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import * as constants from "./constants";
 import {
     BlockNodeEnum, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey,
-    PARAGRAPH_INDEX, RefIDKey
+    PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_PARENT_ID, RefIDKey
 } from "../../sy-tomato-plugin/src/libs/gconst";
 import AddBookSvelte from "./AddBook.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { progStorage } from "./ProgressiveStorage";
+import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
+import { notifyFleetChanged } from "./fleet";
 import { HtmlCBType } from "./constants";
-import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { addClickEvent, btn, getContentPrefix, progressiveBtnFloating } from "./ProgressiveBtn";
-import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveViewAllMenu, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
+import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
+import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
+import { addClickEvent, progressiveBtnFloating } from "./ProgressiveBtn";
+import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
 import { mount, } from "svelte";
 import { fullfilContent } from "./helper";
 import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
 import { pressSkip, showCardAnswer } from "../../sy-tomato-plugin/src/libs/cardUtils";
 
-export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK 2025-5-12 21:37:37", "⚙️", () => tomatoI18n.渐进学习的设置)
-export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn 2025-5-13 13:32:20", "📖", () => tomatoI18n.开始学习)
-export const Progressive开始随机学习 = winHotkey("⌥⇧-", "Progressive startToLearnRand 2025-5-13 13:32:21", "🔀📖", () => tomatoI18n.开始随机学习)
-export const Progressive查看所有渐进学习文档 = winHotkey("⌥=", "查看所有渐进学习文档 2025-5-13 13:32:21", "👁️📚", () => tomatoI18n.查看所有渐进学习文档)
-export const Progressive上一页 = winHotkey("ctrl+left", "上一页 2025-5-13 13:32:21", "⏫", () => tomatoI18n.上一页)
-export const Progressive下一页 = winHotkey("ctrl+right", "下一页 2025-5-13 13:32:21", "⏬", () => tomatoI18n.下一页)
-export const Progressive跳到分片或回到原文 = winHotkey("⇧⌥w", "跳到分片或回到原文 2025-5-13 13:32:21", "🎯📖", () => tomatoI18n.跳到分片或回到原文)
-export const Progressive添加当前文档到渐进阅读分片模式 = winHotkey("⇧⌥m", "添加当前文档到渐进阅读(分片模式) 2025-5-13 13:32:21", "＋📗", () => tomatoI18n.添加当前文档到渐进阅读分片模式)
+export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK", "⚙️", () => tomatoI18n.渐进学习的设置)
+export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn", "📖", () => tomatoI18n.开始今日阅读)
+export const Progressive开始随机学习 = winHotkey("⌥⇧-", "Progressive startToLearnRand", "🔀📖", () => tomatoI18n.开始随机学习)
+export const Progressive上一页 = winHotkey("ctrl+left", "上一页", "⏫", () => tomatoI18n.上一页)
+export const Progressive下一页 = winHotkey("ctrl+right", "下一页", "⏬", () => tomatoI18n.下一页)
+export const Progressive跳到分片或回到原文 = winHotkey("⇧⌥w", "跳到分片或回到原文", "🎯📖", () => tomatoI18n.跳到分片或回到原文)
+export const Progressive添加当前文档到渐进阅读分片模式 = winHotkey("⇧⌥m", "添加当前文档到渐进阅读(分片模式)", "＋📗", () => tomatoI18n.添加当前文档到渐进阅读分片模式)
 
 class Progressive {
     plugin: Plugin;
@@ -89,14 +93,6 @@ class Progressive {
             },
         });
         this.plugin.addCommand({
-            langKey: Progressive查看所有渐进学习文档.langKey,
-            langText: Progressive查看所有渐进学习文档.langText(),
-            hotkey: Progressive查看所有渐进学习文档.m,
-            callback: async () => {
-                await this.viewAllProgressiveBooks();
-            },
-        });
-        this.plugin.addCommand({
             langKey: Progressive上一页.langKey,
             langText: Progressive上一页.langText(),
             hotkey: Progressive上一页.m,
@@ -136,16 +132,6 @@ class Progressive {
                     }
                 });
             }
-            if (ProgressiveViewAllMenu.get()) {
-                menu.addItem({
-                    iconHTML: Progressive查看所有渐进学习文档.icon,
-                    label: Progressive查看所有渐进学习文档.langText(),
-                    accelerator: Progressive查看所有渐进学习文档.m,
-                    click: async () => {
-                        await this.viewAllProgressiveBooks();
-                    }
-                });
-            }
             if (ProgressiveJumpMenu.get()) {
                 menu.addItem({
                     iconHTML: Progressive跳到分片或回到原文.icon,
@@ -156,16 +142,8 @@ class Progressive {
                     },
                 });
             }
-            if (ProgressiveStart2learn.get()) {
-                menu.addItem({
-                    iconHTML: Progressive开始学习.icon,
-                    label: Progressive开始学习.langText(),
-                    accelerator: Progressive开始学习.m,
-                    click: () => {
-                        this.startToLearnWithLock();
-                    }
-                });
-            }
+            // □11 盘点整改 A 类：右键「开始学习」退役——火苗点击=startReading 全局出片 +
+            // 书态 ▶ + 🔄 三重覆盖，右键不再重复占位
         });
         events.addListener("ProgressiveBox", (eventType, detail: Protyle) => {
             if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
@@ -294,14 +272,6 @@ class Progressive {
             }
         });
         menu.addItem({
-            iconHTML: Progressive查看所有渐进学习文档.icon,
-            label: Progressive查看所有渐进学习文档.langText(),
-            accelerator: Progressive查看所有渐进学习文档.m,
-            click: async () => {
-                await this.viewAllProgressiveBooks();
-            }
-        });
-        menu.addItem({
             iconHTML: Progressive跳到分片或回到原文.icon,
             label: Progressive跳到分片或回到原文.langText(),
             accelerator: Progressive跳到分片或回到原文.m,
@@ -309,7 +279,9 @@ class Progressive {
                 this.readThisPiece();
             }
         });
-        if (ProgressiveStart2learn.get()) {
+        // □11 盘点整改 A 类：桌面顶栏菜单精简为「加书 + 跳到分片」两项（开始学习归火苗/
+        // 书态 ▶/🔄）；移动端三项全留（无火苗 hover 生态，保留常驻入口）
+        if (events.isMobile && ProgressiveStart2learn.get()) {
             menu.addItem({
                 iconHTML: Progressive开始学习.icon,
                 label: Progressive开始学习.langText(),
@@ -319,14 +291,6 @@ class Progressive {
                 }
             });
         }
-        menu.addItem({
-            iconHTML: progSettingsOpenHK.icon,
-            label: progSettingsOpenHK.langText(),
-            accelerator: progSettingsOpenHK.m,
-            click: () => {
-                this.plugin.setting.open(tomatoI18n.渐进学习)
-            }
-        });
         if (events.isMobile) {
             menu.fullscreen();
         } else {
@@ -385,9 +349,24 @@ class Progressive {
     async readThisPiece(blockID?: string) {
         if (!blockID) blockID = events.selectedDivsSync().ids.at(0);
         if (!blockID) return;
-        const row = await siyuan.sqlOne(`select root_id from blocks where id="${blockID}"`);
-        if (row) {
-            const bookID = row["root_id"];
+        // □21 目录浮层含容器内嵌套标题（超块/列表），分片索引只收顶层块 id（getChildBlocks
+        // 平铺）；沿 parent_id 上爬到顶层祖先再匹配（顶层块 parent_id==root_id，一次即停），
+        // 片内定位也用祖先 id——分片以顶层块为单位拷贝，嵌套标题没有自己的 progref。
+        // 块菜单选嵌套块跳分片同享此修复（此前落「请选择段落块」死路）。
+        let topID = blockID;
+        let rootID = "";
+        for (let i = 0; i < 20; i++) {
+            const row = await siyuan.sqlOne(`select parent_id, root_id from blocks where id="${topID}"`);
+            if (!row?.root_id) {
+                rootID = "";
+                break;
+            }
+            rootID = row.root_id;
+            if (!row.parent_id || row.parent_id === row.root_id) break;
+            topID = row.parent_id;
+        }
+        if (rootID) {
+            const bookID = rootID;
             const idx = await progStorage.loadBookIndexIfNeeded(bookID);
             if (idx?.length <= 0) {
                 // not a book
@@ -402,11 +381,11 @@ class Progressive {
             } else {
                 for (let i = 0; i < idx.length; i++) {
                     for (let j = 0; j < idx[i].length; j++) {
-                        if (blockID === idx[i][j]) {
+                        if (topID === idx[i][j]) {
                             await progStorage.gotoBlock(bookID, i);
                             await this.startToLearnWithLock(bookID);//创建分片
                             setTimeout(async () => {
-                                const pieceBlockID = await this.getPiecesByRefID(blockID)
+                                const pieceBlockID = await this.getPiecesByRefID(topID)
                                 if (pieceBlockID) await OpenSyFile2(this.plugin, pieceBlockID);//跳到分片内的块
                             }, 1200);
                             return;
@@ -440,60 +419,64 @@ class Progressive {
         });
     }
 
-    private async openContentsLock(bookID: string) {
-        return navigator.locks.request(constants.BuildContentsLock, { ifAvailable: true }, async (lock) => {
-            if (lock) {
-                await this.openContents(bookID);
-            } else {
-                await siyuan.pushMsg(tomatoI18n.构建打开目录中请稍后片刻);
-            }
-        });
-    }
-
-    private async openContents(bookID: string) {
-        let contentID = await help.findContents(bookID);
-        if (!contentID) {
-            siyuan.pushMsg(tomatoI18n.首次构建目录请稍后片刻);
-            const row = await siyuan.sqlOne(`select box,hpath,content from blocks where id='${bookID}' and type='d'`);
-            const hpath = row.hpath;
-            const boxID = row.box;
-            const bookName = row.content;
-            if (!boxID || !hpath) return;
-
-            const { root } = await getDocBlocks(bookID, "", false, false, 1);
-            const rows = root.children.filter(b => b.type === 'h').map(b => {
-                b.content = b.div.textContent;
-                return b;
-            });
-
-            if (rows.length == 0) return;
-            const c = rows.reduce<string[]>((list, block) => {
-                block.content = block.content.trim();
-                let level = Number(block.subtype[1]);
-                if (!utils.isValidNumber(level) || level < 1) level = 1;
-                list.push(getContentPrefix(level) + btn(HtmlCBType.readThisBlock, block.content, "", block.id, block.id, 0, true));
-                return list;
-            }, []);
-            const attr = {};
-            attr[MarkKey] = help.getDocIalContents(bookID);
-            attr["custom-sy-readonly"] = "true";
-            contentID = await siyuan.createDocWithMdIfNotExists(boxID, `${hpath}/contents-${bookName}`, c.join("\n"), attr);
+    /** ⏸/⚠ 书的统一处理：闭笔记本=提示开箱恢复（书可能只是暂不可见，绝不清理）；
+     * 丢失=confirm 引导清理（只清 books.json 记录+索引文件，prog-data 沉淀物不动） */
+    private async handleUnreadableBook(bookID: string, st: BookStatusInfo) {
+        if (st.status === "closed") {
+            await siyuan.pushMsg(tomatoI18n.书在已关闭的笔记本中(st.name));
+            return;
         }
-        if (contentID) await OpenSyFile2(this.plugin, contentID);
+        await siyuan.pushMsg(tomatoI18n.书原文档已不存在(st.name, st.fsUnavailable));
+        // 无文件层兜底的前端（移动端/浏览器）误判概率高且无法二次确认，不提供清理出口
+        if (st.fsUnavailable) return;
+        const id = bookID || ([...(await loadBookStatuses())].find(([, s]) => s.status === "lost")?.[0] ?? "");
+        if (!id) return;
+        confirm("⚠️", tomatoI18n.清理该书渐进记录确认(st.name), async () => {
+            await progStorage.removeIndex(id);
+            invalidateBookStatusCache();
+            notifyFleetChanged();
+            await siyuan.pushMsg(tomatoI18n.已清理该书记录);
+        });
     }
 
     private async startToLearn(bookID = "", isRand = false) {
         let noteID = "";
-        const bookInfo = await this.getBook2Learn(bookID);
-        if (!bookInfo.bookID) {
-            siyuan.pushMsg(tomatoI18n.您还没添加任何文档);
+        if (!bookID) {
+            // 滚筒出片：order 中 lastServed 之后第一个可读书（跳过忽略/归档/读完），出片即轮转
+            bookID = await rollerNextBook();
+        if (!bookID) {
+            // 出不了片：真空书架 vs 有书但全被 ⏸/⚠ 挡住（全跳光给对症提示，不再误报「没添加文档」）
+            const statuses = await loadBookStatuses();
+            const blocked = [...statuses.values()].find(s => s.status !== "ok");
+            if (blocked) {
+                await this.handleUnreadableBook("", blocked);
+            } else {
+                siyuan.pushMsg(tomatoI18n.您还没添加任何文档);
+            }
             return;
         }
-        bookID = bookInfo.bookID;
+        }
+        // 书籍状态判定（2026-08-28 设计共识）：⏸ 闭笔记本/⚠ 文档丢失的书不出片——
+        // 死书曾是「点了没反应」的根因（toast 一闪而过、无窗口打开）
+        const statuses = await loadBookStatuses();
+        const st = statuses.get(bookID);
+        if (st && st.status !== "ok") {
+            await this.handleUnreadableBook(bookID, st);
+            return;
+        }
+        const bookInfo = await progStorage.booksInfo(bookID);
         const bookIndex = await progStorage.loadBookIndexIfNeeded(bookInfo.bookID);
         let point = (await progStorage.booksInfo(bookInfo.bookID)).point;
         if (isRand) point = utils.getRandInt0tox(bookIndex.length); // 随机创建书籍的某个分片，适用于单词集合。
         await progStorage.updateBookInfoTime(bookID);
+        if (bookIndex.length === 0) {
+            // 0 片 ≠ 最后一页（旧文案误导）：未分片的书引导去分片
+            await siyuan.pushMsg(tomatoI18n.本书还未分片(st.name));
+            confirm("", tomatoI18n.本书还未分片立即重新分片吗(st.name), async () => {
+                await this.addProgressiveReadingWithLock(bookID);
+            });
+            return;
+        }
         if (point >= bookIndex.length) {
             await siyuan.pushMsg(tomatoI18n.已经是最后一页了);
             return;
@@ -585,17 +568,18 @@ class Progressive {
                     pressSkip()
                 });
                 break;
-            case HtmlCBType.deleteAndNext:
-                confirm("⚠️", tomatoI18n.删除并下一个, async () => {
-                    await siyuan.removeRiffCards([noteID]);
-                    await progStorage.gotoBlock(bookID, point + 1);
-                    await this.startToLearnWithLock(bookID);
-                    siyuan.removeDocByID(noteID);
-                    this.closePeices(bookID);
-                    showCardAnswer();
-                    pressSkip()
-                });
+            case HtmlCBType.deleteAndNext: {
+                // v5「读完即删」：分片是一次性餐具（原文档还在、误删可重分片），主循环高频动作不再 confirm
+                await siyuan.removeRiffCards([noteID]);
+                await progStorage.gotoBlock(bookID, point + 1);
+                await this.markReadSafe(bookID); // 已读=删片前进那一刻（火苗/热力图唯一数据源）
+                await this.startToLearnWithLock(bookID);
+                siyuan.removeDocByID(noteID);
+                this.closePeices(bookID);
+                showCardAnswer();
+                pressSkip()
                 break;
+            }
             case HtmlCBType.nextBook:
                 await this.startToLearnWithLock();
                 showCardAnswer();
@@ -609,106 +593,202 @@ class Progressive {
                 pressSkip()
                 break;
             }
-            case HtmlCBType.AddDocCard:
-                await siyuan.addRiffCards([noteID]);
-                break;
-            case HtmlCBType.DelDocCard:
-                await siyuan.removeRiffCards([noteID]);
-                showCardAnswer();
-                pressSkip()
-                break;
             case HtmlCBType.ignoreBook:
                 await progStorage.setIgnoreBook(bookID);
                 break;
-            case HtmlCBType.fullfilContent: {
-                const index = await progStorage.loadBookIndexIfNeeded(bookID);
-                const piecePre = index[point - 1] ?? [];
-                const piece = index[point] ?? [];
-                await fullfilContent(point, bookID, piecePre, piece, noteID, null);
-                break;
-            }
             case HtmlCBType.cleanOriginText:
                 await help.cleanNote(noteID);
                 break;
             case HtmlCBType.openFlashcardTab:
-                if (bookID) openTab({ app: this.plugin.app, card: { type: "doc", id: bookID } });
+                // v5：附属卡 deck 目标从原书改为 digest-书名 夹（摘抄产生的卡才是附属卡）
+                if (bookID) await this.openBookCards(bookID);
                 else openTab({ app: this.plugin.app, card: { type: "all" } });
                 break;
-            case HtmlCBType.viewContents:
-                await this.openContentsLock(bookID);
-                break;
-            case HtmlCBType.splitByPunctuations: {
-                const index = await progStorage.loadBookIndexIfNeeded(bookID);
-                let piece = index[point] ?? [];
-                let piecePre = index[point - 1] ?? [];
-
-                // 如果 piece 为空（可能是因为 point 是时间戳而不是索引），从摘抄文档自身获取内容块
-                // 注意：必须在 cleanNote 之前获取，否则内容会被删除
-                if (piece.length === 0) {
-                    const blocks = await siyuan.getChildBlocks(noteID);
-                    piece = blocks
-                        .filter((b: Block) => b.type !== "d" && b.content)
-                        .map((b: Block) => b.id);
-                }
-
-                await help.cleanNote(noteID);
-                await fullfilContent(point, bookID, piecePre, piece, noteID, "p");
-                break;
-            }
-            case HtmlCBType.splitByPunctuationsList: {
-                const index = await progStorage.loadBookIndexIfNeeded(bookID);
-                let piece = index[point] ?? [];
-                let piecePre = index[point - 1] ?? [];
-                // 如果 piece 为空，从摘抄文档自身获取内容块（必须在 cleanNote 之前）
-                if (piece.length === 0) {
-                    const blocks = await siyuan.getChildBlocks(noteID);
-                    piece = blocks
-                        .filter((b: Block) => b.type !== "d" && b.content)
-                        .map((b: Block) => b.id);
-                }
-                await help.cleanNote(noteID);
-                await fullfilContent(point, bookID, piecePre, piece, noteID, "i");
-                break;
-            }
-            case HtmlCBType.splitByPunctuationsListCheck: {
-                const index = await progStorage.loadBookIndexIfNeeded(bookID);
-                let piece = index[point] ?? [];
-                let piecePre = index[point - 1] ?? [];
-                // 如果 piece 为空，从摘抄文档自身获取内容块（必须在 cleanNote 之前）
-                if (piece.length === 0) {
-                    const blocks = await siyuan.getChildBlocks(noteID);
-                    piece = blocks
-                        .filter((b: Block) => b.type !== "d" && b.content)
-                        .map((b: Block) => b.id);
-                }
-                await help.cleanNote(noteID);
-                await fullfilContent(point, bookID, piecePre, piece, noteID, "t");
-                break;
-            }
             default:
                 throw "Invalid HtmlCBType " + cbType;
         }
     }
 
-    private async getBook2Learn(bookID?: string): Promise<BookInfo> {
-        if (bookID) {
-            return progStorage.booksInfo(bookID);
+    /** □22 重插翻新：清空片内全部子块（含手写笔记——refillMenu 的 confirm 已警告）后按
+     * 所选断句方式重插原文。与 htmlBlockReadNextPeice 共锁防并发；先验源块存活再清空
+     * （同 createPiece 口径），防索引悬空时「清了旧内容却插不进新内容」。 */
+    async refillPiece(bookID: string, noteID: string, point: number, stype: AsList | "no" | null) {
+        return navigator.locks.request("htmlBlockReadNextPeiceLock", { ifAvailable: true }, async (lock) => {
+            if (!lock) {
+                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [3]");
+                return;
+            }
+            const index = await progStorage.loadBookIndexIfNeeded(bookID);
+            const piecePre = index[point - 1] ?? [];
+            const piece = (await siyuan.getRows(index[point] ?? [], "id")).map(r => r.id);
+            if (piece.length === 0) {
+                await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
+                return;
+            }
+            await siyuan.clearAll(noteID);
+            try {
+                await fullfilContent(point, bookID, piecePre, piece, noteID, stype);
+            } catch (e) {
+                // clearAll 不可逆（笔记已删），重插中途失败必须让用户知道可重试自愈——
+                // 静默的话最终态=确认过、清空了、什么都没插回（reasoning review P1-1）
+                console.error("refillPiece fullfilContent failed", e);
+                await siyuan.pushMsg(tomatoI18n.重插失败提示, 4000);
+                return;
+            }
+            await utils.sleep(constants.IndexTime2Wait);
+        });
+    }
+
+    /** 已读记账；附属动作失败只降级不阻断开片 */
+    private async markReadSafe(bookID: string) {
+        try {
+            await rollerMarkRead(bookID);
+            notifyFleetChanged(); // □6 火苗/面板即时联动（fleet.ts 不 import 本类，单向无环）
+        } catch (e) {
+            console.error("roller markRead failed", e);
         }
-        const infos = progStorage.booksInfos();
-        let miniTime = Number.MAX_SAFE_INTEGER;
-        let miniID = "";
-        for (const id in infos) {
-            const { time, ignored } = infos[id];
-            if (ignored) continue;
-            if (time < miniTime) {
-                miniTime = time;
-                miniID = id;
+    }
+
+    // ============ v5 □5 浮条三态动作（docs/prog-v5-floatbar-design.md §3） ============
+
+    /** digest-书名 夹「查不建」：附属卡/摘抄汇总入口没摘过书时不建空夹 */
+    private async findDigestDir(bookID: string): Promise<string> {
+        return findDocByIal(getDocIalDigestDir(bookID));
+    }
+
+    /** 附属卡（三态公共组）：doc deck 挂 digest-书名 夹 */
+    async openBookCards(bookID: string) {
+        const dirID = await this.findDigestDir(bookID);
+        if (!dirID) {
+            await siyuan.pushMsg(tomatoI18n.本书还没有摘抄);
+            return;
+        }
+        openTab({ app: this.plugin.app, card: { type: "doc", id: dirID } });
+    }
+
+    /** 摘抄汇总（书态/摘抄态）：打开 digest-书名 夹 */
+    async openDigestSummary(bookID: string) {
+        const dirID = await this.findDigestDir(bookID);
+        if (!dirID) {
+            await siyuan.pushMsg(tomatoI18n.本书还没有摘抄);
+            return;
+        }
+        await OpenSyFile2(this.plugin, dirID);
+    }
+
+    /** 归档（书态 ghost，confirm）：原书退出一切推送，摘抄永久留存 */
+    async archiveBookWithConfirm(bookID: string) {
+        const name = await progStorage.bookName(bookID);
+        confirm("📦", tomatoI18n.归档本书确认.replace("{name}", name ?? bookID), async () => {
+            await rollerArchiveBook(bookID);
+            await siyuan.pushMsg(tomatoI18n.已归档本书);
+        });
+    }
+
+    /** 回原书（片态=打开原书；摘抄态传 focusBlockID 定位原文块） */
+    async openOriginBook(bookID: string, focusBlockID?: string) {
+        await OpenSyFile2(this.plugin, focusBlockID || bookID);
+    }
+
+    /**
+     * □16 摘抄态回原书智能链（形态一：单动作不加新按钮）：块级 progref → 片/任意文档
+     * parent → 片序号键重切同片（静默重建+toast，confirm 反而打断心流）→ 兜底跳书。
+     * 决策逻辑纯函数在 originTrace.resolveOriginTarget（有单测）。
+     */
+    async openOriginFromDigest(digestDocID: string, selectedIDs: string[]) {
+        let refID = "";
+        for (const id of selectedIDs) {
+            const attrs = await siyuan.getBlockAttrs(id);
+            refID = attrs?.[RefIDKey] ?? "";
+            if (refID) break;
+        }
+        const docAttrs = await siyuan.getBlockAttrs(digestDocID);
+        const refExists = refID ? await siyuan.checkBlockExist(refID) : false;
+        const parentID = docAttrs?.[PDIGEST_PARENT_ID] ?? "";
+        const parentExists = parentID ? await siyuan.checkBlockExist(parentID) : false;
+        const parentIsPiece = parentExists && !!((await siyuan.getBlockAttrs(parentID))?.[MarkKey]);
+        const target = resolveOriginTarget({
+            refID, refExists, parentID, parentExists, parentIsPiece,
+            pieceIdx: docAttrs?.[PIECE_IDX_KEY] ?? "",
+            bookID: parseBookIDFromCtime(docAttrs?.[PDIGEST_CTIME] ?? ""),
+        });
+        if (target.action === "rebuild") {
+            const info = await progStorage.booksInfo(target.bookID);
+            const index = await progStorage.loadBookIndexIfNeeded(target.bookID);
+            const noteID = await help.createPiece(info, index, target.point);
+            if (noteID) {
+                await siyuan.pushMsg(tomatoI18n.分片已重建);
+                await OpenSyFile2(this.plugin, noteID);
+                return;
+            }
+            // 重建失败（书删了/索引空）落兜底跳书
+            await OpenSyFile2(this.plugin, target.bookID);
+            return;
+        }
+        if (target.action !== "none") await OpenSyFile2(this.plugin, target.id);
+    }
+
+    /** recite 安装检测（app.plugins，送仿写按钮显隐；□6 Dock 导流图标复用） */
+    isReciteInstalled(): boolean {
+        return (this.plugin?.app as any)?.plugins?.some((p: any) => p?.name === "sy-recite-plugin") ?? false;
+    }
+
+    /** □11 浮层族通用跳转：文档/块 ID → OpenSyFile2（块 ID 会聚焦定位） */
+    async jumpTo(id: string) {
+        if (id) await OpenSyFile2(this.plugin, id);
+    }
+
+    /** □11 原文侧追溯浮层跳片：gotoBlock 置断点 + 出片（与目录浮层 readThisPiece 同链路） */
+    async jumpToPiece(bookID: string, point: number) {
+        await progStorage.gotoBlock(bookID, point);
+        await this.startToLearnWithLock(bookID);
+    }
+
+    /**
+     * □11 digest 态路径胶囊文案：显示降级后实际可达目标（不显示死链）——
+     * parent 存活且是另一个摘抄 → 「书名 / 父摘抄标题」；parent 是片/书发起或已删
+     * → 只显书名（书永远在：ctime 含 bookID）。点击行为走 openOriginFromDigest
+     * 完整四级链（含块级 progref 优先，胶囊文案不含该层——它随选中实时变）。
+     */
+    async digestCrumbs(digestDocID: string): Promise<string> {
+        const docAttrs = await siyuan.getBlockAttrs(digestDocID);
+        if (!docAttrs) return "";
+        const bookID = parseBookIDFromCtime(docAttrs[PDIGEST_CTIME] ?? "");
+        if (!bookID) return "";
+        const bookName = (await siyuan.getBlockAttrs(bookID))?.title ?? bookID;
+        const parentID = docAttrs[PDIGEST_PARENT_ID] ?? "";
+        if (parentID && parentID !== bookID && await siyuan.checkBlockExist(parentID)) {
+            const pAttrs = await siyuan.getBlockAttrs(parentID);
+            // 父是另一个摘抄（再摘抄链）才显示父段；父是片/原文发起文档则书名已足够
+            if (pAttrs?.[PDIGEST_CTIME]) {
+                return `${bookName} / ${pAttrs.title ?? parentID}`;
             }
         }
-        if (miniID) {
-            return progStorage.booksInfo(miniID);
+        return bookName;
+    }
+
+    /** 送仿写（摘抄态 primary）：触发 recite 仿写练习开关命令 */
+    async sendToRecite() {
+        const recite = (this.plugin?.app as any)?.plugins?.find((p: any) => p?.name === "sy-recite-plugin");
+        const cmd = recite?.commands?.find((c: any) => c.langKey === "reciteTogglePractice");
+        if (cmd?.callback) {
+            await cmd.callback();
+        } else {
+            await siyuan.pushMsg(tomatoI18n.未找到仿写插件功能);
         }
-        return {} as any;
+    }
+
+    /** 定向送仿写（□27 仿写本片副本链路）：对指定文档直接进仿写模式。命令通道
+     *  togglePractice 只认最近交互文档无法定向，故走 recite 实例方法 enterPracticeFor；
+     *  旧版 recite 无此方法时降级提示（副本已建好仍有整摘价值，文案写明版本过旧而非
+     *  未安装——review P2-3） */
+    async enterRecitePractice(docID: string) {
+        const recite = (this.plugin?.app as any)?.plugins?.find((p: any) => p?.name === "sy-recite-plugin");
+        if (typeof recite?.enterPracticeFor === "function") {
+            await recite.enterPracticeFor(docID);
+        } else {
+            await siyuan.pushMsg(tomatoI18n.仿写插件版本过旧);
+        }
     }
 
     async viewAllProgressiveBooks() {
@@ -720,7 +800,7 @@ class Progressive {
                 }
             });
         }, {
-            title: tomatoI18n.查看所有渐进学习文档,
+            title: tomatoI18n.管理书目,
             width: events.isMobile ? "90vw" : undefined,
             height: events.isMobile ? "180vw" : "800px",
         });

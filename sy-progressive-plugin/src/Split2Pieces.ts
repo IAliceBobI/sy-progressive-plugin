@@ -107,22 +107,18 @@ export class HeadingGroup {
     }
 }
 
-import { getDocBlocks } from "../../sy-tomato-plugin/src/libs/docUtils";
+import { childBlocksToWordCount } from "./childBlocks";
 
-// 步骤 1：取书的块 + 算 WordCountType —— 纯逻辑 + siyuan 调用。
+// 步骤 1：取书的块 + 算 WordCountType —— 纯逻辑在 childBlocks.ts（口径注释与单测同在）。
 // 从 AddBook.svelte 的 doCount() 提取。headCount 的副作用不在此处（留在组件）。
-export async function buildContentBlocks(bookID: string, bookName: string): Promise<WordCountType[]> {
-    const { root } = await getDocBlocks(bookID, bookName, false, true, 1);
-    return root.children.map((block) => ({
-        id: block.id,
-        count: block.div.textContent.length,
-        type: block.type,
-        subType: block.subtype,
-        div: block.div,
-    }));
+// 数据源 = getChildBlocks 单发（巨书秒级：45k 块书实测 0.55s；旧 getDocBlocks 通道同书
+// 26~39s + 24MB 主线程 innerHTML 解析）。textLen = sum(count)，口径 ≈ 旧
+// div.textContent.length（剥零宽后 99.5% 逐位一致，2026-08-30 实测拍板）。
+export async function buildContentBlocks(bookID: string): Promise<{ blocks: WordCountType[], textLen: number }> {
+    return childBlocksToWordCount(await siyuan.getChildBlocks(bookID));
 }
 
-// 步骤 2：计算分片索引 —— 纯逻辑（核心可测逻辑，这一轮先导出不写单测）。
+// 步骤 2：计算分片索引 —— 纯逻辑（行为锁定单测在 tests/unit/split2pieces.test.ts）。
 // 从 AddBook.svelte 的 countPieces() 的分片编排部分提取。headings 校验由调用方负责。
 export async function computePieceIndex(
     contentBlocks: WordCountType[],

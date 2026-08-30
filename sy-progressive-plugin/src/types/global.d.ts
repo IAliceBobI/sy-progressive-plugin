@@ -10,7 +10,7 @@ declare global {
             save?: () => void;
             pluginInstance: any;
             split?: {
-                buildContentBlocks: (bookID: string, bookName: string) => Promise<WordCountType[]>;
+                buildContentBlocks: (bookID: string) => Promise<{ blocks: WordCountType[], textLen: number }>;
                 computePieceIndex: (contentBlocks: WordCountType[], headings: string[], bookID: string, splitWordNum: number) => Promise<WordCountType[][]>;
                 saveIndex: (bookID: string, groups: WordCountType[][]) => Promise<void>;
                 loadIndex: (bookID: string) => Promise<string[][]>;

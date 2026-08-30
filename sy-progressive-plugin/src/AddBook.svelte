@@ -1,22 +1,24 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
     import { prog } from "./Progressive";
-    import {
-        addCardSetDueTime,
-        isValidNumber,
-        siyuan,
-    } from "../../sy-tomato-plugin/src/libs/utils";
+    import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { buildContentBlocks, computePieceIndex } from "./Split2Pieces";
-    import { MarkBookKey } from "../../sy-tomato-plugin/src/libs/gconst";
-    import { getDocBlocks } from "../../sy-tomato-plugin/src/libs/docUtils";
+    import {
+        applyBoldMarks,
+        countHeadingLevels,
+        levelsToHeadings,
+        loadBoldIds,
+        pickSmartDefault,
+        summarizePieces,
+    } from "./piecePreview";
+    import type { PiecePreview } from "./piecePreview";
+    import { MarkBookKey, MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
     import { createAllPieces } from "./helper";
     import { progStorage, ProgressiveStorage } from "./ProgressiveStorage";
-    import { readableDuration, validateNum } from "stonev5-utils";
+    import { notifyFleetChanged } from "./fleet";
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-    import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
-    import helpDocs from "./help.json";
 
     interface Props {
         bookID: string;
@@ -30,299 +32,465 @@
     }
     onDestroy(destroy);
 
-    let hasCalcPiece = $state(false);
     let wordCount = $state(0);
     let textLen = $state(0);
     let headCount = $state(1);
-    let headingsText = $state("1");
     let showLastBlock = $state(false);
-    let autoCard = $state(true);
     let createPiecesNow = $state(false);
     let addIndex = $state(false);
-    let splitWordNum = $state(0);
-    let finishDays = $state(0);
     let splitType: AsList = $state("no" as any);
     let disabled = $state(true);
-    let pieceCount = $state(1);
     let contentBlocks: WordCountType[] = $state([]);
     let contentBlockLen = $derived(
         contentBlocks.length === 0 ? 1 : contentBlocks.length,
     );
-    let timePerPiece = $derived(
-        readableDuration((finishDays * 24 * 60 * 60) / pieceCount, 2),
-    );
-    let peicePerDay = $derived((pieceCount / finishDays).toFixed(1));
-    let tips = $derived.by(() => {
-        const schedule = `你已愉快地计划用 ${finishDays} 天读完《${bookName}》的 ${pieceCount} 个分片，每天阅读 ${peicePerDay} 个分片。`;
-        const howCard = `你已了解，分片创建和加入闪卡的时机由插件自动控制。`;
-        const process = `换算下来，你将有 ${timePerPiece} 的时间来学习每个分片。
-第一个分片创建超过 ${timePerPiece} 后，系统才会创建第二个分片。
-若第一个分片尚未进行任何复习，第二个分片将暂不创建。
-待复习完第一个分片，第二个分片将立即创建并加入闪卡队列。`;
-        if (autoCard && finishDays > 0 && createPiecesNow) {
-            return `${schedule}虽然会一次性创建所有分片，但${howCard}${process}`;
-        } else if (autoCard && finishDays > 0) {
-            return `${schedule}${howCard}${process}`;
-        } else if (autoCard && createPiecesNow) {
-            return `你选择一次性创建《${bookName}》的所有分片，并全部加入闪卡。
-该方案适用于可乱序阅读的文档，如单词本、金句集、错题集等。
-一次性复习 ${pieceCount} 个闪卡可能会带来压力，你可以使用番茄工具箱的均匀推迟功能，
-将 ${pieceCount} 个闪卡均匀分散在指定时间范围内。`;
-        } else if (autoCard) {
-            return `你已设置《${bookName}》的每个分片创建时自动加入闪卡。`;
-        }
-    });
+    // □14 断句整体 Pro：p/t/i 三档未激活锁死（no 免费），口径与 Settings 货架一致。
+    // 初始 false（fail-closed）：onMount verify 后才翻真，disabled 骨架期不可见但语义同向
+    let paid = $state(false);
+    // □18 知情警告文案（onMount 检测填充；空串=全新文档不渲染）
+    let warnText = $state("");
+
+    // ===== □4 统计步骤增强：chips + 字数滑块 + 即时预览（方案=docs/prog-addbook-split-preview.md） =====
+    // 切窗离散档：0=「不限」（splitWordNum 0，现有语义保留）。默认 500（2026-08-30 用户
+    // 实测拍板：8000/片太大，短读节奏 500 合身；智能默认目标与兜底同步取本档）。
+    const SPLIT_TIERS: number[] = [0, 500, 1000, 2000, 3000, 5000, 8000];
+    const DEFAULT_SPLIT_IDX = SPLIT_TIERS.indexOf(500);
+    // chips 多选值（"1"~"6"/"b"），computePieceIndex 的 headings 参数由此派生
+    let selectedLevels: string[] = $state([]);
+    let splitIdx: number = $state(DEFAULT_SPLIT_IDX);
+    // b 通道 bold id 缓存：弹窗生命周期 SQL 一次（方案 §2.2）。只整体换引用保持响应式。
+    let boldIds: ReadonlySet<string> = $state(new Set<string>());
+    let preview: PiecePreview | null = $state(null);
+    let recalcing = $state(false);
+    // 智能默认推荐落点（标记用）；null=无推荐（无标题书/兜底失败）
+    let recommend: { level: string } | null = $state(null);
+
+    let levelStats = $derived(countHeadingLevels(contentBlocks));
+    let hasLevels = $derived(levelStats.length > 0 || boldIds.size > 0);
+    let splitWordNum = $derived(SPLIT_TIERS[splitIdx]);
+
+    /** 锁 chip 的统一点击口（鼠标点 label 转发与键盘回车同源）：preventDefault 硬拦
+        radio 选中 + pushMsg 引导——不用原生 disabled（键盘 Tab 不可达，vision review P1） */
+    function onLockedSplitClick(e: Event) {
+        e.preventDefault();
+        void siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
+    }
+
+    /** 方向键导航不触发 click（vision 复评 P2）：radio 组内箭头把 checked 落到锁档时
+        change 兜底回滚 no + 引导，防「半透明选中」怪态与锁档写入配置 */
+    function onLockedSplitChange() {
+        splitType = "no" as AsList;
+        void siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
+    }
 
     onMount(async () => {
         disabled = true;
-        await verifyKeyProgressive();
-        await doCount();
-        disabled = false;
+        paid = (await verifyKeyProgressive()) === true;
+        // □18 知情警告（reasoning review P1）：目标文档已是注册书 → 确认=重置进度+
+        // 按本次设置重分片；已是某书的分片 → 加书=脱离母书独立成书。管理页「重新分片」
+        // 走同一弹窗，同样获警告。仅提示不拦截（重加书是合法路径，知情即可）
+        try {
+            if (progStorage.booksInfos()[bookID]) {
+                warnText = tomatoI18n.加书警告已注册;
+            } else {
+                const attrs = await siyuan.getBlockAttrs(bookID);
+                if (attrs?.[MarkKey] && attrs[MarkKey] !== MarkBookKey) {
+                    warnText = tomatoI18n.加书警告已分片;
+                }
+            }
+        } catch { /* 检测失败不阻断加书主流程，警告层缺席不误导 */ }
+        try {
+            await doCount();
+            await applySmartDefault();
+            disabled = false;
+            void loadBold(); // B chip「有才显示」：不阻塞首帧，SQL 完成后浮现（方案 §4.8）
+        } catch (e) {
+            // 统计失败保持骨架屏（可见失败，可关窗重试）：吞错放行会显示全 0
+            // 统计卡且能一路注册出空索引书（heal 不覆盖该态）
+            console.error("AddBook doCount failed", e);
+            siyuan.pushMsg(tomatoI18n.加书失败请重试);
+        }
     });
 
     async function doCount() {
         siyuan.getBlocksWordCount([bookID]).then((c) => {
             wordCount = c.stat.wordCount;
-        });
-        contentBlocks = await buildContentBlocks(bookID, bookName);
+        }).catch(() => { /* 独立展示通道失败不阻断统计，wordCount 保持 0 */ });
+        // 统计走 getChildBlocks 单发（巨书秒级），textLen = sum(content) 随行返回
+        const { blocks, textLen: totalLen } = await buildContentBlocks(bookID);
+        contentBlocks = blocks;
         // headCount 是 UI 派生状态，副作用留在组件（不放纯函数里）。
-        headCount = 1 + contentBlocks.filter(b => b.type == "h").length;
-        const { div } = await getDocBlocks(bookID, bookName, false, true, 1);
-        textLen = div.textContent.length;
+        // 纯标题数用于「各级标题数」展示（vision P1-1：+1 兜底会与 chips 计数同屏矛盾）；
+        // 「平均每标题块数」除数另用 +1 兜底（无标题书按 1 组防除零）。
+        headCount = blocks.filter(b => b.type == "h").length;
+        textLen = totalLen;
     }
 
-    async function countPieces() {
-        const headings =
-            headingsText
-                ?.trim()
-                ?.replace(/，/g, ",")
-                ?.split(",")
-                ?.map((i) => i.trim())
-                ?.filter((i) => !!i) ?? [];
-        if (
-            !headings.reduce((ret, i) => {
-                if (i == "b") return ret;
-                const j = Number(i);
-                return ret && isValidNumber(j) && j >= 1 && j <= 6;
-            }, true)
-        ) {
-            headingsText = "1,2,3,4,5,6,b";
-            return;
-        }
-        headings.sort();
+    /** 唯一计算口：预览防抖重算与 process 正式分片共用（同参数必同结果，方案 §2.2）。
+        headings 永不含 "b"（已换 "7"）→ HeadingGroup.init 的 SQL+就地改写分支永不触发，
+        contentBlocks 缓存不被污染（split2pieces.test.ts 锁定的坑）；含 "7" 时用
+        boldIds 缓存做纯函数预标记视图（applyBoldMarks 拷贝，不改缓存），无 SQL。 */
+    async function calcGroups(
+        levels: string[],
+        wordNum: number,
+    ): Promise<WordCountType[][]> {
+        const headings = levelsToHeadings(levels);
+        const view = headings.includes("7")
+            ? applyBoldMarks(contentBlocks, boldIds)
+            : contentBlocks; // 不含 "7"：computePieceIndex 零 SQL 零改写，可直接传缓存
+        return computePieceIndex(view, headings, bookID, wordNum);
+    }
 
-        if (!isValidNumber(splitWordNum)) {
-            splitWordNum = 0;
-            return;
+    let calcToken = 0;
+    /** 防抖到期后的实际重算：token 丢弃过期结果（拖动滑块连发）。 */
+    async function recompute(levels: string[], wordNum: number) {
+        const token = ++calcToken;
+        try {
+            const groups = await calcGroups(levels, wordNum);
+            if (token !== calcToken) return;
+            preview = summarizePieces(groups, wordNum);
+        } catch (e) {
+            console.error("piece preview failed", e);
+        } finally {
+            if (token === calcToken) recalcing = false;
         }
-        if (!isValidNumber(finishDays)) {
-            finishDays = 0;
-            return;
-        }
+    }
 
-        // heading
-        const groups = await computePieceIndex(contentBlocks, headings, bookID, splitWordNum);
-        pieceCount = groups.length;
-        hasCalcPiece = true;
-        return groups;
+    // 选级/滑块变化 → 150ms 防抖 → 即时预览。contentBlocks/boldIds 在表单显示前已就绪
+    // 且此后不变（doCount 单发 / loadBold 单发），刻意在 setTimeout 回调内读取使其
+    // 不进本 effect 依赖（boldIds 后到不重算——它只影响 B chip 渲染与下次 calcGroups）。
+    $effect(() => {
+        const levels = [...selectedLevels];
+        const wordNum = SPLIT_TIERS[splitIdx];
+        recalcing = true;
+        const t = window.setTimeout(() => void recompute(levels, wordNum), 150);
+        return () => window.clearTimeout(t);
+    });
+
+    /** 智能默认（方案 §4.6）：目标 500 逐级单级试算（全纯 h 级，contentBlocks 不被
+        改写），chips+滑块落推荐值；失败兜底纯切窗 500。TARGET 必须在 SPLIT_TIERS
+        表内（reasoning review P2-a：indexOf 落空的兜底方向应是最大档而非「不限」）。 */
+    async function applySmartDefault() {
+        const TARGET = SPLIT_TIERS[DEFAULT_SPLIT_IDX];
+        try {
+            const rec = await pickSmartDefault(
+                contentBlocks,
+                levelStats.map(s => s.level),
+                TARGET,
+                (headings, wordNum) => computePieceIndex(contentBlocks, headings, bookID, wordNum),
+            );
+            selectedLevels = [...rec.headings];
+            const idx = SPLIT_TIERS.indexOf(rec.splitWordNum);
+            splitIdx = idx >= 0 ? idx : SPLIT_TIERS.length - 1;
+            recommend = rec.mode === "window-only" || rec.headings.length === 0
+                ? null
+                : { level: rec.headings[0] };
+        } catch (e) {
+            console.error("pickSmartDefault failed", e);
+            selectedLevels = [];
+            splitIdx = DEFAULT_SPLIT_IDX;
+            recommend = null;
+        }
+    }
+
+    /** 粗体 id 集合：SQL 一次缓存（loadBoldIds 内查询与 HeadingGroup.init 逐字一致）。
+        失败置空集 = 无 B chip，统计与预览照常（fail-quiet，同 wordCount 通道）。 */
+    async function loadBold() {
+        try {
+            boldIds = await loadBoldIds(bookID);
+        } catch (e) {
+            console.error("loadBoldIds failed", e);
+            boldIds = new Set<string>();
+        }
     }
 
     async function process() {
-        const groups = await countPieces();
+        // 空文档兜底拦截：空索引书（books.json 有键、索引文件空）不在 heal 自愈范围
+        if (contentBlocks.length === 0) {
+            siyuan.pushMsg(tomatoI18n.加书失败请重试);
+            return;
+        }
+        // 正式分片与预览同一计算口（方案 §2.2）：同参数必同结果，不另写一条逻辑
+        const groups = await calcGroups(selectedLevels, splitWordNum);
+        if (groups.length === 0) return;
         {
             const attrs = {} as AttrType;
             attrs["custom-sy-readonly"] = "true";
             attrs["custom-progmark"] = MarkBookKey;
             await siyuan.setBlockAttrs(bookID, attrs);
         }
-        if (!groups) return;
-        destroy();
+        try {
+            // 保存大索引
+            await progStorage.saveIndex(bookID, groups);
 
-        // 保存大索引
-        await progStorage.saveIndex(bookID, groups);
+            // 保存 bookinfo。boxID 查不到留空（SQL 索引延迟窗口getRowByID 会空）：
+            // booksInfo 惰性补齐链兜底，别让索引延迟把加书断成半注册态（□1）
+            const block = await siyuan.getRowByID(bookID);
+            const info = ProgressiveStorage.defaultBookInfo();
+            info.time = await siyuan.currentTimeMs();
+            info.boxID = block?.box ?? "";
+            info.bookID = bookID;
+            info.showLastBlock = showLastBlock;
+            info.addIndex2paragraph = addIndex;
+            info.bookName = bookName;
+            await progStorage.resetBookInfo(bookID, info);
 
-        // 保存 bookinfo
-        const block = await siyuan.getRowByID(bookID);
-        const info = ProgressiveStorage.defaultBookInfo();
-        info.time = await siyuan.currentTimeMs();
-        info.boxID = block.box;
-        info.bookID = bookID;
-        info.autoCard = autoCard;
-        info.showLastBlock = showLastBlock;
-        info.addIndex2paragraph = addIndex;
-        info.finishDays = finishDays;
-        info.bookName = bookName;
-        info.finishTimeSecs = await siyuan.currentTimeSec();
-        await progStorage.resetBookInfo(bookID, info);
+            // 注册落定才关弹窗（□1）：此前任何失败弹窗保留 + toast，不再静默断链
+            destroy();
+            notifyFleetChanged(); // Dock 即时见新书，不等 30s 定时器
 
-        // 断句
-        if (splitType == "i" || splitType == "p" || splitType == "t") {
-            await progStorage.setAutoSplitSentence(bookID, true, splitType);
-        }
-
-        // 实际执行拆分书籍
-        if (createPiecesNow) {
-            const ids = await createAllPieces(bookID);
-            if (autoCard && ids.length > 0 && finishDays > 0) {
-                addCardSetDueTime(ids.at(0), 1000);
+            // 断句
+            if (splitType == "i" || splitType == "p" || splitType == "t") {
+                await progStorage.setAutoSplitSentence(bookID, true, splitType);
             }
+
+            // 实际执行拆分书籍
+            if (createPiecesNow) {
+                await createAllPieces(bookID);
+            }
+            await prog.startToLearnWithLock(bookID);
+        } catch (e) {
+            // 注册段失败=弹窗还在可原样重点；注册后失败=书已在管理页可见可重试
+            console.error("AddBook process failed", e);
+            siyuan.pushMsg(tomatoI18n.加书失败请重试);
         }
-        await prog.startToLearnWithLock(bookID);
     }
 </script>
 
 <div class="container">
-    <div>
-        {tomatoI18n.总字数} : {wordCount}<br />
-        {tomatoI18n.总文本长度} : {textLen}<br />
-        {tomatoI18n.各级标题数} : {headCount}<br />
-        {tomatoI18n.总内容块数} : {contentBlockLen}<br />
-        {tomatoI18n.平均每个标题下有x块(
-            Math.ceil(contentBlockLen / headCount),
-        )}<br />
-        {tomatoI18n.平均每个块的字数(Math.ceil(wordCount / contentBlockLen))}<br
-        />
-        {tomatoI18n.平均每个块的文本长度(
-            Math.ceil(textLen / contentBlockLen),
-        )}<br />
-        {tomatoI18n.分片数量} : {pieceCount}
-        <button
-            class="b3-button b3-button--outline tomato-button"
-            onclick={countPieces}>{tomatoI18n.计算分片数量}</button
-        >
-    </div>
     {#if disabled}
-        <div>
-            <p class="notice">🫸🫸🫸{tomatoI18n.请耐心等待}🫷🫷🫷</p>
+        <!-- 等待态：骨架屏预告结构 + spinner（doCount 期间，行为同旧版整表替换） -->
+        <div class="prog-loading" aria-live="polite">
+            <div class="prog-skeleton-card" aria-hidden="true">
+                <div class="prog-skeleton-title"></div>
+                <div class="prog-skeleton-grid">
+                    <div class="prog-skeleton-cell"></div>
+                    <div class="prog-skeleton-cell"></div>
+                    <div class="prog-skeleton-cell"></div>
+                    <div class="prog-skeleton-cell"></div>
+                </div>
+                <div class="prog-skeleton-bar"></div>
+            </div>
+            <div class="prog-loading-row">
+                <span class="prog-spinner" aria-hidden="true"></span>
+                {tomatoI18n.请耐心等待}
+            </div>
         </div>
     {:else}
-        <!-- 标题拆分 -->
-        <div>
-            <label>
-                <p>{tomatoI18n.按标题拆分}</p>
-                <input
-                    type="text"
-                    class="b3-text-field"
-                    placeholder="1,2,3,4,5,6,b"
-                    bind:value={headingsText}
-                    oninput={() => (hasCalcPiece = false)}
-                />
-            </label>
-        </div>
-        <!-- length拆分 -->
-        <div>
-            <label>
-                <p>{tomatoI18n.按文本长度拆分}</p>
-                <input
-                    type="number"
-                    required
-                    class="b3-text-field"
-                    placeholder="300"
-                    min="0"
-                    bind:value={splitWordNum}
-                    onblur={() => (splitWordNum = validateNum(splitWordNum, 0))}
-                    oninput={() => (hasCalcPiece = false)}
-                />
-            </label>
-        </div>
-        <!-- 计划阅读 -->
-        {#if autoCard}
-            <div>
-                <label>
-                    <p>{tomatoI18n.计划读完本书的天数}</p>
-                    <input
-                        type="number"
-                        required
-                        class="b3-text-field"
-                        placeholder="30"
-                        min="0"
-                        bind:value={finishDays}
-                        onblur={() => {
-                            finishDays = validateNum(finishDays, 0);
-                            if (!hasCalcPiece) {
-                                countPieces();
-                            }
-                        }}
-                    />
-                    <p class="kbd">{tips}</p>
-                    {#if createPiecesNow && !(finishDays > 0)}
-                        <a
-                            href="https://awx9773btw.feishu.cn/docx/KwZJdW9BeoHkiRxVg6jcLUnanqf"
-                            onclick={(e) => {
-                                if (e.metaKey || e.ctrlKey) return;
-                                e.preventDefault();
-                                openHelpDialog((e.currentTarget as HTMLAnchorElement).href,
-                                    helpDocs);
-                            }}>相关：番茄工具箱的均匀推迟功能，重新规划当前文档和其子文档中，所有闪卡的复习时间。</a
-                        >
-                    {/if}
-                </label>
-            </div>
+        <!-- □18 身份知情警告：已注册书/已是分片时置顶提示（不拦截，重加书是合法路径） -->
+        {#if warnText}
+            <div class="prog-addbook-warn" role="alert">{warnText}</div>
         {/if}
+        <!-- 卡1 文档统计 -->
+        <section class="prog-card">
+            <div class="prog-card-title">{tomatoI18n.文档统计}</div>
+            <div class="prog-stat-grid">
+                <div class="prog-stat">
+                    <span class="prog-stat-value">{wordCount}</span>
+                    <span class="prog-stat-label">{tomatoI18n.总字数}</span>
+                </div>
+                <div class="prog-stat">
+                    <span class="prog-stat-value">{textLen}</span>
+                    <span class="prog-stat-label">{tomatoI18n.总文本长度}</span>
+                </div>
+                <div class="prog-stat">
+                    <span class="prog-stat-value">{headCount}</span>
+                    <span class="prog-stat-label">{tomatoI18n.各级标题数}</span>
+                </div>
+                <div class="prog-stat">
+                    <span class="prog-stat-value">{contentBlockLen}</span>
+                    <span class="prog-stat-label">{tomatoI18n.总内容块数}</span>
+                </div>
+                <div class="prog-stat">
+                    <span class="prog-stat-value">{Math.ceil(contentBlockLen / Math.max(1, headCount))}</span>
+                    <span class="prog-stat-label">{tomatoI18n.平均每标题块数}</span>
+                </div>
+                <div class="prog-stat">
+                    <span class="prog-stat-value">{Math.ceil(wordCount / contentBlockLen)}</span>
+                    <span class="prog-stat-label">{tomatoI18n.平均每块字数}</span>
+                </div>
+                <div class="prog-stat">
+                    <span class="prog-stat-value">{Math.ceil(textLen / contentBlockLen)}</span>
+                    <span class="prog-stat-label">{tomatoI18n.平均每块文本长度}</span>
+                </div>
+            </div>
+            <!-- 分片结果条：即时预览（□4）。按钮退役，片数+三数+sparkline 随参数防抖更新 -->
+            <div class="prog-piece-bar" class:prog-recalcing={recalcing}>
+                <div class="prog-piece-row">
+                    <span class="prog-piece-value">{preview?.count ?? 1}</span>
+                    <span class="prog-piece-label">{tomatoI18n.分片数量}</span>
+                    <span class="prog-piece-stats">
+                        <span class="prog-piece-stat">
+                            <span class="prog-piece-stat-label">{tomatoI18n.最短}</span>
+                            <span class="prog-piece-stat-value">{preview?.min ?? 0}</span>
+                        </span>
+                        <span class="prog-piece-stat">
+                            <span class="prog-piece-stat-label">{tomatoI18n.中位}</span>
+                            <span class="prog-piece-stat-value">{preview?.median ?? 0}</span>
+                        </span>
+                        <span class="prog-piece-stat">
+                            <span class="prog-piece-stat-label">{tomatoI18n.最长}</span>
+                            <span class="prog-piece-stat-value">{preview?.max ?? 0}</span>
+                        </span>
+                    </span>
+                    {#if preview && preview.overCount > 0 && splitWordNum > 0}
+                        <span class="prog-piece-over">{tomatoI18n.超长分片} {preview.overCount}</span>
+                    {/if}
+                </div>
+                <!-- sparkline：每片一竖条、高度=片字数（切窗同口径，方案 §2.3）；超 2×目标=红 -->
+                <div
+                    class="prog-spark"
+                    class:prog-spark-dense={(preview?.wordCounts.length ?? 0) > 150}
+                    role="img"
+                    aria-label={tomatoI18n.片长分布}
+                >
+                    {#if preview}
+                        {#each preview.wordCounts as wc}
+                            <span
+                                class="prog-spark-bar"
+                                class:prog-spark-over={splitWordNum > 0 && wc > splitWordNum * 2}
+                                style="height:{preview.max > 0
+                                    ? Math.round((wc / preview.max) * 100)
+                                    : 0}%"
+                            ></span>
+                        {/each}
+                    {/if}
+                </div>
+            </div>
+        </section>
 
-        <!-- 开关 -->
-        <div class="container">
-            <!-- 一次性创建分片 -->
-            <label>
-                <input
-                    type="checkbox"
-                    class="b3-switch"
-                    bind:checked={createPiecesNow}
-                />
-                {tomatoI18n.立刻创建所有的分片}
-            </label>
-            <!-- 闪卡 -->
-            <label title={tomatoI18n.自动制卡}>
-                <input
-                    type="checkbox"
-                    class="b3-switch"
-                    bind:checked={autoCard}
-                />
-                {tomatoI18n.分片都加入闪卡}
-            </label>
-            <!-- 末尾块 -->
-            <label>
-                <input
-                    type="checkbox"
-                    class="b3-switch"
-                    bind:checked={showLastBlock}
-                />
-                {tomatoI18n.显示上一个分片的最后一个块}
-            </label>
-            <!-- 标号 -->
-            <label>
-                <input
-                    type="checkbox"
-                    class="b3-switch"
-                    bind:checked={addIndex}
-                />
-                {tomatoI18n.新建分片时给段落标上序号}
-            </label>
-        </div>
+        <!-- 卡2 切分设置：标题级 chips + 字数滑块（即时预览的参数面，□4）。
+             □1 引导文案：总纲立「级=在哪切、字数=切多碎」分工，hint/tooltip 分层释义 -->
+        <section class="prog-card">
+            <div class="prog-card-title">{tomatoI18n.切分设置}</div>
+            <div class="prog-field-hint prog-card-lede">{tomatoI18n.切分总纲}</div>
 
-        <!-- 单选 -->
-        <div class="container">
-            {#each ["p", "t", "i", "no"] as t}
-                <label>
-                    <input
-                        type="radio"
-                        name="scoops"
-                        value={t}
-                        bind:group={splitType}
-                    />
-                    {t == "no" ? tomatoI18n.不断句 : ""}
-                    {t == "p" ? tomatoI18n.断句为段落块 : ""}
-                    {t == "t" ? tomatoI18n.断句为任务块 : ""}
-                    {t == "i" ? tomatoI18n.断句为无序表 : ""}
-                </label>
-            {/each}
-        </div>
+            <div class="prog-chip-label">{tomatoI18n.标题级别}</div>
+            {#if !hasLevels}
+                <!-- 无标题书：chips 区提示 + 纯切窗（滑块照常，方案 §4.7） -->
+                <div class="prog-no-heading">{tomatoI18n.本书没有大纲标题}</div>
+            {:else}
+                <div class="prog-chips" role="group" aria-label={tomatoI18n.标题级别}>
+                    {#each levelStats as s (s.level)}
+                        <label
+                            class="prog-chip b3-tooltips b3-tooltips__n"
+                            aria-label={`H${s.level} ×${s.count}${recommend?.level === s.level
+                                ? ` · ${tomatoI18n.推荐}` : ""}\n${tomatoI18n.勾选后以此为切分边界}`}
+                        >
+                            <input type="checkbox" value={s.level} bind:group={selectedLevels} />
+                            <span class="prog-chip-token">H{s.level}</span>
+                            <span class="prog-chip-count">×{s.count}</span>
+                            {#if recommend?.level === s.level}
+                                <span class="prog-chip-reco">{tomatoI18n.推荐}</span>
+                            {/if}
+                        </label>
+                    {/each}
+                    {#if boldIds.size > 0}
+                        <!-- B 殿后（方案 §4.2）：boldIds 懒查就绪后浮现；计数≥10000 显 9999+（SQL limit） -->
+                        <label
+                            class="prog-chip b3-tooltips b3-tooltips__n"
+                            aria-label={`${tomatoI18n.粗体} ×${boldIds.size}${recommend?.level === "b"
+                                ? ` · ${tomatoI18n.推荐}` : ""}\n${tomatoI18n.勾选后以此为切分边界}`}
+                        >
+                            <input type="checkbox" value="b" bind:group={selectedLevels} />
+                            <span class="prog-chip-token">B</span>
+                            <span class="prog-chip-count">×{boldIds.size >= 10000 ? "9999+" : boldIds.size}</span>
+                        </label>
+                    {/if}
+                </div>
+                <div class="prog-field-hint">{tomatoI18n.切分级别提示}</div>
+            {/if}
 
-        <!-- 保存 -->
-        <div class="btns">
-            <button
-                class="b3-button b3-button--outline tomato-button"
-                onclick={process}>{tomatoI18n.添加文档到渐进阅读}</button
+            <div class="prog-slider-row">
+                <span class="prog-field-label">{tomatoI18n.每片字数}</span>
+                <span class="prog-slider-val">
+                    {splitWordNum === 0 ? tomatoI18n.不限 : splitWordNum}
+                </span>
+            </div>
+            <input
+                type="range"
+                class="prog-slider"
+                min="0"
+                max={SPLIT_TIERS.length - 1}
+                step="1"
+                bind:value={splitIdx}
+                aria-label={tomatoI18n.每片字数}
+            />
+            <div class="prog-slider-scale">
+                <span>{tomatoI18n.不限}</span>
+                <span>{SPLIT_TIERS[SPLIT_TIERS.length - 1]}</span>
+            </div>
+            <!-- □1 两态 hint：不限=纯标题切分显级差，开档=切窗主导（用户拖滑块时对照即教学） -->
+            <div class="prog-field-hint">
+                {splitWordNum === 0 ? tomatoI18n.切分不限提示 : tomatoI18n.切分字数提示}
+            </div>
+        </section>
+
+        <!-- 卡3 分片选项 -->
+        <section class="prog-card">
+            <div class="prog-card-title">{tomatoI18n.分片选项}</div>
+            <label class="prog-switch-row">
+                <input type="checkbox" class="b3-switch" bind:checked={createPiecesNow} />
+                <span>{tomatoI18n.立刻创建所有的分片}</span>
+            </label>
+            <label class="prog-switch-row">
+                <input type="checkbox" class="b3-switch" bind:checked={showLastBlock} />
+                <span>{tomatoI18n.显示上一个分片的最后一个块}</span>
+            </label>
+            <label class="prog-switch-row">
+                <input type="checkbox" class="b3-switch" bind:checked={addIndex} />
+                <span>{tomatoI18n.新建分片时给段落标上序号}</span>
+            </label>
+
+            <div class="prog-radio-label">{tomatoI18n.断句方式}</div>
+            <div class="prog-radio-grid" role="radiogroup" aria-label={tomatoI18n.断句方式}>
+                {#each ["p", "t", "i", "no"] as t}
+                    <!-- □14 断句整体 Pro：未激活 p/t/i 可见但锁死（prog-locked + 🔒 +
+                         点击 pushMsg 引导，不静默不藏），no 免费恒可选。锁 chip 不用原生
+                         disabled（键盘 Tab 不可达=键盘用户触发不了引导，vision review P1）：
+                         radio 保持可聚焦，click preventDefault 硬拦选中（鼠标点 label 转发
+                         与键盘回车同一入口），aria-disabled 承担语义；执行侧 splitAndInsert
+                         另有同门禁兜底 -->
+                    {@const name = t == "p"
+                        ? tomatoI18n.断句为段落块
+                        : t == "t"
+                            ? tomatoI18n.断句为任务块
+                            : t == "i"
+                                ? tomatoI18n.断句为无序表
+                                : tomatoI18n.不断句}
+                    {@const locked = !paid && t !== "no"}
+                    <label
+                        class="prog-radio-chip b3-tooltips b3-tooltips__n"
+                        class:prog-locked={locked}
+                        aria-disabled={locked ? "true" : undefined}
+                        aria-label={locked ? `${name}（Pro）` : name}
+                    >
+                        <input
+                            type="radio"
+                            name="scoops"
+                            value={t}
+                            bind:group={splitType}
+                            aria-disabled={locked ? "true" : undefined}
+                            onclick={locked ? onLockedSplitClick : undefined}
+                            onchange={locked ? onLockedSplitChange : undefined}
+                        />
+                        <span>
+                            {t == "no" ? tomatoI18n.不断句 : ""}
+                            {t == "p" ? tomatoI18n.断句为段落块 : ""}
+                            {t == "t" ? tomatoI18n.断句为任务块 : ""}
+                            {t == "i" ? tomatoI18n.断句为无序表 : ""}
+                        </span>
+                        <!-- □30 🔒 emoji 换思源 sprite 小锁（iconLock，用户 emoji 装饰土口径收口） -->
+                        {#if locked}<svg class="prog-radio-tag" aria-hidden="true"><use xlink:href="#iconLock"></use></svg>{/if}
+                    </label>
+                {/each}
+            </div>
+        </section>
+
+        <!-- 底部操作栏：主操作实心 primary，sticky 恒在 -->
+        <div class="prog-footer">
+            <button class="b3-button prog-primary-btn" onclick={process}
+                >{tomatoI18n.添加文档到渐进阅读}</button
             >
             <button
                 class="b3-button b3-button--outline tomato-button"
@@ -333,34 +501,454 @@
 </div>
 
 <style>
-    .btns {
-        display: flex;
-        justify-content: space-between;
-    }
+    /* 只用 --b3-* 变量（明暗自适应）；prog- 前缀防撞。
+       卡片壳/标题/hover 配方照抄 IndexConf.css 的 conf-group/section-title/settingBox，
+       不借 .tomato-settings-dialog 壳（防设置页怪癖与未来改版联动）。□10 方案=docs/prog-config-ui-revamp.md；
+       □4 统计步骤增强（结果条两行化+sparkline+多选 chips+字数滑块）方案=docs/prog-addbook-split-preview.md */
     .container {
-        margin: 2px;
+        display: flex;
         flex: auto;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+        padding: 12px 14px 0;
+    }
+
+    /* □18 身份知情警告条：warning 底+深字（非错误，确认仍是合法路径）。
+       --b3-theme-warning 本仓库无使用先例（文档不全），带 hex fallback 降级无害 */
+    .prog-addbook-warn {
+        padding: 6px 10px;
+        border-radius: var(--b3-border-radius, 4px); /* 卡片同配方（vision 复评 P2：勿硬编码） */
+        font-size: 12px;
+        line-height: 1.5;
+        background-color: color-mix(in srgb, var(--b3-theme-warning, #d25f00) 12%, transparent);
+        color: var(--b3-theme-on-surface);
+        box-shadow: inset 2px 0 0 var(--b3-theme-warning, #d25f00);
+    }
+
+    /* ---- 卡片壳（conf-group 配方） ---- */
+    .prog-card {
+        padding: 10px 12px 12px;
+        background-color: var(--b3-theme-surface);
+        border: 1px solid var(--b3-theme-surface-lighter);
+        border-radius: var(--b3-border-radius);
+    }
+    .prog-card-title {
+        margin: 0 0 8px;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--b3-theme-on-surface); /* section-title 配方 */
+    }
+
+    /* ---- 卡1 统计 ---- */
+    .prog-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+    }
+    .prog-stat {
         display: flex;
         flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        padding: 8px 10px;
+        background-color: var(--b3-theme-background);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
     }
-    .container > div {
-        margin: 10px;
+    .prog-stat-value {
+        overflow: hidden;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--b3-theme-on-background);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        text-overflow: ellipsis;
     }
-    .notice {
-        font-size: larger;
-    }
-    .kbd {
-        padding: 2px 4px;
-        font:
-            100% Consolas,
-            "Liberation Mono",
-            Menlo,
-            Courier,
-            monospace,
-            var(--b3-font-family);
-        line-height: 1;
+    .prog-stat-label {
+        overflow: hidden;
+        font-size: 12px;
+        line-height: 1.4;
         color: var(--b3-theme-on-surface);
-        vertical-align: middle;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+    /* ---- 分片结果条：□4 两行化（行1 数字+三数，行2 sparkline）。淡底/边框/圆角
+       维持 □10 原值；重算期间压暗反馈（方案 §4.9），运行时类走 :global（prog-locked 先例） */
+    .prog-piece-bar {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        margin-top: 8px;
+        padding: 8px 12px;
+        background-color: var(--b3-theme-primary-lightest);
+        border: 1px solid var(--b3-theme-primary-light);
+        border-radius: 6px;
+        transition: opacity 0.15s;
+    }
+    .prog-piece-bar:global(.prog-recalcing) {
+        opacity: 0.55;
+    }
+    .prog-piece-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+    }
+    .prog-piece-value {
+        min-width: 34px;
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--b3-theme-primary);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+    .prog-piece-label {
+        flex: 1;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--b3-theme-on-background);
+    }
+    .prog-piece-stats {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-left: auto;
+    }
+    .prog-piece-stat {
+        display: flex;
+        align-items: baseline;
+        gap: 3px;
+    }
+    .prog-piece-stat-label {
+        font-size: 12px;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.64;
+    }
+    .prog-piece-stat-value {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--b3-theme-on-background);
+        font-variant-numeric: tabular-nums;
+    }
+    .prog-piece-over {
+        font-size: 12px;
+        color: var(--b3-theme-error);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* sparkline：每片一竖条（高度=片字数%，切窗同口径）；>150 片去间隙成连续直方图；
+       overflow-x 兜 >600 片极端书，不撑破弹窗（方案 §4.4） */
+    .prog-spark {
+        display: flex;
+        align-items: flex-end;
+        gap: 1px;
+        height: 44px;
+        overflow-x: auto;
+    }
+    .prog-spark:global(.prog-spark-dense) {
+        gap: 0;
+    }
+    .prog-spark-bar {
+        flex: 1 1 0;
+        min-width: 1px;
+        max-width: 14px;
+        min-height: 2px;
+        background-color: var(--b3-theme-primary-light);
+        border-radius: 1px 1px 0 0;
+    }
+    .prog-spark-bar:global(.prog-spark-over) {
+        background-color: var(--b3-theme-error);
+    }
+
+    /* ---- 卡2 多选 chips（prog-radio-chip 配方改 checkbox，方案 §4.2） ---- */
+    .prog-chip-label {
+        margin: 2px 0 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--b3-theme-on-surface);
+    }
+    .prog-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .prog-chip {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 10px;
+        font-size: 13px;
+        color: var(--b3-theme-on-background);
+        cursor: pointer;
+        background-color: var(--b3-theme-background);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
+        transition: var(--b3-transition);
+    }
+    .prog-chip:has(input:checked) {
+        font-weight: 500;
+        color: var(--b3-theme-primary);
+        background-color: var(--b3-theme-primary-lightest);
+        border-color: var(--b3-theme-primary);
+    }
+    .prog-chip:has(input:focus-visible) {
+        outline: 2px solid var(--b3-theme-primary-light);
+    }
+    .prog-chip input {
+        margin: 0;
+        accent-color: var(--b3-theme-primary);
+    }
+    .prog-chip-token {
+        font-weight: 600;
+    }
+    .prog-chip-count {
+        font-size: 12px;
+        color: inherit;
+        opacity: 0.64;
+        font-variant-numeric: tabular-nums;
+    }
+    /* 智能默认推荐标（方案 §4.6）：{#if} 条件渲染，编译期可知，无需 :global。
+       不透明底隔开选中 chip 的淡底（vision P2-1：暗色下蓝字压暗蓝底对比临界） */
+    .prog-chip-reco {
+        padding: 1px 4px;
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1;
+        color: var(--b3-theme-primary);
+        background-color: var(--b3-theme-background);
+        border: 1px solid var(--b3-theme-primary);
+        border-radius: 4px;
+    }
+    .prog-no-heading {
+        padding: 8px 10px;
+        font-size: 13px;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.64;
+        border: 1px dashed var(--b3-border-color);
+        border-radius: 6px;
+    }
+
+    /* ---- 卡2 字数滑块（Settings prog-tune-row 先例；方案 §4.3） ---- */
+    .prog-slider-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin: 10px 0 6px;
+    }
+    .prog-field-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--b3-theme-on-surface);
+    }
+    .prog-slider-val {
+        min-width: 40px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--b3-theme-primary);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+    .prog-slider {
+        width: 100%;
+        margin: 0;
+        accent-color: var(--b3-theme-primary);
+    }
+    .prog-slider-scale {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2px;
+        font-size: 11px;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.64;
+    }
+    .prog-field-hint {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.64;
+    }
+    /* □1 切分总纲（卡2 导语）：hint 字阶提一档浓度，与下方两行操作性 hint 分层 */
+    .prog-field-hint.prog-card-lede {
+        opacity: 0.78;
+    }
+
+    /* ---- 卡3 开关行（settingBox hover 配方） ---- */
+    .prog-switch-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        margin: 0 -8px;
+        font-size: 13px;
+        color: var(--b3-theme-on-background);
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background-color 0.15s;
+    }
+    .prog-switch-row:hover {
+        background-color: var(--b3-list-hover, var(--b3-theme-surface-lighter));
+    }
+
+    /* ---- 卡3 断句 chip（2×2，预留 □14 锁位） ---- */
+    .prog-radio-label {
+        margin: 10px 0 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--b3-theme-on-surface);
+    }
+    .prog-radio-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    .prog-radio-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        font-size: 13px;
+        color: var(--b3-theme-on-background);
+        cursor: pointer;
+        background-color: var(--b3-theme-background);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
+        transition: var(--b3-transition);
+    }
+    .prog-radio-chip:has(input:checked) {
+        font-weight: 500;
+        color: var(--b3-theme-primary);
+        background-color: var(--b3-theme-primary-lightest);
+        border-color: var(--b3-theme-primary);
+    }
+    .prog-radio-chip:has(input:focus-visible) {
+        outline: 2px solid var(--b3-theme-primary-light);
+    }
+    .prog-radio-chip input {
+        margin: 0;
+        accent-color: var(--b3-theme-primary);
+    }
+    /* □14 锁态（未激活 p/t/i）：运行时挂的类须 :global 组合选择器，否则 scoped CSS
+       当 unused 剪掉（debugging.md 先例）。弱化下沉到文字 span（vision 复评 P2：容器
+       opacity 会连带压暗 b3-tooltips 伪元素=Pro 引导气泡只剩 60% 浓度）+ 虚线边框
+       强化「不可选区」语义；🔒 保持全浓（暗底金锁=强信号） */
+    .prog-radio-chip:global(.prog-locked) {
+        cursor: not-allowed;
+        border-style: dashed;
+    }
+    .prog-radio-chip:global(.prog-locked) > span:not(.prog-radio-tag) {
+        opacity: 0.6;
+    }
+    .prog-radio-chip :global(.prog-radio-tag) {
+        flex: none;
+        margin-left: auto;
+        width: 13px;
+        height: 13px;
+        fill: var(--b3-theme-on-surface); /* □30 sprite 锁保持全浓强信号（原 emoji 口径） */
+    }
+
+    /* ---- 底部操作栏 ---- */
+    .prog-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 0 12px;
         background-color: var(--b3-theme-surface);
+        border-top: 1px solid var(--b3-border-color);
+    }
+    .prog-footer button {
+        margin: 0;
+    }
+    .prog-primary-btn {
+        flex: 1;
+        padding: 8px 18px;
+        font-weight: 500;
+        white-space: normal; /* en 长文案折行不溢出 */
+    }
+
+    /* ---- 等待态：骨架屏 + spinner ---- */
+    .prog-loading {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .prog-skeleton-card {
+        padding: 12px;
+        background-color: var(--b3-theme-surface);
+        border: 1px solid var(--b3-theme-surface-lighter);
+        border-radius: var(--b3-border-radius);
+    }
+    .prog-skeleton-title,
+    .prog-skeleton-cell,
+    .prog-skeleton-bar {
+        border-radius: 4px;
+        background: linear-gradient(
+            90deg,
+            var(--b3-theme-surface-lighter) 25%,
+            var(--b3-theme-background-light) 37%,
+            var(--b3-theme-surface-lighter) 63%
+        );
+        background-size: 400% 100%;
+        animation: prog-shimmer 1.2s ease infinite;
+    }
+    .prog-skeleton-title {
+        width: 30%;
+        height: 14px;
+        margin-bottom: 10px;
+    }
+    .prog-skeleton-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .prog-skeleton-cell {
+        height: 52px;
+    }
+    .prog-skeleton-bar {
+        height: 46px;
+    }
+    .prog-loading-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--b3-theme-on-surface);
+    }
+    .prog-spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--b3-theme-primary-light);
+        border-top-color: var(--b3-theme-primary);
+        border-radius: 50%;
+        animation: prog-spin 0.8s linear infinite;
+    }
+    @keyframes prog-shimmer {
+        0% {
+            background-position: 100% 0;
+        }
+        100% {
+            background-position: 0 0;
+        }
+    }
+    @keyframes prog-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* ---- 移动端 90vw 窄宽（chips 流式换行、sparkline 均分天然适配，无需新增断点） ---- */
+    @media (max-width: 640px) {
+        .prog-stat-grid,
+        .prog-skeleton-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
     }
 </style>

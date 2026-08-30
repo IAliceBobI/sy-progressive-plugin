@@ -1,31 +1,40 @@
-import { Dialog, IEventBusMap, IProtyle, Lute, Plugin, Protyle } from "siyuan";
-import { isEditor, NewLute, } from "../../sy-tomato-plugin/src/libs/utils";
-import DigestProgressiveSvelte from "./DigestProgressive.svelte";
-import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
+import { IEventBusMap, IProtyle, Lute, Plugin } from "siyuan";
+import { NewLute, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { ReviewKey, parseReview } from "./reviewQueue";
+import { applyReviewAction, schedSubmenuItems } from "./reviewMenu";
+import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
-import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-import { add2digBtn2lockIcon, add2piecesBtn2lockIcon, digestmenu, doubleClick2DigestDesktop, doubleClick2DigestMobile } from "../../sy-tomato-plugin/src/libs/stores";
+import { digestmenu } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { createFloatingBtn, getProgFloatingDm } from "./FloatingAction";
-import { addCustomButton } from "../../sy-tomato-plugin/src/exportFiles";
-import { prog } from "./Progressive";
-import { newID } from "stonev5-utils";
-import { mount } from "svelte";
+import { kind, openDigestSubrank, show, toggleFreeFloat } from "./ProgressiveBtn";
 
-export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式 2025-5-12 22:02:39", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
-export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄 2025-5-12 22:02:39", "🍕", () => tomatoI18n.执行摘抄)
-export const digest执行摘抄并断句 = winHotkey("⇧⌥X", "执行摘抄并断句 2025-5-12 22:02:39", "✂", () => tomatoI18n.执行摘抄并断句)
+export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
+export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "🍕", () => tomatoI18n.执行摘抄)
+export const digest执行摘抄并断句 = winHotkey("⇧⌥X", "执行摘抄并断句", "✂", () => tomatoI18n.执行摘抄并断句)
 
+/**
+ * □11 入口统一（设计共识 2）：⌥Z/右键/块图标「渐进阅读摘抄模式」全收——三态（含自由态）
+ * 文档=聚焦浮条+展开摘抄子排；普通文档=自由态上岗+展开子排。三 tab Dialog、双击摘抄
+ * 浮钮（FloatingButton 一族）、锁图标旁「执行摘抄/加书」两钮 2026-08-30 退役；快路径
+ * 保留=选中+⇧⌥Z「执行摘抄」、右键「整篇摘抄」。
+ */
 class DigestProgressiveBox {
     plugin: Plugin;
     settings: TomatoSettings;
     lute: Lute;
     singleTab: SingleTab;
-    digestCallback: any;
-    private dialogOpened = false;
+
+    /** ⌥Z 命令/右键/块图标三入口共用的改道出口 */
+    private enterDigestMode() {
+        if (show.get() && kind.get()) {
+            openDigestSubrank();
+        } else {
+            toggleFreeFloat(true);
+        }
+    }
 
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
         if (!this.plugin) return;
@@ -35,7 +44,7 @@ class DigestProgressiveBox {
                 iconHTML: digest渐进阅读摘抄模式.icon,
                 accelerator: digest渐进阅读摘抄模式.m,
                 click: () => {
-                    this.openDialog(detail.protyle);
+                    this.enterDigestMode();
                 }
             });
         }
@@ -52,11 +61,7 @@ class DigestProgressiveBox {
             langText: digest渐进阅读摘抄模式.langText(),
             hotkey: digest渐进阅读摘抄模式.m,
             callback: () => {
-                if (this.digestCallback) {
-                    this.digestCallback();
-                } else {
-                    this.openDialog(events.protyle?.protyle);
-                }
+                this.enterDigestMode();
             }
         });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
@@ -67,10 +72,61 @@ class DigestProgressiveBox {
                     iconHTML: digest渐进阅读摘抄模式.icon,
                     accelerator: digest渐进阅读摘抄模式.m,
                     click: () => {
-                        this.openDialog(detail.protyle);
+                        this.enterDigestMode();
+                    },
+                });
+                // □16 整摘双通道之一：任意文档（剧本等）无浮条载体，右键整篇摘抄落札记匣/摘抄集
+                menu.addItem({
+                    label: tomatoI18n.整篇摘抄,
+                    iconHTML: "📋",
+                    click: () => { digestWholeDoc(detail.protyle); },
+                });
+            }
+        });
+
+        // v5 □12 重访调度右键（thinkQueue 推广为通用 reviewQueue）：调度态按模式分完成/推迟
+        // 文案（曲线=问题已解决/还没懂；日程=本轮完成/推迟到明天）；「重访调度…」子菜单设/改/移。
+        this.plugin.eventBus.on("open-menu-content", async ({ detail }) => {
+            const menu = detail.menu;
+            const ids = Object.keys((detail as any).blockElements ?? {});
+            if (ids.length === 0) return;
+            const attrs = await siyuan.getBlockAttrs(ids[0]);
+            const s = parseReview(attrs[ReviewKey]);
+            if (s && s.mode !== "done") {
+                const curve = s.mode === "curve";
+                menu.addItem({
+                    label: curve ? tomatoI18n.问题已解决 : tomatoI18n.本轮已完成,
+                    iconHTML: "✅",
+                    click: () => applyReviewAction(ids, "complete", attrs[ReviewKey]),
+                });
+                menu.addItem({
+                    label: curve ? tomatoI18n.还没懂稍后再看 : tomatoI18n.推迟到明天,
+                    iconHTML: curve ? "❓" : "⏰",
+                    click: () => applyReviewAction(ids, "defer", attrs[ReviewKey]),
+                });
+            }
+            if (s?.mode === "done") {
+                menu.addItem({
+                    label: tomatoI18n.取消心得标记,
+                    iconHTML: "✱",
+                    click: async () => {
+                        for (const id of ids) await siyuan.setBlockAttrs(id, { [ReviewKey]: "" } as AttrType);
+                    },
+                });
+            } else {
+                menu.addItem({
+                    label: tomatoI18n.标为心得,
+                    iconHTML: "✱",
+                    click: async () => {
+                        for (const id of ids) await siyuan.setBlockAttrs(id, { [ReviewKey]: "done" } as AttrType);
                     },
                 });
             }
+            menu.addItem({
+                label: tomatoI18n.重访调度,
+                iconHTML: "⏱",
+                submenu: schedSubmenuItems(ids, s),
+            });
         });
 
         this.plugin.addCommand({
@@ -95,122 +151,40 @@ class DigestProgressiveBox {
             }
         });
 
-        const createBtn = () => {
-            createFloatingBtn(this.plugin, this.settings)
-            const e: HTMLElement = getProgFloatingDm()?.getData("e")
-            if (e) { e.style.display = "none"; }
-            this._addSelectionButton()
-        }
-        if (events.isMobile) {
-            if (doubleClick2DigestMobile.get()) {
-                createBtn();
-            }
-        } else {
-            if (doubleClick2DigestDesktop.get()) {
-                createBtn();
-            }
-        }
-        if (add2digBtn2lockIcon.get()) {
-            this._add2digBtn2lockIcon();
-        }
-        if (add2piecesBtn2lockIcon.get()) {
-            this._add2piecesBtn2lockIcon();
-        }
-    }
-
-    private _add2digBtn2lockIcon() {
-        events.addListener("selection btns 2025-5-25 00:40:16", (eventType, detail: Protyle) => {
-            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
-                navigator.locks.request("lock 2025-5-25 00:40:19", { mode: "exclusive" }, async (lock) => {
-                    if (lock) {
-                        const protyle: IProtyle = detail.protyle;
-                        if (!protyle) return;
-                        if (!isEditor(protyle)) return;
-                        addCustomButton(protyle, 'progressive-add2dig', tomatoI18n.执行摘抄, "Star", async () => {
-                            const s = await events.selectedDivs(protyle);
-                            const di = await initDi(s, protyle, this.settings);
-                            di.digest();
-                        });
-                    }
-                });
-            }
+        // □16 整摘命令通道（无默认热键；片态另有浮条子排按钮、任意文档另有右键项）
+        this.plugin.addCommand({
+            langKey: "整篇摘抄",
+            langText: tomatoI18n.整篇摘抄,
+            editorCallback: async (protyle) => { await digestWholeDoc(protyle); },
         });
-    }
-
-    private _add2piecesBtn2lockIcon() {
-        events.addListener("selection btns 2025-5-23 09:47:12", (eventType, detail: Protyle) => {
-            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
-                navigator.locks.request("lock 2025-5-23 09:47:16", { mode: "exclusive" }, async (lock) => {
-                    if (lock) {
-                        const protyle: IProtyle = detail.protyle;
-                        if (!protyle) return;
-                        if (!isEditor(protyle)) return;
-                        addCustomButton(protyle, 'progressive-add2piece', tomatoI18n.添加当前文档到渐进阅读分片模式, "Add", () => {
-                            prog.addProgressiveReadingWithLock();
-                        });
-                    }
-                });
-            }
-        });
-    }
-
-    private _addSelectionButton() {
-        events.addListener("selection btns 2025-5-21 15:24:40", (eventType, detail: Protyle) => {
-            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
-                navigator.locks.request("lock 2025-5-21 15:24:43", { mode: "exclusive" }, async (lock) => {
-                    if (lock) {
-                        const protyle: IProtyle = detail.protyle;
-                        if (!protyle) return;
-                        if (!isEditor(protyle)) return;
-                        this.addMenuButton(protyle)
-                    }
-                });
-            }
-        });
-    }
-
-    private addMenuButton(protyle: IProtyle) {
-        addCustomButton(protyle, 'progressive-menu', tomatoI18n.打开多行选择菜单, "Menu", () => {
-            const e: HTMLElement = getProgFloatingDm()?.getData("e")
-            if (e) { e.style.display = "block"; }
-        });
-    }
-
-    private openDialog(protyle: IProtyle) {
-        if (!protyle) return;
-        if (this.dialogOpened) return;
-        this.dialogOpened = true;
-        const id = newID();
-        const dm = new DestroyManager()
-        const dialog = new Dialog({
-            title: tomatoI18n.渐进阅读摘抄模式,
-            content: `<div id='${id}'></div>`,
-            width: null,
-            height: null,
-            hideCloseIcon: true,
-            destroyCallback: () => {
-                dm.destroyBy("1")
-            },
-            transparent: true,
-        });
-        const d = mount(DigestProgressiveSvelte, {
-            target: dialog.element.querySelector("#" + id),
-            props: {
-                dm,
-                protyle,
-                settings: this.settings,
-                plugin: this.plugin,
-            }
-        });
-        dm.add("1", () => dialog.destroy())
-        dm.add("2", () => d.destroy())
-        dm.add("3", () => digestProgressiveBox.digestCallback = null)
-        dm.add("4", () => this.dialogOpened = false)
     }
 }
 
-export async function initDi(s: Awaited<ReturnType<typeof events.selectedDivs>>, protyle: IProtyle, settings: TomatoSettings) {
-    let di = new DigestBuilder();
+/** □16 整摘：全文档顶层块当一个全选 selection 走 initDi→digestWhole（复用现有复制管道）。
+ *  返回新副本 docID（无效入参/空内容早退返 ""，□27 仿写本片副本链路消费）。
+ *  forRecite（□28）：仿写副本链路传 true——标题加「仿写」前缀 + 副本前台打开（见 digestWhole）。 */
+export async function digestWholeDoc(protyle: IProtyle, forRecite = false): Promise<string> {
+    const welement: HTMLElement = protyle?.wysiwyg?.element;
+    const docID = protyle?.block?.rootID;
+    if (!welement || !docID) return "";
+    const top = ([...welement.children] as HTMLElement[]).filter(el => el?.hasAttribute?.("data-node-id"));
+    if (top.length === 0) {
+        await siyuan.pushMsg(tomatoI18n.没有有效的摘抄内容);
+        return "";
+    }
+    const s = {
+        element: welement,
+        selected: top,
+        ids: top.map(el => el.getAttribute("data-node-id")),
+        docID,
+        boxID: protyle.notebookId,
+        docName: protyle.title?.editElement?.textContent ?? "",
+    };
+    const di = await initDi(s as any, protyle, digestProgressiveBox.settings);
+    return await di.digestWhole(forRecite);
+}
+
+export async function initDi(s: Awaited<ReturnType<typeof events.selectedDivs>>, protyle: IProtyle, settings: TomatoSettings) {    let di = new DigestBuilder();
     di.protyle = protyle;
     di.settings = settings;
     di.element = s.element;
@@ -227,4 +201,3 @@ export async function initDi(s: Awaited<ReturnType<typeof events.selectedDivs>>,
 }
 
 export const digestProgressiveBox = new DigestProgressiveBox();
-

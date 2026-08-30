@@ -1,13 +1,11 @@
 import { Plugin } from "siyuan";
-import { getHPathByDocID, getWordsDoc } from "./helper";
-import { get_siyuan_lnk_md, NewNodeID, Siyuan, siyuan, siyuanCache } from "../../sy-tomato-plugin/src/libs/utils";
+import { get_siyuan_lnk_md, NewNodeID, Siyuan, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { OpenAIClient } from "../../sy-tomato-plugin/src/libs/openAI";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { windowOpenStyle, words2dailycard } from "../../sy-tomato-plugin/src/libs/stores";
+import { windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { getDailyAttrValue, getDailyPath } from "./FlashBox";
-import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+import { progStorage } from "./ProgressiveStorage";
 
 export class WordBuilder {
     docID: string;
@@ -25,16 +23,9 @@ export class WordBuilder {
     }
 
     private async getDocID() {
-        if (words2dailycard.get() && lastVerifyResult()) {
-            const hpath = getDailyPath()
-            const v = getDailyAttrValue();
-            const attr = {};
-            attr[`custom-dailycard-${v}`] = v;
-            return siyuanCache.createDocWithMdIfNotExists(5000, events.boxID, hpath, "", attr);
-        } else {
-            const hpath = await getHPathByDocID(this.bookID, "words");
-            return getWordsDoc(this.bookID, this.boxID, hpath)
-        }
+        // v5 □4 拍板 words 进 prog-data（长期资产）；□7 砍 words2dailycard 日记分支
+        // （旧书下 words 文档原位认回）
+        return progStorage.ensureWordsDoc(this.bookID)
     }
 
     async digest(addCard = false, ai = false) {
@@ -49,17 +40,24 @@ export class WordBuilder {
         await OpenSyFile2(this.plugin, id, windowOpenStyle.get() as any);
 
         if (ai) {
-            const model = OpenAIClient.getOfficalModel(true);
-            if (model) {
-                let first = "en_US";
-                const second = Siyuan.config.appearance.lang;
-                if (first === second) {
-                    first = "zh_CN"
-                }
-                const p = getPrompt(this.rangeText, this.allText, first, second);
-                await model(p, innerID);
+            // □14 生词 AI 恢复收费（□9 拍板：收录免费、AI 翻译/造句拦+引导）——
+            // 未激活只跳过 AI 解释（下方加卡照走），上方收录照常完成。
+            // □19 入口已接回：浮条子排 wordai 钮传 digest(false, true)
+            if (!lastVerifyResult()) {
+                await siyuan.pushMsg(tomatoI18n.生词AIPro提示, 2500);
             } else {
-                await siyuan.pushMsg(tomatoI18n.请先配置AI, 2000);
+                const model = OpenAIClient.getOfficalModel(true);
+                if (model) {
+                    let first = "en_US";
+                    const second = Siyuan.config.appearance.lang;
+                    if (first === second) {
+                        first = "zh_CN"
+                    }
+                    const p = getPrompt(this.rangeText, this.allText, first, second);
+                    await model(p, innerID);
+                } else {
+                    await siyuan.pushMsg(tomatoI18n.请先配置AI, 2000);
+                }
             }
         }
 

@@ -1,3 +1,5 @@
+@use "sass:map";
+
 // ref path of original
 .protyle-wysiwyg div[custom-origin-hpath]:not([custom-prog-origin-text])::before {
   content: attr(custom-origin-hpath);
@@ -14,10 +16,18 @@
   padding-left: 15px;
 }
 
-// note in pieces
+// note in pieces / key note
+// 政策：笔记染色必须用官方 b3 变量——明暗两主题各自适配（daylight #8a4f00 / midnight
+// rgb(255,213,153) 实测），第三方主题覆盖 b3 变量即自动跟随；勿改硬编码色值。
+// 原文块保持无色彩修饰（□11.1 双色已退役）。
 .protyle-wysiwyg div[custom-progref][custom-paragraph-index]:not([custom-prog-origin-text]):not([custom-prog-key-note]):not([custom-prog-key-no-color]) {
   color: var(--b3-font-color2);
 }
+
+// □11.1「片内双色」已于 2026-08-30 随用户实测反馈退役：原文块灰显（--b3-font-color2 在
+// daylight 实渲为棕色）+ 原文块尾打字继承 custom-prog-origin-text 跟着变色 → 笔记与原文
+// 同色没法分清。用户拍板回归「原文不做任何色彩修饰」的老形态（.prog-piece-live 类与
+// ProgressiveBtn 挂类逻辑一并移除，git 历史可寻回）。
 
 // key note
 .protyle-wysiwyg div[custom-prog-key-note]:not([custom-prog-key-no-color]) {
@@ -62,10 +72,1360 @@
 
 // 移动端分片顶栏（PieceTopBar）：body 类驱动编辑宿主 #editor 顶开。#editor 本身是
 // protyle 宿主容器而非滚动内容，padding 压外壳使滚动区整体下移——滚到任何位置都不进
-// 顶栏底下；高度与顶栏同源 CSS 变量（一处改两处生效，顶栏 border-box 52px 含下边框）。
+// 顶栏底下。变量 :root 默认 44px；顶栏展开候选区/摘抄子排折行长高时由 PieceTopBar
+// 的 ResizeObserver 把实测高度回写成 body 级变量（收起回落 44）。
 :root {
   --prog-topbar-h: 44px;
 }
 body.prog-topbar-on #editor {
   padding-top: var(--prog-topbar-h);
+}
+
+// ============================================================
+// v5 □5：--prog-* token 两轨（免费默认「青瓷黛蓝」，值出自 docs/prog-v5-visual-design.md
+// §5.1/5.2 定稿；皮肤整组覆盖机制归 □8，此处先落默认轨）。明暗只用
+// html[data-theme-mode="dark"]（思源 loadAssets 权威判别），不裸用 prefers-color-scheme。
+// ============================================================
+:root {
+  /* 主题色 */
+  --prog-accent: #35606e;
+  --prog-accent-soft: rgba(53, 96, 110, 0.12);
+  --prog-accent-strong: #2b4d58;
+  --prog-card-bg: color-mix(in srgb, var(--prog-accent) 5%, var(--b3-theme-surface));
+  --prog-card-border: color-mix(in srgb, var(--prog-accent) 24%, var(--b3-border-color));
+  --prog-shadow: 0 2px 8px rgba(43, 77, 88, 0.10);
+  --prog-yours: #b06e1e;
+
+  /* 文字层级 */
+  --prog-title: color-mix(in srgb, var(--b3-theme-on-surface) 90%, transparent);
+  --prog-sub: color-mix(in srgb, var(--b3-theme-on-surface) 60%, transparent);
+  --prog-muted: color-mix(in srgb, var(--b3-theme-on-surface) 44%, transparent);
+
+  /* 状态色只属于状态栏火苗（□6）；浮条系统不消费 */
+  --prog-badge-bg: var(--prog-accent-strong);
+  --prog-badge-fg: #fff;
+
+  /* 火苗：身份层（恒暖）+ 状态层（可变芯光，三态注入点） */
+  --prog-flame-base: #b06e1e;
+  --prog-flame-base-soft: rgba(176, 110, 30, 0.25);
+  --prog-status-ok: #3f8b4f;
+  --prog-status-warn: #c98a1e;
+  --prog-status-over: #c23a2b;
+
+  /* 进度条与热力图（□6 Dock 面板） */
+  --prog-progress-track: color-mix(in srgb, var(--prog-accent) 12%, var(--b3-theme-surface));
+  --prog-progress-fill: var(--prog-accent-strong);
+  --prog-heat-0: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+  --prog-heat-1: var(--prog-accent-soft);
+  --prog-heat-2: color-mix(in srgb, var(--prog-accent) 34%, var(--b3-theme-surface));
+  --prog-heat-3: var(--prog-accent);
+  --prog-heat-4: var(--prog-accent-strong);
+
+  /* 面板容器 */
+  --prog-panel-bg: var(--b3-theme-surface);
+  --prog-panel-border: var(--b3-border-color);
+}
+
+html[data-theme-mode="dark"] {
+  --prog-accent: #85b3bd;
+  --prog-accent-soft: rgba(133, 179, 189, 0.14);
+  --prog-accent-strong: #6b9aa5;
+  --prog-card-bg: color-mix(in srgb, var(--prog-accent) 8%, var(--b3-theme-surface));
+  --prog-card-border: color-mix(in srgb, var(--prog-accent) 28%, var(--b3-border-color));
+  --prog-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
+  --prog-yours: #d4a960;
+
+  --prog-title: color-mix(in srgb, var(--b3-theme-on-surface) 90%, transparent);
+  --prog-sub: color-mix(in srgb, var(--b3-theme-on-surface) 62%, transparent);
+  --prog-muted: color-mix(in srgb, var(--b3-theme-on-surface) 46%, transparent);
+
+  --prog-badge-bg: var(--prog-accent-strong);
+  --prog-badge-fg: #1c2326;
+
+  --prog-flame-base: #d4a960;
+  --prog-flame-base-soft: rgba(212, 169, 96, 0.26);
+  --prog-status-ok: #67b07f;
+  --prog-status-warn: #d9a94e;
+  --prog-status-over: #d87a70;
+
+  --prog-progress-track: color-mix(in srgb, var(--prog-accent) 16%, var(--b3-theme-surface));
+  --prog-progress-fill: var(--prog-accent-strong);
+  --prog-heat-0: color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent);
+  --prog-heat-1: var(--prog-accent-soft);
+  --prog-heat-2: color-mix(in srgb, var(--prog-accent) 34%, var(--b3-theme-surface));
+  --prog-heat-3: var(--prog-accent);
+  --prog-heat-4: var(--prog-accent-strong);
+
+  --prog-panel-bg: var(--b3-theme-surface);
+  --prog-panel-border: var(--b3-border-color);
+}
+
+// ============================================================
+// v5 □5 浮条系统（docs/prog-v5-floatbar-design.md §3/§4）：展开态按钮/胶囊/子排凹槽。
+// 三态色零占有（状态归火苗），全部 accent/strong/soft 三档编织层级。
+// ============================================================
+.prog-fb .prog-fb-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--prog-accent-soft);
+  color: var(--prog-accent);
+  transition: transform 0.12s ease-out, background-color 0.12s ease-out, color 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+.prog-fb .prog-fb-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--prog-shadow);
+  background-color: color-mix(in srgb, var(--prog-accent) 18%, var(--b3-theme-surface));
+}
+.prog-fb .prog-fb-btn--primary {
+  background: var(--prog-accent-strong);
+  color: var(--prog-badge-fg);
+}
+.prog-fb .prog-fb-btn--ghost {
+  background: transparent;
+  color: var(--prog-muted);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b3-theme-on-surface) 22%, transparent);
+}
+.prog-fb .prog-fb-btn--ghost:hover {
+  color: var(--b3-theme-error);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b3-theme-error) 55%, transparent);
+}
+/* □18 加书是正向动作（打开弹窗），不随退出类 ghost 的红色 hover（vision review P2） */
+.prog-fb .prog-fb-btn--ghost[data-fb-id="addBook"]:hover {
+  color: var(--prog-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--prog-accent) 55%, transparent);
+}
+/* toggle 开合态（[+] 展开中 / ✂ 摘抄子排展开中）：accent 环 + 加深底，展开/收起可感知；
+   声明在 ghost 后以覆盖其 inset 描边 */
+.prog-fb .prog-fb-btn--on {
+  background: color-mix(in srgb, var(--prog-accent) 22%, var(--b3-theme-surface));
+  color: var(--prog-accent);
+  box-shadow: inset 0 0 0 1.5px var(--prog-accent);
+}
+
+/* □30 未激活门禁可视化：Pro 钮灰但可点（hover 回亮暗示可点，歧义由点击引导 toast 消解）。
+   不带容器前缀（首行 .prog-fb-btn / 平铺区 .prog-fb-flat-btn / 移动端顶栏统一命中）；
+   body.prog-unpaid 由 theme.ts refreshProgGate 挂摘——激活即全局满活力。
+   亮色提亮一档（vision 复审）：.45 在浅底读作「禁用」，灰掉的功能是广告位、须认得出 */
+body.prog-unpaid .prog-fb-pro {
+  opacity: 0.45;
+}
+html:not([data-theme-mode="dark"]) body.prog-unpaid .prog-fb-pro {
+  opacity: 0.55;
+}
+body.prog-unpaid .prog-fb-pro:hover {
+  opacity: 0.8;
+}
+
+/* 附属卡到期胶囊：无到期不渲染（UI 层 {#if}），>99 截 99+（formatDueCount） */
+.prog-fb .prog-fb-cardbadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--prog-badge-bg);
+  color: var(--prog-badge-fg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: var(--prog-shadow);
+}
+
+/* 二级凹槽（✂ 摘抄子排）：accent-soft 底 + 更小按钮 + 顶 hairline 三重降层。
+   不带 .prog-fb 前缀（同平铺区）：移动端顶栏根是 .prog-topbar，带前缀整块脱靶，
+   子排无底无动画且 12% 层级低于平铺区 5%——两端统一后层级规格才成立（review P2-4） */
+.prog-fb-dig {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-top: 2px;
+  padding: 4px;
+  border-radius: 6px;
+  background: var(--prog-accent-soft);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent);
+  animation: prog-fb-dig-in 0.15s ease-out;
+}
+.prog-fb-dig button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--prog-accent);
+  transition: background-color 0.12s ease-out;
+}
+.prog-fb-dig button:hover {
+  background: color-mix(in srgb, var(--prog-accent) 16%, var(--b3-theme-surface));
+}
+/* □10 桌面浮条 body 纵排：首行/平铺区/摘抄子排恒上下堆叠（FloatBar body 原为行向
+   flex-wrap，宽屏 shrink-to-fit 会把常驻平铺区排到首行右侧，设计要求在首行下方）。
+   max-width 520 = 平铺区折行闸门（纯值！min(520px,100%) 的百分比会参与固有尺寸计算
+   把浮条 max-content 撑到可用宽、整条浮条膨胀 1080px，2026-08-29 e2e 实测；窄窗时
+   100vw-16px 钳制经 stretch 传导给平铺区自动收窄）。双类名抬特异性压过 FloatBar.svelte
+   的 scoped 同名规则（0,2,0），不依赖加载序 */
+.floatbar.prog-fb .floatbar-body {
+  flex-direction: column;
+  max-width: 520px;
+}
+
+// ============================================================
+// □10 方案 B 平铺区（docs/prog-floatbar-ux-redesign.md □10 视觉规格 2026-08-29）：
+// 首行下方常驻铺开（无 [+]、无开合态），替代 moreOpen 候选区 + advOpen 高级面板。
+// 结构：5 段（低频 seg 可折行 | 制卡/收集/移动/提取整理 4 组沿用 .prog-fb-adv-group
+// 不折断）。段界=组界，统一段头 ::before 通高重线（与 dig 内组头线分层不同容器）。
+// 容器 5% accent 底比 dig 的 12% 浅一档——常驻收纳层要安静，临时凹槽要跳
+// （层级：首行 accent-soft 实底钮 > dig 12% > flat 5% > 透明格）。
+// ============================================================
+/* ⚠️ 平铺区规则不带 .prog-fb 前缀：桌面 FloatBar 根挂 .prog-fb，但移动端顶栏根是
+   .prog-topbar——带前缀会在移动端整块脱靶（组容器回退 inline、组内折行破坏组界） */
+.prog-fb-flat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px; /* 行距 6 多行扫读，列距 4 对齐 dig */
+  align-items: center;
+  margin-top: 2px; /* + 容器 gap 4 = 与首行总距 6px，同 dig 节奏 */
+  padding: 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--prog-accent) 5%, var(--b3-theme-surface));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent);
+  /* 宽度闸门在容器层（floatbar-body max-width 520 / 顶栏全宽 stretch），此处不再设
+     max-width——百分比版本会污染固有尺寸计算（见上）；无出场动画：flat 无开合态、
+     翻片即重挂载，动画成高频噪音 + 首帧高度抖动 */
+}
+/* 低频段容器：未勾池钮托盘 + 5 低频，段内允许按格折行（无组语义；最坏 14 格） */
+.prog-fb-flat .prog-fb-flat-seg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+/* 段间分隔（低频|制卡|收集|移动|提取整理，段界=组界统一挂段头）：
+   折行后线落新行行首=续行信号，永不孤悬行尾（dig 组头线同哲学）。
+   通格高 26px + 22% 色重 = 段界；与 dig 的临时组头线不同容器不同时出现 */
+.prog-fb-flat > * + *::before {
+  content: "";
+  flex: none;
+  width: 1px;
+  height: 26px;
+  margin: 0 6px;
+  align-self: center;
+  background: color-mix(in srgb, var(--b3-theme-on-surface, #ccc) 22%, transparent);
+}
+/* 平铺格：图标 14 + 12px 短标签，宽度随内容自适应（min-width 不设，防撑爆靠容器折行）。
+   独立类不蹭 .prog-fb-btn（其 width:30px/flex:none 会锁方格）；height 26 故意只声明
+   height——移动端 PieceTopBar :global(button) 的 min 36×36 直接盖过，一套代码两端尺寸 */
+.prog-fb-flat .prog-fb-flat-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--prog-accent);
+  transition: background-color 0.12s ease-out;
+}
+.prog-fb-flat .prog-fb-flat-btn:hover {
+  background: color-mix(in srgb, var(--prog-accent) 16%, var(--b3-theme-surface));
+  /* 不用 translateY/box-shadow：常驻 22 格区 hover 上浮成噪音，底色反馈已足够（对齐 dig） */
+}
+/* 平铺区 digest 格展开态：同首行 .prog-fb-btn--on 的 accent 环（digest 未勾落平铺区时
+   子排开合需有视觉锚点，review P3） */
+.prog-fb-flat .prog-fb-flat-btn--on {
+  background: color-mix(in srgb, var(--prog-accent) 22%, var(--b3-theme-surface));
+  box-shadow: inset 0 0 0 1.5px var(--prog-accent);
+}
+.prog-fb-flat .prog-fb-flat-lbl {
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  /* 不做 ellipsis 截断：无 hover 的常驻格上省略号=信息丢失；超长靠容器折行消化，
+     全名由 tooltip 兜底（en 标签失控时的后备截断策略见规格文档风险备注） */
+}
+/* 高级四组组容器（□6 起沿用）：组容器不折断，折行只落在组边界——adv-group 现只在
+   flat 内存活，作用域从 dig 迁来；组间分隔由 flat 的段头线统一承担，不再自带 ::before。
+   flex-wrap + max-width:100%（窄视口实测 2026-08-29）：宽容器组天然整组单行（组界完整）；
+   物理放不下时（移动端可用宽 ~337 < 提取整理组 469）组内按格折行——按钮可达性优先于
+   组界刚性，nowrap 会把整组挂出屏外不可点 */
+.prog-fb-flat .prog-fb-adv-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+@keyframes prog-fb-dig-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// ============================================================
+// v5 □5 摘抄痕迹（docs/prog-v5-floatbar-design.md §5）：左侧 3px 细色条 + 15px 热区
+// 真实元素（digestMarker 注入 span），点痕迹跳摘抄；勿背景色防与用户高亮混淆。
+// ============================================================
+// □12：块 div 不挂任何属性（custom-* 会被编辑事务卷进 IAL 落盘），定位锚改 :has() 纯 CSS。
+// □12 背景渲染态：markOriginTextBG 开关经 body 类 prog-digest-bg-on 总闸（index.ts 订阅挂载），
+// span 在则背景在——零属性写入，reload 后随 markDigests 重打恢复；不再写 style 到 .sy。
+body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
+  background-color: var(--b3-font-background11);
+}
+.protyle-wysiwyg div:has(> .prog-digest-mark) {
+  position: relative;
+}
+.prog-digest-mark {
+  position: absolute;
+  left: 2px;
+  top: 12px;
+  width: 15px;
+  height: 16px;
+  cursor: pointer;
+  color: var(--prog-accent);
+}
+.prog-digest-mark::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--prog-accent);
+  transition: width 0.12s ease-out, background-color 0.12s ease-out;
+}
+.prog-digest-mark::after {
+  // U+2197 须带 U+FE0E 文本变体选择符：裸 ↗ 在 macOS 被 Apple Color Emoji 接管，
+  // color 对 emoji 字形无效、渲染成彩色方块（vision 复审 P1-3，2026-08-30）
+  content: "↗︎";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.7);
+  opacity: 0;
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+}
+.prog-digest-mark:hover::before {
+  width: 4px;
+  background: var(--prog-accent-strong);
+}
+.prog-digest-mark:hover::after {
+  opacity: 0.9;
+  transform: translateY(-50%) scale(1);
+}
+
+// ============================================================
+// v5 □6 状态栏火苗（docs/prog-v5-visual-design.md §2）：恒暖壳+可变芯光。
+// 三态 = data-state 注入 --prog-flame-core/glow + 形态冗余（黄瘦/红宽呼吸），
+// 色盲双通道可读；长驻无动画，仅红态 3s 慢辉光呼吸。
+// ============================================================
+.prog-flame-host {
+  display: flex;
+  align-items: center;
+}
+.prog-flame {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  height: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: opacity 0.12s ease-out;
+}
+.prog-flame:hover {
+  opacity: 0.8;
+}
+.prog-flame-svg {
+  width: 13px;
+  height: 18px;
+  transform-origin: 50% 100%;
+  transition: transform 0.18s ease-out;
+}
+.prog-flame-base {
+  fill: var(--prog-flame-base);
+}
+.prog-flame-core {
+  fill: var(--prog-flame-core);
+  opacity: 0.85;
+}
+.prog-flame-num {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--prog-flame-core);
+}
+/* 状态色注入（默认 ok 由 :root 的 flame-core= status-ok 兜底） */
+.prog-flame[data-state="warn"] {
+  --prog-flame-core: var(--prog-status-warn);
+}
+.prog-flame[data-state="over"] {
+  --prog-flame-core: var(--prog-status-over);
+}
+/* 形态冗余：黄态瘦 15%、红态底座加宽 + 3s 慢辉光呼吸 */
+.prog-flame[data-state="warn"] .prog-flame-svg {
+  transform: scaleY(0.85);
+}
+.prog-flame[data-state="over"] .prog-flame-svg {
+  transform: scaleX(1.06);
+  animation: prog-flame-breathe 3s ease-in-out infinite;
+}
+@keyframes prog-flame-breathe {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--prog-flame-base-soft)); }
+  50% { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--prog-flame-core) 55%, transparent)); }
+}
+
+// ============================================================
+// v5 □6 左 Dock 舰队总览（docs/prog-v5-visual-design.md §3）：今日状态区/
+// 近14天热力横条/书卡列表/主按钮/底部副操作。动效 0.12-0.18s ease-out，无常驻动画。
+// ============================================================
+.prog-fleet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  background: var(--prog-panel-bg);
+  color: var(--prog-title);
+  overflow: hidden;
+}
+
+/* 顶栏 */
+.prog-fleet-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.prog-fleet-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--prog-sub);
+  flex: 1;
+}
+.prog-fleet-recite {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  color: var(--prog-yours);
+  transition: opacity 0.12s ease-out, background-color 0.12s ease-out;
+}
+.prog-fleet-recite:hover {
+  background: var(--prog-accent-soft);
+}
+.prog-fleet-recite.off {
+  opacity: 0.45;
+  color: var(--b3-theme-on-surface);
+}
+.prog-fleet-recite svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 今日状态区 */
+.prog-fleet-today {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--prog-card-bg);
+  border: 1px solid var(--prog-card-border);
+}
+.prog-fleet-today-num {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.prog-fleet-today-num .big {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--prog-flame-core);
+}
+.prog-fleet[data-state="warn"] .prog-fleet-today-num .big {
+  color: var(--prog-status-warn);
+}
+.prog-fleet[data-state="over"] .prog-fleet-today-num .big {
+  color: var(--prog-status-over);
+}
+.prog-fleet-today-num .total {
+  font-size: 12px;
+  color: var(--prog-muted);
+}
+.debt-pill {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--prog-flame-core);
+  background: color-mix(in srgb, var(--prog-flame-core) 14%, transparent);
+}
+.debt-pill[data-state="warn"] {
+  color: var(--prog-status-warn);
+}
+.debt-pill[data-state="over"] {
+  color: var(--prog-status-over);
+  font-weight: 700;
+}
+
+/* 点行（全局今日点 + 书卡今日点共用） */
+.prog-fleet-dots {
+  display: flex;
+  gap: 5px;
+}
+.prog-fleet-dots .dot,
+.prog-fleet-card .dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--b3-border-color);
+}
+.prog-fleet-dots .dot.lit,
+.prog-fleet-card .dots .dot.lit {
+  background: var(--prog-accent-strong);
+}
+
+/* 档位胶囊（轻1/常3/冲5，可点切换=dailyQuota 设置 UI） */
+.prog-fleet-quota {
+  display: flex;
+  gap: 4px;
+}
+.quota-pill {
+  height: 20px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--prog-sub);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--prog-card-border);
+  transition: all 0.12s ease-out;
+}
+.quota-pill:hover {
+  color: var(--prog-accent);
+}
+.quota-pill.selected {
+  background: var(--prog-accent-strong);
+  color: var(--prog-badge-fg);
+  box-shadow: none;
+}
+
+/* 热力图：近14天横条，右端=今天 */
+.prog-fleet-heat {
+  display: flex;
+  gap: 3px;
+  padding: 0 2px;
+}
+.heat-cell {
+  flex: 1;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--prog-heat-0);
+}
+.heat-cell[data-level="1"] { background: var(--prog-heat-1); }
+.heat-cell[data-level="2"] { background: var(--prog-heat-2); }
+.heat-cell[data-level="3"] { background: var(--prog-heat-3); }
+.heat-cell[data-level="4"] { background: var(--prog-heat-4); }
+.heat-cell.today {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--prog-accent) 65%, transparent);
+}
+
+/* 书卡列表 */
+.prog-fleet-books {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.prog-fleet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--prog-card-border);
+  border-radius: 12px;
+  background: var(--prog-card-bg);
+  box-shadow: var(--prog-shadow);
+  cursor: pointer;
+  text-align: left;
+  color: var(--prog-title);
+  transition: transform 0.12s ease-out, border-color 0.12s ease-out;
+}
+.prog-fleet-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--prog-accent) 45%, var(--prog-card-border));
+}
+.prog-fleet-card.finished {
+  opacity: 0.65;
+}
+// ⏸/⚠ 状态卡（bookStatus 判定链）：与管理页 ShowAllBooks 同视觉语言
+.prog-fleet-card.closed {
+  opacity: 0.62;
+  border-style: dashed;
+  box-shadow: none;
+  &:hover {
+    transform: none;
+    border-color: var(--prog-card-border);
+  }
+}
+.prog-fleet-card.lost {
+  border-color: color-mix(in srgb, var(--prog-status-warn) 38%, var(--prog-card-border));
+  background: color-mix(in srgb, var(--prog-status-warn) 4%, var(--prog-card-bg));
+}
+.prog-fleet-card .st-chip {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--prog-muted);
+  box-shadow: inset 0 0 0 1px var(--b3-border-color);
+  &[data-st="lost"] {
+    color: var(--prog-status-warn);
+    background: color-mix(in srgb, var(--prog-status-warn) 14%, transparent);
+    box-shadow: none;
+  }
+}
+.prog-fleet-card .st-line {
+  font-size: 12px;
+  color: var(--prog-muted);
+}
+.prog-fleet-card.lost .st-line {
+  color: var(--prog-status-warn);
+}
+.prog-fleet-card .row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.prog-fleet-card .name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prog-fleet-card .num {
+  font-size: 12px;
+  color: var(--prog-muted);
+  flex: none;
+}
+.prog-fleet-card .track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--prog-progress-track);
+  overflow: hidden;
+}
+.prog-fleet-card .fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--prog-progress-fill);
+  transition: width 0.18s ease-out;
+}
+.prog-fleet-card .row.sub {
+  align-items: center;
+}
+.prog-fleet-card .dots {
+  display: flex;
+  gap: 5px;
+}
+.prog-fleet-card .badges {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--prog-sub);
+}
+.prog-fleet-card .badges .due {
+  color: var(--prog-status-warn);
+  font-weight: 600;
+  /* v5 □12：✧ 可点开到期待办（role=button） */
+  cursor: pointer;
+}
+
+/* 空状态（无书）：诚实热力全空淡格由数据层保证 */
+.prog-fleet-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 8px;
+  opacity: 0.55;
+  text-align: center;
+}
+.prog-fleet-empty svg {
+  width: 40px;
+  height: 52px;
+  fill: none;
+  stroke: var(--prog-muted);
+  stroke-width: 1.4;
+}
+.prog-fleet-empty .empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--prog-sub);
+}
+.prog-fleet-empty .empty-sub {
+  font-size: 12px;
+  color: var(--prog-muted);
+}
+
+/* 主按钮 + 底部副操作 */
+.prog-fleet-start {
+  flex: none;
+  height: 34px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--prog-accent-strong);
+  color: var(--prog-badge-fg);
+  transition: filter 0.12s ease-out;
+}
+.prog-fleet-start:hover {
+  filter: brightness(1.1);
+}
+.prog-fleet-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.prog-fleet-foot .ghost {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--prog-muted);
+  box-shadow: inset 0 0 0 1px var(--prog-card-border);
+  transition: color 0.12s ease-out;
+}
+.prog-fleet-foot .ghost:hover {
+  color: var(--prog-accent);
+}
+.prog-fleet-foot .ghost.icon {
+  padding: 4px 6px;
+  box-shadow: none;
+}
+.prog-fleet-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--prog-muted);
+  font-size: 12px;
+}
+
+// ============================================================
+// v5 □8 皮肤系统（docs/prog-v5-visual-design.md §4/§5.3，QQ 秀三维正交）：
+// - 维度A 配色 body[data-prog-theme]：token 整组覆盖（SCSS map 生成明暗两轨）
+// - 维度B 火苗形态 body[data-prog-flame]：SVG path 在 theme.ts 注册表（JS 换形）
+// - 维度C 容器材质 body[data-prog-panel]：glass/paper 作用于 .prog-fleet 与 .prog-fb
+// Pro 付费视觉统一 body:not(.prog-unpaid) 前缀门禁（挂了属性未解锁也不生效，回落
+// 免费默认款）；派生项必须整套重声明（var() 在声明元素上求值、继承的是已算值，
+// 只改 accent 派生项不会重算——recite 同款坑）。slug 与 src/theme.ts 注册表一一对齐，
+// 新皮肤两头同步加。默认「青瓷黛蓝」= 无 data-prog-theme 直用 :root token 组。
+// ============================================================
+$prog-skins: (
+  "amber":    (la: #8a5a20, ls: #7a4c15, da: #d4a960, ds: #b98a43),
+  "plum":     (la: #6a5a99, ls: #55477d, da: #9d8cc4, ds: #8071ae),
+  "sakura":   (la: #a34a62, ls: #873b50, da: #d98a9c, ds: #b96f82),
+  "mist":     (la: #44739c, ls: #365c7e, da: #8fb6d9, ds: #7199bd),
+  "ink-mist": (la: #3a3a42, ls: #2c2c33, da: #8a8a92, ds: #6f6f77),
+);
+
+@each $slug, $c in $prog-skins {
+  $la: map.get($c, la);
+  $ls: map.get($c, ls);
+  $da: map.get($c, da);
+  $ds: map.get($c, ds);
+  body:not(.prog-unpaid)[data-prog-theme="#{$slug}"] {
+    --prog-accent: #{$la};
+    --prog-accent-soft: rgba($la, 0.12);
+    --prog-accent-strong: #{$ls};
+    --prog-card-bg: color-mix(in srgb, #{$la} 5%, var(--b3-theme-surface));
+    --prog-card-border: color-mix(in srgb, #{$la} 24%, var(--b3-border-color));
+    --prog-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+    --prog-badge-bg: #{$ls};
+    --prog-progress-track: color-mix(in srgb, #{$la} 12%, var(--b3-theme-surface));
+    --prog-progress-fill: #{$ls};
+    --prog-heat-1: rgba($la, 0.12);
+    --prog-heat-2: color-mix(in srgb, #{$la} 34%, var(--b3-theme-surface));
+    --prog-heat-3: #{$la};
+    --prog-heat-4: #{$ls};
+  }
+  html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-theme="#{$slug}"] {
+    --prog-accent: #{$da};
+    --prog-accent-soft: rgba($da, 0.14);
+    --prog-accent-strong: #{$ds};
+    --prog-card-bg: color-mix(in srgb, #{$da} 8%, var(--b3-theme-surface));
+    --prog-card-border: color-mix(in srgb, #{$da} 28%, var(--b3-border-color));
+    --prog-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
+    --prog-badge-bg: #{$ds};
+    --prog-progress-track: color-mix(in srgb, #{$da} 16%, var(--b3-theme-surface));
+    --prog-progress-fill: #{$ds};
+    --prog-heat-1: rgba($da, 0.14);
+    --prog-heat-2: color-mix(in srgb, #{$da} 34%, var(--b3-theme-surface));
+    --prog-heat-3: #{$da};
+    --prog-heat-4: #{$ds};
+  }
+}
+
+// 火苗壳冷焰覆盖（默认暖琥珀跨皮肤通用；plum 紫焰 / ink-mist 冷白焰强化「三维真差异」）
+body:not(.prog-unpaid)[data-prog-theme="plum"] {
+  --prog-flame-base: #8d7ec4;
+  --prog-flame-base-soft: rgba(141, 126, 196, 0.28);
+}
+html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-theme="plum"] {
+  --prog-flame-base: #a99ad0;
+  --prog-flame-base-soft: rgba(169, 154, 208, 0.30);
+}
+body:not(.prog-unpaid)[data-prog-theme="ink-mist"] {
+  --prog-flame-base: #8e95a3;
+  --prog-flame-base-soft: rgba(142, 149, 163, 0.30);
+}
+html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-theme="ink-mist"] {
+  --prog-flame-base: #b8bec9;
+  --prog-flame-base-soft: rgba(184, 190, 201, 0.32);
+}
+
+// ---------- 维度C：容器材质 ----------
+// 毛玻璃：@supports 包裹 + 无 backdrop-filter 环境回落 0.90 透明度纯色（recite 同款护法）；
+// 暗色线性渐变 + 内高光。根自身是 fixed（浮条）/Dock 容器，backdrop-filter 只影响后代
+// containing block，不破坏自身定位。
+body:not(.prog-unpaid)[data-prog-panel="glass"] .prog-fleet,
+body:not(.prog-unpaid)[data-prog-panel="glass"] .prog-fb {
+  background: color-mix(in srgb, var(--prog-panel-bg) 90%, transparent);
+}
+@supports (backdrop-filter: blur(1px)) {
+  body:not(.prog-unpaid)[data-prog-panel="glass"] .prog-fleet,
+  body:not(.prog-unpaid)[data-prog-panel="glass"] .prog-fb {
+    background: color-mix(in srgb, var(--prog-panel-bg) 68%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+  }
+  html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-panel="glass"] .prog-fleet,
+  html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-panel="glass"] .prog-fb {
+    background: linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--prog-panel-bg) 82%, transparent),
+      color-mix(in srgb, var(--prog-panel-bg) 62%, transparent)
+    );
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+}
+
+// 宣纸：暖纸底 + 细棕边 + 硬影 0 3px 0 + 软影双投影；卡片系一并暖化（材质优先于配色，
+// 本块声明在皮肤 theme 块之后，同特异性下后者生效）
+body:not(.prog-unpaid)[data-prog-panel="paper"] {
+  --prog-panel-bg: #f7f1e6;
+  --prog-panel-border: #d9c8a5;
+  --prog-card-bg: color-mix(in srgb, var(--prog-accent) 6%, #f7f1e6);
+  --prog-card-border: color-mix(in srgb, var(--prog-accent) 22%, #d9c8a5);
+}
+html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-panel="paper"] {
+  --prog-panel-bg: #2a2620;
+  --prog-panel-border: #4a4133;
+  --prog-card-bg: color-mix(in srgb, var(--prog-accent) 7%, #2a2620);
+  --prog-card-border: color-mix(in srgb, var(--prog-accent) 24%, #4a4133);
+}
+body:not(.prog-unpaid)[data-prog-panel="paper"] .prog-fleet,
+body:not(.prog-unpaid)[data-prog-panel="paper"] .prog-fb {
+  box-shadow: 0 3px 0 rgba(217, 200, 165, 0.55), 0 8px 18px rgba(93, 78, 50, 0.16);
+}
+html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-panel="paper"] .prog-fleet,
+html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-panel="paper"] .prog-fb {
+  box-shadow: 0 3px 0 #4a4133, 0 8px 18px rgba(0, 0, 0, 0.40);
+}
+
+// ---------- v5 □8 设置面板皮肤货架（照 recite .rs-skins 手法：96×64 mini 样机卡） ----------
+.prog-skins-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 2px;
+}
+.prog-skin-card {
+  position: relative;
+  width: 96px;
+  height: 64px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--b3-theme-surface);
+  box-shadow: inset 0 0 0 1px var(--b3-border-color);
+  transition: box-shadow 0.12s ease-out, transform 0.12s ease-out;
+  text-align: left;
+  padding: 0;
+}
+.prog-skin-card:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--prog-accent) 55%, var(--b3-border-color));
+}
+.prog-skin-card.selected {
+  box-shadow: inset 0 0 0 2px var(--prog-accent-strong);
+}
+.prog-skin-card .skin-mock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.prog-skin-card .skin-chip {
+  height: 10px;
+  border-radius: 3px;
+}
+.prog-skin-card .skin-chip.a {
+  background: var(--mock-accent);
+}
+.prog-skin-card .skin-chip.b {
+  width: 60%;
+  background: color-mix(in srgb, var(--mock-accent) 30%, transparent);
+}
+.prog-skin-card .skin-name {
+  margin-top: auto;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--b3-theme-on-surface);
+}
+/* 火苗形态卡：SVG 真形态预览居中（96×64 内 20×27） */
+.prog-skin-card--flame .skin-mock,
+.prog-skin-card--panel .skin-mock {
+  align-items: center;
+  justify-content: center;
+}
+.prog-skin-card--flame svg {
+  width: 20px;
+  height: 27px;
+}
+.prog-skin-card--flame .skin-name,
+.prog-skin-card--panel .skin-name {
+  margin-top: auto;
+}
+/* 三维子标题与微调输入 */
+.prog-skins-sub {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--b3-theme-on-surface);
+  opacity: 0.7;
+}
+.prog-tune-name {
+  flex: 1;
+}
+.prog-skin-card .skin-tag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  color: #fff;
+  background: var(--prog-accent-strong);
+}
+/* □30 货架 locked 变灰对齐 recite 档位（rs-skin--locked 同款）：样机 .45+降饱和、
+   名称 .55、not-allowed；激活后 locked 类摘除满活力（「Pro」角标只在 locked 时渲染）。
+   亮色样机提亮（vision 复审：毛玻璃/破浪焰在白底 .45 近乎隐形，广告位须认得出皮肤长样） */
+.prog-skin-card.locked {
+  cursor: not-allowed;
+}
+.prog-skin-card.locked .skin-tag {
+  background: var(--b3-theme-on-surface);
+  opacity: 0.75;
+}
+.prog-skin-card.locked .skin-mock {
+  opacity: 0.45;
+  filter: saturate(0.75);
+}
+html:not([data-theme-mode="dark"]) .prog-skin-card.locked .skin-mock {
+  opacity: 0.6;
+}
+.prog-skin-card.locked .skin-name {
+  opacity: 0.55;
+}
+html:not([data-theme-mode="dark"]) .prog-skin-card.locked .skin-name {
+  opacity: 0.65;
+}
+
+// 参数微调滑杆行
+.prog-tune-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 13px;
+}
+.prog-tune-row input[type="range"] {
+  flex: 1;
+}
+.prog-tune-row .val {
+  min-width: 3.2em;
+  text-align: right;
+  color: var(--b3-theme-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+// ---------- v5 □9 视觉终审修（2026-08-27 评审：控件吃皮肤 + 货架辨识度） ----------
+// 调参控件跟随装配色（原生蓝 #007AFF 打断「皮肤系统自己不吃皮肤」的贯通感）
+.prog-tune-row input[type="range"] {
+  accent-color: var(--prog-accent);
+}
+.tomato-settings-dialog .prog-accent-btn {
+  border-color: color-mix(in srgb, var(--prog-accent) 55%, var(--b3-border-color));
+  color: var(--prog-accent-strong);
+}
+.tomato-settings-dialog .prog-search-input:focus {
+  border-color: var(--prog-accent);
+  box-shadow: 0 0 0 2px var(--prog-accent-soft);
+}
+
+// 配色组 6 列单行（消灭 5+1 孤行）
+.prog-skins-row--six {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.prog-skins-row--six .prog-skin-card {
+  width: auto;
+}
+
+// 配色样机右下火苗色圆点：冷焰主题露出真火色，深色条不再「像缺图」
+.prog-skin-card .skin-mock {
+  position: relative;
+}
+.prog-skin-card .skin-flame-dot {
+  position: absolute;
+  right: 8px;
+  bottom: 26px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mock-flame, #b06e1e);
+  box-shadow: 0 0 3px color-mix(in srgb, var(--mock-flame, #b06e1e) 45%, transparent);
+}
+
+// 材质样机可辨识化：素面=满宽实色条；毛玻璃=半透明内描边+透出模糊光斑；宣纸=米色纸纹
+.prog-skin-card--panel .skin-chip.a {
+  width: 100%;
+}
+.prog-skin-card--panel[data-slug="glass"] .skin-chip.a {
+  position: relative;
+  background: color-mix(in srgb, var(--mock-accent) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mock-accent) 40%, transparent);
+}
+.prog-skin-card--panel[data-slug="glass"] .skin-chip.a::after {
+  content: "";
+  position: absolute;
+  right: 12%;
+  top: -3px;
+  width: 8px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--prog-flame-base);
+  filter: blur(2.5px);
+}
+.prog-skin-card--panel[data-slug="paper"] .skin-chip.a,
+.prog-skin-card--panel[data-slug="paper"] .skin-chip.b {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(120, 96, 64, 0.22) 2px 3px),
+    color-mix(in srgb, #d9c8a5 70%, var(--b3-theme-surface));
+  border-radius: 2px;
+}
+// ============================================================
+// □11 浮条统一落地（2026-08-30）：状态栏 ✂ 钮（火苗旁）+ 浮层族共享容器 +
+// digest 态路径胶囊。浮层族=路线图/目录/路线指引/原文侧追溯四浮层共一样式族。
+// ============================================================
+.prog-freebtn-host {
+  display: flex;
+  align-items: center;
+}
+.prog-freebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 100%;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--b3-theme-on-surface);
+  opacity: 0.85;
+  cursor: pointer;
+  transition: opacity 0.12s ease-out;
+}
+.prog-freebtn:hover {
+  opacity: 1;
+}
+
+// ---- 浮层族共享容器（FloatPopover.svelte）----
+.prog-popover {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  /* 宽度自适应：max-content 跟内容（短清单不显空），下限 240 上限由内联 max-width 钳 */
+  width: max-content;
+  min-width: 240px;
+  border-radius: 8px;
+  border: 1px solid var(--b3-border-color);
+  background: var(--b3-theme-surface);
+  box-shadow: var(--b3-dialog-shadow, var(--b3-point-shadow));
+  overflow: hidden;
+  z-index: 1000;
+  animation: prog-popover-in 0.14s ease-out;
+}
+@keyframes prog-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.prog-popover-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--b3-border-color);
+}
+.prog-popover-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--b3-theme-on-surface);
+}
+.prog-popover-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--b3-theme-on-surface);
+  cursor: pointer;
+}
+.prog-popover-close:hover {
+  background-color: var(--b3-list-hover);
+}
+.prog-popover-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.prog-popover-hint {
+  padding: 16px 12px;
+  font-size: 12px;
+  color: var(--b3-theme-on-surface);
+  opacity: 0.6;
+  text-align: center;
+}
+.prog-popover-group {
+  flex: none;
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--b3-theme-on-surface);
+  opacity: 0.55;
+}
+.prog-popover-list {
+  display: flex;
+  flex-direction: column;
+}
+.prog-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--b3-theme-on-surface);
+  cursor: pointer;
+}
+button.prog-popover-item:hover {
+  background-color: var(--b3-list-hover);
+}
+.prog-popover-item-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prog-popover-branch {
+  flex: none;
+  opacity: 0.4;
+  font-size: 11px;
+}
+/* 🔨 完成态摘抄：读侧保留可见但弱化（写侧已随三 tab Dialog 退役，□11 review P1） */
+.prog-popover-item--done {
+  opacity: 0.5;
+}
+.prog-popover-donemark {
+  flex: none;
+  font-size: 11px;
+}
+.prog-popover-chip {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--prog-accent, var(--b3-theme-primary)) 14%, transparent);
+  color: var(--prog-accent, var(--b3-theme-primary));
+  font-size: 11px;
+  font-weight: 600;
+}
+/* □29 超量升级入口「查看全部 N 条」：sticky 钉在滚动区底部常可见（30 行预览超折叠线，
+ * 普通流里按钮滚 18 行才见=升级入口可发现性为零）+ accent 加粗与普通行区分（vision P1-1/P1-2）。
+ * sticky 必须挂在 wrap（list）上——挂在按钮上时包含块=list 自身高度，无移动空间不生效 */
+.prog-popover-more-wrap {
+  position: sticky;
+  bottom: -4px; /* 抵消 .prog-popover-body 的 4px 底 padding，贴齐浮层底 */
+  z-index: 1;
+  background: var(--b3-theme-surface);
+  border-top: 1px solid var(--b3-border-color);
+}
+.prog-popover-more-wrap .prog-popover-item-text {
+  color: var(--prog-accent, var(--b3-theme-primary));
+  font-weight: 600;
+}
+// 路线指引浮层行=纯展示（非按钮）：去 hover 感、图标着 accent
+.prog-route-here {
+  padding: 8px 10px 4px;
+  opacity: 0.8;
+}
+.prog-route-item {
+  cursor: default;
+}
+.prog-route-item svg {
+  flex: none;
+  color: var(--prog-accent, var(--b3-theme-primary));
+}
+// 仿写联动页脚（书态路线指引）：说明行可换行弱化（不走 item 的 nowrap+ellipsis），
+// 动作按钮 accent 描边行——与路线行的纯展示态拉开层级
+.prog-route-recite-hint {
+  padding: 2px 10px 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--b3-theme-on-surface);
+  opacity: 0.7;
+}
+.prog-route-recite-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 10px 6px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--prog-accent, var(--b3-theme-primary)) 35%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--prog-accent, var(--b3-theme-primary)) 10%, transparent);
+  color: var(--prog-accent, var(--b3-theme-primary));
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.prog-route-recite-btn:hover {
+  border-color: color-mix(in srgb, var(--prog-accent, var(--b3-theme-primary)) 50%, transparent);
+  background: color-mix(in srgb, var(--prog-accent, var(--b3-theme-primary)) 18%, transparent);
+}
+.prog-route-recite-btn svg {
+  flex: none;
+}
+
+// ---- digest 态路径胶囊（浮条首行上方一行）----
+.prog-fb-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0 0 2px;
+  padding: 2px 6px;
+  border: 1px solid var(--prog-card-border, var(--b3-border-color));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--prog-accent, var(--b3-theme-primary)) 8%, var(--b3-theme-surface));
+  color: var(--b3-theme-on-surface);
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background-color 0.12s ease-out;
+}
+.prog-fb-crumbs:hover {
+  background: color-mix(in srgb, var(--prog-accent, var(--b3-theme-primary)) 16%, var(--b3-theme-surface));
+}
+.prog-fb-crumbs-book {
+  flex: none;
+  display: flex;
+  align-items: center;
+  color: var(--prog-accent, var(--b3-theme-primary));
+}
+.prog-fb-crumbs-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

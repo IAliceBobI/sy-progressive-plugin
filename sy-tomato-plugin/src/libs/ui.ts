@@ -37,6 +37,8 @@ export function isPinned() {
 
 export function addIcon(plugin: Plugin, minute: number | string) {
     const id = "iconTomato" + minute;
+    // 重挂（番茄钟档位即时重配）会重复注册同名 symbol：同 id 同内容本就无害，查重防 sprite 膨胀
+    if (document.getElementById(id)) return id;
     plugin.addIcons(`<symbol id="${id}" viewBox="0 0 32 32"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
     <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-size="20" font-weight="bold">${minute}</text>
     </svg></symbol>`);
@@ -101,7 +103,9 @@ export function searchSettings(settingsDiv: HTMLElement, searchKey: string) {
                 .some((b) => (b as HTMLElement).style.display !== "none");
             e.style.display = anyVisible ? "" : "none";
         });
-        settingsDiv.querySelectorAll("div,strong").forEach(e => {
+        // span 也要枚举（□23 起渐进设置行 label 包 span 挂 tooltip，直接文本在 span 里，
+        // 只枚举 div,strong 会命中但不高亮；span 无直接文本的经 getDirectTextContent 自然空过）
+        settingsDiv.querySelectorAll("div,strong,span").forEach(e => {
             if (getDirectTextContent(e).toLocaleLowerCase().includes(sk)) {
                 e.classList.add("tomato-highlight")
             }

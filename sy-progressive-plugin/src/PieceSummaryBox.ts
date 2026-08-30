@@ -4,32 +4,17 @@ import { NewLute, cloneCleanDiv, getID, siyuan } from "../../sy-tomato-plugin/sr
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { PieceSummaryBoxmenu, summary2dailynote, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
-export const PieceSummaryBox收集内容到文件 = winHotkey("shift+alt+o", "收集内容到文件 2025-5-13 08:44:46", "💼", () => tomatoI18n.收集内容到文件, true, PieceSummaryBoxmenu)
+export const PieceSummaryBox收集内容到文件 = winHotkey("shift+alt+o", "收集内容到文件", "💼", () => tomatoI18n.收集内容到文件, true) // □14 收费门恢复（收集=合并导出型，Pro）
 
 class PieceSummaryBox {
     private plugin: Plugin;
     settings: TomatoSettings;
     lute: Lute;
-
-    blockIconEvent(detail: any) {
-        if (!this.plugin) return;
-        const menu = detail.menu;
-        if (PieceSummaryBox收集内容到文件.menu()) {
-            menu.addItem({
-                iconHTML: PieceSummaryBox收集内容到文件.icon,
-                label: PieceSummaryBox收集内容到文件.langText(),
-                accelerator: PieceSummaryBox收集内容到文件.m,
-                click: async () => {
-                    this.copyBlocks(events.protyle?.protyle);
-                }
-            });
-        }
-    }
 
     async onload(plugin: Plugin, settings: TomatoSettings) {
         this.plugin = plugin;
@@ -46,36 +31,21 @@ class PieceSummaryBox {
                 }
             },
         });
-        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
-            const menu = detail.menu;
-            if (PieceSummaryBox收集内容到文件.menu()) {
-                menu.addItem({
-                    iconHTML: PieceSummaryBox收集内容到文件.icon,
-                    label: PieceSummaryBox收集内容到文件.langText(),
-                    accelerator: PieceSummaryBox收集内容到文件.m,
-                    click: async () => {
-                        this.copyBlocks(events.protyle?.protyle);
-                    }
-                });
-            }
-        });
     }
 
-    private async copyBlocks(protyle: IProtyle) {
+    /** v5 □7：入口收进浮条 [+] 高级功能 + 命令面板（右键菜单/块图标菜单退役）；
+        summary2dailycard 日记分支随设置砍除，固定收集到书的 summary 文档 */
+    async copyBlocks(protyle: IProtyle) {
         const { selected } = await events.selectedDivs(protyle);
         if (!(selected?.length > 0)) return;
         let summaryID: string;
-        if (summary2dailynote.get()) {
-            //
-        } else {
-            const { bookID } = await getBookIDByBlock(getID(selected[0]));
-            if (bookID) {
-                summaryID = await findSummary(bookID);
-                if (!summaryID) {
-                    const hpath = await getHPathByDocID(bookID, "summary");
-                    if (hpath) {
-                        summaryID = await getSummaryDoc(bookID, events.boxID, hpath);
-                    }
+        const { bookID } = await getBookIDByBlock(getID(selected[0]));
+        if (bookID) {
+            summaryID = await findSummary(bookID);
+            if (!summaryID) {
+                const hpath = await getHPathByDocID(bookID, "summary");
+                if (hpath) {
+                    summaryID = await getSummaryDoc(bookID, events.boxID, hpath);
                 }
             }
         }

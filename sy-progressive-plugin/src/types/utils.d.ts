@@ -4,7 +4,9 @@ declare module "*.scss";
 
 type AsList = "p" | "i" | "t";
 
-type WordCountType = { id: string; count: number; type: string; subType: string, div: HTMLElement };
+// div 字段已随统计步骤 childBlocks 化退役（2026-08-30）：加书链路无人消费，
+// 落盘 preSave 只存 id
+type WordCountType = { id: string; count: number; type: string; subType: string };
 
 type BookInfo = {
     time?: number,
@@ -24,6 +26,7 @@ type BookInfo = {
     finishPieceID?: string,
     finishIgnore?: boolean,
     finishShowInput?: boolean,
+    archived?: string,
 };
 
 type BookInfos = { [key: string]: BookInfo };

@@ -1,41 +1,23 @@
-import { IProtyle, Lute, Plugin } from "siyuan";
-import { BlockNodeEnum, DATA_NODE_ID, DATA_NODE_INDEX, DATA_TYPE, IN_BOOK_INDEX, PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_INDEX, PDIGEST_LAST_ID, PROG_ORIGIN_TEXT, RefIDKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
-import { cleanDiv, get_siyuan_lnk_md, getContenteditableElement, NewNodeID, parseIAL, replaceAll, set_href, addCardSetDueTime, siyuan, getAllContentEditableText, getAllText } from "../../sy-tomato-plugin/src/libs/utils";
-import { getHPathByDocID, getTraceDoc } from "./helper";
+import { IProtyle, Plugin } from "siyuan";
+import { BlockNodeEnum, DATA_NODE_ID, DATA_NODE_INDEX, DATA_TYPE, IN_BOOK_INDEX, MarkKey, PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_LAST_ID, PROG_ORIGIN_TEXT, RefIDKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
+import { cleanDiv, get_siyuan_lnk_md, parseIAL, replaceAll, addCardSetDueTime, siyuan, getAllContentEditableText, getAllText } from "../../sy-tomato-plugin/src/libs/utils";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
+import { invalidateDigestMarker, markDigests } from "./digestMarker";
 import { splitLines } from "./SplitSentence";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { digest2dailycard, digest2Trace, digestAddReadingpoint, digestGlobalSigle, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { digest2dailycard, digestAddReadingpoint, digestGlobalSigle, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { getDailyPath } from "./FlashBox";
-import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
-import { zipNways } from "../../sy-tomato-plugin/src/libs/functional";
+import { progStorage } from "./ProgressiveStorage";
+import { ReviewKey, markQuestion } from "./reviewQueue";
+import { PIECE_IDX_KEY, buildPieceIdx, piecePointFromMark, validDigestMd } from "./originTrace";
 
-async function addPlusLnk(selected: HTMLElement[], digestID: string, lute: Lute) {
-    const div = selected[selected.length - 1];
-    const edit = getContenteditableElement(div);
-    if (edit) {
-        const span = edit.appendChild(document.createElement("span")) as HTMLElement;
-        set_href(span, digestID, "+");
-        return siyuan.safeUpdateBlock(div.getAttribute(DATA_NODE_ID), lute.BlockDOM2Md(div.outerHTML));
-    }
-}
-
-async function changeBG(div: HTMLElement) {
-    div.style.backgroundColor = "var(--b3-font-background11)";
-    const attrs = { "style": "background-color: var(--b3-font-background11);" } as AttrType;
-    return siyuan.setBlockAttrs(div.getAttribute(DATA_NODE_ID), attrs);
-}
-
-function genSQL(bookID: string, name: string, and: string, order: string) {
-    return `select root_id from attributes 
-        where name="${name}" 
-        and value like "${bookID}#%" 
-        and ${and} order by value ${order} limit 1`;
-}
+// □12 摘抄标记零触碰统一（2026-08-30）：+ 链接（addPlusLnk）与写 style 背景（changeBG）
+// 两个动正文路径退役，原文痕迹唯一机制=digestMarker span 渲染态（digestMarker.ts），
+// 背景色并入 CSS div:has(> .prog-digest-mark)（index.scss，body 类总开关）。
+// 存量正文里的 + 链接与 style 背景不清理（老政策：用户数据不动）。
 
 export class DigestBuilder {
     protyle: IProtyle;
@@ -54,6 +36,10 @@ export class DigestBuilder {
     otab: SingleTab;
     attrs: AttrType;
     settings: TomatoSettings;
+    /** □16：摘抄发起文档是片时的片序号（写片序号键用；null=非片发起） */
+    piecePoint: number | null = null;
+    /** v5：getBookID 结果是否为已注册的书——非书文本（含札记摘抄再摘抄）落札记匣 */
+    inBook: boolean;
 
     async init() {
         this.allText = getAllText(this.selected);
@@ -63,6 +49,32 @@ export class DigestBuilder {
         if (fallbackID) this.anchorID = fallbackID;
 
         let { bookID } = await getBookID(this.docID);
+        let localPoint: number | null = null;
+        if (!bookID) {
+            // □29 属性窗口兜底：片文档 IAL custom-progmark 走 createDocWithMd 两步后补，
+            // 巨书出片后实测 24s+ 仍读不到 → 此处解析空、旧逻辑 fallback 片 id 会让摘抄
+            // ctime 挂错归属（清单查空）。片内容块的 custom-progref（书原文块 id，随
+            // insert 事务内联落盘、无后补窗口）在 DOM 上直读可靠，用它扫本地分片索引
+            // 反查归属书与片序号。书态原书块无 progref 不命中，行为不变；自由态同。
+            // 光标态 selected 可能是嵌套块（列表项内段等），progref 只挂 wysiwyg 直接
+            // 子级的复制块上——沿父链爬到直接子级再取（reasoning P2-1）
+            const refOf = (el: HTMLElement): string | null => {
+                let n: HTMLElement | null = el;
+                while (n && n.parentElement && !n.parentElement.classList.contains("protyle-wysiwyg")) {
+                    n = n.parentElement;
+                }
+                return n?.getAttribute?.(RefIDKey) ?? null;
+            };
+            const refID = (this.selected ?? []).map(refOf).find(v => !!v) ?? "";
+            if (refID) {
+                const hit = await progStorage.findPieceByBlockID(refID);
+                if (hit) {
+                    bookID = hit.bookID;
+                    localPoint = hit.point;
+                }
+            }
+        }
+        this.inBook = !!bookID && !!progStorage.booksInfos()[bookID];
         if (!bookID) bookID = this.docID;
         this.bookID = bookID;
 
@@ -74,21 +86,10 @@ export class DigestBuilder {
         if (currentDocAttrs["custom-card-priority"]) {
             this.attrs["custom-card-priority"] = currentDocAttrs["custom-card-priority"];
         }
-    }
-
-    async getDigest(bIdx: string, ctime: string, arrow: string, order: string) {
-        if (bIdx) {
-            const row = await siyuan.sqlAttr(genSQL(this.bookID, PDIGEST_INDEX, `value ${arrow} "${bIdx}"`, order));
-            if (row.length > 0) return row[0]?.root_id;
-
-        }
-        if (ctime) {
-            const row = await siyuan.sqlAttr(genSQL(this.bookID, PDIGEST_CTIME, `value ${arrow} "${ctime}"`, order));
-            if (row.length > 0) return row[0]?.root_id;
-        }
-        const row = await siyuan.sqlAttr(`select root_id from attributes where name="${PDIGEST_CTIME}"
-            and value like "${this.bookID}#%" order by value desc limit 1`);
-        if (row.length > 0) return row[0]?.root_id;
+        // □16 片序号键：发起文档是片（IAL custom-progmark）时记下片序号，
+        // digest 里 parent-id 锚的片删掉后按它重切同片（片=一次性餐具可领新的）；
+        // mark 同在两步属性窗口内读不到（□29）→ 反查所得 localPoint 兜底
+        this.piecePoint = piecePointFromMark(currentDocAttrs[MarkKey]) ?? localPoint;
     }
 
     async saveCardMode() {
@@ -105,22 +106,17 @@ export class DigestBuilder {
     }
 
     private async setDigestCard(digestID: string) {
-        if (digest2dailycard.get() && lastVerifyResult()) {
+        if (digest2dailycard.get()) {
             addCardSetDueTime(digestID)
         } else {
             if (this.cardMode == "0") {
                 return;
             } else if (this.cardMode == "1") {
-                const row = await siyuan.sqlOne(`SELECT a.id FROM blocks a
-                    INNER JOIN (
-                        SELECT hpath,content
-                        FROM blocks
-                        WHERE type='d'
-                        AND id ='${this.bookID}'
-                    ) b ON a.hpath = b.hpath || '/digest-' || b.content
-                WHERE a.type='d' limit 1`);
-                if (row?.id) {
-                    const cards = await siyuan.getTreeRiffCardsAll(row.id);
+                // v5：digest 夹位置无关（IAL 锚定），子树旧卡直接按夹 ID 取；
+                // 非书文本没有书夹，按札记匣子树清卡
+                const dirID = this.inBook ? await progStorage.ensureDigestDir(this.bookID) : await progStorage.ensureNoteBox();
+                if (dirID) {
+                    const cards = await siyuan.getTreeRiffCardsAll(dirID);
                     await siyuan.removeRiffCards(cards.map(card => card.id));
                 }
             }
@@ -128,183 +124,225 @@ export class DigestBuilder {
         }
     }
 
-    async finishDigest() {
-        const digestID = this.docID;
-        await siyuan.removeRiffCards([digestID]);
-        await siyuan.setBlockAttrs(digestID, { "custom-pdigest-ctime": "🔨#" + this.ctime } as AttrType);
-        await siyuan.renameDocByID(digestID, "🔨" + this.docName);
-        const rows = await siyuan.sqlAttr(`select block_id from attributes where 
-            name="${PDIGEST_CTIME}" 
-            and value like "${this.bookID}#%"
-            and value<"${this.ctime}" 
-            and block_id!="${digestID}"
-            order by value desc limit 1`);
-        if (await this.tryOpen(rows)) return;
-        const latestRows = await siyuan.sqlAttr(`select block_id from attributes where 
-            name="${PDIGEST_CTIME}" 
-            and value like "${this.bookID}#%"
-            and block_id!="${digestID}"
-            order by value desc limit 1`);
-        if (await this.tryOpen(latestRows)) return;
-        await this.otab.open(this.anchorID);
-    }
-
-    async cleanDigest() {
-        const rows = await siyuan.sqlAttr(`select block_id from attributes where name="${PDIGEST_CTIME}" and value like "🔨#${this.bookID}#%" limit 1000000`);
-        for (const row of rows) await siyuan.removeDocByID(row.block_id);
-    }
-
-    async gotoDigest(arrow: string, order: string) {
-        const docAttrs = await siyuan.getBlockAttrs(this.docID);
-        const bIdx = docAttrs["custom-pdigest-index"];
-        const ctime = docAttrs["custom-pdigest-ctime"];
-        const id = await this.getDigest(bIdx, ctime, arrow, order);
-        await this.otab.open(id);
-    }
-
-    async getDigestLnk(open = true) {
-        const taskContents = siyuan.getChildBlocks(this.bookID)
-            .then(async rows => {
-                const rs = await siyuan.getRows(rows.filter(i => i.type == 'h').map(i => i.id), "markdown", true);
-                const map = new Map(rs.map(r => [r.id, r.markdown]))
-                return rows.map(r => {
-                    return { id: r.id, type: r.type, content: map.get(r.id) }
-                })
-            });
-
-        const taskTraceID = getHPathByDocID(this.bookID, "trace")
-            .then(hpath => getTraceDoc(this.bookID, this.boxID, hpath))
-            .then(async traceID => {
-                await siyuan.clearAll(traceID);
-                return traceID
-            });
-
-        const rows = await siyuan.sql(`select ial,content,id from blocks where id = "${this.bookID}" or id in 
-            (select block_id from attributes where name="${PDIGEST_CTIME}" and value like "${this.bookID}#%" limit 1000000)`);
-        if (rows.length <= 1) return;
-
-        const [attrMap, parents] = rows.map(r => {
-            const a = parseIAL(r.ial);
-            a.title = r.content;
-            a.id = r.id;
-            return a;
-        }).reduce(([a, p], attr) => {
-            a.set(attr.id, attr);
-            p.add(attr["custom-pdigest-parent-id"]);
-            return [a, p];
-        }, [new Map<string, AttrType>(), new Set<string>()]);
-
-        const bookName = attrMap.get(this.bookID).title;
-
-        const leaves = [...attrMap.keys()].reduce((l, id) => {
-            if (!parents.has(id) && id != this.bookID) l.push(attrMap.get(id));
-            return l;
-        }, [] as AttrType[]).sort((a, b) => -a["custom-pdigest-ctime"].localeCompare(b["custom-pdigest-ctime"]));
-
-        const lines = leaves.map(leave => {
-            const lnk: AttrType[] = [];
-            lnk.push(leave);
-            do {
-                if (leave["custom-pdigest-parent-id"] == this.bookID) break;
-                leave = attrMap.get(leave["custom-pdigest-parent-id"]);
-                if (leave) lnk.push(leave);
-            } while (leave);
-            return lnk;
-        }).map(list => {
-            const line: string[] = [];
-            for (const attr of list) line.push(get_siyuan_lnk_md(attr.id, attr.title));
-            line.push(get_siyuan_lnk_md(this.bookID, bookName));
-            const lnk = `${line.join(" -> ")}\n{: id="${NewNodeID()}"}\n{: id="${NewNodeID()}"}`;
-            return { lnk, id: list[0]["custom-pdigest-last-id"] };
-        });
-
-        await siyuan.getRows(lines.map(l => l.id), "id,ial", true, [`ial like "%custom-progref%"`], true)
-            .then(rows => {
-                for (const [row, line] of zipNways(rows, lines)) {
-                    const attr = parseIAL(row?.ial)
-                    if (attr["custom-progref"]) {
-                        line.id = attr["custom-progref"]
-                    }
-                }
-            });
-
-        const extContents = (await taskContents).map(c => {
-            const list = [];
-            if (c.type == "h") list.push(`${c.content}${get_siyuan_lnk_md(c.id, "   .   ")}`);
-            list.push(...lines.filter(i => i.id == c.id).map(l => l.lnk))
-            return list;
-        }).flat();
-        const traceID = await taskTraceID;
-        await siyuan.insertBlockAsChildOf(`{{{row\n${extContents.join("\n")}\n}}}`, traceID);
-        if (open) await this.otab.open(traceID);
-    }
-
-    private async getDigestDocID() {
-        if (digest2dailycard.get() && lastVerifyResult()) {
-            return getDailyPath().split("/").slice(0, -1).join("/")
-        } else {
-            return getHPathByDocID(this.bookID, "digest");
-        }
-    }
-
-    private async newDigestDoc(idx: string, md: string) {
-        const hpath = await this.getDigestDocID();
+    private async newDigestDoc(idx: string, md: string, question = false, whole = false, forRecite = false) {
         const attr = {} as AttrType;
         const ct = new Date().getTime();
         attr["custom-pdigest-index"] = `${this.bookID}#${idx.padStart(10, "0")}`;
         attr["custom-pdigest-parent-id"] = this.docID;
         attr["custom-pdigest-last-id"] = this.anchorID;
         attr["custom-pdigest-ctime"] = `${this.bookID}#${ct}`;
+        // □16：片发起的摘抄顺手写片序号键（parent-id 锚片 ID，片删后悬空；序号才可再生）
+        if (this.piecePoint != null) attr[PIECE_IDX_KEY] = buildPieceIdx(this.bookID, this.piecePoint);
         attr["custom-card-priority"] = this.attrs["custom-card-priority"] ?? "60";
         attr["custom-off-tomatobacklink"] = "1";
         attr["custom-progmark"] = `${TEMP_CONTENT}#${this.bookID},${ct}`;
-        const digestID = await siyuan.createDocWithMd(this.boxID, `${hpath}/[${idx}]${this.allText.slice(0, 10)}`, md, "", attr);
+        // v5 落点：书摘抄进 prog-data/digest-书名/，非书文本进札记匣（夹均按 IAL 锚定，位置无关；
+        // 日记模式 digest2dailycard 保持用户自选落点不变）
+        let boxID = this.boxID;
+        let dirPath: string;
+        if (digest2dailycard.get()) {
+            dirPath = getDailyPath().split("/").slice(0, -1).join("/");
+        } else {
+            const dirID = this.inBook ? await progStorage.ensureDigestDir(this.bookID) : await progStorage.ensureNoteBox();
+            if (!dirID) return "";
+            // digest 夹可能刚建（首次摘抄），SQL 索引未进查空 box，走 getBlockInfo 文件树直查
+            const info = await siyuan.getBlockInfo(dirID);
+            if (!info?.box) return "";
+            boxID = info.box;
+            dirPath = await siyuan.getHPathByID(dirID, info.box);
+            if (!dirPath) return "";
+        }
+        // 「仿写」前缀仅仿写副本链路（□28）：整摘副本无仿写语义不加，用户靠前缀一眼认出练习文档
+        const title = `${forRecite ? "仿写" : ""}${question ? "❓" : ""}[${whole ? "整" : idx}]${this.allText.slice(0, 10)}`;
+        const digestID = await siyuan.createDocWithMd(boxID, `${dirPath}/${title}`, md, "", attr);
+        // 新摘抄即失效痕迹缓存：refMap 有 60s TTL，不失效则当前文档 ≤60s 内重出场不打新痕迹
+        if (digestID) invalidateDigestMarker(this.bookID);
         return digestID;
     }
 
-    async digest(split = false) {
-        const { idx, md } = await getDigestMd(this.settings, this.selected, this.protyle, split, true, false, this.attrs);
-        // 过滤空内容：移除空字符串、纯空白字符或仅包含属性行的条目
-        const validMd = md.filter(m => {
-            if (!m || !m.trim()) return false;
-            // 检查是否仅包含属性行（如 {: id="xxx" }）
-            const lines = m.trim().split('\n').filter(line => line.trim());
-            if (lines.length === 0) return false;
-            // 如果只有一行且是属性行，则视为无效
-            if (lines.length === 1 && lines[0].startsWith('{:')) return false;
-            return true;
-        });
+    /** 问题摘抄：给文档首个内容块打 custom-prog-think（曲线重访入口，见 reviewQueue.ts） */
+    private async markQuestionOn(digestID: string) {
+        if (!digestID) return;
+        const rows = await siyuan.getChildBlocks(digestID);
+        const first = rows.find(r => r.type !== "h");
+        if (!first) return;
+        await siyuan.setBlockAttrs(first.id, { [ReviewKey]: markQuestion(Date.now()) } as AttrType);
+    }
+
+    async digest(split = false, question = false) {
+        const { idx, md } = await getDigestMd(this.settings, this.selected, split, true, false);
+        // 过滤空内容：移除空字符串、纯空白字符或仅包含属性行的条目（□16 抽出与整摘共用）
+        const validMd = validDigestMd(md);
         if (validMd.length == 0) {
             siyuan.pushMsg(tomatoI18n.没有有效的摘抄内容);
             return;
         }
-        const digestID = await this.newDigestDoc(idx, validMd.join("\n"));
+        const digestID = await this.newDigestDoc(idx, validMd.join("\n"), question);
+        if (question) await this.markQuestionOn(digestID);
+        // □12：摘抄后立即重打当前文档痕迹（竖条+背景渲染态）；缓存刚被 invalidate 失效，
+        // 不必 force。不 await——otab.open 可能替换页签，fire-and-forget 持引用打标无害
+        markDigests(this.protyle, this.bookID).catch(() => { });
         await this.otab.open(digestID, windowOpenStyle.get() as any, this.ids.at(0));
         await this.setDigestCard(digestID);
-        if (digestProgressiveBox.settings.markOriginText && !(await events.isDocReadonly(this.protyle, this.attrs))) {
-            addPlusLnk(this.selected, digestID, digestProgressiveBox.lute);
-        }
-        if (digest2Trace.get() && lastVerifyResult()) {
-            setTimeout(() => {
-                this.getDigestLnk(false);
-            }, 4000);
-        }
         if (digestAddReadingpoint.get()) {
             readingPointBox.addReadPointLock(this.ids[this.ids.length - 1], this.selected[this.selected.length - 1])
         }
     }
 
-    async tryOpen(rows: Attributes[]) {
-        if (rows.length > 0) {
-            await siyuan.addRiffCards([rows[0].block_id]);
-            await this.otab.open(rows[0].block_id);
-            return true;
+    /**
+     * □16 整摘：一键整片/整文 → 新 digest 副本（用户在副本上挑拣删改成侧重化变形）。
+     * 复用现有复制管道（getDigestMd+fastCopyBlock 同链路），IAL 属性行随块复制自动继承
+     * progref——溯源/痕迹零额外工作。与 digest() 差异：selected=全文档顶层块、无选中态副作用
+     * （不加原文标记/阅读点/trace）、cardMode 走书默认（"0" 不入卡）。
+     * 返回新副本 docID（空内容早退返 ""——□27 仿写本片副本链路需要定向进仿写；
+     * 现有整摘调用方忽略返回值无碍）。
+     * forRecite（□28 仿写副本练习链路）：标题加「仿写」前缀 + 打开副本强制前台（"1" front）——
+     * 练习对象就是副本本身，用户必须被带过去；windowOpenStyle 的 back/nop 档会把人留在原片，
+     * 而后台副本加载事件会让 recite 背景跟角色错铺到原片。整摘链路不传，保持用户打开偏好。
+     */
+    async digestWhole(forRecite = false): Promise<string> {
+        const { idx, md } = await getDigestMd(this.settings, this.selected, false, true, false);
+        const validMd = validDigestMd(md);
+        if (validMd.length == 0) {
+            siyuan.pushMsg(tomatoI18n.没有有效的摘抄内容);
+            return "";
         }
-        return false;
+        const digestID = await this.newDigestDoc(idx, validMd.join("\n"), false, true, forRecite);
+        if (!digestID) {
+            // 摘抄目录解析失败（ensureDigestDir/getBlockInfo 瞬态空）——newDigestDoc 内部静默，
+            // 此处补提示防「点了没反应」（review P2-2；副本链路据此知道已 toast）
+            siyuan.pushMsg(tomatoI18n.摘抄目录未就绪请重试);
+            return "";
+        }
+        // 整摘同享 invalidate 缓存失效，与 digest() 对称即时重打（review P2#4）
+        markDigests(this.protyle, this.bookID).catch(() => { });
+        await this.otab.open(digestID, (forRecite ? "front" : windowOpenStyle.get()) as any, this.ids.at(0));
+        await this.setDigestCard(digestID);
+        return digestID;
     }
 }
 
-export async function getDigestMd(settings: TomatoSettings, selected: HTMLElement[], protyle: IProtyle, split: boolean, ref = true, checkbox = false, attrs?: AttrType) {
+// ============ □11 浮层族数据层（trace 文档机制的「拉」版替代，getDigestLnk SQL 链路复用） ============
+
+/** 摘抄树节点：children=本摘抄上再摘抄的支路（支路→主干）；done=🔨 完成态（读侧保留） */
+export interface DigestTreeNode {
+    id: string;
+    title: string;
+    ctime: string;
+    done: boolean;
+    children: DigestTreeNode[];
+}
+
+export interface DigestTreeData {
+    bookName: string;
+    /** 顶层摘抄（parent 是书或不在摘抄集合内） */
+    roots: DigestTreeNode[];
+    /** 全部摘抄按 ctime 倒序（原文侧追溯浮层的清单形态用） */
+    flat: DigestTreeNode[];
+}
+
+/** ctime 值剥 🔨 完成态前缀（finishDigest 写「🔨#bookID#ct」）；非完成态返回 null */
+function doneCtime(v: string): string | null {
+    return v.startsWith("🔨#") ? v.slice(2) : null;
+}
+
+/**
+ * 查书的全摘抄树（路线图浮层/原文侧追溯浮层共用）：SQL 取书+全部摘抄文档（ctime
+ * like `bookID#%` + 完成态 `🔨#bookID#%`——读侧保留 🔨 存量可见〔□11 review P1：写侧
+ * 随三 tab Dialog 退役，完成态入口去留待拍板〕），parent-id 组树。环防护：挂树后先
+ * 算完整不可达集（环+环上挂块）再统一提升进 roots——逐个提升会与已提升父重复挂载。
+ */
+export async function queryDigestTree(bookID: string): Promise<DigestTreeData> {
+    const rows = await siyuan.sql(`select ial,content,id from blocks where id = "${bookID}" or id in
+        (select block_id from attributes where name="${PDIGEST_CTIME}" and (value like "${bookID}#%" or value like "🔨#${bookID}#%") limit 1000000)`);
+    let bookName = "";
+    const nodes: DigestTreeNode[] = [];
+    const parentOf = new Map<string, string>();
+    for (const r of rows) {
+        const a = parseIAL(r.ial);
+        if (r.id === bookID) {
+            bookName = r.content ?? "";
+            continue;
+        }
+        const ct = a[PDIGEST_CTIME] ?? "";
+        // 排序统一按剥前缀后的真实时间；done 单独记，弱化渲染用
+        nodes.push({ id: r.id, title: r.content ?? "", ctime: doneCtime(ct) ?? ct, done: doneCtime(ct) != null, children: [] });
+        parentOf.set(r.id, a["custom-pdigest-parent-id"] ?? "");
+    }
+    const byId = new Map(nodes.map(n => [n.id, n]));
+    const roots: DigestTreeNode[] = [];
+    for (const n of nodes) {
+        const p = byId.get(parentOf.get(n.id) ?? "");
+        if (p && p !== n) p.children.push(n);
+        else roots.push(n);
+    }
+    // 环提升：先 DFS 收集从 roots 可达集，剩余完整不可达集一次性补进 roots（review P2）
+    const seen = new Set<string>();
+    const stack = [...roots];
+    while (stack.length) {
+        const n = stack.pop()!;
+        if (seen.has(n.id)) continue;
+        seen.add(n.id);
+        stack.push(...n.children);
+    }
+    const unreachable = nodes.filter(n => !seen.has(n.id));
+    if (unreachable.length > 0) {
+        roots.push(...unreachable);
+        stack.push(...unreachable);
+        while (stack.length) {
+            const m = stack.pop()!;
+            if (seen.has(m.id)) continue;
+            seen.add(m.id);
+            stack.push(...m.children);
+        }
+    }
+    const byCtimeDesc = (a: DigestTreeNode, b: DigestTreeNode) => -a.ctime.localeCompare(b.ctime);
+    roots.sort(byCtimeDesc);
+    const sortTree = (list: DigestTreeNode[]) => {
+        list.sort(byCtimeDesc);
+        list.forEach(n => sortTree(n.children));
+    };
+    sortTree(roots);
+    const flat: DigestTreeNode[] = [];
+    const collect = (list: DigestTreeNode[]) => {
+        for (const n of list) {
+            flat.push(n);
+            collect(n.children);
+        }
+    };
+    collect(roots);
+    flat.sort(byCtimeDesc);
+    return { bookName, roots, flat };
+}
+
+/** 本书批注项（✅7 增量：路线图浮层「本书批注」分组；锚定=原文块属性，渲染归 tomato 全局） */
+export interface BookCommentItem {
+    blockID: string;
+    /** 原文块内容（列表行标题；截断在渲染层） */
+    content: string;
+    /** true=选区批注（custom-tomato-key-comment），false=块批注 */
+    range: boolean;
+}
+
+/** 查书子树内带批注属性的块（选区/块批注两键，点击跳原文块）。同块双键（先块批注后
+ *  选区批注等）按 block_id 去重、选区优先——keyed each 重复 key 会炸渲染（review P2） */
+export async function queryBookComments(bookID: string): Promise<BookCommentItem[]> {
+    const rows = await siyuan.sql(`select a.block_id as id, a.name as k, b.content as c from attributes a
+        left join blocks b on b.id = a.block_id
+        where a.name in ('custom-tomato-key-comment','custom-tomato-comment')
+        and a.block_id in (select id from blocks where root_id = '${bookID}') limit 10000`);
+    const byBlock = new Map<string, BookCommentItem>();
+    for (const r of (rows ?? []) as any[]) {
+        const range = r.k === "custom-tomato-key-comment";
+        const prev = byBlock.get(r.id);
+        if (prev == null || (range && !prev.range)) {
+            byBlock.set(r.id, { blockID: r.id, content: r.c ?? "", range });
+        }
+    }
+    return [...byBlock.values()];
+}
+
+export async function getDigestMd(settings: TomatoSettings, selected: HTMLElement[], split: boolean, ref = true, checkbox = false) {
     const md: string[] = [];
     if (selected == null || selected.length == 0) return { idx: "0", md };
     let idx: string;
@@ -321,8 +359,6 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
         const cloned = div.cloneNode(true) as HTMLDivElement;
         // cloned.querySelectorAll(`div[${CONTENT_EDITABLE}="false"]`).forEach(e => e.setAttribute(CONTENT_EDITABLE, "true"));
         // const mOri = digestProgressiveBox.lute.BlockDOM2Md(cloned.outerHTML);
-
-        if (digestProgressiveBox.settings.markOriginTextBG && !(await events.isDocReadonly(protyle, attrs))) changeBG(div);
 
         await cleanDiv(cloned,
             !digestProgressiveBox.settings.digestNoBacktraceLink, // ref

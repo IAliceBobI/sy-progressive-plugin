@@ -40,12 +40,11 @@ Finally finish what you read: split long documents into daily digestible pieces 
 ## Docs & Community
 
 - 📖 **[Documentation](https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink)** (Chinese, with GIFs & videos for every feature)
-- 📅 [Changelog](https://awx9773btw.feishu.cn/docx/Cm7nd2G9KoJhOjxGACycvJU6nRg?from=from_copylink)
 - 🙏 [Acknowledgments](https://awx9773btw.feishu.cn/docx/FQ7udC3jeorfDYxI39ict2UNn2g?from=from_copylink)
 - 💬 [QQ Group](https://pd.qq.com/s/2fh7nh7gz) (Chinese) — feedback and feature requests
 - 🔓 [Open-source repo](https://github.com/IAliceBobI/sy-progressive-plugin) — what you see is what's compiled: built by GitHub Actions
 
-📊 SiYuan Marketplace: 32,000+ downloads · ★ 5.0
+📊 SiYuan Marketplace: 32,000+ downloads
 
 ## Support the Author
 

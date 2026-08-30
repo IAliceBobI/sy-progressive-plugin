@@ -1,5 +1,5 @@
 import { IProtyle } from "siyuan";
-import { set_href, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import * as gconst from "../../sy-tomato-plugin/src/libs/gconst";
@@ -7,13 +7,13 @@ import { getCardsDoc, getHPathByDocID } from "./helper";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { domNewLine, DomSuperBlockBuilder, getSpans } from "../../sy-tomato-plugin/src/libs/sydom";
 import { getDocTracer, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { flashcardAddRefs, flashcardNotebook, flashcardUseLink, makeCardEnable, makeCardHereEnable, multilineMarkEnable, send2dailyCardEnable, send2dailyCardNoRefEnable, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { flashcardAddRefs, flashcardNotebook, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
-import { lastVerifyResult, verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 
-enum CardType {
+export enum CardType {
     Here = "Here", None = "None"
 }
 
@@ -37,69 +37,15 @@ function getBlockDOM(dom: HTMLElement): { dom: HTMLElement, blockID: string } {
     return { dom, blockID };
 }
 
-export const flashBox制卡 = winHotkey("⌥E", "制卡 2025-5-13 09:05:57", "＋🗃️", () => tomatoI18n.制卡)
-export const flashBox原地制卡 = winHotkey("⌥`", "原地制卡 2025-5-13 09:05:57", "＋🗃️⬇️", () => tomatoI18n.原地制卡)
-export const flashBox制卡并发到dailycard = winHotkey("⌘`", "制卡并发到dailycard 2025-5-13 09:05:57", "🗓️🗃️⭐", () => tomatoI18n.制卡并发到dailycard)
-export const flashBox制卡并发到dailycard无引用 = winHotkey("⌥S", "制卡并发到dailycard无引用 2025-5-13 09:05:57", "🗓️🗃️", () => tomatoI18n.制卡并发到dailycard无引用, true, send2dailyCardNoRefEnable)
-export const flashBox多行标记 = winHotkey("shift+alt+enter", "多行标记 2025-5-13 09:05:57", "🪧", () => tomatoI18n.多行标记)
+export const flashBox制卡 = winHotkey("⌥E", "制卡", "＋🗃️", () => tomatoI18n.制卡)
+export const flashBox原地制卡 = winHotkey("⌥`", "原地制卡", "＋🗃️⬇️", () => tomatoI18n.原地制卡)
+export const flashBox制卡并发到dailycard = winHotkey("⌘`", "制卡并发到dailycard", "🗓️🗃️⭐", () => tomatoI18n.制卡并发到dailycard)
+export const flashBox制卡并发到dailycard无引用 = winHotkey("⌥S", "制卡并发到dailycard无引用", "🗓️🗃️", () => tomatoI18n.制卡并发到dailycard无引用) // □14 拍板免费（制卡=核心复习流，不设门）
+export const flashBox多行标记 = winHotkey("shift+alt+enter", "多行标记", "🪧", () => tomatoI18n.多行标记)
 
 class FlashBox {
     private plugin: BaseTomatoPlugin;
     private settings: TomatoSettings;
-
-    blockIconEvent(detail: any) {
-        if (!this.plugin) return;
-        if (makeCardEnable.get()) {
-            detail.menu.addItem({
-                iconHTML: flashBox制卡.icon,
-                accelerator: flashBox制卡.m,
-                label: flashBox制卡.langText(),
-                click: () => {
-                    this.makeCard(detail.protyle, CardType.None);
-                }
-            });
-        }
-        if (makeCardHereEnable.get()) {
-            detail.menu.addItem({
-                iconHTML: flashBox原地制卡.icon,
-                accelerator: flashBox原地制卡.m,
-                label: flashBox原地制卡.langText(),
-                click: () => {
-                    this.makeCard(detail.protyle, CardType.Here);
-                }
-            });
-        }
-        if (send2dailyCardEnable.get()) {
-            detail.menu.addItem({
-                iconHTML: flashBox制卡并发到dailycard.icon,
-                accelerator: flashBox制卡并发到dailycard.m,
-                label: flashBox制卡并发到dailycard.langText(),
-                click: () => {
-                    this.makeCard(detail.protyle, CardType.None, getDailyPath());
-                }
-            });
-        }
-        if (flashBox制卡并发到dailycard无引用.menu()) {
-            detail.menu.addItem({
-                iconHTML: flashBox制卡并发到dailycard无引用.icon,
-                accelerator: flashBox制卡并发到dailycard无引用.m,
-                label: flashBox制卡并发到dailycard无引用.langText(),
-                click: () => {
-                    this.makeCard(detail.protyle, CardType.None, getDailyPath(), true);
-                }
-            });
-        }
-        if (multilineMarkEnable.get()) {
-            detail.menu.addItem({
-                iconHTML: flashBox多行标记.icon,
-                accelerator: flashBox多行标记.m,
-                label: flashBox多行标记.langText(),
-                click: () => {
-                    this.multilineMark(detail.protyle);
-                }
-            });
-        }
-    }
 
     async onload(plugin: BaseTomatoPlugin, settings: TomatoSettings) {
         this.plugin = plugin;
@@ -146,75 +92,6 @@ class FlashBox {
             hotkey: flashBox多行标记.m,
             editorCallback: (p) => this.multilineMark(p),
         });
-        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
-            const menu = detail.menu;
-            if (makeCardEnable.get()) {
-                menu.addItem({
-                    iconHTML: flashBox制卡.icon,
-                    accelerator: flashBox制卡.m,
-                    label: flashBox制卡.langText(),
-                    click: () => {
-                        const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
-                        const blank = detail?.range?.cloneContents()?.textContent ?? "";
-                        if (blockID) {
-                            this.blankSpaceCard(blockID, blank, detail?.range, detail?.protyle, CardType.None);
-                        }
-                    },
-                });
-            }
-            if (makeCardHereEnable.get()) {
-                menu.addItem({
-                    iconHTML: flashBox原地制卡.icon,
-                    accelerator: flashBox原地制卡.m,
-                    label: flashBox原地制卡.langText(),
-                    click: () => {
-                        const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
-                        const blank = detail?.range?.cloneContents()?.textContent ?? "";
-                        if (blockID) {
-                            this.blankSpaceCard(blockID, blank, detail?.range, detail?.protyle, CardType.Here);
-                        }
-                    },
-                });
-            }
-            if (send2dailyCardEnable.get()) {
-                menu.addItem({
-                    iconHTML: flashBox制卡并发到dailycard.icon,
-                    accelerator: flashBox制卡并发到dailycard.m,
-                    label: flashBox制卡并发到dailycard.langText(),
-                    click: () => {
-                        const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
-                        const blank = detail?.range?.cloneContents()?.textContent ?? "";
-                        if (blockID) {
-                            this.blankSpaceCard(blockID, blank, detail?.range, detail?.protyle, CardType.None, getDailyPath());
-                        }
-                    },
-                });
-            }
-            if (flashBox制卡并发到dailycard无引用.menu()) {
-                menu.addItem({
-                    iconHTML: flashBox制卡并发到dailycard无引用.icon,
-                    accelerator: flashBox制卡并发到dailycard无引用.m,
-                    label: flashBox制卡并发到dailycard无引用.langText(),
-                    click: () => {
-                        const blockID = detail?.element?.getAttribute("data-node-id") ?? "";
-                        const blank = detail?.range?.cloneContents()?.textContent ?? "";
-                        if (blockID) {
-                            this.blankSpaceCard(blockID, blank, detail?.range, detail?.protyle, CardType.None, getDailyPath(), true);
-                        }
-                    },
-                });
-            }
-            if (multilineMarkEnable.get()) {
-                detail.menu.addItem({
-                    iconHTML: flashBox多行标记.icon,
-                    accelerator: flashBox多行标记.m,
-                    label: flashBox多行标记.langText(),
-                    click: () => {
-                        this.multilineMark(detail.protyle);
-                    }
-                });
-            }
-        });
     }
 
     async multilineMark(protyle: IProtyle) {
@@ -254,13 +131,14 @@ class FlashBox {
     //              ┌────────┐              ┌───────────┐
     //     ┌───────►│makeCard│─────────────►│ insertCard│
     //     │        └────────┘              └───────────┘
-    //     │              │                    ▲         
-    // ┌───┴─┐            │                    │         
-    // │start│            │                    │         
-    // └───┬─┘            │   ┌──────────────┐ │         
-    //     └──────────────┴──►│blankSpaceCard│─┘         
-    //                        └──────────────┘           
-    private async makeCard(protyle: IProtyle, t: CardType, path?: string, noRef?: boolean) {
+    //     │              │                    ▲
+    // ┌───┴─┐            │                    │
+    // │start│            │
+    // └───┬─┘            │   ┌──────────────┐ │
+    //     └──────────────┴──►│blankSpaceCard│─┘
+    //                        └──────────────┘
+    /** v5 □7：制卡入口收进浮条 [+] 高级功能 + 命令面板（右键菜单/块图标菜单退役） */
+    async makeCard(protyle: IProtyle, t: CardType, path?: string, noRef?: boolean) {
         if (!protyle) return;
         const { ids, divs } = await this.cloneSelectedLineMarkdowns(protyle, noRef);
         if (ids.length > 0) { // multilines
@@ -311,16 +189,8 @@ class FlashBox {
             ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
         }
 
-        if (this.settings.markOriginText && !(await events.isDocReadonly(protyle, srcDocAttrs))) {
-            const { div } = await utils.getBlockDiv(lastSelectedID);
-            if (this.settings.markOriginTextBG) (div as HTMLElement).style.backgroundColor = "var(--b3-font-background7)";
-            const edit = utils.getContenteditableElement(div);
-            if (edit) {
-                const span = edit.appendChild(document.createElement("span")) as HTMLElement;
-                set_href(span, cardID, "  &  ");
-                ops.push(...siyuan.transUpdateBlocks([{ id: lastSelectedID, domStr: div.outerHTML }]))
-            }
-        }
+        // □12 摘抄标记零触碰统一：markOriginText 退役——制卡后原文不再写 & 链接/背景
+        // （原文痕迹唯一机制=digestMarker span，摘抄侧覆盖）
 
         ops.push(siyuan.transDoUpdateUpdated(cardID))
         await siyuan.transactions(ops).then(() => {
@@ -339,7 +209,7 @@ class FlashBox {
         let refPath: string = "";
         let inBookIdx: string = "";
         const spans: HTMLElement[] = [];
-        if (flashcardAddRefs.get() && lastVerifyResult()) {
+        if (flashcardAddRefs.get()) {
             spans.push(...await getSpans(divs, await getDocTracer()));
         }
         for (const div of divs) {
@@ -402,16 +272,13 @@ class FlashBox {
         let setRef = !noRef;
         let doSetPath = true;
         const ids = [];
-        const ro = await events.isDocReadonly(protyle);
         for (const div of multiLine) {
             const { id, div: elem, setTheRef, setPath } = await this.cloneDiv(div as any, setRef, doSetPath);
-            if (this.settings.markOriginText && !ro) if (this.settings.markOriginTextBG) (div as HTMLElement).style.backgroundColor = "var(--b3-font-background7)";
             if (setTheRef) setRef = false;
             if (setPath) doSetPath = false;
             ids.push(id);
             divs.push(elem);
         }
-        if (this.settings.markOriginText && !ro) if (this.settings.markOriginTextBG) changeBGofseletedElement(ids);
         return { divs, ids };
     }
 
@@ -440,26 +307,10 @@ class FlashBox {
 
             if (ro) dom.querySelectorAll(`div[${gconst.CONTENT_EDITABLE}="true"]`).forEach(e => e.setAttribute(gconst.CONTENT_EDITABLE, "false"));
 
-            if (this.settings.markOriginTextBG && !ro) {
-                protyle.toolbar.setInlineMark(protyle, "text", "range", { type: "backgroundColor", color: "var(--b3-font-background9)" });
-
-                div.querySelectorAll('[data-type~="text"]').forEach((e: HTMLElement) => {
-                    if (e.style.backgroundColor == "var(--b3-font-background9)") {
-                        e.style.backgroundColor = "";
-                    }
-                });
-                div.querySelectorAll('[data-type~="prog-marked"]').forEach((e: HTMLElement) => { // for old
-                    const v = e.getAttribute("data-type").replace("prog-marked", "");
-                    e.setAttribute("data-type", v);
-                    e.style.backgroundColor = "";
-                });
-            }
-
             tmpDiv = div;
         } else {
-            const { id, div } = await this.cloneDiv(dom as HTMLDivElement, !noRef);
+            const { div } = await this.cloneDiv(dom as HTMLDivElement, !noRef);
             tmpDiv = div;
-            if (this.settings.markOriginText && !ro) if (this.settings.markOriginTextBG) changeBGofseletedElement([id]);
         }
         await this.insertCard(protyle, [tmpDiv], cardType, blockID, path);
     }
@@ -474,13 +325,6 @@ export async function getDailyCardDocID(boxID: string, path: string) {
     attr[`custom-dailycard-${v}`] = v;
     const targetDocID = await utils.siyuanCache.createDocWithMdIfNotExists(5000, boxID, path, "", attr);
     return targetDocID;
-}
-
-async function changeBGofseletedElement(ids: any[]) {
-    const attrs = { "style": "background-color: var(--b3-font-background7);" } as AttrType;
-    return siyuan.batchSetBlockAttrs(ids.map(id => {
-        return { id, attrs };
-    }));
 }
 
 // const appendDiv = (() => {

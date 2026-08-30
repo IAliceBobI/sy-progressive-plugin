@@ -1,13 +1,17 @@
 import { BlockNodeEnum, CONTENT_EDITABLE, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey, PARAGRAPH_INDEX, PROG_ORIGIN_TEXT, PROG_PIECE_PREVIOUS, RefIDKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
-import { addCardSetDueTime, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
+import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { IProtyle } from "siyuan";
 import { progStorage } from "./ProgressiveStorage";
 import { isMultiLineElement } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
-import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { SplitSentence } from "./SplitSentence";
 import { prog } from "./Progressive";
+import { pieceDocName, pieceAlias, getDocIalWords } from "./progData";
+
+// getDocIalWords 定义已挪 progData.ts（v5 words 进 prog-data，ProgressiveStorage 也要用，避免循环 import）
+export { getDocIalWords };
 
 export function tempContent(content: string, id?: string) { // for btns and split lines
     if (!id) return content + `\n{: ${MarkKey}="${TEMP_CONTENT}"}`;
@@ -18,16 +22,8 @@ export function getDocIalPieces(bookID: string, point: number) {
     return `${TEMP_CONTENT}#${bookID},${point}`;
 }
 
-export function getDocIalContents(bookID: string) {
-    return `contents#${TEMP_CONTENT}#${bookID}`;
-}
-
 export function getDocIalCards(bookID: string) {
     return `cards#${TEMP_CONTENT}#${bookID}`;
-}
-
-export function getDocIalWords(bookID: string) {
-    return `words#${TEMP_CONTENT}#${bookID}`;
 }
 
 export function getDocIalSummary(bookID: string) {
@@ -42,16 +38,8 @@ export function getDocIalNewBookKey(bookID: string) {
     return `newBookDoc#${TEMP_CONTENT}#${bookID}`;
 }
 
-export function getDocIaltrace(bookID: string) {
-    return `traceDoc#${TEMP_CONTENT}#${bookID}`;
-}
-
 export function getDocIalKeysDoc(bookID: string, point: number) {
     return `keysDoc#${TEMP_CONTENT}#${bookID},${point}`;
-}
-
-export function getDocIalCompareDoc(bookID: string, point: number) {
-    return `compareDoc#${TEMP_CONTENT}#${bookID},${point}`;
 }
 
 export async function getHPathByDocID(docID: string, prefix: string) {
@@ -112,29 +100,11 @@ export async function getAllInOneKeyDoc(bookID: string, boxID: string, hpath: st
     return targetDocID;
 }
 
-export async function getTraceDoc(bookID: string, boxID: string, hpath: string) {
-    const id = await findTraceDoc(bookID);
-    if (id) return id;
-    const attr = {};
-    attr[MarkKey] = getDocIaltrace(bookID);
-    const targetDocID = await utils.siyuanCache.createDocWithMdIfNotExists(5000, boxID, hpath, "", attr);
-    return targetDocID;
-}
-
 export async function getKeysDoc(bookID: string, point: number, boxID: string, hpath: string) {
     const id = await findKeysDoc(bookID, point);
     if (id) return id;
     const attr = {};
     attr[MarkKey] = getDocIalKeysDoc(bookID, point);
-    const targetDocID = await utils.siyuanCache.createDocWithMdIfNotExists(5000, boxID, hpath, "", attr);
-    return targetDocID;
-}
-
-export async function getCompareDoc(bookID: string, point: number, boxID: string, hpath: string) {
-    const id = await findCompareDoc(bookID, point);
-    if (id) return id;
-    const attr = {};
-    attr[MarkKey] = getDocIalCompareDoc(bookID, point);
     const targetDocID = await utils.siyuanCache.createDocWithMdIfNotExists(5000, boxID, hpath, "", attr);
     return targetDocID;
 }
@@ -169,10 +139,6 @@ export async function findPieceDoc(bookID: string, point: number) {
     return doFindDoc(bookID, getDocIalPieces, point);
 }
 
-export async function findContents(bookID: string) {
-    return doFindDoc(bookID, getDocIalContents);
-}
-
 export async function findCards(bookID: string) {
     return doFindDoc(bookID, getDocIalCards);
 }
@@ -193,16 +159,8 @@ export async function findNewBookDoc(bookID: string) {
     return doFindDoc(bookID, getDocIalNewBookKey);
 }
 
-export async function findTraceDoc(bookID: string) {
-    return doFindDoc(bookID, getDocIaltrace);
-}
-
 export async function findKeysDoc(bookID: string, point: number) {
     return doFindDoc(bookID, getDocIalKeysDoc, point);
-}
-
-export async function findCompareDoc(bookID: string, point: number) {
-    return doFindDoc(bookID, getDocIalCompareDoc, point);
 }
 
 async function doFindDoc(bookID: string, func: Func, point?: number) {
@@ -233,13 +191,13 @@ export async function createAllPieces(bookID: string) {
     const index = await progStorage.loadBookIndexIfNeeded(bookID)
     const ids = [];
     for (let i = 0; i < index.length; i++) {
-        const id = await createPiece(info, index, i, info.finishDays <= 0)
+        const id = await createPiece(info, index, i)
         ids.push(id)
     }
     return ids;
 }
 
-export async function createPiece(bookInfo: BookInfo, index: string[][], point: number, allowCard = true) {
+export async function createPiece(bookInfo: BookInfo, index: string[][], point: number) {
     if (bookInfo == null || index == null || point == null) return "";
     if (point > index.length - 1) return ""
     if (point < 0) return ""
@@ -254,23 +212,14 @@ export async function createPiece(bookInfo: BookInfo, index: string[][], point: 
     // 过滤后全部悬空则跳过该 point，否则会创建只有标题没有内容的空分片。
     const piece = (await siyuan.getRows(index.at(point) ?? [], "id")).map(r => r.id);
     if (piece.length === 0) return "";
-    noteID = await createNote(bookInfo.boxID, bookInfo.bookID, piece, point);
+    noteID = await createNote(bookInfo.bookID, piece, point);
     if (!noteID) return "";
 
     await fullfilContent(point, bookInfo.bookID, piecePre, piece, noteID, null);
-
-    if (bookInfo.autoCard && allowCard) {
-        addCardSetDueTime(noteID, 1000);
-    }
-
-    if (!bookInfo.finishPieceID) { // 初始化 finishPieceID
-        bookInfo.finishPieceID = noteID;
-        await progStorage.resetBookInfo(bookInfo.bookID, bookInfo);
-    }
     return noteID;
 }
 
-export async function fullfilContent(point: number, bookID: string, piecePre: string[], piece: string[], noteID: string, stype: AsList) {
+export async function fullfilContent(point: number, bookID: string, piecePre: string[], piece: string[], noteID: string, stype: AsList | "no" | null) {
     progStorage.updateBookInfoTime(bookID);
     const info = await progStorage.booksInfo(bookID);
 
@@ -282,7 +231,9 @@ export async function fullfilContent(point: number, bookID: string, piecePre: st
     }
 
     let splited = false
-    if (stype) {
+    if (stype === "no") {
+        // □22 二轮增补：重插「不断句」档——直选与书级 auto 全跳过，强制整块复制
+    } else if (stype) {
         splited = await splitAndInsert(bookID, noteID, stype, piece);
     } else if (info.autoSplitSentenceP) {
         splited = await splitAndInsert(bookID, noteID, "p", piece);
@@ -345,23 +296,25 @@ export async function copyBlock(point: number, info: BookInfo, id: string, tempD
 }
 
 export async function splitAndInsert(bookID: string, noteID: string, t: AsList, ids: string[]) {
-    if (lastVerifyResult() || t == 'p') {
-        if (!ids?.length) {
-            // 如果没有内容需要断句，返回 false 让调用者执行默认逻辑
-            return false;
-        }
-        const s = new SplitSentence(bookID, utils.getProgressivePluginInstance(), noteID, t);
-        const success = await s.splitByIDs(ids);
-        if (!success) {
-            // 如果断句失败，返回 false 让调用者执行默认逻辑
-            return false;
-        }
-        await s.insert(false);
-        return true
-    } else {
-        await siyuan.pushMsg(tomatoI18n.此功能需要激活VIP)
+    if (!ids?.length) {
+        // 如果没有内容需要断句，返回 false 让调用者执行默认逻辑
+        return false;
     }
-    return false;
+    // □14 断句整体 Pro（p/t/i 三档，□9 拍板）：执行侧兜底门禁——未激活拦 + pushMsg
+    // 引导后返回 false，调用者走普通整块复制（分片照常生成，只少断句）。AddBook 弹窗
+    // 的锁位 chip 是第一道门，这里兜 AddBook 之外的入口（ShowAllBooks 开关/旧书存量配置）
+    if (!lastVerifyResult()) {
+        void siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
+        return false;
+    }
+    const s = new SplitSentence(bookID, utils.getProgressivePluginInstance(), noteID, t);
+    const success = await s.splitByIDs(ids);
+    if (!success) {
+        // 如果断句失败，返回 false 让调用者执行默认逻辑
+        return false;
+    }
+    await s.insert(false);
+    return true;
 }
 
 export async function fastCopyBlock(point: number, info: BookInfo, id: string, markdown: string, type: string, attrs: AttrType, idx?: { i: number }) {
@@ -431,11 +384,13 @@ function allListItemlnk2self(div: HTMLDivElement, attrs?: AttrType) {
     });
 }
 
-async function createNote(boxID: string, bookID: string, piece: string[], point: number) {
-    const row = await siyuan.sqlOne(`select hpath,content from blocks where type='d' and id='${bookID}'`);
+async function createNote(bookID: string, piece: string[], point: number) {
+    // boxID 实时取（不信任 BookInfo 缓存）：书移到别的笔记本后缓存会 stale，往旧 box 建片必错
+    const row = await siyuan.sqlOne(`select box,hpath,content from blocks where type='d' and id='${bookID}'`);
+    const boxID = row?.box ?? "";
     let dir = row?.hpath ?? "";
     const bookName = row?.content ?? "";
-    if (!dir || !bookName) return "";
+    if (!boxID || !dir || !bookName) return "";
 
     let content: string;
     let hasContent = false;
@@ -457,16 +412,21 @@ async function createNote(boxID: string, bookID: string, piece: string[], point:
 
     const attr = {} as AttrType;
     attr["custom-card-priority"] = "50";
+    let docTitle: string;
     if (content) {
-        attr["alias"] = bookName + "," + content;
-        content = `[${String(point).padStart(5, "0")}]${content}`;
+        docTitle = pieceDocName(point, content);
+        attr["alias"] = pieceAlias(bookName, content);
     } else {
-        attr["alias"] = bookName;
-        content = `[${String(point).padStart(5, "0")}]${bookName}`;
+        docTitle = pieceDocName(point, bookName);
+        attr["alias"] = pieceAlias(bookName, "");
     }
     attr[MarkKey] = getDocIalPieces(bookID, point);
+    // 片=自由工作台：读/改/摘抄皆可，不预设工作流；原书保持锁定（再生源头），片随便造。
+    // v5 □16「片=只读原料」退役：不再写 custom-sy-readonly，旧片带锁不迁移、随删片重切
+    // 换新（读完即删/序号重切重建片；refill 复用现有片文档不会带走旧锁）
 
-    dir = dir + `/pieces-${bookName}/` + content;
+    // v5：分片直挂书下（去 pieces- 夹层，breaking change）；老夹层里的旧分片靠 IAL 查找兼容、读完即删自然消亡
+    dir = dir + `/` + docTitle;
     return siyuan.createDocWithMd(boxID, dir, "", "", attr);
 }
 
@@ -475,13 +435,6 @@ export function isProtylePiece(protyle: IProtyle) {
     const attr = div?.getAttribute(MarkKey) ?? "";
     const pieceLen = getDocIalPieces("20231229160401-0lfc8qj", 0).length;
     return { isPiece: attr.startsWith(TEMP_CONTENT + "#") && attr.length >= pieceLen, markKey: attr };
-}
-
-export function isProtyleKeyDoc(protyle: IProtyle) {
-    const div = protyle?.element?.querySelector(`[${MarkKey}]`) as HTMLDivElement;
-    const attr = div?.getAttribute(MarkKey) ?? "";
-    const fake = getDocIalKeysDoc("20231229160401-0lfc8qj", 0);
-    return { isKeyDoc: attr.includes(fake.split("#", 1)[0] + "#" + TEMP_CONTENT + "#") && attr.length >= fake.length, keyDocAttr: attr };
 }
 
 export function findBack(e: Element) {

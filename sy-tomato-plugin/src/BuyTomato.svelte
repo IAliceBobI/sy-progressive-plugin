@@ -3,9 +3,11 @@
     export type ProductPrice = { current: number; next?: number };
     // 价格单一事实来源：ActivationCard 的未激活态价格条也从此取，避免两处硬编码漂移。
     // 2026-08 三产品化改查表：recite ￥10 终身无划线原价（next 缺省即不渲染原价）。
+    // 渐进 □9 终稿（2026-08-29）＝￥72：Pro=皮肤系统+断句+生词 AI+收集/写作对比，单向送仿写全套；
+    // 与 Sign 差价档位同值（码面值=入口现价，云端严格相等校验）；「永不降价只增值」故无划线锚。
     export const productPrices: Record<Product, ProductPrice> = {
         tomato: { current: 72, next: 96 },
-        progressive: { current: 72, next: 96 },
+        progressive: { current: 72 },
         recite: { current: 10 },
     };
 </script>
