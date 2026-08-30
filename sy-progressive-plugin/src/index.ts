@@ -20,7 +20,7 @@ import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlug
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import SettingsSvelte from "./Settings.svelte"
 import { resetKey, verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
-import { neighborCode } from "./neighbor";
+import { neighborCode } from "../../sy-tomato-plugin/src/libs/neighbor";
 import { applyProgSkins, refreshProgGate } from "./theme";
 import { newID } from "stonev5-utils";
 import { ProgressivePluginConfig, ProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gconst";

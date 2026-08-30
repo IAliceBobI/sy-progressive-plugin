@@ -2,6 +2,8 @@
 // 本文件是两侧共用的纯函数对，无模块状态——recite 跨插件 import 无 bundle 复制陷阱
 // （有状态的 userToken 两插件各一份，正是激活态必须走插件实例互问拿字符串的原因）。
 // 鲁棒三纪律：绝不静态 import 对方模块状态 / 惰性检测消时序窗 / 全链 ?. + try 静默降级。
+// 2026-08-31 从 progressive/src 挪进 tomato 共享库：recite 发布仓只拷 recite+tomato 源码，
+// 住渐进侧会让远程构建缺目录炸（v1.1.1 首发实测）；共享代码一律住 tomato（仓库架构约定）。
 import { Plugin } from "siyuan";
 
 export const PROG_PLUGIN_NAME = "sy-progressive-plugin";
