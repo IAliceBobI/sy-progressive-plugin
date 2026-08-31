@@ -5,10 +5,14 @@ import { userID, userToken, writableWithGet } from './stores';
 const MY_PUBKEY = "044ad3bfb46f3b89979dd551a5dada23f8502f8a0c54d247e1f8d31e5d7705a978df1ef30ba5a4b5206f0b0f573c8f76feada715f949430187f62f5640ca144aa7";
 const ec = new EC('secp256k1');
 const keyPair = ec.keyFromPublic(MY_PUBKEY, 'hex')
-let _isValid: boolean = null;
+// □3 V2（2026-08-31）：验证结果 store 化——PairBar 等响应式组件读 $vipVerified 即时
+// 跟随（原模块变量读取在验证后灰态滞后到重挂）；lastVerifyResult() 签名不变返回
+// .get()，既有命令式调用点零改动。null=未验证。
+const _isValid = writableWithGet<boolean | null>(null);
+export const vipVerified = _isValid;
 
 export function lastVerifyResult(): boolean {
-    return _isValid;
+    return _isValid.get();
 }
 
 export const expStore = writableWithGet("")
@@ -23,7 +27,7 @@ export function isMe() {
 }
 
 export function resetKey() {
-    _isValid = null;
+    _isValid.set(null);
 }
 
 export async function verifyKeyTomato() {
@@ -40,10 +44,10 @@ export async function verifyKeyRecite() {
     // 避免商业倒挂）。三产品同公钥仅 included 标记分流，seller/云端零改动。
     // 必须先无副作用验签（verifyUserSign 只读 token）：若先走 verifyKey 失败会塞
     // FREE_KEY 覆盖用户原 token，progressive 码就丢了。
-    if (_isValid != null) return _isValid;
+    if (_isValid.get() != null) return _isValid.get();
     const cross = await verifyUserSign(userToken.get(), "_siyuanProgressiveCode_");
     if (cross.valid) {
-        _isValid = true;
+        _isValid.set(true);
         return true;
     }
     return verifyKey("_siyuanReciteCode_");
@@ -83,15 +87,15 @@ export async function verifyLocalCode(
 export const FREE_KEY = "freeze7XSGUQr_20250721_name_siyuanTomatoCode_30440220584fbd1f344fbadcde83242f7bd87356b0b3186141fc820acfe820d68efb1c0102205a28181a774d96e5c46e1366954ea69f106faa11cb28a8ea7c1d19b87f8bb314";
 
 async function verifyKey(included: string) {
-    if (_isValid != null) return _isValid;
+    if (_isValid.get() != null) return _isValid.get();
 
     let v = await verifyUserSign(userToken.get(), included);
     if (!v.valid) {
         userToken.set(FREE_KEY);
         v = await verifyUserSign(FREE_KEY, "_siyuanTomatoCode_");
     }
-    _isValid = v.valid;
-    return _isValid;
+    _isValid.set(v.valid);
+    return v.valid;
 }
 
 async function verifyUserSign(tokenSign: string, included: string) {

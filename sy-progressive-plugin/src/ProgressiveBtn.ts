@@ -1,16 +1,15 @@
 import { IProtyle } from "siyuan";
 import { getAllEditor } from "siyuan";
-import { CONTENT_EDITABLE, MarkKey, PDIGEST_CTIME, } from "../../sy-tomato-plugin/src/libs/gconst";
+import { CONTENT_EDITABLE } from "../../sy-tomato-plugin/src/libs/gconst";
 import { getActiveDocID, getContenteditableElement, getSyElement, isEditor, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { HtmlCBType } from "./constants";
 import { prog } from "./Progressive";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { into, setGlobal } from "stonev5-utils";
+import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
 import { hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
-import { FloatDocKind } from "./progFloatState";
-import { parseBookIDFromCtime } from "./progData";
+import { FloatDocKind, detectFloatDoc } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests } from "./digestMarker";
@@ -31,7 +30,8 @@ let noteID = writableWithGet("")
 let bookID = writableWithGet("")
 let zIndexPlus = writableWithGet(false)
 let dueText = writableWithGet("")        // 附属卡到期胶囊文案（空=不渲染，formatDueCount 产出）
-let digOpen = writableWithGet(false)     // 摘抄子排展开（⇧⌥Z 改道入口也驱动它）
+let digOpen = writableWithGet(true)     // 摘抄子排：2026-08-31 起默认展开常驻——展开浮条即出现，
+                                        // ✂ 仅作收起/找回切换（⇧⌥Z 改道入口也驱动它）
 let userCollapsed = false;               // session 级：用户点 ✕ 后本会话片态也收起成球
 
 export function progFloatStores() {
@@ -41,17 +41,18 @@ export function progFloatStores() {
 // DigestProgressiveBox ⌥z 改道需要读出场态（show+kind=当前文档在三态内）
 export { show, kind };
 
-/** 展开浮条（球点击 / 命令通道）；userCollapsed 随之清掉 */
+/** 展开浮条（球点击 / 命令通道）；userCollapsed 随之清掉，摘抄子排随展开重新出现 */
 export function expandFloatBar() {
     userCollapsed = false;
     expanded.set(true);
+    digOpen.set(true);
 }
 
-/** 收起为球（浮条 ✕）；记住用户偏好，本会话片态出场不再强展开 */
+/** 收起为球（浮条 ✕）；记住用户偏好，本会话片态出场不再强展开。
+ *  digOpen 不清——子排开合只归 ✂ 管，下次 expandFloatBar 会重新置开 */
 export function collapseFloatBar() {
     userCollapsed = true;
     expanded.set(false);
-    digOpen.set(false);
 }
 
 /** 展开浮条并打开摘抄子排（⌥z 摘抄模式命令在三态文档内的改道出口） */
@@ -63,6 +64,11 @@ export function openDigestSubrank() {
 // □11 自由态（第四态）：会话级上岗/下班——上岗后本会话所有普通文档浮条都到场，
 // 浮条 ✕=本会话收起（同 userCollapsed 先例，session 级不落盘）。三态文档出场不受影响。
 let freeSession = false;
+
+// □12 窗口期兜底的负结果缓存（review P1-1）：重查内核真值仍识别不出的 docID=真普通
+// 文档，记住后本会话不再对它兜底重查（防出场锁被 await 拖过内核往返丢兄弟事件）。
+// 只增不清，插件 reload 自然清零；安全性论证见识别段注释。
+const verifiedNormalDoc = new Set<string>();
 
 /** 自由态上岗（状态栏 ✂ 钮 / ⌥Z 在普通文档的改道出口）。三态文档在场=聚焦浮条+
  *  展开子排；普通文档=自由态上岗并立刻出场（withSubrank=⌥Z 通道顺手展开摘抄子排）。
@@ -94,10 +100,8 @@ export function freeFloatOff() {
     show.set(false);
 }
 
-// 浮条不可见即清子排（reasoning review P2-5）：show.set(false) 系路径（离开三态文档/
-// 系统开关/闪卡预览）不清 digOpen，⇧⌥Z 开子排后快捷键切走再回来会带旧开合态——在
-// store 所在地订阅一次兜底（□8 组件 $effect 随 moreOpen/advOpen 退役删除，此为等价覆盖）
-show.subscribe(v => { if (!v) digOpen.set(false); });
+// 子排常驻后无需「不可见即清」兜底（旧订阅防 ⇧⌥Z 开子排后跨文档带旧开合态）——开是默认态，
+// 出场 docChanged 恒重置为开，✂ 收起只在同文档会话内生效（2026-08-31 随子排转常驻移除）。
 
 export function initProgFloatBtns() {
     if (initProgFloatBtnsDisable.get()) {
@@ -160,6 +164,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         return;
     }
     let { attrs, docID, name } = events.getInfo(protyle)
+    let attrsIsFinal = false;   // attrs 已直查内核（闪卡预览分支）——识别落空也无需兜底重查
     zIndexPlus.set(false);
     if (protyle.element.classList.contains("card__block")) {
         // 闪卡预览里显示的是分片：维持片态出场（hideBtnsInFlashCard 可关）；
@@ -169,6 +174,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
             return;
         }
         attrs = await siyuan.getBlockAttrs(docID)
+        attrsIsFinal = true;
         name = attrs.title;
         zIndexPlus.set(true);
     } else {
@@ -177,33 +183,27 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         }
     }
 
-    // v5 三态识别（判据优先级 pdigest > mark > books，与 progFloatState.detectFloatKind 一致：
-    // 真实 digest 文档自带片形状 custom-progmark 防删护栏，mark 优先会误判成片）
-    const { _bookID, _point, _digestBookID, _isBook } = into(() => {
-        const mark = attrs?.[MarkKey]?.split("#")?.at(1)?.split(",") ?? [];
-        const digestBookID = attrs?.[PDIGEST_CTIME] ? parseBookIDFromCtime(attrs[PDIGEST_CTIME]) : "";
-        return {
-            _bookID: mark[0],
-            _point: parseInt(mark[1]),
-            _digestBookID: digestBookID,
-            _isBook: Object.prototype.hasOwnProperty.call(progStorage.booksInfos(), docID ?? ""),
-        };
-    });
-
-    let nextKind: FloatDocKind | null = null;
-    let nextBookID = "";
-    let nextPoint = 0;
-    if (_digestBookID) {
-        nextKind = "digest";
-        nextBookID = _digestBookID;
-    } else if (_bookID != null && _bookID !== "" && Number.isInteger(_point)) {
-        nextKind = "piece";
-        nextBookID = _bookID;
-        nextPoint = _point;
-    } else if (_isBook) {
-        nextKind = "book";
-        nextBookID = docID;
+    // v5 三态识别（progFloatState.detectFloatDoc：判据优先级 pdigest > mark > books，
+    // 真实 digest 文档自带片形状 custom-progmark 防删护栏，mark 优先会误判成片）。
+    // □12 窗口期兜底：attrs 是 events.getInfo 的 protyle IAL 快照，片/digest 刚创建时
+    // custom-progmark 两步后补（createDocWithMd→setBlockAttrs）尚未反映进快照（巨书实测
+    // 24s+ 才随事件刷新），识别落空会把刚开的片误判成 free 态出场（或直接不出场）。
+    // 落空≠不存在——识别不出时用 getBlockAttrs 查内核真值再识别一次（书态不依赖 attrs，
+    // 首轮即命中，不触发重查），仍识别不出才是真的普通文档。
+    // 负缓存（review P1-1）：重查仍落空的 docID 记住，后续出场事件不再重查——出场链五事件
+    // 走 ifAvailable 锁（拿不到即丢弃不排队），await 重查会把锁拖过一次内核往返，普通文档
+    // 的事件高频面会在毫秒窗内丢兄弟事件。缓存安全性：mark/ctime 全仓只随新建文档写入
+    // （无给既有文档后补的 flow），片/digest 恒新 docID 不命中，普通→书走 book 分支首轮
+    // 即判；插件 reload 自然清零。
+    const isBook = (id: string) => progStorage.isRegisteredBook(id);
+    let id = detectFloatDoc(attrs, docID ?? "", isBook);
+    if (!id && docID && !attrsIsFinal && !verifiedNormalDoc.has(docID)) {
+        id = detectFloatDoc(await siyuan.getBlockAttrs(docID), docID, isBook);
+        if (!id) verifiedNormalDoc.add(docID);
     }
+    const nextBookID = id?.bookID ?? "";
+    const nextPoint = id?.point ?? 0;
+    let nextKind: FloatDocKind | null = id?.kind ?? null;
 
     // □11 自由态：普通文档（非三态）在自由态上岗时以 free 态出场（✂📥 两键）
     if (docID == null || (nextKind == null && !freeSession)) {
@@ -221,7 +221,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     point.set(nextPoint);
     bookID.set(nextBookID);
     if (docChanged) {
-        digOpen.set(false);
+        digOpen.set(true); // 子排常驻：每次出场/换文档重新展开（✂ 收起仅同文档会话有效）
         // 片态直接展开（尊重 userCollapsed）；free 态出场直接展开不收球（□11）
         expanded.set((nextKind === "piece" && !userCollapsed) || nextKind === "free");
         if (nextBookID) refreshDue(nextBookID);

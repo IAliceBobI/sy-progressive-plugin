@@ -14,6 +14,13 @@ declare global {
             timeUtil: any;
             events: any;
             tools: any;
+            pairBar?: {
+                trigger: () => Promise<void>;
+                pick: (funcID: string) => Promise<void>;
+                confirmTarget: () => Promise<void>;
+                cancel: () => void;
+                toggleCopy: () => void;
+            };
             save?: () => void;
             rmContentEmptyRefs?: () => void;
             api?: {

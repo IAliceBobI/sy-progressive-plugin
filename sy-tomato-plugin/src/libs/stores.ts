@@ -339,6 +339,8 @@ export const cssRefStyle = settingFactory("cssRefStyle", false, STORAGE_SETTINGS
 export const exportWL4All = settingFactory("exportWL4All", false, STORAGE_SETTINGS, null as TSK);
 export const exportWhiteList = settingFactory("exportWhiteList", [], STORAGE_SETTINGS, null as TSK);
 export const exportBlackList = settingFactory("exportBlackList", [], STORAGE_SETTINGS, null as TSK);
+// 右键菜单逐项隐藏（□4）：存「已隐藏菜单项 key 集合」，空=全显示；key 体系=winHotkey langKey 或 m.<模块>.<语义> 前缀
+export const hiddenMenuItems = settingFactory("hiddenMenuItems", [], STORAGE_SETTINGS, null as TSK);
 // 默认开启（2026-08-22 用户拍板：干净路径是默认形态，无需选择）；已存储过旧值的用户不受影响。
 export const exportCleanPath = settingFactory("exportCleanPath", true, STORAGE_SETTINGS, null as TSK);
 export const showDocAttrs = settingFactory("showDocAttrs", false, STORAGE_SETTINGS, null as TSK);
@@ -426,6 +428,15 @@ export const linkBoxSyncScanDeep = settingFactory("linkBoxSyncScanDeep", true, S
 export const linkBoxSyncRemapChildID = settingFactory("linkBoxSyncRemapChildID", false, STORAGE_SETTINGS, null as TSK);
 export const linkBoxLnkTitle = settingFactory("linkBoxLnkTitle", false, STORAGE_SETTINGS, null as TSK);
 export const linkBoxUseLnkOrRef = settingFactory("linkBoxUseLnkOrRef", false, STORAGE_SETTINGS, null as TSK);
+// 块配对接力浮条（□2 V1）：入口非功能，开关正交（图标亮灰跟随各功能总开关）
+export const pairBarEnabled = settingFactory("pairBarEnabled", true, STORAGE_SETTINGS, null as TSK);
+export const pairBarDefaultFunc = settingFactory("pairBarDefaultFunc", "", STORAGE_SETTINGS, null as TSK);
+export const pairBarEntryHotkey = settingFactory("pairBarEntryHotkey", true, STORAGE_SETTINGS, null as TSK);
+export const pairBarEntryStatus = settingFactory("pairBarEntryStatus", true, STORAGE_SETTINGS, null as TSK);
+export const pairBarEntryMenu = settingFactory("pairBarEntryMenu", true, STORAGE_SETTINGS, null as TSK);
+export const pairBarEntryIconMenu = settingFactory("pairBarEntryIconMenu", true, STORAGE_SETTINGS, null as TSK);
+// □3 V2：引导模式（默认关）——pick 态点块锁源、target 态点目标块即确认的纯鼠标流
+export const pairBarGuideMode = settingFactory("pairBarGuideMode", false, STORAGE_SETTINGS, null as TSK);
 export const dailyNoteBoxCheckbox = settingFactory("dailyNoteBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const dailyNoteGoToBottom = settingFactory("dailyNoteGoToBottom", false, STORAGE_SETTINGS, null as TSK);
 export const dailyNoteGoToBottomMenu = settingFactory("dailyNoteGoToBottomMenu", true, STORAGE_SETTINGS, null as TSK);
@@ -440,7 +451,6 @@ export const dailyNoteCopyUseRef = settingFactory("dailyNoteCopyUseRef", true, S
 export const dailyNoteCopyUpdateBG = settingFactory("dailyNoteCopyUpdateBG", true, STORAGE_SETTINGS, null as TSK);
 export const dailyNoteCopyInsertPR = settingFactory("dailyNoteCopyInsertPR", true, STORAGE_SETTINGS, null as TSK);
 export const dailyNoteCopyShowPath = settingFactory("dailyNoteCopyShowPath", true, STORAGE_SETTINGS, null as TSK);
-export const dailyNoteCopyComment = settingFactory("dailyNoteCopyComment", true, STORAGE_SETTINGS, null as TSK);
 export const dailyNoteCopyFlashCard = settingFactory("dailyNoteCopyFlashCard", false, STORAGE_SETTINGS, null as TSK);
 export const imgOverlayCheckbox = settingFactory("imgOverlayCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const backLinkBottomBoxCheckbox = settingFactory("backLinkBottomBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
@@ -537,16 +547,28 @@ export const fastNoteBoxDocPrefix = settingFactory("fastNoteBoxDocPrefix", true,
 export const commentBoxCheckbox = settingFactory("commentBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const commentBoxMenu = settingFactory("commentBoxMenu", true, STORAGE_SETTINGS, null as TSK);
 export const commentBoxMaxProtyleHeight = settingFactory("commentBoxMaxProtyleHeight", 300, STORAGE_SETTINGS, null as TSK);
+export const commentBoxAnnoUnderlineThickness = settingFactory("commentBoxAnnoUnderlineThickness", 2, STORAGE_SETTINGS, null as TSK);
+// □1 标记形态主档：underline 下划线式（现状）/ marker 马克笔式 / frame 花边框（文字流蝴蝶），
+// spec §11（docs/tomato-anno-visual-spec.md）
+export const commentBoxAnnoMarkStyle = settingFactory("commentBoxAnnoMarkStyle", "underline", STORAGE_SETTINGS, null as TSK);
+// □1 线型（下划线式子维度）：五谱 solid/dashed/dotted/wavy/double + 装饰串 dot-bead/ring-bead
+// （后两档走 background 渐变通道替代下划线，spec §11.1.1）
+export const commentBoxAnnoLineType = settingFactory("commentBoxAnnoLineType", "dashed", STORAGE_SETTINGS, null as TSK);
+// □1 背景微底色开关（下划线式子维度；marker/frame 形态下不生效不显示）
+export const commentBoxAnnoBg = settingFactory("commentBoxAnnoBg", true, STORAGE_SETTINGS, null as TSK);
 export const commentBoxForwardRef = settingFactory("commentBoxForwardRef", true, STORAGE_SETTINGS, null as TSK);
 export const commentBoxBackwardRef = settingFactory("commentBoxBackwardRef", true, STORAGE_SETTINGS, null as TSK);
 export const commentBoxVirtualRef = settingFactory("commentBoxVirtualRef", true, STORAGE_SETTINGS, null as TSK);
+// □7 面板批注分区开关（默认关：新分区不打断文档正引主读流）
+export const commentBoxAnnotations = settingFactory("commentBoxAnnotations", false, STORAGE_SETTINGS, null as TSK);
 export const commentBoxAddFlashCard = settingFactory("commentBoxAddFlashCard", false, STORAGE_SETTINGS, null as TSK);
-export const commentBoxAddTime = settingFactory("commentBoxAddTime", false, STORAGE_SETTINGS, null as TSK);
-export const commentBoxAddKeepText = settingFactory("commentBoxAddKeepText", true, STORAGE_SETTINGS, null as TSK);
-export const commentBoxAddUnderline = settingFactory("commentBoxAddUnderline", true, STORAGE_SETTINGS, null as TSK);
-export const commentBoxSaveUnderDoc = settingFactory("commentBoxSaveUnderDoc", true, STORAGE_SETTINGS, null as TSK);
+// □5 旧批注链设置退役（2026-08-31）：commentBoxAddTime/AddKeepText/AddUnderline/SaveUnderDoc、
+// dailyNoteCopyComment 随产物链删除；存量值留在 tomato-settings.json 不迁移不清理
 export const commentBoxShowID = settingFactory("commentBoxShowID", false, STORAGE_SETTINGS, null as TSK);
 export const commentBoxStaticOutlink = settingFactory("commentBoxStaticOutlink", false, STORAGE_SETTINGS, null as TSK);
+// □2 面板皮肤四档：classic 经典（v1 现状，默认零回归）/ candy 糖霜 / paper 纸墨 / airy 疏朗，
+// spec §10（docs/tomato-commentbox-visual-spec.md）——面板根 data-skin 分档，多皮肤 CSS 共存
+export const commentBoxPanelSkin = settingFactory("commentBoxPanelSkin", "classic", STORAGE_SETTINGS, null as TSK);
 
 // ---------------
 

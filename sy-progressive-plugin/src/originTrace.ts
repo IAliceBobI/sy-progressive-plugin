@@ -1,5 +1,5 @@
 // v5 □16 摘抄工作流深化纯逻辑（handoff □16 拍板）：溯源降级链决策 + 片序号键 + 整摘内容过滤。
-// 纯函数无 DOM/SiYuan 依赖（progFloatState 模式）；SiYuan API 侧在 Progressive.ts / digestUtils.ts 消费。
+// 纯函数无 DOM/SiYuan 依赖；SiYuan API 侧在 Progressive.ts / digestUtils.ts 消费。
 //
 // 三层身份：读在片上、摘在 digest 上、源在书上——片=可抛弃可再生的工作台（自由读写，
 // 删了可按大索引重切同样的片，2026-08-29 浮条 UX 重设计 □9 解锁退役「片=只读原料」）；
@@ -46,6 +46,45 @@ export interface OriginTargetInput {
     pieceIdx: string;
     /** ctime 解析出的书 ID（兜底） */
     bookID: string;
+}
+
+/** 摘抄归属链来源：mark=片 IAL、progref=块级反查（□29）、book=发起文档自身是注册书
+ *  （□8 书态原文直接摘抄）、self=三链落空自指（札记摘抄/普通文档，落札记匣） */
+export type DigestOriginFrom = "mark" | "progref" | "book" | "self";
+
+/**
+ * 摘抄发起文档 → 归属书判定链（digestUtils.init 消费，□11 从三段内联收拢为纯函数）：
+ * ①mark（getBookID 解析片 IAL）②mark 落空的属性窗口期走 progref 反查（带回片序号）
+ * ③发起文档自身是注册书。inBook=归属书须已注册——mark/反查给了 bookID 但书已删
+ * （记录已清）时 inBook=false 落札记匣；三链全空自指 bookID=docID。
+ * refHit 仅在 mark 落空时参与（与旧链一致）；isRegistered 由消费方注入
+ * （progStorage.isRegisteredBook）。
+ */
+export function resolveDigestOrigin(args: {
+    markBookID: string;
+    refHit: { bookID: string; point: number } | null;
+    docID: string;
+    isRegistered: (id: string) => boolean;
+}): { bookID: string; inBook: boolean; point: number | null; from: DigestOriginFrom } {
+    const { markBookID, refHit, docID, isRegistered } = args;
+    let bookID = markBookID ?? "";
+    let point: number | null = null;
+    let from: DigestOriginFrom = "mark";
+    if (!bookID && refHit) {
+        bookID = refHit.bookID;
+        point = refHit.point;
+        from = "progref";
+    }
+    if (!bookID && isRegistered(docID)) {
+        bookID = docID;
+        from = "book";
+    }
+    const inBook = !!bookID && isRegistered(bookID);
+    if (!bookID) {
+        bookID = docID;
+        from = "self";
+    }
+    return { bookID, inBook, point, from };
 }
 
 export type OriginTarget =

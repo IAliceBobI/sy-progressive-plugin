@@ -1,6 +1,6 @@
 // v5 □15 摘抄痕迹多摘列表纯逻辑（handoff □15 拍板）：refMap 从 ref→最新块 ID 单值升级
 // ref→块 ID 数组；痕迹点击单摘直跳（现状保留）/多摘弹原生 Menu 轻量列表。
-// 纯函数无 DOM/SiYuan 依赖（progFloatState 模式），DOM/Menu 层在 digestMarker.ts 消费。
+// 纯函数无 DOM/SiYuan 依赖，DOM/Menu 层在 digestMarker.ts 消费。
 
 /** buildRefMap 的 SQL 行（attributes 表 name=custom-progref） */
 export interface RefRow {

@@ -33,15 +33,17 @@
 
 ## 上手
 
-1. 打开一篇长文，选中想读的文字，浮条点「执行摘抄」；或者用命令「添加当前文档到渐进阅读分片模式」把整篇切片
-2. 命令面板执行「开始学习」，按节奏读当天份，读完翻页
+1. 打开一篇长文，选中想读的文字，浮条点「执行摘抄」；或者用命令「添加当前文档到渐进阅读（加书）」把整篇切片
+2. 命令面板执行「开始今日阅读」，按节奏读当天份，读完翻页
 3. 想记住的重点：选中后挖空/制卡，复习走思源自带闪卡体系
 
 ## 文档与社区
 
 - 📖 **[帮助文档](https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink)**——每个功能都有配图和视频演示，5 分钟看懂全部玩法
 - 🙏 [鸣谢](https://awx9773btw.feishu.cn/docx/FQ7udC3jeorfDYxI39ict2UNn2g?from=from_copylink)
-- 💬 [QQ 交流群](https://pd.qq.com/s/2fh7nh7gz)——反馈、催更、蹲新功能
+- 💬 [QQ 交流群](https://pd.qq.com/s/r3jz0g16)——反馈、催更、蹲新功能
+- 💬 [飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=f08gff0c-d6b0-4a0d-8323-c8a0553e4fff&qr_code=true)——反馈、催更、蹲新功能
+- 📱 扫码进群：![群二维码（左 QQ 频道，右飞书群）](group-qr.png)
 - 🔓 [开源仓库](https://github.com/IAliceBobI/sy-progressive-plugin)——代码即产物，GitHub Actions 在线编译，所见即所得
 
 📊 思源集市下载 32,000+

@@ -369,22 +369,6 @@ export abstract class TomatoI18nABC13 extends TomatoI18nABC14 {
             default: return "Use the prefix of the current document name";
         }
     }
-    public get 把批注保存在子文档否则保存在日记中() {
-        switch (this.lang) {
-            case "zh_CN": return "把批注保存在子文档，否则保存在日记中";
-            case "es_ES": return "Guarda las anotaciones en el subdocumento, de lo contrario en el diario";
-            case "fr_FR": return "Enregistrez les annotations dans le sous-document, sinon dans le journal";
-            case "ja_JP": return "注釈はサブドキュメントに保存し、そうでなければ日記に保存します";
-            case "zh_CHT": return "將批註保存在子文件，否則保存在日誌中";
-            case "it_IT": return "Salva le annotazioni nel sottodocumento, altrimenti nel diario";
-            case "de_DE": return "Speichere Anmerkungen im Unterdokument, sonst im Tagebuch";
-            case "he_IL": return "שמור הערות במסמך המשנה, אחרת ביומן";
-            case "ru_RU": return "Сохраняйте аннотации в поддокументе, иначе в дневнике";
-            case "pl_PL": return "Zapisz adnotacje w poddokumencie, w przeciwnym razie w dzienniku";
-            case "en_US":
-            default: return "Save annotations in the subdocument, otherwise in the journal";
-        }
-    }
     public get 块关系图帮助() {
         switch (this.lang) {
             case "zh_CN":
@@ -699,6 +683,175 @@ export abstract class TomatoI18nABC13 extends TomatoI18nABC14 {
             case "pl_PL": return "Koniec";
             case "en_US":
             default: return "End";
+        }
+    }
+    public get 清空筛选() {
+        switch (this.lang) {
+            case "zh_CN": return "清空筛选";
+            case "es_ES": return "Borrar filtro";
+            case "fr_FR": return "Effacer le filtre";
+            case "ja_JP": return "フィルターをクリア";
+            case "zh_CHT": return "清空篩選";
+            case "it_IT": return "Cancella filtro";
+            case "de_DE": return "Filter löschen";
+            case "he_IL": return "נקה מסנן";
+            case "ru_RU": return "Очистить фильтр";
+            case "pl_PL": return "Wyczyść filtr";
+            case "en_US":
+            default: return "Clear filter";
+        }
+    }
+    public get 右键菜单管理() {
+        switch (this.lang) {
+            case "zh_CN": return "右键菜单管理";
+            case "es_ES": return "Gestión del menú contextual";
+            case "fr_FR": return "Gestion du menu contextuel";
+            case "ja_JP": return "右クリックメニュー管理";
+            case "zh_CHT": return "右鍵選單管理";
+            case "it_IT": return "Gestione menu contestuale";
+            case "de_DE": return "Kontextmenü verwalten";
+            case "he_IL": return "ניהול תפריט הקשר";
+            case "ru_RU": return "Управление контекстным меню";
+            case "pl_PL": return "Zarządzanie menu kontekstowym";
+            case "en_US":
+            default: return "Context menu management";
+        }
+    }
+    public get 右键菜单管理说明() {
+        switch (this.lang) {
+            case "zh_CN": return "勾选 = 显示在右键菜单；取消勾选 = 隐藏（快捷键与命令面板不受影响）";
+            case "zh_CHT": return "勾選 = 顯示在右鍵選單；取消勾選 = 隱藏（快捷鍵與命令面板不受影響）";
+            case "ja_JP": return "チェック = 右クリックメニューに表示；解除 = 非表示（ショートカットとコマンドパレットには影響しません）";
+            case "en_US":
+            default: return "Checked = show in context menu; unchecked = hidden (hotkeys and command palette unaffected)";
+        }
+    }
+    public get 日记() {
+        switch (this.lang) {
+            case "zh_CN": return "日记";
+            case "es_ES": return "Diario";
+            case "fr_FR": return "Note quotidienne";
+            case "ja_JP": return "日記";
+            case "zh_CHT": return "日记";
+            case "it_IT": return "Nota quotidiana";
+            case "de_DE": return "Tagesnotiz";
+            case "he_IL": return "יומן";
+            case "ru_RU": return "Ежедневник";
+            case "pl_PL": return "Dziennik";
+            case "en_US":
+            default: return "Daily note";
+        }
+    }
+    public get 互链与引用() {
+        switch (this.lang) {
+            case "zh_CN": return "互链与引用";
+            case "es_ES": return "Enlaces y referencias";
+            case "fr_FR": return "Liens et références";
+            case "ja_JP": return "リンクと参照";
+            case "zh_CHT": return "互链与引用";
+            case "it_IT": return "Collegamenti e riferimenti";
+            case "de_DE": return "Links & Referenzen";
+            case "he_IL": return "קישורים והפניות";
+            case "ru_RU": return "Ссылки и упоминания";
+            case "pl_PL": return "Linki i odniesienia";
+            case "en_US":
+            default: return "Links & references";
+        }
+    }
+    public get 文档整理() {
+        switch (this.lang) {
+            case "zh_CN": return "文档整理";
+            case "es_ES": return "Herramientas de documentos";
+            case "fr_FR": return "Outils de documents";
+            case "ja_JP": return "ドキュメント整理";
+            case "zh_CHT": return "文档整理";
+            case "it_IT": return "Strumenti documento";
+            case "de_DE": return "Dokumentwerkzeuge";
+            case "he_IL": return "כלי מסמכים";
+            case "ru_RU": return "Инструменты документов";
+            case "pl_PL": return "Narzędzia dokumentów";
+            case "en_US":
+            default: return "Document tools";
+        }
+    }
+    public get 图片() {
+        switch (this.lang) {
+            case "zh_CN": return "图片";
+            case "es_ES": return "Imágenes";
+            case "fr_FR": return "Images";
+            case "ja_JP": return "画像";
+            case "zh_CHT": return "图片";
+            case "it_IT": return "Immagini";
+            case "de_DE": return "Bilder";
+            case "he_IL": return "תמונות";
+            case "ru_RU": return "Изображения";
+            case "pl_PL": return "Obrazy";
+            case "en_US":
+            default: return "Images";
+        }
+    }
+    public get 智能问答() {
+        switch (this.lang) {
+            case "zh_CN": return "智能问答";
+            case "es_ES": return "Preguntas y respuestas IA";
+            case "fr_FR": return "Q&R IA";
+            case "ja_JP": return "AI質問";
+            case "zh_CHT": return "智能问答";
+            case "it_IT": return "Q&R IA";
+            case "de_DE": return "KI-Fragen";
+            case "he_IL": return "שאלות ותשובות AI";
+            case "ru_RU": return "ИИ-вопросы";
+            case "pl_PL": return "Pytania AI";
+            case "en_US":
+            default: return "AI Q&A";
+        }
+    }
+    public get 数据库反链() {
+        switch (this.lang) {
+            case "zh_CN": return "数据库反链";
+            case "es_ES": return "Retroenlaces de base de datos";
+            case "fr_FR": return "Rétroliens de base de données";
+            case "ja_JP": return "データベースバックリンク";
+            case "zh_CHT": return "数据库反链";
+            case "it_IT": return "Retrocollegamenti database";
+            case "de_DE": return "Datenbank-Rückverweise";
+            case "he_IL": return "קישורים לאחור של מסד נתונים";
+            case "ru_RU": return "Обратные ссылки БД";
+            case "pl_PL": return "Odnośniki bazy danych";
+            case "en_US":
+            default: return "Database backlinks";
+        }
+    }
+    public get 导出() {
+        switch (this.lang) {
+            case "zh_CN": return "导出";
+            case "es_ES": return "Exportar";
+            case "fr_FR": return "Exporter";
+            case "ja_JP": return "エクスポート";
+            case "zh_CHT": return "导出";
+            case "it_IT": return "Esporta";
+            case "de_DE": return "Exportieren";
+            case "he_IL": return "ייצוא";
+            case "ru_RU": return "Экспорт";
+            case "pl_PL": return "Eksport";
+            case "en_US":
+            default: return "Export";
+        }
+    }
+    public get 全部显示() {
+        switch (this.lang) {
+            case "zh_CN": return "全部显示";
+            case "es_ES": return "Mostrar todo";
+            case "fr_FR": return "Tout afficher";
+            case "ja_JP": return "すべて表示";
+            case "zh_CHT": return "全部顯示";
+            case "it_IT": return "Mostra tutto";
+            case "de_DE": return "Alle anzeigen";
+            case "he_IL": return "הצג הכל";
+            case "ru_RU": return "Показать все";
+            case "pl_PL": return "Pokaż wszystko";
+            case "en_US":
+            default: return "Show all";
         }
     }
 }

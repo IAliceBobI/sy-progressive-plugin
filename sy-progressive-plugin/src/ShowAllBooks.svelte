@@ -56,7 +56,9 @@
     async function load(force: boolean) {
         await progStorage.healHalfRegistered(); // □1 半注册自愈：救回断链书后再列书
         const ids = Object.keys(progStorage.booksInfos()).filter(
-            (id) => !id.endsWith("_cache"), // 防历史 _cache 脏键渲染成幽灵行
+            // 全库唯一谓词：非块 id 形状脏键（_cache 等）不渲染成幽灵行；
+            // 块 id 形状的死书仍列出——⚠ 卡承载清理入口，别在这里挡
+            (id) => progStorage.isRegisteredBook(id),
         );
         const st = await loadBookStatuses(force);
         const ro = await progStorage.loadReadingOrder();

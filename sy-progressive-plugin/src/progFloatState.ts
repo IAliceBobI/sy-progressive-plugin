@@ -1,26 +1,47 @@
 // v5 □5 浮条三态纯逻辑：出场识别 + 按钮组构造（视觉方案 docs/prog-v5-floatbar-design.md §3.1）。
-// 纯函数无 DOM/SiYuan 依赖，UI 层（ProgressiveBtn/ProgressiveFloatBtns）只消费这里的结果。
+// 可单测纯逻辑，UI 层（ProgressiveBtn/ProgressiveFloatBtns）只消费这里的结果（□12 起识别
+// 函数经 progData 复用 ctime 解析，依赖链经 vitest siyuan stub 可进单测，见 fleetData 先例）。
 import { MarkKey, PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
+import { parseBookIDFromCtime } from "./progData";
 
 /** 四态：book=原书 / piece=分片 / digest=摘抄文档 / free=自由态（□11 普通文档摘抄上岗） */
 export type FloatDocKind = "book" | "piece" | "digest" | "free";
 
+/** 识别结果载荷：出场链除了 kind 还要 bookID/point 驱动按钮动作 */
+export interface FloatDocIdentity {
+    kind: FloatDocKind;
+    /** digest=源书 / piece=所属书 / book=书自身 */
+    bookID: string;
+    /** 片号（仅 piece 态有意义，其余为 0） */
+    point: number;
+}
+
 /**
- * 识别当前文档属于哪态：
- * - 摘抄：文档 IAL custom-pdigest-ctime（PDIGEST_CTIME）
- * - 片：文档 IAL custom-progmark（MarkKey）
- * - 书：docID 命中 books.json（isRegisteredBook 回调，生产侧注入 booksInfo 查询）
+ * 识别当前文档属于哪态并提取载荷（浮条出场链唯一识别入口，ProgressiveBtn 旧内联已收编）：
+ * - digest：文档 IAL custom-pdigest-ctime（兼容已完成的 🔨#bookID#ct 形态，书 ID 取首段）
+ * - 片：文档 IAL custom-progmark（TEMP#bookID,point）
+ * - 书：docID 命中注册书（isRegisteredBook 回调，生产侧注入 progStorage.isRegisteredBook）
  * 判据优先级 pdigest > mark > book：真实 digest 文档自带片形状 custom-progmark
  * （2024 起防删护栏 TEMP_CONTENT#bookID,ctime），mark 优先会把摘抄误判成片（□16 e2e 实锤）。
+ * 载荷不完整（mark 缺书 ID/片号、ctime 解析空书 ID）= 该态不成立——出场按钮动作
+ * 靠载荷驱动，缺载荷的态无法出场（沿用旧内联语义）。
+ * □12：片 IAL 两步后补的窗口期内 attrs 快照可能读不到 mark（本函数返回 null 并非
+ * 真非三态），调用方以 getBlockAttrs 重查内核真值再识别一次兜底；本函数自身无 I/O。
  */
-export function detectFloatKind(
+export function detectFloatDoc(
     attrs: Record<string, string> | undefined,
     docID: string,
     isRegisteredBook: (id: string) => boolean,
-): FloatDocKind | null {
-    if (attrs?.[PDIGEST_CTIME] != null && attrs[PDIGEST_CTIME] !== "") return "digest";
-    if (attrs?.[MarkKey] != null && attrs[MarkKey] !== "") return "piece";
-    if (docID && isRegisteredBook(docID)) return "book";
+): FloatDocIdentity | null {
+    const ctime = attrs?.[PDIGEST_CTIME];
+    if (ctime) {
+        const bookID = parseBookIDFromCtime(ctime);
+        if (bookID) return { kind: "digest", bookID, point: 0 };
+    }
+    const mark = attrs?.[MarkKey]?.split("#")?.at(1)?.split(",") ?? [];
+    const point = parseInt(mark[1]);
+    if (mark[0] && Number.isInteger(point)) return { kind: "piece", bookID: mark[0], point };
+    if (docID && isRegisteredBook(docID)) return { kind: "book", bookID: docID, point: 0 };
     return null;
 }
 
@@ -39,6 +60,7 @@ export interface FloatButtonSpec {
 const SCENE: Record<FloatDocKind, FloatButtonSpec[]> = {
     book: [
         { id: "continue", icon: "iconProgPlay", kind: "primary", group: "scene" },     // ▶继续读（断点开片）
+        { id: "toPiece", icon: "iconProgPiece", kind: "normal", group: "scene" },      // 📄跳到分片（□2 选中/光标块就地定位，≠continue 全局断点）
         { id: "summary", icon: "iconProgQuill", kind: "normal", group: "scene" },      // ✒摘抄汇总
         { id: "addBook", icon: "iconProgAddBook", kind: "ghost", group: "scene" },     // 📥加书（□18 各态常驻；已是书=AddBook 重复注册路径现成）
         { id: "archive", icon: "iconProgArchive", kind: "ghost", group: "scene" },     // 📦归档

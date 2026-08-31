@@ -31,8 +31,8 @@
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import HotkeyCap from "../../sy-tomato-plugin/src/HotkeyCap.svelte";
-    import ActivationCard from "../../sy-tomato-plugin/src/ActivationCard.svelte";
-    import DevDeactivate from "../../sy-tomato-plugin/src/DevDeactivate.svelte";
+    import UpgradeBar from "../../sy-tomato-plugin/src/UpgradeBar.svelte";
+    import { openUnlockDialog } from "../../sy-tomato-plugin/src/unlockDialog";
     import NotebookSelect from "../../sy-tomato-plugin/src/NotebookSelect.svelte";
     import { saveRestorePagePosition } from "../../sy-tomato-plugin/src/libs/utils";
     import {
@@ -75,7 +75,7 @@
         swap: () => tomatoI18n.换一本书看,
         next: () => tomatoI18n.下一片删本片,
         prev: () => tomatoI18n.纯回看上一片,
-        origin: () => tomatoI18n.打开原书,
+        origin: () => tomatoI18n.回原书,
         addBook: () => tomatoI18n.加书,
         nextPure: () => tomatoI18n.下一个分片,
         delBack: () => tomatoI18n.删除分片看上一个分片,
@@ -116,7 +116,7 @@
         swap: () => tomatoI18n.tip换书,
         next: () => tomatoI18n.tip下片删,
         prev: () => tomatoI18n.tip回看,
-        origin: () => tomatoI18n.tip打开原书,
+        origin: () => tomatoI18n.tip片回原书,
         addBook: () => tomatoI18n.tip加书,
         nextPure: () => tomatoI18n.tip下一个分片,
         delBack: () => tomatoI18n.tip上片删,
@@ -193,9 +193,11 @@
     interface Props {
         dm: DestroyManager;
         plugin: BaseTomatoPlugin;
+        /** header Pro 徽标节点（□3）：激活态回写窗口内由 $effect 接管显隐 */
+        proBadge?: HTMLElement;
     }
 
-    let { dm, plugin = $bindable() }: Props = $props();
+    let { dm, plugin = $bindable(), proBadge }: Props = $props();
     let settingsDiv: HTMLElement = $state();
     let searchInput: HTMLElement = $state();
     let searchKey = $state("");
@@ -203,6 +205,10 @@
     // 永不挂，借用会恒 true 让激活卡对未激活用户谎报已激活）；面板打开时启动 verify 已
     // 就位不闪，随后 ActivationCard onMount 自动 verify 经 bind:codeValid 回写纠正
     let codeValid = $state(lastVerifyResult() === true);
+    // □3：header Pro 徽标随激活态显隐（懒缓存未命中时 UpgradeBar onMount verify 回写纠正）
+    $effect(() => {
+        if (proBadge) proBadge.style.display = codeValid ? "" : "none";
+    });
     const SearchKeyItemKey =
         "progressive_settings_SearchKeyItemKey_RfrUm9VLS4GehTzg5ygRrNT";
 
@@ -239,7 +245,7 @@
     }
 
     // ===== v5 □8 皮肤货架：locked 绑激活态——免费默认款永久可选，Pro 款未激活锁死
-    // （功能层锁：aria-disabled + 点击弹激活引导，不用 disabled 属性否则收不到点击没法
+    // （功能层锁：aria-disabled + 点击弹解锁框，不用 disabled 属性否则收不到点击没法
     // 引导）；已激活全解锁。点击已解锁卡：选中 + 写 settingCfg 对应键 + applyProgSkins
     // 即时换肤（免重载，recite 先例）。锁卡在 unpaid 下另有 CSS 门禁兜底（挂属性不生效）。
     const themes = $derived(PROG_THEMES.map(s => ({
@@ -269,7 +275,11 @@
 
     function pickSkin(key: string, slug: string, locked: boolean, setter: (s: string) => void) {
         if (locked) {
-            siyuan.pushMsg(tomatoI18n.皮肤Pro提示, 2500);
+            // □1 灰档统一：锁卡点击弹统一解锁框（替代原 pushMsg 提示）
+            openUnlockDialog({
+                product: "progressive",
+                onActivated: () => plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg),
+            });
             return;
         }
         setter(slug);
@@ -312,144 +322,12 @@
 </script>
 
 <div class="container tomato-settings-dialog" bind:this={settingsDiv}>
-    <!-- 激活/购买共享卡（阶段 0+1）：verify 收进组件，结果经 bind:codeValid 回传父 -->
-    <ActivationCard
+    <!-- 付费状态条（□1）：未激活一行入口，点击弹统一解锁框；已激活整条不渲染 -->
+    <UpgradeBar
         product="progressive"
         bind:codeValid
-        showBuy={true}
         onActivated={() => plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg)}
-    ></ActivationCard>
-    <!-- 开发者（isMe）专属取消激活入口：已激活后激活卡整卡隐藏，此处是唯一退出通道，
-         普通用户不可见（2026-08-24 B 方案） -->
-    {#if codeValid}
-        <div class="settingBox dev-row">
-            <DevDeactivate />
-        </div>
-    {/if}
-
-    <!-- v5 □8 皮肤系统：三维正交货架（配色/火苗形态/容器材质）+ 参数微调。
-         Pro=¥72 一个价（□9 终稿：皮肤系统+断句+生词 AI+收集/写作对比），免费默认款不退化；锁卡点击弹激活引导 -->
-    <section class="conf-group">
-        <div class="settingBox">
-            <div class="section-title">{tomatoI18n.皮肤外观}</div>
-            <div>{tomatoI18n.Pro解锁说明}</div>
-
-            <div class="prog-skins-sub">{tomatoI18n.配色主题}</div>
-            <div class="prog-skins-row prog-skins-row--six">
-                {#each themes as s (s.slug)}
-                    <button
-                        class="prog-skin-card"
-                        class:selected={s.slug === selectedTheme}
-                        class:locked={s.locked}
-                        aria-disabled={s.locked || undefined}
-                        data-slug={s.slug}
-                        style="--mock-accent:{s.color};--mock-flame:{s.flame ?? '#b06e1e'}"
-                        onclick={() => pickTheme(s.slug, s.locked)}
-                    >
-                            <div class="skin-mock">
-                                <div class="skin-chip a"></div>
-                                <div class="skin-chip b"></div>
-                                <div class="skin-name"
-                                    >{s.slug === selectedTheme && tune.name ? `${s.name} · ${tune.name}` : s.name}</div
-                                >
-                                <span class="skin-flame-dot" aria-hidden="true"></span>
-                            </div>
-                            <!-- □30：角标只在未激活锁定时渲染（变灰+引导），激活后退役全消失 -->
-                            {#if s.locked}<span class="skin-tag">Pro</span>{/if}
-                    </button>
-                {/each}
-            </div>
-
-            <div class="prog-skins-sub">{tomatoI18n.火苗形态}</div>
-            <div class="prog-skins-row">
-                {#each flames as s (s.slug)}
-                    <button
-                        class="prog-skin-card prog-skin-card--flame"
-                        class:selected={s.slug === selectedFlame}
-                        class:locked={s.locked}
-                        aria-disabled={s.locked || undefined}
-                        data-slug={s.slug}
-                        onclick={() => pickFlame(s.slug, s.locked)}
-                    >
-                        <div class="skin-mock">
-                            <svg viewBox="0 0 24 32" aria-hidden="true">
-                                <path d={s.d} fill="var(--prog-flame-base)" />
-                            </svg>
-                            <div class="skin-name">{s.name}</div>
-                        </div>
-                        <!-- □30：角标只在未激活锁定时渲染（变灰+引导），激活后退役全消失 -->
-                        {#if s.locked}<span class="skin-tag">Pro</span>{/if}
-                    </button>
-                {/each}
-            </div>
-
-            <div class="prog-skins-sub">{tomatoI18n.容器材质}</div>
-            <div class="prog-skins-row">
-                {#each panels as s (s.slug)}
-                    <button
-                        class="prog-skin-card prog-skin-card--panel"
-                        class:selected={s.slug === selectedPanel}
-                        class:locked={s.locked}
-                        aria-disabled={s.locked || undefined}
-                        data-slug={s.slug}
-                        style="--mock-accent:{s.mock}"
-                        onclick={() => pickPanel(s.slug, s.locked)}
-                    >
-                        <div class="skin-mock">
-                            <div class="skin-chip a"></div>
-                            <div class="skin-chip b"></div>
-                            <div class="skin-name">{s.name}</div>
-                        </div>
-                        <!-- □30：角标只在未激活锁定时渲染（变灰+引导），激活后退役全消失 -->
-                        {#if s.locked}<span class="skin-tag">Pro</span>{/if}
-                    </button>
-                {/each}
-            </div>
-
-            <div class="prog-skins-sub">{tomatoI18n.参数微调}</div>
-            <div class="prog-tune-row">
-                <span>{tomatoI18n.色相}</span>
-                <input
-                    type="range"
-                    min="-30"
-                    max="30"
-                    step="1"
-                    bind:value={tune.hue}
-                    oninput={onTuneInput}
-                    disabled={tuneLocked}
-                />
-                <span class="val">{tune.hue > 0 ? "+" : ""}{tune.hue}°</span>
-            </div>
-            <div class="prog-tune-row">
-                <span>{tomatoI18n.亮度}</span>
-                <input
-                    type="range"
-                    min="-20"
-                    max="20"
-                    step="1"
-                    bind:value={tune.bri}
-                    oninput={onTuneInput}
-                    disabled={tuneLocked}
-                />
-                <span class="val">{tune.bri > 0 ? "+" : ""}{tune.bri}%</span>
-            </div>
-            <div class="prog-tune-row">
-                <input
-                    class="b3-text-field prog-tune-name"
-                    placeholder={tomatoI18n.自定义名称}
-                    maxlength="12"
-                    bind:value={tune.name}
-                    oninput={onTuneInput}
-                    disabled={tuneLocked}
-                />
-                <button
-                    class="b3-button b3-button--outline tomato-button prog-accent-btn"
-                    onclick={resetTune}
-                    disabled={tuneLocked}>{tomatoI18n.重置微调}</button
-                >
-            </div>
-        </div>
-    </section>
+    ></UpgradeBar>
 
     <!-- search：placeholder 化（对齐番茄），输入框宽度由 IndexConf.css 拉满自适应 -->
     <div class="settingBox search-bar" data-search>
@@ -466,22 +344,6 @@
     </div>
 
     <!-- 快捷键 -->
-    <section class="conf-group">
-        <div class="settingBox">
-            <div class="section-title">{tomatoI18n.数据管理}</div>
-            <div class="settingBox dev-row">
-                <span class="kbd">prog-data</span>
-                <span>{progDataPath || tomatoI18n.progData未创建说明}</span>
-            </div>
-            <div class="settingBox dev-row">
-                <button
-                    class="b3-button b3-button--outline tomato-button prog-accent-btn b3-tooltips b3-tooltips__n"
-                    aria-label={tomatoI18n.tip设置归拢}
-                    onclick={doConsolidate}>{tomatoI18n.归拢老数据}</button>
-                {#if consolidateMsg}<span>{consolidateMsg}</span>{/if}
-            </div>
-        </div>
-    </section>
     <section class="conf-group">
         <div class="settingBox">
             <div class="section-title">{tomatoI18n.快捷键如有冲突请调整}</div>
@@ -532,22 +394,23 @@
                 <input
                     type="checkbox"
                     class="b3-switch"
-                    bind:checked={$ProgressiveStart2learn}
+                    bind:checked={$ProgressiveJumpMenu}
                 />
-                {tomatoI18n.移动端菜单显示开始学习}:
-                {Progressive开始学习.langText()}
-                <HotkeyCap hk={Progressive开始学习} pluginName="sy-progressive-plugin"></HotkeyCap>
+                {tomatoI18n.menu添加右键菜单}:
+                {Progressive跳到分片或回到原文.icon}
+                {Progressive跳到分片或回到原文.langText()}
+                <HotkeyCap hk={Progressive跳到分片或回到原文} pluginName="sy-progressive-plugin"></HotkeyCap>
             </div>
 
             <div>
                 <input
                     type="checkbox"
                     class="b3-switch"
-                    bind:checked={$ProgressiveJumpMenu}
+                    bind:checked={$ProgressiveStart2learn}
                 />
-                {tomatoI18n.menu添加右键菜单}:{Progressive跳到分片或回到原文.icon}
-                {Progressive跳到分片或回到原文.langText()}
-                <HotkeyCap hk={Progressive跳到分片或回到原文} pluginName="sy-progressive-plugin"></HotkeyCap>
+                {tomatoI18n.移动端菜单显示开始学习}:
+                {Progressive开始学习.langText()}
+                <HotkeyCap hk={Progressive开始学习} pluginName="sy-progressive-plugin"></HotkeyCap>
             </div>
         </div>
     </section>
@@ -740,12 +603,151 @@
         </div>
     </section>
 
-    <!-- save -->
-    <div class="settingBox save-row">
-        <button
-            class="b3-button b3-button--outline tomato-button"
-            onclick={save}>{tomatoI18n.保存}</button
-        >
+    <!-- v5 □8 皮肤系统：三维正交货架（配色/火苗形态/容器材质）+ 参数微调。
+         Pro=¥72 一个价（□9 终稿：皮肤系统+断句+生词 AI+收集/写作对比），免费默认款不退化；锁卡点击弹统一解锁框。
+         □2 挪后段：免费设置优先呈现，皮肤货架垫数据管理之前 -->
+    <section class="conf-group">
+        <div class="settingBox">
+            <div class="section-title">{tomatoI18n.皮肤外观}</div>
+
+            <div class="prog-skins-sub">{tomatoI18n.配色主题}</div>
+            <div class="prog-skins-row prog-skins-row--six">
+                {#each themes as s (s.slug)}
+                    <button
+                        class="prog-skin-card"
+                        class:selected={s.slug === selectedTheme}
+                        class:locked={s.locked}
+                        aria-disabled={s.locked || undefined}
+                        data-slug={s.slug}
+                        style="--mock-accent:{s.color};--mock-flame:{s.flame ?? '#b06e1e'}"
+                        onclick={() => pickTheme(s.slug, s.locked)}
+                    >
+                            <div class="skin-mock">
+                                <div class="skin-chip a"></div>
+                                <div class="skin-chip b"></div>
+                                <div class="skin-name"
+                                    >{s.slug === selectedTheme && tune.name ? `${s.name} · ${tune.name}` : s.name}</div
+                                >
+                                <span class="skin-flame-dot" aria-hidden="true"></span>
+                            </div>
+                            <!-- □30：角标只在未激活锁定时渲染（变灰+引导），激活后退役全消失 -->
+                            {#if s.locked}<span class="skin-tag">Pro</span>{/if}
+                    </button>
+                {/each}
+            </div>
+
+            <div class="prog-skins-sub">{tomatoI18n.火苗形态}</div>
+            <div class="prog-skins-row">
+                {#each flames as s (s.slug)}
+                    <button
+                        class="prog-skin-card prog-skin-card--flame"
+                        class:selected={s.slug === selectedFlame}
+                        class:locked={s.locked}
+                        aria-disabled={s.locked || undefined}
+                        data-slug={s.slug}
+                        onclick={() => pickFlame(s.slug, s.locked)}
+                    >
+                        <div class="skin-mock">
+                            <svg viewBox="0 0 24 32" aria-hidden="true">
+                                <path d={s.d} fill="var(--prog-flame-base)" />
+                            </svg>
+                            <div class="skin-name">{s.name}</div>
+                        </div>
+                        <!-- □30：角标只在未激活锁定时渲染（变灰+引导），激活后退役全消失 -->
+                        {#if s.locked}<span class="skin-tag">Pro</span>{/if}
+                    </button>
+                {/each}
+            </div>
+
+            <div class="prog-skins-sub">{tomatoI18n.容器材质}</div>
+            <div class="prog-skins-row">
+                {#each panels as s (s.slug)}
+                    <button
+                        class="prog-skin-card prog-skin-card--panel"
+                        class:selected={s.slug === selectedPanel}
+                        class:locked={s.locked}
+                        aria-disabled={s.locked || undefined}
+                        data-slug={s.slug}
+                        style="--mock-accent:{s.mock}"
+                        onclick={() => pickPanel(s.slug, s.locked)}
+                    >
+                        <div class="skin-mock">
+                            <div class="skin-chip a"></div>
+                            <div class="skin-chip b"></div>
+                            <div class="skin-name">{s.name}</div>
+                        </div>
+                        <!-- □30：角标只在未激活锁定时渲染（变灰+引导），激活后退役全消失 -->
+                        {#if s.locked}<span class="skin-tag">Pro</span>{/if}
+                    </button>
+                {/each}
+            </div>
+
+            <div class="prog-skins-sub">{tomatoI18n.参数微调}</div>
+            <div class="prog-tune-row">
+                <span>{tomatoI18n.色相}</span>
+                <input
+                    type="range"
+                    min="-30"
+                    max="30"
+                    step="1"
+                    bind:value={tune.hue}
+                    oninput={onTuneInput}
+                    disabled={tuneLocked}
+                />
+                <span class="val">{tune.hue > 0 ? "+" : ""}{tune.hue}°</span>
+            </div>
+            <div class="prog-tune-row">
+                <span>{tomatoI18n.亮度}</span>
+                <input
+                    type="range"
+                    min="-20"
+                    max="20"
+                    step="1"
+                    bind:value={tune.bri}
+                    oninput={onTuneInput}
+                    disabled={tuneLocked}
+                />
+                <span class="val">{tune.bri > 0 ? "+" : ""}{tune.bri}%</span>
+            </div>
+            <div class="prog-tune-row">
+                <input
+                    class="b3-text-field prog-tune-name"
+                    placeholder={tomatoI18n.自定义名称}
+                    maxlength="12"
+                    bind:value={tune.name}
+                    oninput={onTuneInput}
+                    disabled={tuneLocked}
+                />
+                <button
+                    class="b3-button b3-button--outline tomato-button prog-accent-btn"
+                    onclick={resetTune}
+                    disabled={tuneLocked}>{tomatoI18n.重置微调}</button
+                >
+            </div>
+        </div>
+    </section>
+
+    <!-- 数据管理（□2 挪最后：低频+危险操作收底） -->
+    <section class="conf-group">
+        <div class="settingBox">
+            <div class="section-title">{tomatoI18n.数据管理}</div>
+            <div class="settingBox dev-row">
+                <span class="kbd">prog-data</span>
+                <span>{progDataPath || tomatoI18n.progData未创建说明}</span>
+            </div>
+            <div class="settingBox dev-row">
+                <button
+                    class="b3-button b3-button--outline tomato-button prog-accent-btn b3-tooltips b3-tooltips__n"
+                    aria-label={tomatoI18n.tip设置归拢}
+                    onclick={doConsolidate}>{tomatoI18n.归拢老数据}</button>
+                {#if consolidateMsg}<span>{consolidateMsg}</span>{/if}
+            </div>
+        </div>
+    </section>
+
+    <!-- save（□3）：52px sticky footer 收底，主色「保存并关闭」（原面板末位 outline 保存行退役） -->
+    <div class="settings-footer">
+        <button class="b3-button tomato-save-btn" onclick={save}>{tomatoI18n.保存并关闭}</button>
     </div>
 </div>
 

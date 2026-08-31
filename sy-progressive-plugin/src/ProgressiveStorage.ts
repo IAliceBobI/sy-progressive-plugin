@@ -226,6 +226,24 @@ export class ProgressiveStorage {
         return this.plugin.data[constants.STORAGE_BOOKS];
     }
 
+    /** 是否已注册书：键存在且形状为块 id（_cache 等历史污染键不算书）。
+     *  全库唯一判定谓词（□11 统一）——digestUtils / ProgressiveBtn / AddBook 等
+     *  一律调此，勿再裸查 booksInfos()（此前真值/hasOwnProperty/形状过滤三种写法并存） */
+    isRegisteredBook(docID: string): boolean {
+        return !!docID && BLOCK_ID_RE.test(docID)
+            && Object.prototype.hasOwnProperty.call(this.booksInfos(), docID);
+    }
+
+    /** 只读查书档：命中返回现有条目，未命中返回 null——不注册、不补 boxID、不落盘。
+     *  rebuild 等容错路径专用（□11）：书可能已删/记录已清，booksInfo() 的自增注册
+     *  会造死书键且 time=now 骗过 bookStatus 新书保护期（lost 误判 ok）。
+     *  与 isRegisteredBook 同闸（形状不过关的脏键不返回，防 _cache 键以类型谎言命中）。
+     *  注：重建成功时 fullfilContent 仍会经单数版重注册活书（等价旧行为，重锚语义） */
+    peekBookInfo(docID: string): BookInfo | null {
+        if (!this.isRegisteredBook(docID)) return null;
+        return this.booksInfos()[docID] ?? null;
+    }
+
     // ============ v5 prog-data 锚定链 ============
     // 根目录：storage ID + IAL 双锚（换设备/清存储靠 IAL 认回）；
     // digest 夹/札记匣：只走 IAL 认回（全局唯一，不缓存——少一个 stale 源）。
@@ -390,8 +408,8 @@ export class ProgressiveStorage {
     async findPieceByBlockID(blockID: string): Promise<{ bookID: string; point: number } | null> {
         if (!blockID) return null;
         for (const bookID of Object.keys(this.booksInfos())) {
-            // _cache 等历史污染键不是书（loadData 落空索引还要每次重试），按块 id 形状过滤
-            if (!BLOCK_ID_RE.test(bookID)) continue;
+            // _cache 等历史污染键不是书（loadData 落空索引还要每次重试）——谓词见 isRegisteredBook
+            if (!this.isRegisteredBook(bookID)) continue;
             const idx = await this.loadBookIndexIfNeeded(bookID);
             for (let p = 0; p < idx.length; p++) {
                 if (idx[p].includes(blockID)) return { bookID, point: p };

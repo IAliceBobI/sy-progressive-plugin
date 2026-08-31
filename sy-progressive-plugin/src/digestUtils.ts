@@ -12,7 +12,8 @@ import { getDailyPath } from "./FlashBox";
 import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
 import { progStorage } from "./ProgressiveStorage";
 import { ReviewKey, markQuestion } from "./reviewQueue";
-import { PIECE_IDX_KEY, buildPieceIdx, piecePointFromMark, validDigestMd } from "./originTrace";
+import { PIECE_IDX_KEY, buildPieceIdx, piecePointFromMark, resolveDigestOrigin, validDigestMd } from "./originTrace";
+import { bookCommentsFromRows, type BookCommentItem, type BookCommentRow } from "./digestComments";
 
 // □12 摘抄标记零触碰统一（2026-08-30）：+ 链接（addPlusLnk）与写 style 背景（changeBG）
 // 两个动正文路径退役，原文痕迹唯一机制=digestMarker span 渲染态（digestMarker.ts），
@@ -48,9 +49,9 @@ export class DigestBuilder {
         const fallbackID = this.element.getAttribute(PDIGEST_LAST_ID);
         if (fallbackID) this.anchorID = fallbackID;
 
-        let { bookID } = await getBookID(this.docID);
-        let localPoint: number | null = null;
-        if (!bookID) {
+        const { bookID: markBookID } = await getBookID(this.docID);
+        let refHit: { bookID: string; point: number } | null = null;
+        if (!markBookID) {
             // □29 属性窗口兜底：片文档 IAL custom-progmark 走 createDocWithMd 两步后补，
             // 巨书出片后实测 24s+ 仍读不到 → 此处解析空、旧逻辑 fallback 片 id 会让摘抄
             // ctime 挂错归属（清单查空）。片内容块的 custom-progref（书原文块 id，随
@@ -66,17 +67,18 @@ export class DigestBuilder {
                 return n?.getAttribute?.(RefIDKey) ?? null;
             };
             const refID = (this.selected ?? []).map(refOf).find(v => !!v) ?? "";
-            if (refID) {
-                const hit = await progStorage.findPieceByBlockID(refID);
-                if (hit) {
-                    bookID = hit.bookID;
-                    localPoint = hit.point;
-                }
-            }
+            if (refID) refHit = await progStorage.findPieceByBlockID(refID);
         }
-        this.inBook = !!bookID && !!progStorage.booksInfos()[bookID];
-        if (!bookID) bookID = this.docID;
-        this.bookID = bookID;
+        // 归属判定链（mark → progref 反查 → □8 书态兜底 → 自指）收拢为纯函数，
+        // 优先级语义与 inBook（含「书已删记录已清落札记匣」）见 originTrace.resolveDigestOrigin
+        const origin = resolveDigestOrigin({
+            markBookID: markBookID ?? "",
+            refHit,
+            docID: this.docID,
+            isRegistered: (id) => progStorage.isRegisteredBook(id),
+        });
+        this.inBook = origin.inBook;
+        this.bookID = origin.bookID;
 
         this.attrs = await siyuan.getBlockAttrs(this.bookID);
         // 获取当前文档的属性，用于继承优先级等设置
@@ -88,8 +90,8 @@ export class DigestBuilder {
         }
         // □16 片序号键：发起文档是片（IAL custom-progmark）时记下片序号，
         // digest 里 parent-id 锚的片删掉后按它重切同片（片=一次性餐具可领新的）；
-        // mark 同在两步属性窗口内读不到（□29）→ 反查所得 localPoint 兜底
-        this.piecePoint = piecePointFromMark(currentDocAttrs[MarkKey]) ?? localPoint;
+        // mark 同在两步属性窗口内读不到（□29）→ 反查所得 origin.point 兜底
+        this.piecePoint = piecePointFromMark(currentDocAttrs[MarkKey]) ?? origin.point;
     }
 
     async saveCardMode() {
@@ -315,31 +317,17 @@ export async function queryDigestTree(bookID: string): Promise<DigestTreeData> {
     return { bookName, roots, flat };
 }
 
-/** 本书批注项（✅7 增量：路线图浮层「本书批注」分组；锚定=原文块属性，渲染归 tomato 全局） */
-export interface BookCommentItem {
-    blockID: string;
-    /** 原文块内容（列表行标题；截断在渲染层） */
-    content: string;
-    /** true=选区批注（custom-tomato-key-comment），false=块批注 */
-    range: boolean;
-}
+// □5 起批注属性模型切换：旧双键退役，改查 custom-tomato-annotations（JSON 数组，
+// 选区=条目有 sel）；行→条目与净化语义在 digestComments.ts 纯函数层（单测锁定）
+export type { BookCommentItem } from "./digestComments";
 
-/** 查书子树内带批注属性的块（选区/块批注两键，点击跳原文块）。同块双键（先块批注后
- *  选区批注等）按 block_id 去重、选区优先——keyed each 重复 key 会炸渲染（review P2） */
+/** 查书子树内带批注属性的块（一块一属性键，点击跳原文块） */
 export async function queryBookComments(bookID: string): Promise<BookCommentItem[]> {
-    const rows = await siyuan.sql(`select a.block_id as id, a.name as k, b.content as c from attributes a
+    const rows = await siyuan.sql(`select a.block_id as id, a.value as v, b.content as c from attributes a
         left join blocks b on b.id = a.block_id
-        where a.name in ('custom-tomato-key-comment','custom-tomato-comment')
+        where a.name = 'custom-tomato-annotations'
         and a.block_id in (select id from blocks where root_id = '${bookID}') limit 10000`);
-    const byBlock = new Map<string, BookCommentItem>();
-    for (const r of (rows ?? []) as any[]) {
-        const range = r.k === "custom-tomato-key-comment";
-        const prev = byBlock.get(r.id);
-        if (prev == null || (range && !prev.range)) {
-            byBlock.set(r.id, { blockID: r.id, content: r.c ?? "", range });
-        }
-    }
-    return [...byBlock.values()];
+    return bookCommentsFromRows((rows ?? []) as BookCommentRow[]);
 }
 
 export async function getDigestMd(settings: TomatoSettings, selected: HTMLElement[], split: boolean, ref = true, checkbox = false) {

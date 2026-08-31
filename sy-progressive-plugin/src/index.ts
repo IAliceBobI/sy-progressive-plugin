@@ -3,6 +3,8 @@ import { openChangelogDialog } from "../../sy-tomato-plugin/src/libs/changelogDi
 import changelog from "./changelog.json";
 import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
 import helpDocs from "./help.json";
+import { openHelpMenu } from "../../sy-tomato-plugin/src/libs/helpMenu";
+import { buildSettingsHeader } from "../../sy-tomato-plugin/src/libs/settingsHeader";
 import { ICONS } from "./icons";
 import { prog, progSettingsOpenHK } from "./Progressive";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
@@ -201,60 +203,6 @@ export default class ThePlugin extends BaseTomatoPlugin {
     private settingsDm: DestroyManager | null = null;
 
     private openSettings() {
-        const getTitle = (version: string) => {
-            const help = document.createElement("button") as HTMLButtonElement;
-            help.addEventListener("click", () => {
-                openHelpDialog("https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink", helpDocs);
-            });
-            help.classList.add("b3-button")
-            help.classList.add("b3-button--text")
-            help.textContent = 'Help帮助'
-
-            const log = document.createElement("button") as HTMLButtonElement;
-            log.addEventListener("click", () => openChangelogDialog(changelog));
-            log.classList.add("b3-button")
-            log.classList.add("b3-button--text")
-            log.textContent = '更新日志'
-
-            const save = document.createElement("button") as HTMLButtonElement;
-            save.addEventListener("click", () => {
-                (globalThis as any).tomato_zZmqus5PtYRi.save();
-            });
-            save.classList.add("b3-button")
-            save.classList.add("b3-button--outline")
-            save.textContent = tomatoI18n.保存并退出;
-
-            const div = document.createElement("div") as HTMLDivElement;
-            const name = document.createElement("span") as HTMLSpanElement;
-            name.textContent = tomatoI18n.渐进学习 + " · " + tomatoI18n.设置;
-            name.style.fontWeight = "600";
-            name.style.whiteSpace = "nowrap";
-            div.appendChild(name);
-            const versionSpan = document.createElement("span") as HTMLSpanElement;
-            versionSpan.textContent = "v" + version + "p";
-            versionSpan.style.fontSize = "12px";
-            versionSpan.style.alignSelf = "center";
-            div.appendChild(versionSpan);
-            // 按钮组整组不拆行；放得下时被 margin-left:auto 推到行右端，窄窗/手机放不下时整组换行并右对齐
-            const btnRow = document.createElement("div") as HTMLDivElement;
-            btnRow.style.display = "flex";
-            btnRow.style.alignItems = "center";
-            btnRow.style.flexWrap = "nowrap";
-            btnRow.style.gap = "8px";
-            btnRow.style.marginLeft = "auto";
-            btnRow.appendChild(help);
-            btnRow.appendChild(log);
-            btnRow.appendChild(save);
-            div.appendChild(btnRow);
-            div.style.display = "flex"
-            div.style.alignItems = "center"
-            div.style.flexWrap = "wrap"
-            div.style.rowGap = "6px"
-            div.style.columnGap = "8px"
-            div.style.width = "100%"
-            return div;
-        }
-
         const dm = new DestroyManager();
         this.settingsDm?.destroyBy();
         this.settingsDm = dm;
@@ -269,13 +217,26 @@ export default class ThePlugin extends BaseTomatoPlugin {
             },
             hideCloseIcon: true,
         });
+        // □3 统一 header：名+版本+Pro 徽标｜帮助菜单单图标钮+关闭钮；Help帮助/更新日志/
+        // outline 保存钮退役（帮助收进菜单，保存走 footer「保存并关闭」）
+        const header = buildSettingsHeader({
+            title: tomatoI18n.渐进学习 + " · " + tomatoI18n.设置,
+            version: "v" + this.pluginSpec?.version + "p",
+            pro: lastVerifyResult() === true,
+            onHelp: (e) => openHelpMenu(e, {
+                usage: () => openHelpDialog("https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink", helpDocs),
+                changelog: () => openChangelogDialog(changelog),
+            }),
+            onClose: () => dialog.destroy(),
+        });
         dialog.element.querySelector(".b3-dialog__header")
-            .replaceChildren(getTitle(this.pluginSpec?.version));
+            .replaceChildren(header.root);
         const d = mount(SettingsSvelte, {
             target: dialog.element.querySelector("#" + id),
             props: {
                 plugin: this,
                 dm,
+                proBadge: header.badge,
             }
         });
         dm.add("1", () => { dialog.destroy() })
@@ -341,6 +302,8 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 this.openSettings();
             },
         })
-        prog.addTopbar(this, "left");
+        // 桌面顶栏菜单退役（2026-08-31 用户拍板）：加书/跳转在桌面走右键块菜单+浮条+命令
+        // 面板；移动端保留顶栏——移动端无浮条 hover 生态，这里是唯一常驻入口
+        if (events.isMobile) prog.addTopbar(this, "left");
     }
 }

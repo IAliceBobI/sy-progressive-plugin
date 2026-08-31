@@ -90,7 +90,7 @@
         // 按本次设置重分片；已是某书的分片 → 加书=脱离母书独立成书。管理页「重新分片」
         // 走同一弹窗，同样获警告。仅提示不拦截（重加书是合法路径，知情即可）
         try {
-            if (progStorage.booksInfos()[bookID]) {
+            if (progStorage.isRegisteredBook(bookID)) {
                 warnText = tomatoI18n.加书警告已注册;
             } else {
                 const attrs = await siyuan.getBlockAttrs(bookID);

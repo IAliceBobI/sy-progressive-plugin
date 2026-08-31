@@ -34,7 +34,6 @@
     import { SuperRefBox全局修复引用, SuperRefBox全局加固引用 } from "./SuperRefBox";
     import { tomatoI18n } from "./tomatoI18n";
     import HotkeyCap from "./HotkeyCap.svelte";
-    import { helpOpen } from "./helpOpen";
 
     let { codeValid }: { codeValid: boolean } = $props();
     let codeNotValid = $derived(!codeValid);
@@ -46,11 +45,6 @@
         <div class="section-title">
             <input type="checkbox" class="b3-switch" bind:checked={$markdownExportBoxCheckbox} />
             {tomatoI18n.导出工作空间}
-            <strong>
-                <a href="https://awx9773btw.feishu.cn/docx/UmNxds5JLo4m1qxc7j3cOvh4ncc?from=from_copylink" onclick={helpOpen}>
-                    {tomatoI18n.帮助}</a
-                >
-            </strong>
         </div>
         {#if $markdownExportBoxCheckbox}
             <!-- ① 导出范围 -->
@@ -192,7 +186,7 @@
                     <span class="tomato-row-label">{tomatoI18n.增量导出间隔秒}</span>
                     <div class="helpText">{tomatoI18n.增量导出最小3秒}</div>
                 {:else}
-                    <span class="tomato-timer-off">{tomatoI18n.已关闭开启后按设定间隔自动执行增量导出}</span>
+                    <span class="tomato-timer-off">{tomatoI18n.开启后按设定间隔自动执行增量导出}</span>
                 {/if}
             </div>
             <div class="tomato-input-row" class:codeNotValid>
@@ -208,7 +202,7 @@
                     <span class="tomato-row-label">{tomatoI18n.确保导出间隔分钟}</span>
                     <div class="helpText">{tomatoI18n.确保导出最小3分钟}</div>
                 {:else}
-                    <span class="tomato-timer-off">{tomatoI18n.已关闭开启后按设定间隔确保导出符合配置}</span>
+                    <span class="tomato-timer-off">{tomatoI18n.开启后按设定间隔确保导出符合配置}</span>
                 {/if}
             </div>
 
@@ -243,11 +237,6 @@
         <div class="section-title">
             <input type="checkbox" class="b3-switch" bind:checked={$blockEditorBox} />
             块编辑器
-            <strong>
-                <a href="https://awx9773btw.feishu.cn/docx/AheDdwG35ol3qWxYPeYc8HennJf?from=from_copylink" onclick={helpOpen}>
-                    {tomatoI18n.帮助}</a
-                >
-            </strong>
         </div>
         {#if $blockEditorBox}
             <div>
@@ -262,11 +251,6 @@
         <div class="section-title">
             <input type="checkbox" class="b3-switch" bind:checked={$superRefBoxCheckBox} />
             引用修复工具
-            <strong>
-                <a href="https://awx9773btw.feishu.cn/docx/WTgxdUINHoYXHbxmU87cxs5knfd?from=from_copylink" onclick={helpOpen}>
-                    {tomatoI18n.帮助}</a
-                >
-            </strong>
         </div>
         {#if $superRefBoxCheckBox}
             <div>这是一个实验功能，请提前备份好。</div>

@@ -34,14 +34,16 @@ Finally finish what you read: split long documents into daily digestible pieces 
 ## Getting Started
 
 1. Open a long document, select the text you want to read, and click "Excerpt" on the floating bar — or run the command "Add current document to piece-based progressive reading" to slice the whole doc
-2. Run "Start learning" from the command palette, read today's portion, and page through
+2. Run "Start today's reading" from the command palette, read today's portion, and page through
 3. To remember the good parts: select and cloze/make cards — review happens in SiYuan's built-in flashcard system
 
 ## Docs & Community
 
 - 📖 **[Documentation](https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink)** (Chinese, with GIFs & videos for every feature)
 - 🙏 [Acknowledgments](https://awx9773btw.feishu.cn/docx/FQ7udC3jeorfDYxI39ict2UNn2g?from=from_copylink)
-- 💬 [QQ Group](https://pd.qq.com/s/2fh7nh7gz) (Chinese) — feedback and feature requests
+- 💬 [QQ Group](https://pd.qq.com/s/r3jz0g16) (Chinese) — feedback and feature requests
+- 💬 [Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=f08gff0c-d6b0-4a0d-8323-c8a0553e4fff&qr_code=true) (Chinese) — feedback and feature requests
+- 📱 Scan to join: ![Group QR codes (left: QQ Channel, right: Feishu)](group-qr.png)
 - 🔓 [Open-source repo](https://github.com/IAliceBobI/sy-progressive-plugin) — what you see is what's compiled: built by GitHub Actions
 
 📊 SiYuan Marketplace: 32,000+ downloads

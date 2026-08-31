@@ -14,8 +14,6 @@
 
 <script lang="ts">
     import { SPACE } from "./libs/gconst";
-    import { activateFromCloud } from "./libs/redeem";
-    import { userID } from "./libs/stores";
     import { taobaoTomato, taobaoProgressive, taobaoRecite } from "./libs/taobaocode";
     import { expStore } from "./libs/user";
     import { icon } from "./libs/domUtils";
@@ -63,33 +61,6 @@
 
     // 供 BuyDialog.ts 的 DestroyManager 挂卸载：弹框关闭时正确清理 Svelte 实例。
     export function destroy() {}
-
-    // 爱发电收费端隐藏（2026-08-22 用户定调：流量全导淘宝兑换码，费率贵）。
-    // 全链路后端保留（webhook/在线购买/管理后台），重启时改回 true 即恢复
-    const AFDIAN_ENABLED = false;
-
-    // 爱发电在线购买（自动发货）：付款页预填 remark=思源 userID，webhook 签发 license，
-    // 回来点「我已完成购买」凭 userID 从 /activate 取码激活。
-    // remark 带说明文字防买家误删，插件名方便卖家人工看单；云函数 extractSiyuanUserID
-    // 从杂项文本抽 13-17 位数字（插件名各语言均为纯文本无数字），互不影响。
-    // recite 无爱发电 plan（流量全导淘宝），AFDIAN_ENABLED=false 下永不渲染，分流兜底走 progressive 分支。
-    // 「仿写练习」是产品名（plugin.json displayName 恒中文），非 tomatoI18n 现成 key，用字面量
-    const buyURL = $derived(
-        "https://afdian.com/item?plan_id=" +
-        (product === "tomato" ? "3f94b04e9ddd11f1b07752540025c377" : "6d6770e29ddd11f192645254001e7c00") +
-        "&product_type=1&remark=" +
-        encodeURIComponent(
-            `思源用户ID ${$userID} ${product === "tomato" ? tomatoI18n.番茄工具箱 : product === "progressive" ? tomatoI18n.渐进学习 : "仿写练习"}（请勿删除，用于自动发货）`,
-        ),
-    );
-
-    async function paidActivate() {
-        await activateFromCloud(
-            tomatoI18n.未查询到付款订单,
-            tomatoI18n.购买查询失败请检查网络后重试,
-            product,
-        );
-    }
 </script>
 
 <div>
@@ -136,34 +107,7 @@
         {/if}
     </div>
 
-    <!-- 爱发电通道（备选，当前隐藏）：全自动发货，平台抽成 -->
-    {#if AFDIAN_ENABLED}
-        <div class="section">
-            <div class="sectionTitle">{tomatoI18n.在线购买自动发货}</div>
-            {#if $userID}
-                <div class="center kbd">{tomatoI18n.在线购买说明}</div>
-                <div class="center">
-                    <a
-                        class="b3-button b3-button--outline settingBox"
-                        target="_blank"
-                        href={buyURL}
-                        >{tomatoI18n.去爱发电购买}
-                    </a>
-                    <button
-                        class="b3-button b3-button--outline settingBox"
-                        onclick={paidActivate}
-                        >{tomatoI18n.我已完成购买}
-                    </button>
-                </div>
-            {:else}
-                <div class="center">
-                    <span class="b3-label b3-label__text kbd">
-                        {tomatoI18n.如果要激活插件请先登录思源本体的账户}
-                    </span>
-                </div>
-            {/if}
-        </div>
-    {/if}
+    <!-- 爱发电通道 2026-08-31 彻底移除（用户定调：平台扣 6% 太高，打赏直走微信/支付宝收款码，购买走淘宝兑换码） -->
 </div>
 
 <style>
@@ -277,10 +221,5 @@
     }
     img[alt="taobao"] {
         margin: 12px 0;
-    }
-    /* 加元素选择器提高特异性：设置对话框全局样式 IndexConf.css 也定义了 .settingBox，
-       此处需保持自己的 margin 不被覆盖（两处使用均为 button 元素） */
-    button.settingBox {
-        margin: 5px;
     }
 </style>

@@ -17,7 +17,8 @@
     import { digestProgressiveBox, initDi, digestWholeDoc } from "./DigestProgressiveBox";
     import { openFloatPopover, closeFloatPopover } from "./overlays";
     import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
-    import { mount } from "svelte";
+    import { mount, onMount } from "svelte";
+    import { showFloatTip, hideFloatTip, destroyFloatTip } from "./floatTip";
     import DigestTreePopover from "./DigestTreePopover.svelte";
     import ContentsPopover from "./ContentsPopover.svelte";
     import RouteGuidePopover from "./RouteGuidePopover.svelte";
@@ -64,8 +65,8 @@
     const useTopBar = isMobile && getProgressivePluginConfig().mobileTopBar !== false;
 
     // □10 方案 B：平铺区常驻铺开（无 [+]、无二级），moreOpen/advOpen 开合态消亡；
-    // digOpen 是 store，由 collapseFloatBar/docChanged 重置（□8 的「不可见即清」$effect
-    // 随开合面板退役而删，唯一残留开合面 digOpen 的覆盖本就在那两处）。
+    // digOpen 是 store 且 2026-08-31 起默认开常驻（展开浮条即出现，✂ 仅收起/找回；
+    // 重置点=expandFloatBar/出场 docChanged，见 ProgressiveBtn.ts）。
 
     // □14c 片态首行有序清单（全量 28 项任意可入，顺序即渲染序）：组件 $state 镜像 +
     // settingFactory 持久化——拖拽落子即时生效（set+write 落盘），设置面板保存 reload
@@ -155,7 +156,7 @@
     }
 
     // □11 三行制 tooltip（docs/prog-floatbar-ux-redesign.md □11.2）：按钮名\n用法一句话\n快捷键（如有）。
-    // 用法句 = tomatoI18n.tip* getter（□11.3 清单）；b3-tooltips 原生 \n 多行。
+    // 用法句 = tomatoI18n.tip* getter（□11.3 清单）；多行由 .tooltip 类的 break-spaces 换行（floatTip.ts 单例）。
     const tip3 = (name: string, usage: string, w?: string) =>
         w ? `${name}\n${usage}\n${w}` : `${name}\n${usage}`;
 
@@ -165,11 +166,14 @@
         swap: () => tip3(tomatoI18n.换书, tomatoI18n.tip换书),
         next: () => tip3(tomatoI18n.下片删, tomatoI18n.tip下片删),
         prev: () => tip3(tomatoI18n.回看, tomatoI18n.tip回看),
-        origin: () => tip3(tomatoI18n.打开原书, tomatoI18n.tip打开原书), // 摘抄态文案（回原书）在渲染处特判
+        // origin 主排只有片/摘抄两态在用：片态=回原书带块级定位（2026-08-31 升级），
+        // 摘抄态文案（回原书·定位摘抄原文）在渲染处特判覆盖
+        origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书), // 摘抄态文案在渲染处特判
         nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片), // 托盘动作勾上主排后主排也要有文案
         delBack: () => tip3(tomatoI18n.上片删, tomatoI18n.tip上片删),
         quit: () => tip3(tomatoI18n.关闭分片, tomatoI18n.tip关闭分片),
         continue: () => tip3(tomatoI18n.继续读, tomatoI18n.tip继续读),
+        toPiece: () => tip3(tomatoI18n.跳到分片, tomatoI18n.tip跳到分片), // □2 书态就地跳片
         summary: () => tip3(tomatoI18n.摘抄汇总, tomatoI18n.tip摘抄汇总),
         archive: () => tip3(tomatoI18n.归档本书, tomatoI18n.tip归档本书),
         recite: () => tip3(tomatoI18n.送进仿写, tomatoI18n.tip送进仿写),
@@ -185,7 +189,7 @@
         swap: () => tip3(tomatoI18n.换书, tomatoI18n.tip换书),
         next: () => tip3(tomatoI18n.下片删, tomatoI18n.tip下片删),
         prev: () => tip3(tomatoI18n.回看, tomatoI18n.tip回看),
-        origin: () => tip3(tomatoI18n.打开原书, tomatoI18n.tip打开原书),
+        origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书), // 平铺区只出现在片态（摘抄态平铺区仅 map）
         addBook: () => tip3(tomatoI18n.加书, tomatoI18n.tip加书), // □18：存量 mainIds 未含时平铺区兜底
         contents: () => tip3(tomatoI18n.打开目录, tomatoI18n.tip打开目录),
         refill: () => tip3(tomatoI18n.重插, tomatoI18n.tip重插),
@@ -229,7 +233,7 @@
         swap: () => tomatoI18n.换书,
         next: () => tomatoI18n.下片删,
         prev: () => tomatoI18n.回看,
-        origin: () => tomatoI18n.打开原书,
+        origin: () => tomatoI18n.回原书,
         addBook: () => tomatoI18n.加书,
         nextPure: () => tomatoI18n.下一个分片,
         delBack: () => tomatoI18n.上片删,
@@ -450,6 +454,9 @@
             case "origin":
                 if ($kind === "digest") {
                     await openOriginFromDigest();
+                } else if ($kind === "piece") {
+                    // 2026-08-31 升级：片态回原书带块级定位（原=仅打开原书文档）
+                    await prog.returnToOriginFromPiece($noteID, $bookID);
                 } else {
                     await prog.openOriginBook($bookID);
                 }
@@ -464,6 +471,26 @@
             case "continue":
                 await prog.startToLearnWithLock($bookID);
                 break;
+            case "toPiece": {
+                // □2 书态就地跳片：打开选中/光标块所在分片（≠continue=全局断点）。
+                // 目标块双校验（reasoning review P1-1）：events.protyle 会被块引浮窗/搜索
+                // 预览等非编辑器宿主劫持（setReadingPointMap 对一切带 .event 的 loaded 事件
+                // 都写），光标兜底又是全局 selection——不校验会拿别文档的块去跳片、甚至
+                // 改写别书的断点。解析按 $noteID 过滤，取块后 element.contains 再验一道。
+                const own = events.protyle?.protyle;
+                const protyle = own?.block?.rootID === $noteID
+                    ? own
+                    : getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle ?? null;
+                const info = events.selectedDivsSync(protyle);
+                const sel0 = info?.selected?.[0];
+                const blockID = sel0 && info.element?.contains(sel0) ? info.ids.at(0) : undefined;
+                if (!blockID) {
+                    await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
+                    break;
+                }
+                await prog.readThisPiece(blockID);
+                break;
+            }
             case "summary":
                 await prog.openDigestSummary($bookID);
                 break;
@@ -705,7 +732,6 @@
         const di = await initDi(s, protyle, digestProgressiveBox.settings);
         if (cardMode) di.cardMode = cardMode; // 去向级覆盖，不 saveCardMode 不改书全局
         await di.digest(split, question);
-        digOpen.set(false);
     }
 
     async function runWord(ai = false) {
@@ -730,7 +756,6 @@
         word.bookID = di.bookID;
         word.allText = di.allText;
         await word.digest(false, ai); // □19：ai=true 走 AI 翻译造句（Pro 门禁在 wordsUtils 层，unpaid 引导）
-        digOpen.set(false);
     }
 
     async function onDig(id: string, ev?: MouseEvent) {
@@ -758,7 +783,6 @@
                 } else {
                     await prog.sendToRecite();
                 }
-                digOpen.set(false);
                 break;
             case "sched": // v5 □12：选中块附加/调整重访调度（独立菜单，见 reviewMenu.ts）
                 {
@@ -776,7 +800,6 @@
                             ?? getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle;
                         if (protyle) {
                             await digestWholeDoc(protyle);
-                            digOpen.set(false);
                         } else {
                             // 反馈口径与 runPieceRecite 一致（□28 review P2-4：静默吞点击易误判按钮失灵）
                             await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪);
@@ -786,24 +809,70 @@
         }
     }
 
-    function closeOverlays(ev: MouseEvent) {
-        const t = ev.target as HTMLElement;
-        // .prog-topbar：移动端顶栏形态的根（不在 .prog-fb 内）——漏判会让 mousedown 先清
-        // digOpen、随后的 click 翻转恒为开，子排「只能开不能关」（reasoning review P1）；
-        // .prog-popover：浮层族内部点击不关子排（□11 review P2）
-        if (!t.closest(".prog-fb") && !t.closest(".prog-topbar") && !t.closest(".prog-popover")) {
-            digOpen.set(false);
-        }
+    function closeOverlays(_ev: MouseEvent) {
+        // 摘抄子排 2026-08-31 起常驻（展开浮条即出现）：编辑器内点选/划选不再收起子排——
+        // 收起只走首行 ✂ 切换（旧行为「点外面即收」逼用户每轮重开，正是要治的摩擦）。
+        // .prog-topbar/.prog-popover 历史豁免随收起语义一并失效，仅留 tooltip 交互即隐。
+        hideTip(); // 交互即隐：拖浮条/点按钮时锚要动，fixed 气泡不跟随
     }
+
+    // ---- 浮条 tooltip：自建单例（□1 根治版，协议在 floatTip.ts 头注释）----
+    // □10 曾改写思源 #tooltip 共享单例（b3-tooltips 纯 CSS 气泡被 .floatbar-body 裁切
+    // 的防溢方案），但思源 block/popover.ts 的 document 级 mouseover 监听对一切非候选
+    // 元素 hover 都会 hideTooltip() 该单例（含按钮内 svg/间隙/padding），叠加本组件
+    // `btn === tipTarget` 早退形成「藏后同钮不重弹」锁死——真机 hover 大多不弹的根因
+    // （2026-08-31 真实轨迹 e2e 实锤）。自建元素对思源隐藏生态隐身，pointer-events:none。
+    // 委托挂 window 不依赖 FloatBar 内部结构；标记类 prog-fbtip 圈定退役 CSS 气泡的
+    // 按钮——FloatBar 自带 ✕ 钮在 head（body 外无裁切）保留原生 CSS 气泡不受此管。
+    let tipTarget: HTMLElement | null = null;
+    function hideTip() {
+        tipTarget = null;
+        hideFloatTip();
+    }
+    function onFloatOver(ev: MouseEvent) {
+        if (dragId != null) return; // 拖拽换位中 tip 不跟闪
+        const t = ev.target as HTMLElement;
+        const btn = t.closest?.(".prog-fb .prog-fbtip") as HTMLElement | null;
+        if (!btn || btn === tipTarget) return; // 按钮内子元素间移动不重弹
+        tipTarget = btn;
+        showFloatTip(btn);
+    }
+    function onFloatOut(ev: MouseEvent) {
+        if (!tipTarget) return;
+        const to = ev.relatedTarget as HTMLElement | null;
+        // 判据用 .floatbar-body 而非 .prog-fb（reasoning review P2-1）：head 标题区在
+        // body 外且自带 b3-tooltips ✕ 钮——按根判会双气泡并存（我们的 tip 不隐 + ✕ 的
+        // CSS 气泡起）；按钮区（主排/平铺/子排）全在 body 内，行内互移不隐。
+        if (!to?.closest?.(".floatbar-body")) hideTip();
+    }
+    onMount(() => {
+        // 条内滚动（.floatbar-body ov:auto）时按钮动而 fixed 气泡不动——capture 级滚动即隐。
+        // 守卫 tipTarget：只收拾自己的气泡，别把思源原生 tooltip（无全局 scroll 隐藏协议）
+        // 一并误杀（review P1-1）
+        const onScroll = () => { if (tipTarget) hideTip(); };
+        window.addEventListener("scroll", onScroll, true);
+        return () => {
+            window.removeEventListener("scroll", onScroll, true);
+            tipTarget = null;
+            destroyFloatTip(); // unmount（浮条销毁）不留悬空气泡
+        };
+    });
+    $effect(() => {
+        // 按钮 DOM 消失/换位的状态不止 show/expanded——kind 切换（⌘数字）、子排收起、
+        // 平铺区折叠、拖拽换位都可能由键盘/异步驱动且无 mousedown 前置、浏览器不补发
+        // mouseout，tip 会失联挂死（review P1-2）；依赖全挂 + isConnected 判定一次兜住
+        void $kind; void $digOpen; void flatCollapsed; void mainIds;
+        if (!$show || !$expanded || (tipTarget && !tipTarget.isConnected)) hideTip();
+    });
 </script>
 
-<svelte:window onmousedown={closeOverlays} />
+<svelte:window onmousedown={closeOverlays} onmouseover={onFloatOver} onmouseout={onFloatOut} />
 
 {#snippet btns()}
     <!-- □11 digest 态路径胶囊：来自哪本书/父摘抄（降级后实际可达目标），点击走四级链 -->
     {#if $kind === "digest" && crumbs}
         <button
-            class="prog-fb-crumbs b3-tooltips b3-tooltips__n"
+            class="prog-fb-crumbs prog-fbtip"
             aria-label={tomatoI18n.tip路径胶囊}
             onclick={() => openOriginFromDigest()}
         ><span class="prog-fb-crumbs-book">{@html icon("iconProgBook", 12)}</span><span class="prog-fb-crumbs-text">{crumbs}</span></button>
@@ -817,7 +886,7 @@
             <button
                 draggable={canDrag}
                 data-fb-id={b.id}
-                class="prog-fb-btn prog-fb-btn--{b.kind === 'common' ? 'normal' : b.kind} b3-tooltips b3-tooltips__n {$digOpen && b.id === "digest" ? "prog-fb-btn--on" : ""}"
+                class="prog-fb-btn prog-fb-btn--{b.kind === 'common' ? 'normal' : b.kind} prog-fbtip {$digOpen && b.id === "digest" ? "prog-fb-btn--on" : ""}"
                 class:prog-fb-btn--dragging={dragId === b.id}
                 class:prog-fb-pro={isAdvPro(b.id)}
                 aria-label={(b.id === "digest" && $digOpen) ? tomatoI18n.收起
@@ -835,7 +904,7 @@
         {#if flatCells.length > 0 || advVisible.length > 0}
             <!-- □14b 折叠钮：首行行尾，chevron 指向即动作方向（展开中显示⌃=收起） -->
             <button
-                class="prog-fb-fold b3-tooltips b3-tooltips__n"
+                class="prog-fb-fold prog-fbtip"
                 class:prog-fb-fold--closed={flatCollapsed}
                 aria-label={flatCollapsed ? tomatoI18n.展开工具区 : tomatoI18n.收起工具区}
                 onclick={toggleFlat}
@@ -851,7 +920,7 @@
                 {#each flatCells as id (id)}
                     <button
                         draggable={canDrag}
-                        class="prog-fb-flat-btn b3-tooltips b3-tooltips__n {$digOpen && id === "digest" ? "prog-fb-flat-btn--on" : ""}"
+                        class="prog-fb-flat-btn prog-fbtip {$digOpen && id === "digest" ? "prog-fb-flat-btn--on" : ""}"
                         class:prog-fb-btn--dragging={dragId === id}
                         class:prog-fb-pro={isAdvPro(id)}
                         aria-label={(id === "digest" && $digOpen) ? tomatoI18n.收起 : (FLAT_TIPS[id]?.() ?? id) + proNote(isAdvPro(id))}
@@ -866,7 +935,7 @@
                     {#each group as it (it.id)}
                     <button
                         draggable={canDrag}
-                        class="prog-fb-flat-btn b3-tooltips b3-tooltips__n"
+                        class="prog-fb-flat-btn prog-fbtip"
                         class:prog-fb-btn--dragging={dragId === it.id}
                         class:prog-fb-pro={it.spec.vip === true}
                         aria-label={tip3(it.label(), ADV_USAGE[it.id]?.() ?? it.label(), it.spec.w()) + proNote(it.spec.vip === true)}
@@ -879,12 +948,14 @@
             {/each}
         </div>
     {/if}
-    {#if $digOpen}
+    {#if $digOpen && $kind !== "digest"}
+        <!-- 子排常驻（2026-08-31）：digOpen 默认开、展开浮条即出现，✂ 仅作收起/找回切换；
+             摘抄态没有 ✂（渲染了就无法收起）故不渲染——摘抄文档再摘抄落札记匣本就低频 -->
         <div class="prog-fb-dig">
             <!-- whole（整摘）限片态：书态整本复制不实用，整书场景走选中摘抄 -->
             {#each Object.keys(DIG_ICONS).filter(id => id !== "whole" || $kind === "piece") as id (id)}
                 <button
-                    class="prog-fb-btn--sm b3-tooltips b3-tooltips__n"
+                    class="prog-fb-btn--sm prog-fbtip"
                     aria-label={DIG_TIPS[id]?.() ?? id}
                     onclick={(e) => onDig(id, e)}
                 >{@html icon(DIG_ICONS[id], 14)}</button>

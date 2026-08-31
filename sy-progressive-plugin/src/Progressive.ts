@@ -12,7 +12,7 @@ import {
 } from "../../sy-tomato-plugin/src/libs/gconst";
 import AddBookSvelte from "./AddBook.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
-import { progStorage } from "./ProgressiveStorage";
+import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
 import { notifyFleetChanged } from "./fleet";
 import { HtmlCBType } from "./constants";
@@ -43,26 +43,16 @@ class Progressive {
     private docID: string;
     private observer: MutationObserver;
     private welement: any;
+    private jumpSeq = 0; // □3 跳片轮询 latest-wins 序号（review P2-2）
 
+    /** 顶栏按钮（2026-08-31 起仅移动端注册——桌面顶栏入口退役，见 index.ts 注册处）：
+     *  移动端无浮条 hover 生态，顶栏是加书/跳转/开始学习的唯一常驻入口 */
     addTopbar(plugin: Plugin, position: "left" | "right") {
         const tb = plugin.addTopBar({
             icon: "iconFilesRoot",
             title: tomatoI18n.渐进学习菜单,
             position,
-            callback: () => {
-                if (events.isMobile) {
-                    this.addMenu();
-                } else {
-                    let rect = tb.getBoundingClientRect();
-                    if (rect.width === 0) {
-                        rect = document.querySelector("#barMore").getBoundingClientRect();
-                    }
-                    if (rect.width === 0) {
-                        rect = document.querySelector("#barPlugins").getBoundingClientRect();
-                    }
-                    this.addMenu(rect);
-                }
-            }
+            callback: () => this.addMenu(),
         });
         return tb;
     }
@@ -261,7 +251,9 @@ class Progressive {
         }
     }
 
-    private addMenu(rect?: DOMRect) {
+    /** 移动端顶栏全屏菜单：加书 + 跳到分片 + 开始学习（□11 盘点：开始学习桌面归火苗，
+     *  移动端无火苗 hover 生态故保留常驻入口；桌面同款能力走右键块菜单+浮条+命令面板） */
+    private addMenu() {
         const menu = new Menu("progressiveMenu");
         menu.addItem({
             iconHTML: Progressive添加当前文档到渐进阅读分片模式.icon,
@@ -279,9 +271,7 @@ class Progressive {
                 this.readThisPiece();
             }
         });
-        // □11 盘点整改 A 类：桌面顶栏菜单精简为「加书 + 跳到分片」两项（开始学习归火苗/
-        // 书态 ▶/🔄）；移动端三项全留（无火苗 hover 生态，保留常驻入口）
-        if (events.isMobile && ProgressiveStart2learn.get()) {
+        if (ProgressiveStart2learn.get()) {
             menu.addItem({
                 iconHTML: Progressive开始学习.icon,
                 label: Progressive开始学习.langText(),
@@ -291,15 +281,7 @@ class Progressive {
                 }
             });
         }
-        if (events.isMobile) {
-            menu.fullscreen();
-        } else {
-            menu.open({
-                x: rect.right,
-                y: rect.bottom,
-                isLeft: true,
-            });
-        }
+        menu.fullscreen();
     }
 
     async addProgressiveReadingWithLock(bookID?: string) {
@@ -384,10 +366,11 @@ class Progressive {
                         if (topID === idx[i][j]) {
                             await progStorage.gotoBlock(bookID, i);
                             await this.startToLearnWithLock(bookID);//创建分片
-                            setTimeout(async () => {
-                                const pieceBlockID = await this.getPiecesByRefID(topID)
-                                if (pieceBlockID) await OpenSyFile2(this.plugin, pieceBlockID);//跳到分片内的块
-                            }, 1200);
+                            // □3：1200ms 固定时延不等片真就绪（删片重建链索引追赶远超
+                            // 1.2s），改轮询 findPieceDoc 命中后再查副本跳块（不阻塞菜单回调）。
+                            // seq latest-wins（review P2-2）：重入时旧轮询晚命中不得拉走用户
+                            this.jumpToPieceBlockWhenReady(bookID, i, topID, ++this.jumpSeq)
+                                .catch(() => siyuan.pushMsg(tomatoI18n.请等待索引建立));
                             return;
                         }
                     }
@@ -399,19 +382,55 @@ class Progressive {
         }
     }
 
-    private async getPiecesByRefID(oriID: string) {
-        const rows = await siyuan.sqlAttr(`select * from attributes where name="${RefIDKey}" and value="${oriID}" limit 1`)
-        return rows.at(0).block_id;
+    /** □3：等片文档就绪后跳到片内对应块——轮询替代 1200ms 固定时延（片已存在的正常路径
+     * 首轮即命中零等待；删片重建时兜索引追赶，最多 ~60s 后提示重试）。seq latest-wins：
+     * 新一轮跳转发起后旧轮询静默退场（review P2-2）。 */
+    private async jumpToPieceBlockWhenReady(bookID: string, point: number, topID: string, seq: number) {
+        let missAfterHit = 0; // 片已在但副本属性持续 miss 的轮数（review P2-3）
+        for (let i = 0; i < 60; i++) {
+            const pieceDocID = await help.findPieceDoc(bookID, point);
+            if (pieceDocID) {
+                const pieceBlockID = await this.getPiecesByRefID(topID, pieceDocID);
+                if (pieceBlockID) {
+                    if (seq !== this.jumpSeq) return;
+                    await OpenSyFile2(this.plugin, pieceBlockID);//跳到分片内的块
+                    return;
+                }
+                // 片文档已在但块副本属性持续未入索引：多半副本真无 progref（HTML 块拷贝
+                // 丢 IAL/用户手删），烧满 60s 只会误报索引慢——10 轮即收（review P2-3）
+                if (++missAfterHit >= 10) {
+                    await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
+                    return;
+                }
+            }
+            await utils.sleep(1000);
+        }
+        await siyuan.pushMsg(tomatoI18n.请等待索引建立);
+    }
+
+    private async getPiecesByRefID(oriID: string, pieceDocID: string) {
+        // □3：限定 root_id=目标片文档——digest 文档的摘抄拷贝同样带 progref 指向原块，
+        // 无过滤时 limit 1 无序命中谁看缘分（e2e 实锤跳到 digest 文档）；空结果回 ""
+        // （原 rows.at(0).block_id 对空集 TypeError 且在 setTimeout 内未捕获）。
+        // 取舍：副本被用户移出片文档后不再命中（旧版会跳到移动后的位置）。
+        const rows = await siyuan.sqlAttr(
+            `select * from attributes where name="${RefIDKey}" and value="${oriID}" and root_id="${pieceDocID}" limit 1`)
+        return rows.at(0)?.block_id ?? "";
     }
 
     async startToLearnWithLock(bookID = "", isRand = false) {
         return navigator.locks.request(constants.StartToLearnLock, { ifAvailable: true }, async (lock) => {
             if (lock) {
                 await siyuan.pushMsg(tomatoI18n.正在为您打开文档片段);
+                // □3 review P1：false=createPiece 落空（索引追赶窗口，可重试）；undefined=各
+                // 终态（已带对症提示，不重试不叠弹）。重试间隔防连发，烧完仍 false 才弹失效。
+                let ok: boolean | undefined = false;
                 let i = 0;
-                while (await this.startToLearn(bookID, isRand) === false) {
+                while ((ok = await this.startToLearn(bookID, isRand)) === false) {
                     if (i++ > 30) break;
+                    await utils.sleep(500);
                 }
+                if (ok === false) await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
                 await utils.sleep(constants.IndexTime2Wait);
             } else {
                 await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [2]");
@@ -491,9 +510,10 @@ class Progressive {
             openPiece = true;
             await OpenSyFile2(this.plugin, noteID)
         } else {
-            // 分片源块全部失效（索引残留的已删除块），明确提示而非停留在"正在为您打开"
-            await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
-            return;
+            // 分片源块失效/索引未就绪（createPiece 返回 ""）——可重试失败：返回 false 交
+            // startToLearnWithLock 重试（□3 review P1：原裸 return 使 while 重试循环死代码，
+            // 索引追赶窗口一次机会都不给；终态提示上抛由 WithLock 统一弹防 30 连发）
+            return false;
         }
         if (openPiece && this.settings.openCardsOnOpenPiece) {
             let hpath = "";
@@ -691,6 +711,21 @@ class Progressive {
     }
 
     /**
+     * 片态浮条「回原书」（2026-08-31 升级，原=仅打开原书文档）：按文档序取片内首个带
+     * custom-progref 的块定位跳原文位置——⌥⇧W 回程同款块级体验且免选块；旧片无 progref
+     * /SQL 落空回落打开原书文档本身。attributes 表无序，序从 blocks.sort 带出。
+     */
+    async returnToOriginFromPiece(noteID: string, bookID: string) {
+        let refID = "";
+        try {
+            const row = await siyuan.sqlOne(
+                `select a.value as ref from blocks b join attributes a on a.block_id = b.id and a.name = '${RefIDKey}' where b.root_id = '${noteID}' order by b.sort limit 1`);
+            refID = (row as any)?.ref ?? "";
+        } catch { /* 查询异常回落打开原书 */ }
+        await this.openOriginBook(bookID, refID);
+    }
+
+    /**
      * □16 摘抄态回原书智能链（形态一：单动作不加新按钮）：块级 progref → 片/任意文档
      * parent → 片序号键重切同片（静默重建+toast，confirm 反而打断心流）→ 兜底跳书。
      * 决策逻辑纯函数在 originTrace.resolveOriginTarget（有单测）。
@@ -713,7 +748,10 @@ class Progressive {
             bookID: parseBookIDFromCtime(docAttrs?.[PDIGEST_CTIME] ?? ""),
         });
         if (target.action === "rebuild") {
-            const info = await progStorage.booksInfo(target.bookID);
+            // 只读取档（□11）：书可能已删/记录已清，booksInfo() 的自增注册会造死书键
+            // 且 time=now 骗过 bookStatus 新书保护期；createPiece 只消费 bookID，缺档给默认壳
+            const info = progStorage.peekBookInfo(target.bookID)
+                ?? { ...ProgressiveStorage.defaultBookInfo(), bookID: target.bookID };
             const index = await progStorage.loadBookIndexIfNeeded(target.bookID);
             const noteID = await help.createPiece(info, index, target.point);
             if (noteID) {

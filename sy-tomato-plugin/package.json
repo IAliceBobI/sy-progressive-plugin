@@ -80,6 +80,7 @@
     "moment-timezone": "^0.6.3",
     "openai": "^4.49.1",
     "pinyin-pro": "^3.20.3",
+    "qrcode-generator": "^2.0.4",
     "stonev5-utils": "^1.2.0",
     "terser": "^5.31.6",
     "ts-md5": "^2.0.1"

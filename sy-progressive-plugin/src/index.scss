@@ -164,6 +164,14 @@ html[data-theme-mode="dark"] {
 // v5 □5 浮条系统（docs/prog-v5-floatbar-design.md §3/§4）：展开态按钮/胶囊/子排凹槽。
 // 三态色零占有（状态归火苗），全部 accent/strong/soft 三档编织层级。
 // ============================================================
+// 浮条 tooltip 自建单例（floatTip.ts）：复用思源 .tooltip 类观感，但纯提示勿拦指针
+// （原生 #tooltip 因同步悬浮要点链接而刻意可拦——会与按钮 hover 几何互扰，见
+// debugging.md「平铺区按钮 tooltip 裁切」□1 增量）。规则挂 id 常驻，show 里
+// removeAttribute("style") 清定位不误伤。
+#prog-float-tip {
+  pointer-events: none;
+}
+
 .prog-fb .prog-fb-btn {
   position: relative;
   display: flex;
@@ -246,19 +254,20 @@ body.prog-unpaid .prog-fb-pro:hover {
   box-shadow: var(--prog-shadow);
 }
 
-/* 二级凹槽（✂ 摘抄子排）：accent-soft 底 + 更小按钮 + 顶 hairline 三重降层。
-   不带 .prog-fb 前缀（同平铺区）：移动端顶栏根是 .prog-topbar，带前缀整块脱靶，
-   子排无底无动画且 12% 层级低于平铺区 5%——两端统一后层级规格才成立（review P2-4） */
+/* 二级芯片排（✂ 摘抄子排）：方案 A 芯片化同语（2026-08-31 拍板，□5）——弃连续色带容器
+   +hairline 的「外挂」视觉，子排钮与主排同为独立散点芯片，仅以底色深浅+尺寸分层级：
+   主排芯片 accent-soft（亮 12%/暗 14%）30px > 子排芯片 8% 26px > 平铺区 5% 26px；
+   padding 0 后子排首钮与主排首钮左缘自然对齐。
+   不带 .prog-fb 前缀（同平铺区）：移动端顶栏根是 .prog-topbar，带前缀整块脱靶（review P2-4）。
+   移动端注意：顶栏 .prog-topbar-btns 的 :global(button)（0,2,1）整体盖过本段 8%/16%
+   芯片色（统一灰芯片，同 .prog-fb-flat-btn 先例 344 行）——本段层级规格仅桌面生效 */
 .prog-fb-dig {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
   margin-top: 2px;
-  padding: 4px;
-  border-radius: 6px;
-  background: var(--prog-accent-soft);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent);
+  padding: 0;
   animation: prog-fb-dig-in 0.15s ease-out;
 }
 .prog-fb-dig button {
@@ -272,7 +281,7 @@ body.prog-unpaid .prog-fb-pro:hover {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  background: transparent;
+  background: color-mix(in srgb, var(--prog-accent) 8%, var(--b3-theme-surface));
   color: var(--prog-accent);
   transition: background-color 0.12s ease-out;
 }
@@ -295,8 +304,8 @@ body.prog-unpaid .prog-fb-pro:hover {
 // 首行下方常驻铺开（无 [+]、无开合态），替代 moreOpen 候选区 + advOpen 高级面板。
 // 结构：5 段（低频 seg 可折行 | 制卡/收集/移动/提取整理 4 组沿用 .prog-fb-adv-group
 // 不折断）。段界=组界，统一段头 ::before 通高重线（与 dig 内组头线分层不同容器）。
-// 容器 5% accent 底比 dig 的 12% 浅一档——常驻收纳层要安静，临时凹槽要跳
-// （层级：首行 accent-soft 实底钮 > dig 12% > flat 5% > 透明格）。
+// 容器 5% accent 色带保留——常驻收纳层要安静；「跳」的职责自 □5 起由 dig 的 8% 芯片
+// 本体承担（dig 容器色带已删）：层级 首行 accent-soft 12/14% > dig 芯片 8% > flat 带 5% > 透明格。
 // ============================================================
 /* ⚠️ 平铺区规则不带 .prog-fb 前缀：桌面 FloatBar 根挂 .prog-fb，但移动端顶栏根是
    .prog-topbar——带前缀会在移动端整块脱靶（组容器回退 inline、组内折行破坏组界） */
@@ -887,7 +896,10 @@ $prog-skins: (
   $ds: map.get($c, ds);
   body:not(.prog-unpaid)[data-prog-theme="#{$slug}"] {
     --prog-accent: #{$la};
-    --prog-accent-soft: rgba($la, 0.12);
+    // SCSS 铁律：CSS 自定义属性的值不求值 SCSS 变量/函数，rgba($la, …) 会原样进产物
+    // → 使用处非法回退透明（皮肤档 normal 底色全灭的根因，vision review 实锤）。
+    // 表达式必须整体 #{} 插值；同款 heat-1/dark 块同步修。
+    --prog-accent-soft: #{rgba($la, 0.12)};
     --prog-accent-strong: #{$ls};
     --prog-card-bg: color-mix(in srgb, #{$la} 5%, var(--b3-theme-surface));
     --prog-card-border: color-mix(in srgb, #{$la} 24%, var(--b3-border-color));
@@ -895,14 +907,14 @@ $prog-skins: (
     --prog-badge-bg: #{$ls};
     --prog-progress-track: color-mix(in srgb, #{$la} 12%, var(--b3-theme-surface));
     --prog-progress-fill: #{$ls};
-    --prog-heat-1: rgba($la, 0.12);
+    --prog-heat-1: #{rgba($la, 0.12)};
     --prog-heat-2: color-mix(in srgb, #{$la} 34%, var(--b3-theme-surface));
     --prog-heat-3: #{$la};
     --prog-heat-4: #{$ls};
   }
   html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-theme="#{$slug}"] {
     --prog-accent: #{$da};
-    --prog-accent-soft: rgba($da, 0.14);
+    --prog-accent-soft: #{rgba($da, 0.14)};
     --prog-accent-strong: #{$ds};
     --prog-card-bg: color-mix(in srgb, #{$da} 8%, var(--b3-theme-surface));
     --prog-card-border: color-mix(in srgb, #{$da} 28%, var(--b3-border-color));
@@ -910,7 +922,7 @@ $prog-skins: (
     --prog-badge-bg: #{$ds};
     --prog-progress-track: color-mix(in srgb, #{$da} 16%, var(--b3-theme-surface));
     --prog-progress-fill: #{$ds};
-    --prog-heat-1: rgba($da, 0.14);
+    --prog-heat-1: #{rgba($da, 0.14)};
     --prog-heat-2: color-mix(in srgb, #{$da} 34%, var(--b3-theme-surface));
     --prog-heat-3: #{$da};
     --prog-heat-4: #{$ds};
@@ -1006,10 +1018,12 @@ html[data-theme-mode="dark"] body:not(.prog-unpaid)[data-prog-panel="paper"] .pr
 }
 .prog-skin-card:hover {
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--prog-accent) 55%, var(--b3-border-color));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b3-theme-primary) 55%, var(--b3-border-color));
 }
+/* □5 打磨：选中/hover 描边不再跟随皮肤色（绯樱落霞曾=绛红描边），统一主题
+   primary——皮肤色只存在于色卡样机内容本身（chip/flame mock） */
 .prog-skin-card.selected {
-  box-shadow: inset 0 0 0 2px var(--prog-accent-strong);
+  box-shadow: inset 0 0 0 2px var(--b3-theme-primary);
 }
 .prog-skin-card .skin-mock {
   display: flex;
