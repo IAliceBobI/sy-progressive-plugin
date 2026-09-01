@@ -20,6 +20,7 @@
     import { commentBoxAddFlashCard, commentBoxAnnoEditorFontSize, commentBoxAnnoEditorMode } from "./libs/stores";
     import { getTomatoPluginInstance, siyuan } from "./libs/utils";
     import { debugLog } from "./libs/logUtils";
+    import { vipVerified } from "./libs/user";
     import { hidePanelTip, showPanelTip } from "./libs/panelTip";
     import { tomatoI18n } from "./tomatoI18n";
     import AnnoChat from "./AnnoChat.svelte";
@@ -339,7 +340,7 @@
                         e.stopPropagation();
                         void annoChatRef?.compress();
                     }}
-                ><svg><use xlink:href="#iconContract"></use></svg>{tomatoI18n.压缩成笔记}</button>
+                ><svg><use xlink:href="#iconContract"></use></svg>{tomatoI18n.压缩成笔记}{#if $vipVerified !== true}<span class="anno-ai-compress__pro">Pro</span>{/if}</button>
                 {#if !events.isMobile}
                     <svg class="anno-ai-bar__chev"><use xlink:href="#iconUp"></use></svg>
                 {/if}
@@ -591,7 +592,20 @@
     }
     .anno-ai-compress > svg { width: 12px; height: 12px; }
     .anno-ai-compress:hover:not(:disabled) { background: var(--b3-theme-surface-lighter); }
-    .anno-ai-compress:disabled { opacity: .38; cursor: default; }
+    /* disabled 不用整体 opacity——会把 Pro 徽标一起淡到不可读（vision P1）；只弱化图标与文字，
+       徽标在任何状态保持实底可读（门牌语义：disabled 只说明「先对话」，功能归属不变） */
+    .anno-ai-compress:disabled { cursor: default; color: var(--b3-theme-on-surface-light); }
+    .anno-ai-compress:disabled > svg { opacity: .5; }
+    /* 未激活时压缩按钮的 Pro 标（与 AnnoChat chip-pro 同款胶囊；激活即消） */
+    .anno-ai-compress__pro {
+        padding: 1px 4px;
+        font-size: 9px;
+        line-height: 1;
+        font-weight: 600;
+        border-radius: 8px;
+        color: var(--b3-theme-on-primary);
+        background: var(--b3-theme-primary);
+    }
 
     /* 移动端全屏接管：编辑器/引文/按钮行让位，对话区近满屏（spec §6） */
     .container.is-chat-open.is-mobile .anno-sel-quote,

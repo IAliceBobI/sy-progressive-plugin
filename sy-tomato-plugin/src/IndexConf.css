@@ -655,6 +655,10 @@
 }
 .tomato-settings-dialog details.settingBox > summary.section-title {
     padding-top: 4px; /* 对齐 .settingBox > div.section-title 的标题上缘呼吸 */
+    /* vision P1（R5 □1 评审）：summary 与其内容 softBox 左缘对齐（同 5% 缩进列）——
+       4 个折叠区连排后 summary 凸出内容的归属模糊被放大；details 非 div 不吃
+       .settingBox > div:not(:first-child) 的 5%，须在此显式补 */
+    margin-left: 5%;
 }
 /* 自绘指示箭头：收起 › 展开 90° 下转（b3 主题变量，双主题自适应） */
 .tomato-settings-dialog details.settingBox > summary::after {

@@ -523,6 +523,9 @@ export function closeProtyle(...bks: BacklinkSv<Protyle>[]) {
         bk.ob?.disconnect();
         bk.ob = null;
         bk.protyle?.destroy();
+        // 内核 destroy() 不把 element 从 DOM 摘除（只摘 class/observers，2026-09-01 查内核源码
+        // 实证）——卡 DOM 若被 keyed each 复用，尸体 element 会残留在卡内与新实例堆叠，必须自摘
+        bk.protyle?.protyle?.element?.remove();
         bk.protyle = null;
     }
 }

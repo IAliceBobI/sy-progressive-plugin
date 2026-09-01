@@ -14,6 +14,7 @@ import { back_link_dailynote_off, back_link_default_off, back_link_goto_bottom_b
 import { OpenSyFile2 } from "./libs/docUtils";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { verifyKeyTomato } from "./libs/user";
+import { debugLog } from "./libs/logUtils";
 import { winHotkey } from "./libs/winHotkey";
 import { addIfVisible } from "./libs/menuManager";
 import { newID } from "stonev5-utils";
@@ -75,6 +76,7 @@ export class BKMaker {
                     dm: this.dm,
                 }
             });
+            debugLog("bk.mount.done", `doc=${this.docID} interval=${Math.max(2, Number(bk_refresh_interval_sec.get()) || 15)}s freeze=${this.shouldFreeze}`, "bk");
             const handler = setInterval(() => {
                 if (!this.running()) {
                     this.dm.destroyBy("from maker")
@@ -149,6 +151,7 @@ class BackLinkBottomBox {
     public settingCfg: TomatoSettings;
 
     async onload(plugin: BaseTomatoPlugin) {
+        debugLog("bk.onload", `checkbox=${backLinkBottomBoxCheckbox.get()}`, "bk");
         if (!backLinkBottomBoxCheckbox.get()) return;
 
         this.plugin = plugin;
@@ -191,11 +194,18 @@ class BackLinkBottomBox {
                 navigator.locks.request("BackLinkBottomBoxLock", { mode: "exclusive" }, async (lock) => {
                     if (lock) {
                         const protyle = detail.protyle as IProtyle;
+                        debugLog("bk.evt", `${eventType} doc=${protyle?.block?.rootID ?? "?"} el=${!!protyle?.element}`, "bk");
                         if (!protyle?.element) return;
-                        if (protyle.element.getAttribute(TOMATO_BK_IGNORE)) return;
+                        if (protyle.element.getAttribute(TOMATO_BK_IGNORE)) {
+                            debugLog("bk.evt.skip", "TOMATO_BK_IGNORE on element", "bk");
+                            return;
+                        }
 
                         const docID = protyle.block.rootID;
-                        if (!docID) return;
+                        if (!docID) {
+                            debugLog("bk.evt.skip", "no rootID", "bk");
+                            return;
+                        }
 
                         if (events.isMobile) {
                             [...document.querySelectorAll(`[${BKMAKER_ADD}]`)]
@@ -205,21 +215,38 @@ class BackLinkBottomBox {
                         const attrs = await siyuan.getBlockAttrs(docID);
                         const disabled = await isBkOff(docID, attrs);
                         if (disabled) {
+                            debugLog("bk.evt.skip", `disabled doc=${docID}`, "bk");
                             BKMaker.removeBkDiv(docID);
                             protyle.wysiwyg.element.style.paddingBottom = "200px";
                             return;
                         }
 
                         if (BKMaker.installed(docID)) return;
-                        if (!back_link_show_floatUI.get() && isFloatUI(detail)) return;
-                        if (isSearchUI(detail)) return;
-                        if (isCardUI(detail)) return;
-                        if (isDocFlow(detail)) return;
-                        if (await skipByAttrs(docID, attrs)) return;
+                        if (!back_link_show_floatUI.get() && isFloatUI(detail)) {
+                            debugLog("bk.evt.skip", "floatUI hidden", "bk");
+                            return;
+                        }
+                        if (isSearchUI(detail)) {
+                            debugLog("bk.evt.skip", "searchUI", "bk");
+                            return;
+                        }
+                        if (isCardUI(detail)) {
+                            debugLog("bk.evt.skip", "cardUI", "bk");
+                            return;
+                        }
+                        if (isDocFlow(detail)) {
+                            debugLog("bk.evt.skip", "docFlow", "bk");
+                            return;
+                        }
+                        if (await skipByAttrs(docID, attrs)) {
+                            debugLog("bk.evt.skip", `skipByAttrs doc=${docID} keys=${Object.keys(attrs).join(",")}`, "bk");
+                            return;
+                        }
 
                         // create maker
                         let maker = new BKMaker(this, docID);
                         maker.disabled = false;
+                        debugLog("bk.mount", `doTheWork doc=${docID} type=${eventType}`, "bk");
 
                         // update current doc
                         maker.docName = protyle.title?.editElement?.textContent;

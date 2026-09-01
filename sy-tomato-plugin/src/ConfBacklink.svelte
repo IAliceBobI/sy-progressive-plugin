@@ -181,15 +181,10 @@
                 {tomatoI18n.底部反链刷新间隔秒数($bk_refresh_interval_sec)}
             </div>
 
-            <div class:codeNotValid>
-                <input
-                    type="checkbox"
-                    disabled={codeNotValid}
-                    class:codeNotValid
-                    class="b3-switch"
-                    bind:checked={$back_link_goto_bottom_btn}
-                />
-                {tomatoI18n.在标题下添加跳转到底部的按钮}<TomatoVIP {codeValid}></TomatoVIP>
+            <!-- 跳底按钮 2026-09-01 放开（收费边界定稿：便利开关非省力型，收费理由弱） -->
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$back_link_goto_bottom_btn} />
+                {tomatoI18n.在标题下添加跳转到底部的按钮}
             </div>
 
             <div>
@@ -236,16 +231,10 @@
                 {tomatoI18n.补充文件后缀}
             </div>
 
-            <div class:codeNotValid>
-                <input
-                    disabled={codeNotValid}
-                    class:codeNotValid
-                    type="checkbox"
-                    class="b3-switch"
-                    bind:checked={$toolbarEN2CHBtn}
-                />
+            <!-- 语言切换按钮 2026-09-01 放开（收费边界定稿：入口偏好微调非省力型） -->
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$toolbarEN2CHBtn} />
                 {tomatoI18n.显示语言切换按钮}
-                <TomatoVIP {codeValid}></TomatoVIP>
             </div>
         {/if}
     </div>

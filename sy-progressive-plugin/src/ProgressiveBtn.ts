@@ -8,8 +8,8 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
-import { digSubrankOpen, hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
-import { FloatDocKind, detectFloatDoc } from "./progFloatState";
+import { digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { FloatDocKind, detectFloatDoc, expandAtAppear } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests } from "./digestMarker";
@@ -20,7 +20,9 @@ const Prog_BUTTON_BookID = "custom-prog-button-bookID";
 const Prog_BUTTON_Point = "custom-prog-button-point";
 
 // v5 □5 浮条三态 stores：show=体系内文档在场（球或浮条），expanded=浮条展开（false 时收起为球）。
-// 片态出场直接展开（userCollapsed 记录用户 ✕ 收起偏好，session 级）；书/摘抄态出场收起成球。
+// 出场展开态走 expandAtAppear（2026-09-02）：floatbarExpandPref 持久偏好优先，无偏好时
+// 维持出厂默认（片/free 展开、书/摘抄收球——旧 userCollapsed〔session 级〕随之退役，其
+// 「本会话收过片态也出球」语义被持久偏好覆盖）。
 let show = writableWithGet(false)
 let expanded = writableWithGet(false)
 let kind = writableWithGet<FloatDocKind | null>(null)
@@ -32,7 +34,6 @@ let zIndexPlus = writableWithGet(false)
 let dueText = writableWithGet("")        // 附属卡到期胶囊文案（空=不渲染，formatDueCount 产出）
 const digOpen = digSubrankOpen          // □2 摘抄子排开合：持久记忆（digSubrankOpen，收起跨分片/
                                          // 跨会话记住）；开合只归 ✂ 管与显式命令（⌥Z 改道），出场链不再强制展开
-let userCollapsed = false;               // session 级：用户点 ✕ 后本会话片态也收起成球
 
 export function progFloatStores() {
     return { show, expanded, kind, title, point, noteID, bookID, zIndexPlus, dueText, digOpen };
@@ -41,17 +42,19 @@ export function progFloatStores() {
 // DigestProgressiveBox ⌥z 改道需要读出场态（show+kind=当前文档在三态内）
 export { show, kind };
 
-/** 展开浮条（球点击 / 命令通道）；userCollapsed 随之清掉。子排不联动——□2 起开合持久
- *  记忆只归 ✂ 与显式命令管，点球展开浮条尊重用户上次的子排状态 */
+/** 展开浮条（球点击 / 命令通道）；显式意志落盘（2026-09-02 起跨会话记忆）。子排不
+ *  联动——□2 起开合持久记忆只归 ✂ 与显式命令管，点球展开浮条尊重用户上次的子排状态 */
 export function expandFloatBar() {
-    userCollapsed = false;
+    floatbarExpandPref.set(true);
+    void floatbarExpandPref.write();
     expanded.set(true);
 }
 
-/** 收起为球（浮条 ✕）；记住用户偏好，本会话片态出场不再强展开。
+/** 收起为球（浮条 ✕）；显式意志落盘——之后一切态出场都收球，直到再次展开。
  *  digOpen 不清——子排开合只归 ✂ 管，且随 digSubrankOpen 持久记忆 */
 export function collapseFloatBar() {
-    userCollapsed = true;
+    floatbarExpandPref.set(false);
+    void floatbarExpandPref.write();
     expanded.set(false);
 }
 
@@ -65,7 +68,7 @@ export function openDigestSubrank() {
 }
 
 // □11 自由态（第四态）：会话级上岗/下班——上岗后本会话所有普通文档浮条都到场，
-// 浮条 ✕=本会话收起（同 userCollapsed 先例，session 级不落盘）。三态文档出场不受影响。
+// 浮条 ✕=本会话下班（不写 floatbarExpandPref——下班是退出自由态，非展开偏好意志）。
 let freeSession = false;
 
 // □12 窗口期兜底的负结果缓存（review P1-1）：重查内核真值仍识别不出的 docID=真普通
@@ -146,7 +149,7 @@ export function toggleFloatBarSystem() {
     initProgFloatBtnsDisable.set(next);
     if (next) {
         show.set(false);
-    } else expanded.set(false); // 重开后各文档重新出场（球/片态展开）
+    } else expanded.set(expandAtAppear(floatbarExpandPref.get(), kind.get() ?? "book")); // 重开后与出场同款求值（对齐偏好）
 }
 // （□11.1「片内双色」.prog-piece-live 挂类/清类逻辑已随 2026-08-30 用户实测反馈退役——
 // 原文灰显+笔记继承属性同色没法分清，回归原文不做色彩修饰的老形态，CSS 与本体同批移除）
@@ -229,8 +232,9 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     if (docChanged) {
         // □2（2026-09-01）：digOpen 不再强制置开——子排开合随 digSubrankOpen 持久记忆，
         // 用户收起后切分片/换文档保持收起（原「每次出场重新展开」拍板随用户反馈推翻）
-        // 片态直接展开（尊重 userCollapsed）；free 态出场直接展开不收球（□11）
-        expanded.set((nextKind === "piece" && !userCollapsed) || nextKind === "free");
+        // 展开态同款持久化（2026-09-02）：expandAtAppear 偏好优先——书/摘抄态出场不再
+        // 无条件收球，跟随用户最后一次显式意志；无意志维持出厂默认（片/free 展开）
+        expanded.set(expandAtAppear(floatbarExpandPref.get(), nextKind));
         if (nextBookID) refreshDue(nextBookID);
     }
     // 摘抄痕迹：片态（块 custom-progref 命中）与书态原文（块 ID 即 ref 值）双侧打标。

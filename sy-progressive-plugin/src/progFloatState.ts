@@ -45,6 +45,17 @@ export function detectFloatDoc(
     return null;
 }
 
+/**
+ * 出场展开求值（2026-09-02 浮条展开偏好持久化）：pref=用户最后一次显式意志
+ * （点球展开/点 ✕ 收起，petal 落盘；null=从未表达）。有偏好跟偏好、无偏好维持
+ * 出厂默认（片/free 展开、书/摘抄收球——与旧 userCollapsed 时代行为逐位一致，
+ * 老用户升级零迁移）。free 恒展开不看偏好（□11 上岗即展开拍板不被偏好推翻）。
+ */
+export function expandAtAppear(pref: boolean | null, kind: FloatDocKind): boolean {
+    if (kind === "free") return true;
+    return pref ?? kind === "piece";
+}
+
 export type FloatBtnKind = "common" | "primary" | "normal" | "ghost";
 
 export interface FloatButtonSpec {

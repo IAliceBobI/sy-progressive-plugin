@@ -18,6 +18,7 @@
         siyuan,
         sleep,
     } from "./libs/utils";
+    import { debugLog } from "./libs/logUtils";
     import {
         getConceptTrees,
         sortDiv,
@@ -306,6 +307,7 @@
                     block2lnks = bl;
                     maxPage = mp;
                     hierarchyConcepts = h;
+                    debugLog("bk.get", `caller=${caller} docs=${b.length}/${mp + 1}p concepts=${a.length} g="${globalSearchText}" l="${searchText}"`, "bk");
                     if (start > 0) {
                         const end = new Date().getTime();
                         siyuan.pushMsg(

@@ -1,6 +1,6 @@
 import { siyuan, } from "./libs/utils";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
-import { cpBoxCheckbox, deleteBlocksMenu } from "./libs/stores";
+import { deleteBlocksMenu, pairBarEnabled } from "./libs/stores";
 import { tomatoI18n } from "./tomatoI18n";
 import { getDocBlocks, OpenSyFile2 } from "./libs/docUtils";
 import { events } from "./libs/Events";
@@ -8,7 +8,8 @@ import { winHotkey } from "./libs/winHotkey";
 import { addIfVisible } from "./libs/menuManager";
 import { IProtyle } from "siyuan";
 
-const LongContentOpsLock = "LongContentOpsLock";
+/** 长内容批量操作跨入口并发锁（R5 □2 起浮条删除档与老三键共用同款防并发） */
+export const LongContentOpsLock = "LongContentOpsLock";
 
 export const CpBox批量删除大量连续内容块 = winHotkey("alt+shift+;", "deleteBlocks", "iconTrashcan", () => tomatoI18n.批量删除大量连续内容块, false, deleteBlocksMenu)
 export const CpBox批量移动大量连续内容块 = winHotkey("alt+shift+'", "moveBlocks")
@@ -18,7 +19,8 @@ class CpBox {
     private plugin: BaseTomatoPlugin;
 
     async onload(plugin: BaseTomatoPlugin) {
-        if (!cpBoxCheckbox.get()) return;
+        // R5 □1 总开关化：长内容工具命令注册随块配对工具总开关（开关控制注册，中途改需 reload）
+        if (!pairBarEnabled.get()) return;
 
         this.plugin = plugin;
 

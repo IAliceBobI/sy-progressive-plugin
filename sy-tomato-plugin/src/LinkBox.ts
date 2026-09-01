@@ -4,7 +4,7 @@ import * as gconst from "./libs/gconst";
 import { bilinkWithInsertingRefs, clean_broken_href, extractLinksFromElement, getAttribute, getDoOperations, joinByComma, linkTwoElementsWithRef, setAttribute, siyuan, } from "./libs/utils";
 import * as utils from "./libs/utils";
 import { AttrBuilder, findElementByAttr, findListTypeByElement } from "./libs/listUtils";
-import { linkBoxAttrIconOnHide, linkBoxBilinkMenu, linkBoxCheckbox, linkBoxLnkTitle, linkBoxSyncBlock, linkBoxSyncBlockAuto, linkBoxSyncHref, linkBoxSyncRef, linkBoxSyncRemapChildID, linkBoxSyncScanDeep, linkBoxUseLnkOrRef } from "./libs/stores";
+import { linkBoxAttrIconOnHide, linkBoxBilinkMenu, linkBoxLnkTitle, linkBoxSyncBlockAuto, linkBoxSyncHref, linkBoxSyncRef, linkBoxSyncRemapChildID, linkBoxSyncScanDeep, linkBoxUseLnkOrRef, pairBarEnabled } from "./libs/stores";
 import { tomatoI18n } from "./tomatoI18n";
 import { PROTYLE_WYSIWYG_SELECT, TOMATO_CONTROL_SYNC } from "./libs/gconst";
 import { OpenSyFile2 } from "./libs/docUtils";
@@ -53,10 +53,12 @@ class LinkBox {
     async onload(plugin: BaseTomatoPlugin) {
         this.plugin = plugin;
         await verifyKeyTomato()
-        // 2026-08-31 块配对 □1 解耦：同步块注册只看 linkBoxSyncBlock（UI 联动下其开启时
-        // 本就反向强制开 linkBoxCheckbox，正常路径行为不变）；互链族照旧看 linkBoxCheckbox
-        if (linkBoxCheckbox.get()) this.regBilinkCmds();
-        if (linkBoxSyncBlock.get()) await this.regSyncBlockCmds();
+        // R5 □1 总开关化：块配对工具一个总开关管全部命令注册（互链族+同步块族）。
+        // 开关控制注册，中途改开关需 reload 生效；「同步块强开互链」联动随三 store 退役删除
+        if (pairBarEnabled.get()) {
+            this.regBilinkCmds();
+            await this.regSyncBlockCmds();
+        }
     }
 
     /** 单功能命令共用的第一步「锁源」：选中块记入 selectedDivs（老命令兼容层单例，□2 浮条不复用） */
@@ -74,7 +76,7 @@ class LinkBox {
         }
     }
 
-    /** 互链族（linkBoxCheckbox 开关下）：12 个单功能命令 + 互链右键菜单挂点 */
+    /** 互链族：12 个单功能命令 + 互链右键菜单挂点（注册链由 pairBarEnabled 总开关管） */
     private regBilinkCmds() {
         this.plugin.addCommand({
             langKey: LinkBoxbilink.langKey,
@@ -218,7 +220,7 @@ class LinkBox {
         });
     }
 
-    /** 同步块族（linkBoxSyncBlock 开关下）：3 个命令 + 同步块右键菜单挂点 + ws 同步监听 + 巡检 + 徽标 observer */
+    /** 同步块族：3 个命令 + 同步块右键菜单挂点 + ws 同步监听 + 巡检 + 徽标 observer */
     private async regSyncBlockCmds() {
         this.plugin.addCommand({
             langText: LinkBox查看所有同步位置.langText(),
@@ -294,8 +296,10 @@ class LinkBox {
     }
 
     blockIconEvent(detail: any) {
-        if (linkBoxCheckbox.get()) this.addLnkByLnk(detail);
-        if (linkBoxSyncBlock.get()) this.showSyncBlocksMenu(detail);
+        // click_blockicon 挂点在 index.ts 常驻监听（不走注册链），此处须自守总开关
+        if (!pairBarEnabled.get()) return;
+        this.addLnkByLnk(detail);
+        this.showSyncBlocksMenu(detail);
     }
 
     async link2bottom(protyle: IProtyle, div: HTMLElement) {

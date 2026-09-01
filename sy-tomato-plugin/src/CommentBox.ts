@@ -17,7 +17,8 @@ const TAB_TYPE = "custom_tab_CommentBox"
 
 export const CommentBox添加批注到日记 = winHotkey("⇧⌥F", "comment box", "iconQuoteTomato", () => tomatoI18n.添加批注到日记, false)
 export const CommentBoxTab批注 = winHotkey("⇧⌥I", "comment tab", "iconQuoteTomato", () => tomatoI18n.批注, false)
-export const CommentBox刷新文档正引 = winHotkey("F9", "comment refresh ref", "iconQuoteTomato", () => tomatoI18n.刷新文档正引, true)
+// F9 手动强刷 2026-09-01 放开（收费边界定稿：刷新是面板刚需动作非省力型）
+export const CommentBox刷新文档正引 = winHotkey("F9", "comment refresh ref", "iconQuoteTomato", () => tomatoI18n.刷新文档正引, false)
 
 class CommentBox {
     plugin: BaseTomatoPlugin;

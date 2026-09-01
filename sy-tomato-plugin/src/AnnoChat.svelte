@@ -22,6 +22,8 @@
     import { OpenAIClient, appendChunk, getAIConfig, stripThinkTag } from "./libs/openAI";
     import type { StreamState } from "./libs/openAI";
     import { siyuan } from "./libs/utils";
+    import { vipVerified } from "./libs/user";
+    import { openUnlockDialog } from "./unlockDialog";
     import { tomatoI18n } from "./tomatoI18n";
 
     interface Props {
@@ -173,8 +175,18 @@
         await ask(t, null);
     }
 
+    /** Pro 门禁（收费边界 2026-09-01 定稿：轻问答免费 / 角色邀请+压缩成笔记 Pro）：
+     *  未激活 toast + 统一解锁框；vip 读 store 保激活后即时变绿（pairbar □2 评审转出③同款） */
+    async function gatePro(name: string): Promise<boolean> {
+        if ($vipVerified === true) return true;
+        await siyuan.pushMsg(tomatoI18n.需要Pro(name));
+        openUnlockDialog({ product: "tomato" });
+        return false;
+    }
+
     async function invite(r: AnnoRole) {
         if (busy) return;
+        if (!(await gatePro(roleName(r)))) return;
         const m = inviteMessage(roleName(r), tomatoI18n.邀请角色发言);
         pushChat(annoId, m);
         refresh();
@@ -184,6 +196,7 @@
     /** 压缩成笔记（AnnoEdit 工具行按钮经 bind:this 调入） */
     export async function compress() {
         if (busy || !canCompress) return;
+        if (!(await gatePro(tomatoI18n.压缩成笔记))) return;
         await ask("", null, true);
     }
 
@@ -285,11 +298,11 @@
             <button
                 class="anno-chat__chip b3-tooltips b3-tooltips__n"
                 aria-label={tomatoI18n.以角色提问.replace("{x}", roleName(r))}
-                onclick={() => void invite(r)}>{roleName(r)}</button>
+                onclick={() => void invite(r)}>{roleName(r)}{#if $vipVerified !== true}<span class="anno-chat__chip-pro">Pro</span>{/if}</button>
         {/each}
         {#each customs as r (r.key)}
             <span class="anno-chat__chip b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.以角色提问.replace("{x}", r.name)}>
-                <button class="anno-chat__chip-main" onclick={() => void invite(r)}>{r.name}</button>
+                <button class="anno-chat__chip-main" onclick={() => void invite(r)}>{r.name}{#if $vipVerified !== true}<span class="anno-chat__chip-pro">Pro</span>{/if}</button>
                 <button
                     class="anno-chat__chip-del b3-tooltips b3-tooltips__n"
                     aria-label={tomatoI18n.删除角色}
@@ -508,6 +521,20 @@
         font-family: inherit;
         color: inherit;
         cursor: pointer;
+        /* flex 居中：徽标与文字基线对齐在带 × 的 chip 上差 1px（vision P2），与整 chip 同款居中 */
+        display: inline-flex;
+        align-items: center;
+    }
+    /* 未激活时角色 chip 的 Pro 标（主色实底胶囊，pairbar-vip 同款观感；激活即消） */
+    .anno-chat__chip-pro {
+        margin-left: 4px;
+        padding: 1px 4px;
+        font-size: 9px;
+        line-height: 1;
+        font-weight: 600;
+        border-radius: 8px;
+        color: var(--b3-theme-on-primary);
+        background: var(--b3-theme-primary);
     }
     .anno-chat__chip-del {
         width: 14px;
