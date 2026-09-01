@@ -80,6 +80,7 @@ type TomatoSettings = {
     dailyNotetopbarleft: boolean,
     ProgressiveJumpMenu: boolean,
     piecesmenu: boolean,
+    blockIconMenu: boolean,
     ProgressiveStart2learn: boolean,
     digestmenu: boolean,
     toolbarlocatedoc: boolean,
@@ -106,6 +107,7 @@ type TomatoSettings = {
     imgBoxShowMenu: boolean,
     aiBoxMenuShow: boolean,
     digest2dailycard: boolean,
+    card2dailycard: boolean,
     mobileTopBar: boolean,
     cardAppendTime: boolean,
     cardUnderPiece: boolean,
@@ -114,6 +116,7 @@ type TomatoSettings = {
     initProgFloatBtnsDisable: boolean,
     floatbarMainBtns: string[],
     floatbarFlatCollapsed: boolean,
+    digSubrankOpen: boolean,
     markOriginTextBG: boolean,
     pieceNoBacktraceLink: boolean,
     digestNoBacktraceLink: boolean,
@@ -176,11 +179,12 @@ type TomatoSettings = {
     linkBoxUseLnkOrRef: boolean,
     pairBarEnabled: boolean,
     pairBarDefaultFunc: string,
+    pairBarLastFunc: string,
+    pairBarLastSrcID: string,
     pairBarEntryHotkey: boolean,
     pairBarEntryStatus: boolean,
     pairBarEntryMenu: boolean,
     pairBarEntryIconMenu: boolean,
-    pairBarGuideMode: boolean,
     dailyNoteBoxCheckbox: boolean,
     dailyNoteGoToBottom: boolean,
     dailyNoteMoveToBottom: boolean,
@@ -294,6 +298,10 @@ type TomatoSettings = {
     commentBoxShowID: boolean,
     commentBoxStaticOutlink: boolean,
     commentBoxPanelSkin: string,
+    /** 批注弹窗编辑器形态：rich（内嵌 Protyle 富文本）| plain（textarea 秒开，2026-09-01） */
+    commentBoxAnnoEditorMode: string,
+    /** 批注编辑器字号 px（两模式统一，12~22） */
+    commentBoxAnnoEditorFontSize: number,
     linkBoxAttrIconOnHide: boolean,
 };
 

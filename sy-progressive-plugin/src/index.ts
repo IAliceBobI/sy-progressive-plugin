@@ -16,7 +16,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -37,7 +37,7 @@ import { initFleet, notifyFleetChanged, onunloadFleet, type FleetActions } from 
 import { closeFloatPopover } from "./overlays";
 import { openDueReviewList } from "./reviewMenu";
 import { buildContentBlocks, computePieceIndex, runSplit } from "./Split2Pieces";
-import { createPiece, fullfilContent } from "./helper";
+import { createPiece, deleteAllPieces, fullfilContent } from "./helper";
 import { invalidateBookStatusCache } from "./bookStatus";
 
 function loadStore(plugin: BaseTomatoPlugin) {
@@ -51,7 +51,9 @@ function loadStore(plugin: BaseTomatoPlugin) {
     piecesmenu.load(plugin);
     ProgressiveStart2learn.load(plugin);
     digestmenu.load(plugin);
+    blockIconMenu.load(plugin);
     digest2dailycard.load(plugin);
+    card2dailycard.load(plugin);
     flashcardAddRefs.load(plugin);
     flashcardMultipleLnks.load(plugin);
     windowOpenStyle.load(plugin);
@@ -71,6 +73,7 @@ function loadStore(plugin: BaseTomatoPlugin) {
     initProgFloatBtnsDisable.load(plugin);
     floatbarMainBtns.load(plugin);
     floatbarFlatCollapsed.load(plugin);
+    digSubrankOpen.load(plugin);
 }
 
 export default class ThePlugin extends BaseTomatoPlugin {
@@ -93,8 +96,19 @@ export default class ThePlugin extends BaseTomatoPlugin {
         super(options)
         this.loadProgStore = loadStore;
 
-        if (window.prog_zZmqus5PtYRi == null)
-            window.prog_zZmqus5PtYRi = {} as any
+        // □4 调试通道门禁：prog/split 含无确认破坏 API（deleteAllPieces/refillPiece 等），
+        // 默认不挂；仅 localStorage PROG_DEBUG=1 显式开启（dev 实例调试用，设置后 reload 插件生效）。
+        // localStorage 裸读须防抛：constructor 里抛=整个插件加载失败，与 fail-closed 意图相反
+        let progDebug = false;
+        try {
+            progDebug = localStorage.getItem("PROG_DEBUG") === "1";
+        } catch { /* 禁用环境同样视为关 */ }
+        if (progDebug) {
+            if (window.prog_zZmqus5PtYRi == null)
+                window.prog_zZmqus5PtYRi = {} as any
+        } else {
+            delete window.prog_zZmqus5PtYRi // 清前次调试残留（window 跨插件 reload 存活，不清则关闸后旧通道仍带废引用常驻）
+        }
 
         this.taskCfg = this.loadData(STORAGE_Prog_SETTINGS).then(cfg => {
             this.settingCfg = cfg;
@@ -102,19 +116,23 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 this.settingCfg = {} as TomatoSettings;
             }
 
-            window.prog_zZmqus5PtYRi.pluginConfig = this.settingCfg;
-            window.prog_zZmqus5PtYRi.siyuan = siyuan
-            window.prog_zZmqus5PtYRi.timeUtil = timeUtil
-            window.prog_zZmqus5PtYRi.pluginInstance = this;
-            window.prog_zZmqus5PtYRi.split = {
-                buildContentBlocks,
-                computePieceIndex,
-                saveIndex: (bookID: string, groups: WordCountType[][]) => progStorage.saveIndex(bookID, groups),
-                loadIndex: (bookID: string) => progStorage.loadBookIndexIfNeeded(bookID),
-                createPiece,
-                fullfilContent,
-                runSplit,
-            };
+            if (window.prog_zZmqus5PtYRi) { // 门禁未开=整组调试挂载跳过
+                window.prog_zZmqus5PtYRi.pluginConfig = this.settingCfg;
+                window.prog_zZmqus5PtYRi.siyuan = siyuan
+                window.prog_zZmqus5PtYRi.timeUtil = timeUtil
+                window.prog_zZmqus5PtYRi.pluginInstance = this;
+                window.prog_zZmqus5PtYRi.prog = prog; // agent 实验通道：refillPiece 等真链路（含锁/索引加载）
+                window.prog_zZmqus5PtYRi.split = {
+                    buildContentBlocks,
+                    computePieceIndex,
+                    saveIndex: (bookID: string, groups: WordCountType[][]) => progStorage.saveIndex(bookID, groups),
+                    loadIndex: (bookID: string) => progStorage.loadBookIndexIfNeeded(bookID),
+                    createPiece,
+                    deleteAllPieces,
+                    fullfilContent,
+                    runSplit,
+                };
+            }
             loadStore(this);
             setGlobal(ProgressivePluginConfig, this.settingCfg)
             return this.settingCfg;

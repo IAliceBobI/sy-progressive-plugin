@@ -59,11 +59,14 @@
   border: 1px solid var(--b3-font-color5);
 }
 
-// settings search 
+// settings search（与 tomato src/index.scss □4 新版同步：底色+inset 环纯绘制信号，删 x-large 字号跳变；
+// 本副本是历史抄送——渐进产物独立打包，须与 tomato 手动保持一致，改其一必改其二）
 .tomato-highlight {
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  font-size: x-large;
   color: var(--b3-font-color2);
+  background-color: rgba(102, 60, 0, 0.12);
+  background-color: color-mix(in srgb, var(--b3-font-color2) 12%, transparent);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b3-font-color2) 35%, transparent);
 }
 
 .tomato-button {
@@ -1321,6 +1324,15 @@ html:not([data-theme-mode="dark"]) .prog-skin-card.locked .skin-name {
   line-height: 1.4;
   color: var(--b3-theme-on-surface);
   cursor: pointer;
+}
+/* □1 片态目录当前位置：primary 淡底标记「你在这里」（置于 :hover 之前，当前行 hover 仍有反馈；
+   hover 专属规则保蓝系底，悬停瞬间不「褪标」——vision review P2-2） */
+button.prog-popover-item.prog-popover-item-current {
+  color: var(--b3-theme-primary);
+  background-color: var(--b3-theme-primary-lightest);
+}
+button.prog-popover-item.prog-popover-item-current:hover {
+  background-color: var(--b3-theme-primary-light);
 }
 button.prog-popover-item:hover {
   background-color: var(--b3-list-hover);

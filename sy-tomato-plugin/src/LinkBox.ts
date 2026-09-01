@@ -298,7 +298,7 @@ class LinkBox {
         if (linkBoxSyncBlock.get()) this.showSyncBlocksMenu(detail);
     }
 
-    private async link2bottom(protyle: IProtyle, div: HTMLElement) {
+    async link2bottom(protyle: IProtyle, div: HTMLElement) {
         const docID = protyle?.block?.rootID;
         if (!docID) return;
         const newID = utils.NewNodeID();
@@ -315,7 +315,7 @@ class LinkBox {
         await OpenSyFile2(this.plugin, anchorID);
     }
 
-    private async delLnk(_protyle: IProtyle, div: HTMLElement) {
+    async delLnk(_protyle: IProtyle, div: HTMLElement) {
         const blockID = getAttribute(div, "data-node-id")
         let toIDs = getAttribute(div, "custom-lnk-to-ids")?.split(",") ?? []
         if (blockID && toIDs.length > 0) {
@@ -342,7 +342,7 @@ class LinkBox {
         }
     }
 
-    private async fixLnk(protyle: IProtyle, div: HTMLElement) {
+    async fixLnk(protyle: IProtyle, div: HTMLElement) {
         const id = div.getAttribute(gconst.DATA_NODE_ID);
         siyuan.pushMsg("fix broken link");
         const { newToIDs, realToIDs } = await (async () => {

@@ -68,11 +68,15 @@
   }
 }
 
-// settings search
+// settings search（□4 重设计，spec docs/tomato-block-pair-visual-spec.md §3-B4②）：
+// 旧 x-large 橙字=命中即字号跳变（全面板 P2）；新信号=底色+内环纯绘制，命中行零位移。
+// 置灰行叠加减淡由 IndexConf.css 的 .codeNotValid:has(.tomato-highlight) 提亮规则配套
 .tomato-highlight {
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  font-size: x-large;
   color: var(--b3-font-color2);
+  background-color: rgba(102, 60, 0, 0.12);
+  background-color: color-mix(in srgb, var(--b3-font-color2) 12%, transparent);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b3-font-color2) 35%, transparent);
 }
 
 .protyle-wysiwyg div[custom-tomato-line-blur] {
@@ -614,4 +618,10 @@ html[data-tomato-anno-underline="ring-bead"] .protyle-wysiwyg {
     border-color: var(--b3-theme-error);
     background: transparent;
   }
+}
+
+// □5 面板 tooltip 自建单例（libs/panelTip.ts）：纯提示常驻不拦指针
+// （原生单例因同步悬浮要点链接而刻意可拦，面板提示无此需求）
+#tomato-panel-tip {
+  pointer-events: none;
 }

@@ -9,15 +9,17 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 
 /** 重插断句档位：null=按书设置（书级 auto 断句或不断句，免费）；"no"=强制不断句（免费，
- * 压过书级 auto）；p/t/i=直选三档（Pro）。用户实测二轮增补（2026-08-30）：纯不断句档。 */
+ * 压过书级 auto）；p/t/i=直选三档（Pro）。用户实测二轮增补（2026-08-30）：纯不断句档。
+ * □1 重插失真（2026-09-01）：no 档升首位+标签换「原样插回」——用户心智「重插=原样恢复」，
+ * 首位 null 档在书级 auto 开着时会按断句重写块结构，产物≠原文。 */
 export type RefillMode = AsList | "no" | null;
 
-export const REFILL_MODES: readonly RefillMode[] = [null, "no", "p", "t", "i"];
+export const REFILL_MODES: readonly RefillMode[] = ["no", null, "p", "t", "i"];
 
 /** 纯逻辑：档位标签（菜单项次序=REFILL_MODES 数组序） */
 export function refillModeLabel(stype: RefillMode): string {
     switch (stype) {
-        case "no": return tomatoI18n.不断句;
+        case "no": return tomatoI18n.原样插回;
         case "p": return tomatoI18n.断句为段落块;
         case "t": return tomatoI18n.断句为任务块;
         case "i": return tomatoI18n.断句为无序表;

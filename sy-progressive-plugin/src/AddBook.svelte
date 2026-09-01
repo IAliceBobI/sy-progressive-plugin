@@ -8,14 +8,14 @@
         countHeadingLevels,
         levelsToHeadings,
         loadBoldIds,
-        pickSmartDefault,
         summarizePieces,
     } from "./piecePreview";
     import type { PiecePreview } from "./piecePreview";
     import { MarkBookKey, MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
-    import { createAllPieces } from "./helper";
+    import { createAllPieces, deleteAllPieces, hasPieces } from "./helper";
+    import * as constants from "./constants";
     import { progStorage, ProgressiveStorage } from "./ProgressiveStorage";
     import { notifyFleetChanged } from "./fleet";
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
@@ -52,18 +52,19 @@
 
     // ===== □4 统计步骤增强：chips + 字数滑块 + 即时预览（方案=docs/prog-addbook-split-preview.md） =====
     // 切窗离散档：0=「不限」（splitWordNum 0，现有语义保留）。默认 500（2026-08-30 用户
-    // 实测拍板：8000/片太大，短读节奏 500 合身；智能默认目标与兜底同步取本档）。
+    // 实测拍板：8000/片太大，短读节奏 500 合身）。
     const SPLIT_TIERS: number[] = [0, 500, 1000, 2000, 3000, 5000, 8000];
     const DEFAULT_SPLIT_IDX = SPLIT_TIERS.indexOf(500);
-    // chips 多选值（"1"~"6"/"b"），computePieceIndex 的 headings 参数由此派生
+    // chips 多选值（"1"~"6"/"b"），computePieceIndex 的 headings 参数由此派生。
+    // □2 分片默认值改造（2026-09-01 拍板）：默认=实际存在的标题级全勾（h1~h6、B 不勾），
+    // 即「先按大小标题拆，超大节再切窗」；智能默认（pickSmartDefault 单级试算）退役，
+    // 函数与单测留存 piecePreview.ts 备将来复用
     let selectedLevels: string[] = $state([]);
     let splitIdx: number = $state(DEFAULT_SPLIT_IDX);
     // b 通道 bold id 缓存：弹窗生命周期 SQL 一次（方案 §2.2）。只整体换引用保持响应式。
     let boldIds: ReadonlySet<string> = $state(new Set<string>());
     let preview: PiecePreview | null = $state(null);
     let recalcing = $state(false);
-    // 智能默认推荐落点（标记用）；null=无推荐（无标题书/兜底失败）
-    let recommend: { level: string } | null = $state(null);
 
     let levelStats = $derived(countHeadingLevels(contentBlocks));
     let hasLevels = $derived(levelStats.length > 0 || boldIds.size > 0);
@@ -83,6 +84,17 @@
         void siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
     }
 
+    /** □6 全选：勾上所有可选级——实存标题级 + B chip（粗体懒查就绪后才可见，未就绪不勾）。
+        已知窗口：boldIds 单发 SQL 到场前点全选会漏 B（chip 尚不可见，用户可到场后手点补勾，
+        可接受）；勿改成「boldIds 到场自动补勾 B」——会覆盖用户在等待期内的手动收窄/清空，
+        且未选 "b" 时正式分片与预览共用 calcGroups、boldIds 完全不参与，无正确性影响 */
+    function selectAllLevels() {
+        selectedLevels = [
+            ...levelStats.map((s) => s.level),
+            ...(boldIds.size > 0 ? ["b"] : []),
+        ];
+    }
+
     onMount(async () => {
         disabled = true;
         paid = (await verifyKeyProgressive()) === true;
@@ -96,12 +108,18 @@
                 const attrs = await siyuan.getBlockAttrs(bookID);
                 if (attrs?.[MarkKey] && attrs[MarkKey] !== MarkBookKey) {
                     warnText = tomatoI18n.加书警告已分片;
+                } else if (await hasPieces(bookID)) {
+                    // 删记录（removeIndex）后重加书：书未注册但旧片还在，确认会照删——
+                    // 新增删除行为后的知情面补齐（review P1-1），复用同款警告文案
+                    warnText = tomatoI18n.加书警告已注册;
                 }
             }
         } catch { /* 检测失败不阻断加书主流程，警告层缺席不误导 */ }
         try {
             await doCount();
-            await applySmartDefault();
+            // □2 默认全勾：doCount 后 contentBlocks 就绪、levelStats 同步可读（$derived
+            // 惰性求值读取即算）。失败走 catch 保持骨架屏，selectedLevels 维持 [] 不误勾
+            selectedLevels = levelStats.map(s => s.level);
             disabled = false;
             void loadBold(); // B chip「有才显示」：不阻塞首帧，SQL 完成后浮现（方案 §4.8）
         } catch (e) {
@@ -167,32 +185,6 @@
         return () => window.clearTimeout(t);
     });
 
-    /** 智能默认（方案 §4.6）：目标 500 逐级单级试算（全纯 h 级，contentBlocks 不被
-        改写），chips+滑块落推荐值；失败兜底纯切窗 500。TARGET 必须在 SPLIT_TIERS
-        表内（reasoning review P2-a：indexOf 落空的兜底方向应是最大档而非「不限」）。 */
-    async function applySmartDefault() {
-        const TARGET = SPLIT_TIERS[DEFAULT_SPLIT_IDX];
-        try {
-            const rec = await pickSmartDefault(
-                contentBlocks,
-                levelStats.map(s => s.level),
-                TARGET,
-                (headings, wordNum) => computePieceIndex(contentBlocks, headings, bookID, wordNum),
-            );
-            selectedLevels = [...rec.headings];
-            const idx = SPLIT_TIERS.indexOf(rec.splitWordNum);
-            splitIdx = idx >= 0 ? idx : SPLIT_TIERS.length - 1;
-            recommend = rec.mode === "window-only" || rec.headings.length === 0
-                ? null
-                : { level: rec.headings[0] };
-        } catch (e) {
-            console.error("pickSmartDefault failed", e);
-            selectedLevels = [];
-            splitIdx = DEFAULT_SPLIT_IDX;
-            recommend = null;
-        }
-    }
-
     /** 粗体 id 集合：SQL 一次缓存（loadBoldIds 内查询与 HeadingGroup.init 逐字一致）。
         失败置空集 = 无 B chip，统计与预览照常（fail-quiet，同 wordCount 通道）。 */
     async function loadBold() {
@@ -238,6 +230,18 @@
             // 注册落定才关弹窗（□1）：此前任何失败弹窗保留 + toast，不再静默断链
             destroy();
             notifyFleetChanged(); // Dock 即时见新书，不等 30s 定时器
+
+            // 重划分先清旧片（2026-08-31 跳转错位根因）：旧片 IAL 标记与新方案同名会被
+            // createPiece 复用，须在按新索引建片前整批删除（□18 警告文案对应的实质动作；
+            // 全新加书查到空集零删除）。放关弹窗后：删除耗时（巨书残留上百片）不该卡在
+            // 弹窗上。与阅读链共用 StartToLearnLock 排队串行（review P1-2）：无锁窗口内
+            // 点开始学习/跳到分片会复用旧片（原 bug 短窗复发），锁住让它们排队等清理完成。
+            if (await hasPieces(bookID)) {
+                await siyuan.pushMsg(tomatoI18n.正在重建分片);
+                await navigator.locks.request(constants.StartToLearnLock, async () => {
+                    await deleteAllPieces(bookID);
+                });
+            }
 
             // 断句
             if (splitType == "i" || splitType == "p" || splitType == "t") {
@@ -365,7 +369,22 @@
             <div class="prog-card-title">{tomatoI18n.切分设置}</div>
             <div class="prog-field-hint prog-card-lede">{tomatoI18n.切分总纲}</div>
 
-            <div class="prog-chip-label">{tomatoI18n.标题级别}</div>
+            <div class="prog-chip-label">
+                {tomatoI18n.标题级别}
+                <!-- □6 全选/清空轻量钮：默认全勾后收窄到单级需逐个取消 5~6 次，两键一键到位。
+                     位置钉在标签行尾（不随 chips 换行漂移）；无标题书（hasLevels=false）无 chips 不出 -->
+                {#if hasLevels}
+                    <span class="prog-chips-ops">
+                        <button type="button" class="prog-chips-op" onclick={selectAllLevels}>
+                            {tomatoI18n.全选}
+                        </button>
+                        <span class="prog-chips-op-sep" aria-hidden="true">·</span>
+                        <button type="button" class="prog-chips-op" onclick={() => (selectedLevels = [])}>
+                            {tomatoI18n.清空}
+                        </button>
+                    </span>
+                {/if}
+            </div>
             {#if !hasLevels}
                 <!-- 无标题书：chips 区提示 + 纯切窗（滑块照常，方案 §4.7） -->
                 <div class="prog-no-heading">{tomatoI18n.本书没有大纲标题}</div>
@@ -374,23 +393,18 @@
                     {#each levelStats as s (s.level)}
                         <label
                             class="prog-chip b3-tooltips b3-tooltips__n"
-                            aria-label={`H${s.level} ×${s.count}${recommend?.level === s.level
-                                ? ` · ${tomatoI18n.推荐}` : ""}\n${tomatoI18n.勾选后以此为切分边界}`}
+                            aria-label={`H${s.level} ×${s.count}\n${tomatoI18n.勾选后以此为切分边界}`}
                         >
                             <input type="checkbox" value={s.level} bind:group={selectedLevels} />
                             <span class="prog-chip-token">H{s.level}</span>
                             <span class="prog-chip-count">×{s.count}</span>
-                            {#if recommend?.level === s.level}
-                                <span class="prog-chip-reco">{tomatoI18n.推荐}</span>
-                            {/if}
                         </label>
                     {/each}
                     {#if boldIds.size > 0}
                         <!-- B 殿后（方案 §4.2）：boldIds 懒查就绪后浮现；计数≥10000 显 9999+（SQL limit） -->
                         <label
                             class="prog-chip b3-tooltips b3-tooltips__n"
-                            aria-label={`${tomatoI18n.粗体} ×${boldIds.size}${recommend?.level === "b"
-                                ? ` · ${tomatoI18n.推荐}` : ""}\n${tomatoI18n.勾选后以此为切分边界}`}
+                            aria-label={`${tomatoI18n.粗体} ×${boldIds.size >= 10000 ? "9999+" : boldIds.size}\n${tomatoI18n.勾选后以此为切分边界}`}
                         >
                             <input type="checkbox" value="b" bind:group={selectedLevels} />
                             <span class="prog-chip-token">B</span>
@@ -666,10 +680,42 @@
 
     /* ---- 卡2 多选 chips（prog-radio-chip 配方改 checkbox，方案 §4.2） ---- */
     .prog-chip-label {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
         margin: 2px 0 6px;
         font-size: 13px;
         font-weight: 500;
         color: var(--b3-theme-on-surface);
+    }
+    /* □6 全选/清空轻量文字钮：无边框 primary 色小一号，与实体 chips 视觉分层（hover 下划线供可点感）。
+       ops 用 inline-flex+gap 定距（不依赖模板空白折叠）；padding 2px 补命中区；focus-visible 对齐
+       chips 的 2px outline 先例（vision/reasoning review P2） */
+    .prog-chips-ops {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+    .prog-chips-op {
+        padding: 2px 2px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--b3-theme-primary);
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+    .prog-chips-op:hover {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+    .prog-chips-op:focus-visible {
+        outline: 2px solid var(--b3-theme-primary-light);
+    }
+    .prog-chips-op-sep {
+        font-size: 12px;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.55;
     }
     .prog-chips {
         display: flex;
@@ -710,18 +756,6 @@
         color: inherit;
         opacity: 0.64;
         font-variant-numeric: tabular-nums;
-    }
-    /* 智能默认推荐标（方案 §4.6）：{#if} 条件渲染，编译期可知，无需 :global。
-       不透明底隔开选中 chip 的淡底（vision P2-1：暗色下蓝字压暗蓝底对比临界） */
-    .prog-chip-reco {
-        padding: 1px 4px;
-        font-size: 11px;
-        font-weight: 500;
-        line-height: 1;
-        color: var(--b3-theme-primary);
-        background-color: var(--b3-theme-background);
-        border: 1px solid var(--b3-theme-primary);
-        border-radius: 4px;
     }
     .prog-no-heading {
         padding: 8px 10px;

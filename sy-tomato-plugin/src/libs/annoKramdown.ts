@@ -43,7 +43,11 @@ export function stripDraftShell(kramdown: string): string {
         .filter((l) => !IAL_LINE_RE.test(l))
         .map((l) => l.replace(IAL_INLINE_RE, ""))
         .join("\n")
-        .replace(/^\n+|\n+$/g, "");
+        // 首尾 ZWSP 与空行一并剥除（□2 创建统一 + reasoning P2-1）：空种子是 ZWSP 段（内核会退化
+        // 纯空 sb），用户输入与种子同段粘连后首/尾可能带 \u200b，也可能「种子段回车+另起段输入」
+        // 形成 \u200b\n\n 混合——两步 replace 会在第一步被 ZWSP 挡住残留空行，须单字符类一步扫；
+        // 不可见字符对用户零价值，剥首尾不伤中段内容
+        .replace(/^[\n\u200b]+|[\n\u200b]+$/g, "");
 }
 
 /**

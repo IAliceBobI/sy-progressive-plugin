@@ -13,12 +13,14 @@ import { mount, unmount } from "svelte";
 import { newID } from "stonev5-utils";
 import { events, EventType } from "./libs/Events";
 import { getAttribute, setAttribute, siyuan } from "./libs/utils";
+import { debugLog } from "./libs/logUtils";
 import { getDoOperations } from "./libs/blockUtils";
 import { isReadonly } from "./libs/navUtils";
 import { DestroyManager } from "./libs/destroyer";
 import {
     commentBoxAddFlashCard,
     commentBoxAnnoBg,
+    commentBoxAnnoEditorMode,
     commentBoxAnnoLineType,
     commentBoxAnnoMarkStyle,
     commentBoxAnnoUnderlineThickness,
@@ -38,12 +40,11 @@ import {
 } from "./libs/annotationsAttr";
 import { annoIdFromHref, blockSubRanges, hasBlockLevelEntry, type BlockSubRange } from "./libs/annoDom";
 import { stripAllAnnoLinks, stripAnnoLinks } from "./libs/annoKramdown";
-import { sweepDraftDoc } from "./libs/annoDraft";
+import { newDraftBlock, sweepDraftDoc } from "./libs/annoDraft";
 import { clearChat } from "./libs/annoChat";
 import { annoPop } from "./libs/annoPop";
 import { tomatoI18n } from "./tomatoI18n";
 import type { TomatoAnnotation } from "./libs/annotationsAttr";
-import AnnoInput from "./AnnoInput.svelte";
 import AnnoEdit from "./AnnoEdit.svelte";
 import AnnoBubble from "./AnnoBubble.svelte";
 
@@ -237,49 +238,96 @@ class Annotations {
 
     // ---------- 创建链路（旧 findDivs 的新流程，入口语义不变：右键菜单/⇧⌥F） ----------
 
+    /** 创建链路（入口语义不变：右键菜单/⇧⌥F）。□2 统一：弹窗=AnnoEdit 完整功能面
+     *  （内嵌 Protyle 草稿+问 AI，与编辑同一 Dialog 形态/同一份尺寸记忆）；写链 doSave 不变 */
     async create(protyle: IProtyle) {
-        if (document.querySelector(".b3-dialog--open")) return; // 已有弹窗不重入（reasoning P2-4）
-        const { selected, rangeText, range } = await events.selectedDivs(protyle);
-        if (!selected || selected.length === 0) return;
-        if ((await isReadonly(protyle)) === "true") {
-            siyuan.pushMsg(tomatoI18n.文档只读);
-            return;
+        const t0 = Date.now(); // debugLog 打点锚：量化创建弹窗各段耗时（debugging.md loki 节）
+        if (this.editOpening || document.querySelector(".b3-dialog--open")) return; // 已有弹窗/取数中不重入
+        this.editOpening = true;
+        try {
+            const { selected, rangeText, range } = await events.selectedDivs(protyle);
+            debugLog("anno_create", `phase=selected ms=${Date.now() - t0}`, "anno");
+            if (!selected || selected.length === 0) return;
+            if ((await isReadonly(protyle)) === "true") {
+                siyuan.pushMsg(tomatoI18n.文档只读);
+                return;
+            }
+            const isSel = !!rangeText && !!range;
+            // 选区 Range 须开弹窗前克隆快照（□2 统一后创建弹窗内嵌 protyle：用户点进草稿会使
+            // 文档选区迁移，getRangeAt 返回的是选区持有的活引用、会被 protyle 原地改写——
+            // 旧 AnnoInput 是 textarea 不动文档选区从未暴露；快照后 setInlineMark 不受弹窗交互影响）
+            const selRange = isSel ? (range as Range).cloneRange() : undefined;
+            // AI 上下文取数（□2 统一后创建也有问 AI）：宿主块原文+文档标题+前后邻居，openEdit 同款
+            // 并行链（跨块只取首块，完整选区由 sel.txt 在 AnnoChat ctx 兜底）；失败/为空不阻塞创建
+            const host = selected[0];
+            const fetchSource = async (): Promise<string> => {
+                const hostID = getAttribute(host, "data-node-id") ?? "";
+                if (!hostID) return "";
+                try {
+                    const kd = (await siyuan.getBlockKramdown(hostID))?.kramdown ?? "";
+                    return stripAllAnnoLinks(kd.replace(/\n\{:[^\n]*\}\s*$/, ""));
+                } catch {
+                    return "";
+                }
+            };
+            // rich 模式预建草稿与入口取数并行（草稿块 SQL 索引等待是大头，重叠掉 fetchSource
+            // 串行段；plain 模式不建——秒开链路建了即删纯浪费）
+            const draftP = commentBoxAnnoEditorMode.get() === "plain" ? null : newDraftBlock("");
+            const [source, ctxExtra] = await Promise.all([fetchSource(), this.chatContextExtra(host)]);
+            debugLog("anno_create", `phase=source_ready ms=${Date.now() - t0}`, "anno");
+            // 预生成 annoId 透传落库（makeAnnotation 可选 id）：创建期 AI 对话缓存 key 与落库条目同源，
+            // 保存后重开编辑对话可续；重试保存同 id=doSave 先摘再挂（最新 text 落库，reasoning P1-1）
+            const annoId = newID();
+            const id = newID();
+            const dm = new DestroyManager();
+            const memo = !events.isMobile;
+            const dialog = new Dialog({
+                title: tomatoI18n.添加批注,
+                content: `<div id="${id}" style="flex:1 1 auto;display:flex;flex-direction:column;min-height:0"></div>`,
+                width: events.isMobile ? "90vw" : "720px",
+                positionId: memo ? ANNO_EDIT_POSITION_ID : undefined,
+                transparent: true,
+                destroyCallback() {
+                    dm.destroyBy("dialog");
+                },
+            });
+            if (memo) dialog.element.setAttribute("data-key", ANNO_EDIT_POSITION_ID);
+            this.editOpening = false; // Dialog 元素已入 DOM（--open 类内核 +50ms 才加，上方 entry 守卫的
+            // await 窗口由 flag 兜底；此后的真防线=弹窗已在场拦截点击）
+            dm.add("dialog", () => dialog.destroy());
+            const svelte = mount(AnnoEdit, {
+                target: dialog.element.querySelector("#" + id),
+                props: {
+                    dm,
+                    annoId,
+                    source,
+                    selText: isSel ? rangeText : "",
+                    initialText: "",
+                    create: true,
+                    blockCount: isSel ? 0 : selected.length,
+                    draftReady: draftP,
+                    ...ctxExtra,
+                    onSave: (text: string) => this.enqueue(() =>
+                        this.doSave(protyle, text, isSel ? { txt: clipAnnoSelText(rangeText) } : undefined, selRange, selected, annoId)),
+                },
+            });
+            dm.add("svelte", () => svelte.destroy());
+            debugLog("anno_create", `phase=dialog_mounted ms=${Date.now() - t0} mode=${commentBoxAnnoEditorMode.get()}`, "anno");
+        } finally {
+            this.editOpening = false;
         }
-        const isSel = !!rangeText && !!range;
-        const id = newID();
-        const dm = new DestroyManager();
-        const dialog = new Dialog({
-            title: tomatoI18n.添加批注,
-            content: `<div id="${id}"></div>`,
-            width: events.isMobile ? "90vw" : null,
-            height: events.isMobile ? null : null,
-            transparent: true,
-            destroyCallback() {
-                dm.destroyBy("dialog");
-            },
-        });
-        dm.add("dialog", () => dialog.destroy());
-        const svelte = mount(AnnoInput, {
-            target: dialog.element.querySelector("#" + id),
-            props: {
-                dm,
-                selText: isSel ? rangeText : "",
-                blockCount: isSel ? 0 : selected.length,
-                onSave: (text: string) => this.enqueue(() =>
-                    this.doSave(protyle, text, isSel ? { txt: clipAnnoSelText(rangeText) } : undefined, isSel ? range : undefined, selected)),
-            },
-        });
-        dm.add("svelte", () => svelte.destroy());
     }
 
     /** 属性先落（kernel=source of truth）→ 标记后写（setInlineMark 重建块 DOM 时带上属性）；
-     *  返回 false=写失败，弹窗不关、输入保留（写失败铁律） */
+     *  返回 false=写失败，弹窗不关、输入保留（写失败铁律）。
+     *  entryId=创建链预生成 id（□2 统一：AI 对话缓存同源+写失败重试幂等，见 create 注记） */
     private async doSave(
         protyle: IProtyle,
         text: string,
         sel: { txt: string } | undefined,
         range: Range | undefined,
         selected: HTMLElement[],
+        entryId?: string,
     ): Promise<boolean> {
         let subs: BlockSubRange[] = [];
         let divs: HTMLElement[];
@@ -301,8 +349,9 @@ class Annotations {
         divs = pairs.map((p) => p.div);
         const ids = pairs.map((p) => p.id);
 
-        // 1. 写属性（读旧串→append→批量落盘）
-        const entry = makeAnnotation({ text, sel });
+        // 1. 写属性（读旧串→append→批量落盘）。同 id 先摘再挂（reasoning P1-1）：首次保存
+        // 「写成功但读回验证失败」后用户改文重试时，纯 append 幂等会首写赢静默吞掉新 text
+        const entry = makeAnnotation({ text, sel, id: entryId });
         let cur: { [id: string]: Record<string, string> } | null = null;
         try {
             cur = await siyuan.batchGetBlockAttrs(ids);
@@ -312,7 +361,7 @@ class Annotations {
             return false;
         }
         const ops = ids.map((id) => {
-            const attr = appendAnnotation(cur![id]?.[ANNOTATIONS_ATTR], entry);
+            const attr = appendAnnotation(removeAnnotation(cur![id]?.[ANNOTATIONS_ATTR], entry.id), entry);
             return { id, attrs: { [ANNOTATIONS_ATTR]: attr } };
         });
         try {
@@ -378,7 +427,8 @@ class Annotations {
             }
         });
         try {
-            // annoId 为 NewNodeID 字符集（[0-9a-z-]），无引号注入面；不出现在 ial 其他位置（sel 快照含此串概率≈0）
+            // annoId 为 newID() 产物（"ID"+uuid hex，字符集 [0-9a-zA-Z]），无引号/百分号注入面；
+            // 不出现在 ial 其他位置（sel 快照含此串概率≈0）
             const rows = await siyuan.sql(
                 `select id from blocks where ial like '%custom-tomato-annotations%' and ial like '%${annoId}%' limit 10000`,
             );

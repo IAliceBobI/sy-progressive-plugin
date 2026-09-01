@@ -2,6 +2,7 @@ import { BlockNodeEnum, CONTENT_EDITABLE, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { IProtyle } from "siyuan";
 import { progStorage } from "./ProgressiveStorage";
@@ -139,6 +140,36 @@ export async function findPieceDoc(bookID: string, point: number) {
     return doFindDoc(bookID, getDocIalPieces, point);
 }
 
+/** 重划分前删除本书全部旧片（2026-08-31 用户实测报回的根因）：旧片 IAL 标记与新方案
+ *  同名（TEMP#bookID,point），findPieceDoc/createPiece 命中即复用旧边界内容的片——
+ *  书→片副本 miss（轮询 10 轮报「请选择段落块」）、片→原文按旧边界错位。分片=一次性
+ *  餐具（读完即删同语义），重划分=按新设置整批重建，旧片删进 history 可恢复。删除走
+ *  like 前缀 custom-progmark="TEMP#bookID,——keysDoc（keysDoc#…前缀）/cards/words 等
+ *  辅助文档不同前缀不会误伤；单片失败不阻断（残留片回 bug 态，重走重划分可自愈）。
+ *  已知边界：片 IAL 是 createDocWithMd→setBlockAttrs 两步后补，巨书上入索引可滞后
+ *  24s+——加书后极短窗内重划分会漏删刚建的片（此时片内容与新索引同源，实害有限）。 */
+export async function deleteAllPieces(bookID: string) {
+    const rows = await siyuan.sql(
+        `select id from blocks where type='d' and ial like '%${MarkKey}="${TEMP_CONTENT}#${bookID},%'`);
+    const ids = (rows ?? []).map(r => r?.id).filter(Boolean);
+    for (const id of ids) {
+        try {
+            // 闪卡先行清理（读完即删链 Progressive.ts 同款）：内核 removeDoc 不清 riff 卡
+            await siyuan.removeRiffCards([id]);
+            await siyuan.removeDocByIDSiyuan(id);
+        } catch { /* 单片失败不阻断 */ }
+    }
+    return ids.length;
+}
+
+/** 本书是否存在片文档（同款 LIKE 前缀）：删记录（removeIndex）后重加书路径的知情
+ *  警告用——此时书未注册但旧片还在，process() 会照删，须先警告（review P1-1）。 */
+export async function hasPieces(bookID: string) {
+    const row = await siyuan.sqlOne(
+        `select count(*) as n from blocks where type='d' and ial like '%${MarkKey}="${TEMP_CONTENT}#${bookID},%'`);
+    return Number((row as any)?.n ?? 0) > 0;
+}
+
 export async function findCards(bookID: string) {
     return doFindDoc(bookID, getDocIalCards);
 }
@@ -255,8 +286,28 @@ export async function fullfilContent(point: number, bookID: string, piecePre: st
         }
     }
 
-    if (allContent.length > 0) {
-        await siyuan.insertBlockAsChildOf(allContent.filter(i => !!i).join("\n\n"), noteID);
+    const content = allContent.filter(i => !!i);
+    if (content.length > 0) {
+        await siyuan.insertBlockAsChildOf(content.join("\n\n"), noteID);
+    }
+    await removePieceEmptyBlocks(noteID);
+}
+
+/** □1 重插失真（2026-09-01）：clearAll 删光子块后内核按「文档不可零块」自动补一个空段落，
+ * insertBlockAsChildOf(parentID) 是头插——新内容落在残留空块之前，产物尾部永久挂一个
+ * 无 IAL 空块（首建同理：createNote 建空文档自带空块）。fullfilContent 收尾统一清掉：
+ * 本轮插入块全带内容/IAL（上游 filter 过空 markdown），getChildBlocks 实时通道不吃 SQL
+ * 索引延迟；文档此时已有内容，删空块不触发内核补块（dev 实验双验证 2026-09-01）。 */
+async function removePieceEmptyBlocks(noteID: string) {
+    try {
+        const blocks = await siyuan.getChildBlocks(noteID);
+        const empty = (blocks ?? []).filter(b => b.type === "p" && !(b.content ?? "").trim());
+        if (empty.length > 0 && empty.length < (blocks ?? []).length) {
+            await siyuan.deleteBlocks(empty.map(b => b.id));
+        }
+    } catch (e) {
+        // 装饰性收尾：失败不阻断建片/重插主流程，但留观测面（产物会带空块，无日志无法归因）
+        debugLog("refill", `removePieceEmptyBlocks failed: ${e}`, "progressive");
     }
 }
 

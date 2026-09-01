@@ -74,9 +74,27 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function newDraftBlock(text: string): Promise<string> {
     const docID = await ensureDraftDocID();
     if (!docID) return "";
+    // 基线空段清理（□2 创建统一）：内核在文档删空时自动补一个空 p（sweep 的稳态基线），
+    // 它排在草稿 sb 之前=弹窗里的第一行空行——空草稿场景用户点/聚焦第一行会把字打进基线段
+    // 而非 sb（readDraftText 读 sb 永远为空，e2e 实锤「批注内容为空」死循环）；编辑链路因
+    // sb 自带可见文本从未暴露。开窗前清掉（跳过登记在册的活跃草稿）；关窗删 sb 后内核会再补，
+    // 一次开窗多一轮事务可接受
+    try {
+        const children = (await siyuan.getChildBlocks(docID)) ?? [];
+        const active = activeDrafts();
+        const junk = children
+            .filter((c) => c.type === "p" && (c.content ?? "").replace(/\u200b/g, "").trim() === "")
+            .filter((c) => !active.has(c.id))
+            .map((c) => c.id)
+            .filter(Boolean);
+        if (junk.length > 0) await siyuan.deleteBlocks(junk);
+    } catch { /* 清不掉不阻塞：多一行空行仅影响聚焦目标 */ }
+    // 空种子用 ZWSP：内核对纯空内容（`{{{row\n\n}}}`）会退化成无子 sb（kramdown 读回空串，
+    // 实验实锤），ZWSP 能落成「sb 内含可编辑空段」；落库侧由 stripDraftShell 剥首尾 ZWSP 兜底
+    const seed = text.replace(/\u200b/g, "").trim() === "" ? "\u200b" : text;
     let id = "";
     try {
-        const txs = await siyuan.insertBlockAsChildOf(`{{{row\n${text}\n}}}`, docID);
+        const txs = await siyuan.insertBlockAsChildOf(`{{{row\n${seed}\n}}}`, docID);
         const ops = (Array.isArray(txs) ? txs : []).flatMap((t: { doOperations?: unknown[] }) => (t?.doOperations ?? []) as { action?: string; id?: string; data?: string }[]);
         const sb = ops.find((o) => o.action === "insert" && typeof o.data === "string" && o.data.includes('data-type="NodeSuperBlock"'));
         id = sb?.id ?? ops.find((o) => o.action === "insert")?.id ?? "";

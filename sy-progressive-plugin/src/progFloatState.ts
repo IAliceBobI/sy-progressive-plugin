@@ -241,3 +241,22 @@ export function formatDueCount(n: number): string {
     if (n <= 0) return "";
     return n > 99 ? "99+" : String(n);
 }
+
+/**
+ * 摘抄子排 id 联合（□3 review P2-1 编译期收紧）：组件层 DIG_ICONS/DIG_TIPS 须以
+ * Record<DigSubrankId, ...> 精确匹配——任一侧增删 id 都是编译错（make check 拦），
+ * 防两源漂移（漂移的失效模式是 icon undefined 渲染期 TypeError，不是温和降级）。
+ */
+export type DigSubrankId = "inbox" | "think" | "card" | "word" | "wordai" | "write" | "sched" | "whole";
+
+/**
+ * 摘抄子排 id 清单（□3 起单一事实源，渲染序）：digest 态不渲染子排（摘抄文档再摘抄
+ * 落札记匣本就低频且无 ✂ 可收）；whole（整篇摘抄）限 piece+free——书态整本复制不
+ * 实用走选中摘抄，free 态是右键退役后任意文档的整摘兜底入口。icon/tip 映射留 UI 层
+ * （ProgressiveFloatBtns 的 DIG_ICONS/DIG_TIPS），此处只管 id 序与按态过滤。
+ */
+export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
+    if (kind === "digest") return [];
+    const base: DigSubrankId[] = ["inbox", "think", "card", "word", "wordai", "write", "sched"];
+    return kind === "book" ? base : [...base, "whole"];
+}

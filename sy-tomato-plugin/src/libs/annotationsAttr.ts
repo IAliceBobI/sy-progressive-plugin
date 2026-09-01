@@ -26,8 +26,10 @@ export interface TomatoAnnotation {
 
 export type AnnotationPatch = { text?: string; color?: string | null; time?: number };
 
-export function makeAnnotation(input: { text: string; sel?: { txt: string }; color?: string }): TomatoAnnotation {
-    const e: TomatoAnnotation = { id: newID(), text: input.text, time: Date.now() };
+export function makeAnnotation(input: { text: string; sel?: { txt: string }; color?: string; id?: string }): TomatoAnnotation {
+    // 可选 id 透传（□2 创建弹窗统一 AnnoEdit）：预生成 id 让「创建期 AI 对话缓存 key」与落库条目同源，
+    // 保存后重开编辑对话可续；空串视为缺省自造
+    const e: TomatoAnnotation = { id: input.id || newID(), text: input.text, time: Date.now() };
     if (input.sel != null) e.sel = { ...input.sel };
     if (input.color != null) e.color = input.color;
     const clean = sanitize(e);

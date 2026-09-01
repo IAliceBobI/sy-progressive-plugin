@@ -5,15 +5,15 @@
 // 新增菜单项时在此补行；分组标题走 tomatoI18n（无则新增 key）。
 import { tomatoI18n } from "../tomatoI18n";
 import {
-    blockEditorMenu, bk启用禁用文档的底部反链menu, cardBoxSuperCard, cardPriorityBoxPostponeCardMenu,
-    cardPriorityBoxPriorityMenu, cardPriorityBoxSpradDelayMenu, commentBoxMenu, cozeSearchMenuShow,
-    dailyNoteCopyMenu, dailyNoteGoToBottomMenu, dbBkBoxRefreshMenu, deleteBlocksMenu,
-    floatingballDocMenu, floatingballDocTabMenu, graph打开块关系图Menu, graph定位到图中的节点Menu,
-    imgBoxShowMenu, linkBoxBilinkMenu, mindWireDocMenu, mindWireGlobalMenu, mixBoxPinyin,
-    pairBarEntryMenu, prefixArticlesMenu, readingAddDeleteMenu, readingAddJumpMenu, readingAddRPmenu,
-    storeCopyStdMD, storeFillMemoMenu, storeInsertXml, storeMergeDoc, storeMoveDocContentHere,
-    storeOpenRefsMenu, storeRefreshStaticBkLnk, superRefBoxGlobalFixMenu, superRefBoxGlobalLnkMenu,
-    tag2RefSearchLnk, tag2RefSearchRef, aiBoxMenuShow,
+    blockEditorBox, blockEditorMenu, bk启用禁用文档的底部反链menu, cardBoxSuperCard, cardPriorityBoxCheckbox,
+    cardPriorityBoxPostponeCardMenu, cardPriorityBoxPriorityMenu, cardPriorityBoxSpradDelayMenu, commentBoxMenu,
+    cozeSearchMenuShow, dailyNoteCopyMenu, dailyNoteGoToBottomMenu, dbBkBoxRefreshMenu, deleteBlocksMenu,
+    floatingballDocMenu, floatingballDocTabMenu, floatingballEnable, graphBoxCheckbox, graph打开块关系图Menu,
+    graph定位到图中的节点Menu, imgBoxShowMenu, linkBoxBilinkMenu, mindWireCheckbox, mindWireDocMenu,
+    mindWireGlobalMenu, mixBoxPinyin, pairBarEntryMenu, prefixArticlesMenu, readingAddDeleteMenu,
+    readingAddJumpMenu, readingAddRPmenu, storeCopyStdMD, storeFillMemoMenu, storeInsertXml, storeMergeDoc,
+    storeMoveDocContentHere, storeOpenRefsMenu, storeRefreshStaticBkLnk, superRefBoxGlobalFixMenu,
+    superRefBoxGlobalLnkMenu, tag2RefSearchLnk, tag2RefSearchRef, aiBoxMenuShow,
 } from "./stores";
 import { DailyNoteBox移动内容到dailynote } from "../DailyNoteBox";
 import { CommentBox添加批注到日记 } from "../CommentBox";
@@ -40,6 +40,9 @@ export interface ManagedMenuItem {
     label: () => string;
     /** 有独立开关的项绑它（checkbox 读写 store）；缺省走 hiddenMenuItems 隐藏集 */
     store?: { get(): boolean; set(v: boolean): void };
+    /** 功能区总开关层（onload/事件入口整段 return 的那种）：勾选态须合成它，
+     * 勾选时一并打开（否则功能区关着时勾了菜单项也不出现，管理区失去恢复入口） */
+    master?: { get(): boolean; set(v: boolean): void };
 }
 
 export interface MenuManageGroup {
@@ -66,8 +69,8 @@ export const MENU_MANAGE_GROUPS: MenuManageGroup[] = [
         title: () => tomatoI18n.闪卡,
         items: [
             { key: "addFlashCard", label: () => CardBox用选中的行创建超级块超级块制卡取消制卡.langText(), store: cardBoxSuperCard },
-            { key: "m.cardPriority.setPri", label: () => tomatoI18n.为闪卡设置优先级 },
-            { key: "m.cardPriority.stop", label: () => tomatoI18n.推迟与取消推迟 },
+            { key: "m.cardPriority.setPri", label: () => tomatoI18n.为闪卡设置优先级, master: cardPriorityBoxCheckbox },
+            { key: "m.cardPriority.stop", label: () => tomatoI18n.推迟与取消推迟, master: cardPriorityBoxCheckbox },
             { key: "cardPrioritySet", label: () => tomatoI18n.修改文档中闪卡优先级, store: cardPriorityBoxPriorityMenu },
             { key: "delay all cards", label: () => tomatoI18n.推迟闪卡, store: cardPriorityBoxPostponeCardMenu },
             { key: "delay all cards spread on x days", label: () => CardPriorityBox分散推迟闪卡.langText(), store: cardPriorityBoxSpradDelayMenu },
@@ -98,10 +101,10 @@ export const MENU_MANAGE_GROUPS: MenuManageGroup[] = [
             { key: "m.mixBox.delStaticBk", label: () => tomatoI18n.删除静态反链, store: storeRefreshStaticBkLnk },
             { key: "m.mixBox.insertXml", label: () => tomatoI18n.插入空的脑图流程图文件, store: storeInsertXml },
             { key: "deleteBlocks", label: () => CpBox批量删除大量连续内容块.langText(), store: deleteBlocksMenu },
-            { key: "m.cpBox.clean2SubDoc", label: () => tomatoI18n.清理文档内容到子文档 },
-            { key: "m.cpBox.cleanAll", label: () => tomatoI18n.清理文档内容 },
+            { key: "m.cpBox.clean2SubDoc", label: () => tomatoI18n.清理文档内容到子文档, master: deleteBlocksMenu },
+            { key: "m.cpBox.cleanAll", label: () => tomatoI18n.清理文档内容, master: deleteBlocksMenu },
             { key: "前缀文档树", label: () => PrefixArticles前缀文档树.langText(), store: prefixArticlesMenu },
-            { key: "BlockEditor打开编辑器", label: () => BlockEditor打开编辑器.langText(), store: blockEditorMenu },
+            { key: "BlockEditor打开编辑器", label: () => BlockEditor打开编辑器.langText(), store: blockEditorMenu, master: blockEditorBox },
         ],
     },
     {
@@ -147,22 +150,22 @@ export const MENU_MANAGE_GROUPS: MenuManageGroup[] = [
     {
         title: () => tomatoI18n.悬浮球,
         items: [
-            { key: "绑定文档到悬浮按钮", label: () => FloatingBall添加文档.langText(), store: floatingballDocMenu },
-            { key: "FloatingBallTab添加文档", label: () => FloatingBallTab添加文档.langText(), store: floatingballDocTabMenu },
+            { key: "绑定文档到悬浮按钮", label: () => FloatingBall添加文档.langText(), store: floatingballDocMenu, master: floatingballEnable },
+            { key: "FloatingBallTab添加文档", label: () => FloatingBallTab添加文档.langText(), store: floatingballDocTabMenu, master: floatingballEnable },
         ],
     },
     {
         title: () => tomatoI18n.思维导线,
         items: [
-            { key: "MindWire global", label: () => MindWire启用或禁用思维导线.langText(), store: mindWireGlobalMenu },
-            { key: "MindWire doc", label: () => MindWire启用或禁用文档思维导线.langText(), store: mindWireDocMenu },
+            { key: "MindWire global", label: () => MindWire启用或禁用思维导线.langText(), store: mindWireGlobalMenu, master: mindWireCheckbox },
+            { key: "MindWire doc", label: () => MindWire启用或禁用文档思维导线.langText(), store: mindWireDocMenu, master: mindWireCheckbox },
         ],
     },
     {
         title: () => tomatoI18n.块关系图,
         items: [
-            { key: "graphLocateNode", label: () => GraphBox定位到图中的节点.langText(), store: graph定位到图中的节点Menu },
-            { key: "graphLocateNode open", label: () => GraphBox打开块关系图.langText(), store: graph打开块关系图Menu },
+            { key: "graphLocateNode", label: () => GraphBox定位到图中的节点.langText(), store: graph定位到图中的节点Menu, master: graphBoxCheckbox },
+            { key: "graphLocateNode open", label: () => GraphBox打开块关系图.langText(), store: graph打开块关系图Menu, master: graphBoxCheckbox },
         ],
     },
     {

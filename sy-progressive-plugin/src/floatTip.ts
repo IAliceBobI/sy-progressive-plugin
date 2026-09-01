@@ -9,7 +9,9 @@
 // 全局类（fixed/max-width 320px 折行/zoomIn 300ms，与原生观感一致）；pointer-events:none
 // 由 index.scss 的 #prog-float-tip 规则常驻——纯提示勿拦指针（原生单例因同步悬浮要
 // 点链接而刻意可拦，我们无此需求），且 show 里 removeAttribute("style") 清定位不误伤。
-import { northTipPos } from "./tipPos";
+// northTipPos 母本= tomato libs/panelTip.ts（□6 收敛双份拷贝：progressive→tomato 取件方向
+// 合法（roller 等先例），tomato 不反向依赖 progressive；防单边修 bug 漂移）。
+import { northTipPos } from "../../sy-tomato-plugin/src/libs/panelTip";
 
 const TIP_ID = "prog-float-tip";
 

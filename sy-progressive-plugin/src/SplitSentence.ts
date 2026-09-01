@@ -27,7 +27,8 @@ export class SplitSentence {
                 let firstID: string;
                 const mdList: string[] = [];
                 for (const b of this.textAreas) {
-                    if (!firstID && b.blocks.length > 0) {
+                    if (b.blocks.length === 0) continue; // p 档 filter 后理论可空，空 textArea 不产出（防空行粘连）
+                    if (!firstID) {
                         firstID = b.blocks[0].id;
                     }
                     mdList.push(b.blocks.map(i => i.text).join(""));
@@ -74,6 +75,8 @@ export class SplitSentence {
                 }
                 ps = splitLines(ps);
                 let blocks: { text: string, id: string }[];
+                // □1 重插失真（2026-09-01）：三档原各有一次尾部裸 IAL 行 push——Lute 把它解析成
+                // 带属性的空段落块（实测 p 档重插产物尾部凭空多空块），断句产物从此零空块
                 if (this.asList == "p") {
                     blocks = ps.map(i => i.trim())
                         .filter(i => i.length > 0)
@@ -81,22 +84,16 @@ export class SplitSentence {
                             const { newID, attrLine } = getAttrLineWithID(ref, idx);
                             return { text: SPACE.repeat(2) + i + ` ${get_siyuan_lnk_md(ref, "  *  ", prog.settings.pieceNoBacktraceLink)}\n${attrLine}\n`, id: newID };
                         });
-                    const { newID } = getAttrLineWithID(ref, idx);
-                    blocks.push({ text: `{: id="${newID}"}\n`, id: newID });
                 } else if (this.asList == "t") {
                     blocks = ps.map(i => {
                         const { newID, attrLine } = getAttrLineWithID(ref, idx);
                         return { text: `* ${getAttrLine(ref, idx)}[ ] ` + i + ` ${get_siyuan_lnk_md(ref, "  *  ", prog.settings.pieceNoBacktraceLink)}\n\t${attrLine}\n`, id: newID };
                     });
-                    const { newID, attrLine } = getAttrLineWithID(ref, idx);
-                    blocks.push({ text: `${attrLine}\n`, id: newID });
                 } else {
                     blocks = ps.map(i => {
                         const { newID, attrLine } = getAttrLineWithID(ref, idx);
                         return { text: `* ${getAttrLine(ref, idx)} ` + i + ` ${get_siyuan_lnk_md(ref, "  *  ", prog.settings.pieceNoBacktraceLink)}\n\t${attrLine}\n`, id: newID };
                     });
-                    const { newID, attrLine } = getAttrLineWithID(ref, idx);
-                    blocks.push({ text: `${attrLine}\n`, id: newID });
                 }
                 this.textAreas.push({ blocks, ref });
                 i++;

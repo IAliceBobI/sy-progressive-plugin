@@ -7,7 +7,7 @@ import { getCardsDoc, getHPathByDocID } from "./helper";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { domNewLine, DomSuperBlockBuilder, getSpans } from "../../sy-tomato-plugin/src/libs/sydom";
 import { getDocTracer, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { flashcardAddRefs, flashcardNotebook, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { card2dailycard, flashcardAddRefs, flashcardNotebook, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -176,6 +176,11 @@ class FlashBox {
             ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
         } else if (t == CardType.Here) {
             ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], lastSelectedID))
+        } else if (card2dailycard.get()) {
+            // □3 制卡统一归置（2026-09-01 拍板）：默认制卡并入当日 daily card 文档（与 ⌘｀ 同款
+            // 落点）；设置关闭后回落 cards 夹旧路线（cardUnderPiece 分叉保持原语义）
+            const targetDocID = await getDailyCardDocID(boxID, getDailyPath());
+            ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
         } else {
             let hpath = "";
             if (bookID && !this.settings.cardUnderPiece) {

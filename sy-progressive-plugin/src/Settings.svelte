@@ -10,6 +10,7 @@
         mobileTopBar,
         floatbarMainBtns,
         cardAppendTime,
+        card2dailycard,
         cardUnderPiece,
         digest2dailycard,
         digestNoBacktraceLink,
@@ -21,6 +22,7 @@
         initProgFloatBtnsDisable,
         digestmenu,
         piecesmenu,
+        blockIconMenu,
         ProgressiveStart2learn,
         ProgressiveJumpMenu,
         markOriginTextBG,
@@ -43,6 +45,8 @@
     import {
         Progressive开始学习,
         Progressive开始随机学习,
+        Progressive上一页,
+        Progressive下一页,
         Progressive添加当前文档到渐进阅读分片模式,
         Progressive跳到分片或回到原文,
         progSettingsOpenHK,
@@ -355,6 +359,15 @@
                 {Progressive开始随机学习.icon}
                 {Progressive开始随机学习.langText()}<HotkeyCap hk={Progressive开始随机学习} pluginName="sy-progressive-plugin"></HotkeyCap>
             </div>
+            <!-- □5 补全：翻页是阅读主链路（浮条 回看/下一个分片 挂的就是这对键，next 下片删语义不同不挂），与跳到分片/加书同为高频可改项 -->
+            <div>
+                {Progressive上一页.icon}
+                {Progressive上一页.langText()}<HotkeyCap hk={Progressive上一页} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                {Progressive下一页.icon}
+                {Progressive下一页.langText()}<HotkeyCap hk={Progressive下一页} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
             <div>
                 {digest执行摘抄.icon}
                 {digest执行摘抄.langText()}<HotkeyCap hk={digest执行摘抄} pluginName="sy-progressive-plugin"></HotkeyCap>
@@ -366,10 +379,11 @@
         </div>
     </section>
 
-    <!-- 右键菜单（v5 □7：显隐开关 20→4——制卡/收集/提取族收进浮条 [+] 高级功能，随开关退役） -->
+    <!-- 菜单入口（v5 □7：右键显隐开关 20→4——制卡/收集/提取族收进浮条 [+] 高级功能，随开关退役。
+         □11 标题宽化：区内还有块图标菜单（左键点块前小圆点）与移动端菜单，非全是右键，各条目自说明入口类型） -->
     <section class="conf-group">
         <div class="settingBox">
-            <div class="section-title">{tomatoI18n.右键菜单}</div>
+            <div class="section-title">{tomatoI18n.菜单入口}</div>
             <div>{tomatoI18n.menu不显示菜单不影响快捷键的使用}</div>
             <div>
                 <input
@@ -388,6 +402,8 @@
                 />
                 {tomatoI18n.menu添加右键菜单}:
                 {digest渐进阅读摘抄模式.langText()}<HotkeyCap hk={digest渐进阅读摘抄模式} pluginName="sy-progressive-plugin"></HotkeyCap>
+                <!-- digestmenu 一拖二（□3 review P2-2）：同门还有「整篇摘抄」右键项，开回即一并恢复 -->
+                （+{tomatoI18n.整篇摘抄}）
             </div>
 
             <div>
@@ -400,6 +416,17 @@
                 {Progressive跳到分片或回到原文.icon}
                 {Progressive跳到分片或回到原文.langText()}
                 <HotkeyCap hk={Progressive跳到分片或回到原文} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+
+            <!-- □7：块图标菜单（点块前小圆点）独立开关——右键默认关不再连带，键帽见上两行 -->
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$blockIconMenu}
+                />
+                {tomatoI18n.块图标菜单入口}:
+                {Progressive跳到分片或回到原文.langText()} + {digest渐进阅读摘抄模式.langText()}
             </div>
 
             <div>
@@ -551,6 +578,15 @@
                     bind:checked={$openCardsOnOpenPiece}
                 />
                 <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置同步开卡}>{tomatoI18n.打开分片的同时打开cards文档}</span>
+            </div>
+
+            <div>
+                <input
+                    type="checkbox"
+                    class="b3-switch"
+                    bind:checked={$card2dailycard}
+                />
+                <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置制卡daily}>{tomatoI18n.制卡并入dailycard当天文档}</span>
             </div>
 
             <div>

@@ -47,8 +47,9 @@
             neighborCode = progressiveCodeFromApp(getApp?.());
             if (neighborCode) showGeneric = false;
         }
-        // FREE_KEY 是 verifyKey 失败时塞进 store 的过期免费码，展示层清空——
-        // 否则未激活用户看到预填的长串，粘贴自己的码前还得手动清空（2026-08-24 评审）
+        // FREE_KEY 是历史版本 verifyKey 失败时写入的磁盘存量遗物（2026-09-01 □5 起已不再
+        // 写入），展示层清空——勿当死代码删，否则未激活用户看到预填的长串，粘贴自己的码前
+        // 还得手动清空（2026-08-24 评审）
         if ($userToken === FREE_KEY) userToken.set("");
     });
 

@@ -64,7 +64,9 @@ export type SmartDefault = { headings: string[]; splitWordNum: number; mode: Sma
     {headings:[最细级], splitWordNum:target, mode:"fallback"}；levels 空 →
     {headings:[], splitWordNum:target, mode:"window-only"}。
     calc 注入分片计算（生产=computePieceIndex 包装，单测=stub）。
-    blocks 仅供未来内部直算预留，试算全部经 calc（调用方闭包已捕获数据）。 */
+    blocks 仅供未来内部直算预留，试算全部经 calc（调用方闭包已捕获数据）。
+    □2 退役（2026-09-01）：生产零调用（AddBook 改默认实存级全勾），仅单测锁定
+    行为，留作将来「恢复推荐」或复用的素材。 */
 export async function pickSmartDefault(
     blocks: ReadonlyArray<WordCountType>,
     levels: ReadonlyArray<string>,

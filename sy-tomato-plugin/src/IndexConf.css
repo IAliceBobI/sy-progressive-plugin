@@ -335,6 +335,16 @@
     border-radius: 4px;
     box-shadow: inset 0 -1px 0 var(--b3-theme-surface-lighter);
 }
+/* □9（2026-09-01）：HotkeyCap 根 span 此前全仓零样式定义，模板「文本<HotkeyCap>」直贴——
+   文本末字贴住键帽 1px 边框（六行一致的既有通病）。6px 与 .kbd padding 同档；
+   全仓用例键帽前均有文本（无行首用例）。recite 的 .rs-hk-row 是 flex 两端行，
+   右端键帽会被此规则顶缩 6px 与相邻开关行右轨不齐，下方归零覆盖（类名仅 recite 存在） */
+.tomato-settings-dialog .hotkey-wrap {
+    margin-left: 6px;
+}
+.tomato-settings-dialog .rs-hk-row .hotkey-wrap {
+    margin-left: 0;
+}
 /* 可点击键帽（HotkeyCap 组件）：hover 变主色、监听态高亮脉冲 */
 .tomato-settings-dialog .hotkey-cap {
     cursor: pointer;
@@ -696,4 +706,58 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* ── 块配对工具 □4 视觉精修（2026-08-31，唯一事实源 docs/tomato-block-pair-visual-spec.md §3）──
+ * 纪律：旧规则值被 progressive/recite 打包副本钉死，一律新规则高特异性重声明 */
+
+/* B1 softBox 重绘：surface 子卡替代硬编码浅蓝底（旧规则 :5-11 不动，双类升权覆盖） */
+.tomato-settings-dialog .softBox.softBox {
+    padding: 8px 10px;
+    background-color: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    box-shadow: none;
+}
+/* B1 softBox 行距对齐分区 12px（原仅 details 内有，:660；全面板 softBox 同节奏） */
+.tomato-settings-dialog .settingBox .softBox > div:not(:last-child) {
+    margin-bottom: 12px;
+}
+/* B5 分区卡内多段分隔线（全面板，ConfEditor/ConfCards/ConfBlocks 同构同享）：
+ * > 直接子组合器确保不命中面板根的搜索框（.settingBox.search-bar） */
+.tomato-settings-dialog section.conf-group > .settingBox + .settingBox {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--b3-border-color);
+}
+/* B2 折叠区内容计数徽章：语言中性数字 chip，summary flex gap 天然就位 */
+.tomato-settings-dialog .setting-count {
+    flex: none;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 16px;
+    border-radius: 8px;
+    color: var(--b3-theme-on-surface-light, var(--b3-theme-on-surface));
+    background-color: var(--b3-theme-surface-lighter);
+    font-variant-numeric: tabular-nums;
+}
+/* B3 .kbd 帮助块内标题驯化：{@html} 的 h4/h5 吃 UA 默认标题边距把键帽撑成巨块——压平到 12px 档 */
+.tomato-settings-dialog .kbd h4 {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.tomato-settings-dialog .kbd h5 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.6;
+}
+/* B4 搜索高亮命中置灰行时提亮一档（配套 index.scss .tomato-highlight 重设计）：
+ * 50% 合成层把高亮信号乘法减半，:has() 命中期间提到 75%——仍暗于常态，未激活语义保留；
+ * 两选择器=命中落在行内后代（:has）与命中即行自身（searchSettings 直打行 div）；清空搜索自动回落 */
+.tomato-settings-dialog .codeNotValid:has(.tomato-highlight),
+.tomato-settings-dialog .codeNotValid.tomato-highlight {
+    opacity: 75%;
 }

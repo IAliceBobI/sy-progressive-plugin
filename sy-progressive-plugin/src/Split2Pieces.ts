@@ -137,7 +137,8 @@ import { progStorage } from "./ProgressiveStorage";
 import { createPiece } from "./helper";
 
 // 端到端编排：给定书 + point，跑完整分片流程，返回 noteID。
-// 供 window.prog_zZmqus5PtYRi.split.runSplit 调用，让 agent-browser 能逐步调试验证 bug。
+// 供 window.prog_zZmqus5PtYRi.split.runSplit 调用，让 agent-browser 能逐步调试验证 bug
+//（通道默认关闭，localStorage PROG_DEBUG=1 显式开启，门禁在 index.ts）。
 // 保守策略：只用已保存索引（loadBookIndexIfNeeded）；索引为空时抛错而非静默返回空，
 // 让外部调用方能明确区分"索引未就绪"和"createPiece 失败"。
 export async function runSplit(bookID: string, point: number, bookName?: string): Promise<string> {

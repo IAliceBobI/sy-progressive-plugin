@@ -1,14 +1,14 @@
-import { Menu, Plugin, openTab, confirm, IProtyle, Protyle } from "siyuan";
+import { Menu, Plugin, openTab, confirm, IProtyle, IEventBusMap, Protyle } from "siyuan";
 import "./index.scss";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
-import { closeTabByTitle, getActiveDocID, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { closeTabByTitle, getActiveDocID, getActiveProtyle, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import * as help from "./helper";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import * as constants from "./constants";
 import {
     BlockNodeEnum, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey,
-    PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_PARENT_ID, RefIDKey
+    PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_PARENT_ID, PROG_PIECE_PREVIOUS, RefIDKey
 } from "../../sy-tomato-plugin/src/libs/gconst";
 import AddBookSvelte from "./AddBook.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
@@ -20,8 +20,10 @@ import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progDa
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { addClickEvent, progressiveBtnFloating } from "./ProgressiveBtn";
-import { piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { getDailyCardDocID, getDailyPath } from "./FlashBox";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
+import { findPieceByCandidates } from "./contentsJump";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
 import { mount, } from "svelte";
@@ -236,16 +238,21 @@ class Progressive {
         });
     }
 
-    blockIconEvent(detail: any) {
+    blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
         if (!this.plugin) return;
         const menu = detail.menu;
-        if (ProgressiveJumpMenu.get()) {
+        // □7：块图标菜单换独立开关（右键默认关不再连带这里）。click-blockicon 的
+        // detail 无 blockId 字段（官方类型={menu,protyle,blockElements}，handoff □8-B
+        // 原记载 open-menu-blockicon 自带 blockId 系误记），从首个块元素取 id——点哪块
+        // 跳哪块，消掉「按全局选中块跳」的错位（□8-B）
+        if (blockIconMenu.get()) {
             menu.addItem({
                 iconHTML: Progressive跳到分片或回到原文.icon,
                 label: Progressive跳到分片或回到原文.langText(),
                 accelerator: Progressive跳到分片或回到原文.m,
                 click: () => {
-                    this.readThisPiece();
+                    const el = detail.blockElements?.[0];
+                    this.readThisPiece(el?.getAttribute(DATA_NODE_ID) || undefined);
                 }
             });
         }
@@ -300,6 +307,14 @@ class Progressive {
             // events.docID 只在点击编辑器内容后更新——从文档树点开文档还没点内容时
             // 取不到，先取当前激活页签的文档（用户眼前的文档）
             bookID = getActiveDocID() || events.docID;
+            // □8 P2-3 备案（评估后不改）：命令通道无浮条上下文，身份只能取激活页签/全局
+            // 态。已知漂移面：① 闪卡页签激活时预览 protyle 也在 getAllEditor 且 data-id 祖先
+            // 即闪卡页签，getActiveDocID 会取到预览文档；② getActiveDocID 空（面板全关等
+            // 怪态）时回退 events.docID，它会被块引浮窗/搜索预览劫持；③ 在块引浮窗/搜索预览
+            // 内右键时无参取激活页签文档而非右键所在文档（旧版 events.protyle=右键文档能
+            // 就近）。三者均罕见（按钮链传 $noteID 已免，见 ProgressiveFloatBtns onBtn
+            // addBook 注释），且 addProgressiveReadingDialog 弹窗标题即书名、跳片 toast
+            // 兜底，用户可见可退；不加布局依赖校验（会误伤无页签 DOM 的移动端）。
         }
         if (!bookID) {
             await siyuan.pushMsg(tomatoI18n.请先打开一个文档);
@@ -329,23 +344,50 @@ class Progressive {
     }
 
     async readThisPiece(blockID?: string) {
-        if (!blockID) blockID = events.selectedDivsSync().ids.at(0);
-        if (!blockID) return;
-        // □21 目录浮层含容器内嵌套标题（超块/列表），分片索引只收顶层块 id（getChildBlocks
-        // 平铺）；沿 parent_id 上爬到顶层祖先再匹配（顶层块 parent_id==root_id，一次即停），
-        // 片内定位也用祖先 id——分片以顶层块为单位拷贝，嵌套标题没有自己的 progref。
-        // 块菜单选嵌套块跳分片同享此修复（此前落「请选择段落块」死路）。
-        let topID = blockID;
+        if (!blockID) {
+            // □8 P2-2：命令/菜单通道无参解析加身份校验。原 selectedDivsSync() 无参回退全局
+            // events.protyle——会被块引浮窗/搜索预览劫持（setReadingPointMap 对一切带 .event 的
+            // loaded 都写），光标兜底又是全局 selection——不校验会拿别文档的块去跳片、甚至
+            // 改写别书的断点。解析器统一走 getActiveProtyle()（页签宿主匹配，浮窗/预览天然
+            // 排除——review P1-1：初版 own 快速路径只比 rootID，浮窗预览恰为同文档时会把主
+            // 编辑器的合法选择误拒成 toast）；拿不到合格块按无选中处理。移动端
+            // getActiveProtyle 恒 null（无页签 DOM），保持全局解析现状。
+            const protyle = getActiveProtyle();
+            if (protyle?.block?.rootID) {
+                const info = events.selectedDivsSync(protyle);
+                const sel0 = info?.selected?.[0];
+                // contains 二验：光标兜底取的是全局 selection 所在块（可能在别的编辑器/
+                // 浮窗），不在本文档容器内即丢弃
+                blockID = sel0 && info.element?.contains(sel0) ? info.ids.at(0) : undefined;
+            } else {
+                blockID = events.selectedDivsSync().ids?.at(0);
+            }
+        }
+        // 命令/菜单通道无块可依时给反馈（□4 review P2-1：静默 return 让按 ⇧⌥W 的用户
+        // 以为键失效；按钮链 toPiece 同款提示在前端层）
+        if (!blockID) {
+            await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
+            return;
+        }
+        // □21 旧逻辑一律上爬顶层祖先再匹配（前提=「索引只收顶层块、嵌套标题没有自己的
+        // progref」，对超块/列表容器成立）；但思源 heading 容器化书（h2 挂 h1 下的
+        // parent_id 链）getChildBlocks 平铺连嵌套 h2 一起进索引、副本有自己的 progref
+        // ——一律上爬把大纲章节匹配成卷级祖先的分片，片内目录点 h2 章「跳不过去/错跳
+        // 卷片」（2026-09-01 dev 复现）。改候选链就近匹配：先试自身命中再逐级上爬
+        // （findPieceByCandidates），两类嵌套语义都成立；块菜单选嵌套块同享。
         let rootID = "";
+        const candidates = [blockID];
+        let cur = blockID;
         for (let i = 0; i < 20; i++) {
-            const row = await siyuan.sqlOne(`select parent_id, root_id from blocks where id="${topID}"`);
+            const row = await siyuan.sqlOne(`select parent_id, root_id from blocks where id="${cur}"`);
             if (!row?.root_id) {
                 rootID = "";
                 break;
             }
             rootID = row.root_id;
             if (!row.parent_id || row.parent_id === row.root_id) break;
-            topID = row.parent_id;
+            cur = row.parent_id;
+            candidates.push(cur);
         }
         if (rootID) {
             const bookID = rootID;
@@ -361,19 +403,16 @@ class Progressive {
                 }
                 await siyuan.pushMsg(tomatoI18n.请先将此文档加入渐进学习列表);
             } else {
-                for (let i = 0; i < idx.length; i++) {
-                    for (let j = 0; j < idx[i].length; j++) {
-                        if (topID === idx[i][j]) {
-                            await progStorage.gotoBlock(bookID, i);
-                            await this.startToLearnWithLock(bookID);//创建分片
-                            // □3：1200ms 固定时延不等片真就绪（删片重建链索引追赶远超
-                            // 1.2s），改轮询 findPieceDoc 命中后再查副本跳块（不阻塞菜单回调）。
-                            // seq latest-wins（review P2-2）：重入时旧轮询晚命中不得拉走用户
-                            this.jumpToPieceBlockWhenReady(bookID, i, topID, ++this.jumpSeq)
-                                .catch(() => siyuan.pushMsg(tomatoI18n.请等待索引建立));
-                            return;
-                        }
-                    }
+                const hit = findPieceByCandidates(idx, candidates);
+                if (hit) {
+                    await progStorage.gotoBlock(bookID, hit.point);
+                    await this.startToLearnWithLock(bookID);//创建分片
+                    // □3：1200ms 固定时延不等片真就绪（删片重建链索引追赶远超
+                    // 1.2s），改轮询 findPieceDoc 命中后再查副本跳块（不阻塞菜单回调）。
+                    // seq latest-wins（review P2-2）：重入时旧轮询晚命中不得拉走用户
+                    this.jumpToPieceBlockWhenReady(bookID, hit.point, hit.id, ++this.jumpSeq)
+                        .catch(() => siyuan.pushMsg(tomatoI18n.请等待索引建立));
+                    return;
                 }
                 await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
             }
@@ -383,14 +422,15 @@ class Progressive {
     }
 
     /** □3：等片文档就绪后跳到片内对应块——轮询替代 1200ms 固定时延（片已存在的正常路径
-     * 首轮即命中零等待；删片重建时兜索引追赶，最多 ~60s 后提示重试）。seq latest-wins：
-     * 新一轮跳转发起后旧轮询静默退场（review P2-2）。 */
-    private async jumpToPieceBlockWhenReady(bookID: string, point: number, topID: string, seq: number) {
+     * 首轮即命中零等待；删片重建时兜索引追赶，最多 ~60s 后提示重试）。refID=命中索引的
+     * 候选块 id（自身或祖先——分片按索引块拷贝，副本 custom-progref 与之一致）。
+     * seq latest-wins：新一轮跳转发起后旧轮询静默退场（review P2-2）。 */
+    private async jumpToPieceBlockWhenReady(bookID: string, point: number, refID: string, seq: number) {
         let missAfterHit = 0; // 片已在但副本属性持续 miss 的轮数（review P2-3）
         for (let i = 0; i < 60; i++) {
             const pieceDocID = await help.findPieceDoc(bookID, point);
             if (pieceDocID) {
-                const pieceBlockID = await this.getPiecesByRefID(topID, pieceDocID);
+                const pieceBlockID = await this.getPiecesByRefID(refID, pieceDocID);
                 if (pieceBlockID) {
                     if (seq !== this.jumpSeq) return;
                     await OpenSyFile2(this.plugin, pieceBlockID);//跳到分片内的块
@@ -516,18 +556,27 @@ class Progressive {
             return false;
         }
         if (openPiece && this.settings.openCardsOnOpenPiece) {
-            let hpath = "";
-            let docID: string;
-            if (this.settings.cardUnderPiece) {
-                hpath = await help.getHPathByDocID(noteID, "cards");
-                docID = noteID;
-            } else {
-                hpath = await help.getHPathByDocID(bookID, "cards");
-                docID = bookID;
-            }
-            if (hpath && docID) {
-                const targetDocID = await help.getCardsDoc(docID, bookInfo.boxID, hpath);
+            if (card2dailycard.get()) {
+                // □3 制卡统一归置：新卡落当日 dailycard 文档，「开片同步开卡」跟随打开它
+                // （语义保持：边读边看新卡汇合；关掉制卡并入开关才回落旧 cards 夹）。
+                // boxID 与制卡侧同款分叉：闪卡专用笔记本优先，回落书所在笔记本
+                const boxID = flashcardNotebook.get(a => a || bookInfo.boxID);
+                const targetDocID = await getDailyCardDocID(boxID, getDailyPath());
                 OpenSyFile2(this.plugin, targetDocID, windowOpenStyle.get() as any);
+            } else {
+                let hpath = "";
+                let docID: string;
+                if (this.settings.cardUnderPiece) {
+                    hpath = await help.getHPathByDocID(noteID, "cards");
+                    docID = noteID;
+                } else {
+                    hpath = await help.getHPathByDocID(bookID, "cards");
+                    docID = bookID;
+                }
+                if (hpath && docID) {
+                    const targetDocID = await help.getCardsDoc(docID, bookInfo.boxID, hpath);
+                    OpenSyFile2(this.plugin, targetDocID, windowOpenStyle.get() as any);
+                }
             }
         }
         return true;
@@ -705,21 +754,33 @@ class Progressive {
         });
     }
 
-    /** 回原书（片态=打开原书；摘抄态传 focusBlockID 定位原文块） */
+    /** 回原书（片态=打开原书；摘抄态传 focusBlockID 定位原文块）。focusBlockID 悬空
+     *  兜底（□1 review P2-3）：片态目录大纲有 5min TTL 缓存，窗口内书被编辑删了标题，
+     *  点旧行回落整书打开，不给 openTab 喂悬空 id 静默无反应。 */
     async openOriginBook(bookID: string, focusBlockID?: string) {
-        await OpenSyFile2(this.plugin, focusBlockID || bookID);
+        let target = focusBlockID || bookID;
+        if (focusBlockID && focusBlockID !== bookID
+            && !(await siyuan.checkBlockExist(focusBlockID))) {
+            target = bookID;
+        }
+        await OpenSyFile2(this.plugin, target);
     }
 
     /**
      * 片态浮条「回原书」（2026-08-31 升级，原=仅打开原书文档）：按文档序取片内首个带
      * custom-progref 的块定位跳原文位置——⌥⇧W 回程同款块级体验且免选块；旧片无 progref
      * /SQL 落空回落打开原书文档本身。attributes 表无序，序从 blocks.sort 带出。
+     * 开启「显示上一分片最后块」时片首的 previous 副本同样带 progref（copyBlock 对 mark
+     * 块统一打标）——不排除会跳到上一片末尾而非本片开头（2026-08-31 跳转链路体检修）。
      */
     async returnToOriginFromPiece(noteID: string, bookID: string) {
         let refID = "";
         try {
             const row = await siyuan.sqlOne(
-                `select a.value as ref from blocks b join attributes a on a.block_id = b.id and a.name = '${RefIDKey}' where b.root_id = '${noteID}' order by b.sort limit 1`);
+                `select a.value as ref from blocks b join attributes a on a.block_id = b.id and a.name = '${RefIDKey}'` +
+                ` where b.root_id = '${noteID}' and b.id not in` +
+                ` (select block_id from attributes where name = '${PROG_PIECE_PREVIOUS}' and root_id = '${noteID}')` +
+                ` order by b.sort limit 1`);
             refID = (row as any)?.ref ?? "";
         } catch { /* 查询异常回落打开原书 */ }
         await this.openOriginBook(bookID, refID);

@@ -8,10 +8,13 @@
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { getProgressivePluginConfig, icon, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { events } from "../../sy-tomato-plugin/src/libs/Events";
-    import { prog } from "./Progressive";
+    import {
+        prog, Progressive上一页, Progressive下一页,
+        Progressive跳到分片或回到原文, Progressive添加当前文档到渐进阅读分片模式,
+    } from "./Progressive";
     import { HtmlCBType } from "./constants";
-    import { buildFloatButtons, buildFlatCells, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, type FloatDocKind } from "./progFloatState";
-    import { floatbarFlatCollapsed, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
+    import { buildFloatButtons, buildFlatCells, digestSubrankIds, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, type FloatDocKind } from "./progFloatState";
+    import { digSubrankOpen, floatbarFlatCollapsed, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { progPaid } from "./theme";
     import { collapseFloatBar, expandFloatBar, floatSwapBook, freeFloatOff } from "./ProgressiveBtn";
     import { digestProgressiveBox, initDi, digestWholeDoc } from "./DigestProgressiveBox";
@@ -65,8 +68,8 @@
     const useTopBar = isMobile && getProgressivePluginConfig().mobileTopBar !== false;
 
     // □10 方案 B：平铺区常驻铺开（无 [+]、无二级），moreOpen/advOpen 开合态消亡；
-    // digOpen 是 store 且 2026-08-31 起默认开常驻（展开浮条即出现，✂ 仅收起/找回；
-    // 重置点=expandFloatBar/出场 docChanged，见 ProgressiveBtn.ts）。
+    // digOpen 是持久 store（□2 起开合随 digSubrankOpen 跨分片/跨会话记忆，未存过值=开；
+    // 出场链不再强制展开，只归 ✂ 与 ⌥Z 显式命令管，见 ProgressiveBtn.ts）。
 
     // □14c 片态首行有序清单（全量 28 项任意可入，顺序即渲染序）：组件 $state 镜像 +
     // settingFactory 持久化——拖拽落子即时生效（set+write 落盘），设置面板保存 reload
@@ -83,6 +86,9 @@
         $kind == null ? [] : buildFloatButtons($kind, { reciteInstalled: prog.isReciteInstalled(), mainIds }),
     );
     const flatCells = $derived($kind == null ? [] : buildFlatCells($kind, { mainIds }));
+    // □3 子排 id 序收单一事实源（digestSubrankIds）：whole（整摘）限片+自由态，自由态
+    // 是右键退役后任意文档的整摘兜底；kind 空窗视同 digest 不渲染
+    const digIds = $derived($kind == null ? [] : digestSubrankIds($kind));
 
     // □14b 平铺区折叠态（持久化偏好）：折叠=平铺区整个不渲染（浮条回落首行高度），
     // 与摘抄子排正交（临时动作层照常弹）；首行尾 chevron 钮切换，移动端顶栏同款
@@ -160,26 +166,33 @@
     const tip3 = (name: string, usage: string, w?: string) =>
         w ? `${name}\n${usage}\n${w}` : `${name}\n${usage}`;
 
+    // □4 快捷键行（与高级组同款 .w() 通道）：钮↔命令行为链同款才挂——toPiece/origin(片态)
+    // ≡跳到分片或回到原文、prev/nextPure≡上一页/下一页（同链 gotoBlock±1 纯翻页不删）、
+    // addBook≡添加文档；next(下片删)≠下一页（删片语义不同）、continue≠开始学习（按钮=本书
+    // 断点，命令无参走滚筒优先下一本书，多书必分叉）——均不硬挂（review P1-1）。
+    // .w() 读 keymap 当前值跟随改键，aria-label 渲染期求值；刷新粒度=$show/$expanded 翻转、
+    // $kind 切换、mainIds 变化——同态翻片不重渲染，改键后旧浮条停留旧键到下次收展/切态
+    // （改键低频+恢复路径多，接受；PairBar 先例同款）。
     const TIPS: Record<string, () => string> = {
         digest: () => tip3(tomatoI18n.摘抄, tomatoI18n.tip摘抄),
         cards: () => tip3(tomatoI18n.附属卡, tomatoI18n.tip本书附属卡), // 名用无占位 getter（本书附属卡带「·到期 {N}」尾巴）
         swap: () => tip3(tomatoI18n.换书, tomatoI18n.tip换书),
         next: () => tip3(tomatoI18n.下片删, tomatoI18n.tip下片删),
-        prev: () => tip3(tomatoI18n.回看, tomatoI18n.tip回看),
+        prev: () => tip3(tomatoI18n.回看, tomatoI18n.tip回看, Progressive上一页.w()),
         // origin 主排只有片/摘抄两态在用：片态=回原书带块级定位（2026-08-31 升级），
         // 摘抄态文案（回原书·定位摘抄原文）在渲染处特判覆盖
-        origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书), // 摘抄态文案在渲染处特判
-        nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片), // 托盘动作勾上主排后主排也要有文案
+        origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书, $kind === "piece" ? Progressive跳到分片或回到原文.w() : undefined), // 摘抄态文案在渲染处特判
+        nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片, Progressive下一页.w()), // 托盘动作勾上主排后主排也要有文案
         delBack: () => tip3(tomatoI18n.上片删, tomatoI18n.tip上片删),
         quit: () => tip3(tomatoI18n.关闭分片, tomatoI18n.tip关闭分片),
-        continue: () => tip3(tomatoI18n.继续读, tomatoI18n.tip继续读),
-        toPiece: () => tip3(tomatoI18n.跳到分片, tomatoI18n.tip跳到分片), // □2 书态就地跳片
+        continue: () => tip3(tomatoI18n.继续读, tomatoI18n.tip继续读), // ⌥- 命令=滚筒全局轮转≠本书断点，不挂键
+        toPiece: () => tip3(tomatoI18n.跳到分片, tomatoI18n.tip跳到分片, Progressive跳到分片或回到原文.w()), // □2 书态就地跳片
         summary: () => tip3(tomatoI18n.摘抄汇总, tomatoI18n.tip摘抄汇总),
         archive: () => tip3(tomatoI18n.归档本书, tomatoI18n.tip归档本书),
         recite: () => tip3(tomatoI18n.送进仿写, tomatoI18n.tip送进仿写),
         // □11：tree=路线图浮层（digest 态）；addBook=📥 加书（□18 起 free/book/piece 三态常驻）
         tree: () => tip3(tomatoI18n.路线图, tomatoI18n.tip路线图),
-        addBook: () => tip3(tomatoI18n.加书, tomatoI18n.tip加书),
+        addBook: () => tip3(tomatoI18n.加书, tomatoI18n.tip加书, Progressive添加当前文档到渐进阅读分片模式.w()),
     };
     // 平铺区按钮全量 spec：前 10 项 = 池按钮落回平铺区时的渲染（图标+三行 tooltip+短标签同首行语义），
     // 后 5 项 = 片态恒低频；书态只消费 contents/ignore 两项。名与格内短标签（FLAT_LABELS）同源
@@ -188,13 +201,13 @@
         cards: () => tip3(tomatoI18n.附属卡, tomatoI18n.tip本书附属卡),
         swap: () => tip3(tomatoI18n.换书, tomatoI18n.tip换书),
         next: () => tip3(tomatoI18n.下片删, tomatoI18n.tip下片删),
-        prev: () => tip3(tomatoI18n.回看, tomatoI18n.tip回看),
-        origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书), // 平铺区只出现在片态（摘抄态平铺区仅 map）
-        addBook: () => tip3(tomatoI18n.加书, tomatoI18n.tip加书), // □18：存量 mainIds 未含时平铺区兜底
+        prev: () => tip3(tomatoI18n.回看, tomatoI18n.tip回看, Progressive上一页.w()),
+        origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书, $kind === "piece" ? Progressive跳到分片或回到原文.w() : undefined), // 平铺区只出现在片态（摘抄态平铺区仅 map）
+        addBook: () => tip3(tomatoI18n.加书, tomatoI18n.tip加书, Progressive添加当前文档到渐进阅读分片模式.w()), // □18：存量 mainIds 未含时平铺区兜底
         contents: () => tip3(tomatoI18n.打开目录, tomatoI18n.tip打开目录),
         refill: () => tip3(tomatoI18n.重插, tomatoI18n.tip重插),
         clean: () => tip3(tomatoI18n.删原文, tomatoI18n.tip删原文),
-        nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片),
+        nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片, Progressive下一页.w()),
         delBack: () => tip3(tomatoI18n.上片删, tomatoI18n.tip上片删),
         delExit: () => tip3(tomatoI18n.删片退出, tomatoI18n.tip删片退出),
         quit: () => tip3(tomatoI18n.关闭分片, tomatoI18n.tip关闭分片),
@@ -248,8 +261,9 @@
         recite: () => tomatoI18n.仿写本片,
     };
     // □11 三行制：子排名沿用单字短名，用法句补齐（card 与高级组同 id 不同义，各自 getter；
-    // multi/dialog 随三 tab Dialog 退役摘除）
-    const DIG_TIPS: Record<string, () => string> = {
+    // multi/dialog 随三 tab Dialog 退役摘除）。key 走 DigSubrankId 精确匹配（□3 review
+    // P2-1：与 digestSubrankIds 漂移=编译错，防 icon undefined 渲染期崩）
+    const DIG_TIPS: Record<DigSubrankId, () => string> = {
         inbox: () => tip3(tomatoI18n.留档, tomatoI18n.tip留档),
         think: () => tip3(tomatoI18n.思考, tomatoI18n.tip思考),
         card: () => tip3(tomatoI18n.背诵, tomatoI18n.tip背诵),
@@ -259,7 +273,7 @@
         sched: () => tip3(tomatoI18n.重访调度, tomatoI18n.tip重访调度),
         whole: () => tip3(tomatoI18n.整篇摘抄, tomatoI18n.tip整篇摘抄),
     };
-    const DIG_ICONS: Record<string, string> = {
+    const DIG_ICONS: Record<DigSubrankId, string> = {
         inbox: "iconProgInbox",
         think: "iconProgThink",
         card: "iconProgRecite",
@@ -293,17 +307,26 @@
         });
     }
 
-    /** □11 目录浮层（contents 钮改道）：书大纲标题列表，点标题跳对应分片 */
+    /** □11 目录浮层（contents 钮改道）：书大纲标题列表。□1（2026-09-01）按态分语义：
+     *  片态=跳原文标题位置（openOriginBook 定位原标题块；回程靠原文上的书态浮条
+     *  「跳到分片」）+ 高亮当前位置；书态=跳对应分片（现状不动，readThisPiece）。 */
     function openContentsPopover(ev?: MouseEvent) {
+        // 态/书/片号同一时刻快照（review P2-2：onJump 闭包不混「打开时快照+点击时活读」，
+        // 浮层开着时键盘切页签换态，旧浮层点击仍按打开时的语义走，自洽不串台）
+        const isPiece = $kind === "piece";
+        const bid = $bookID;
+        const pt = isPiece ? $point : null;
         openFloatPopover({
             title: tomatoI18n.打开目录,
             x: anchorXY(ev).x, y: anchorXY(ev).y,
             component: ContentsPopover,
             props: {
-                bookID: $bookID,
+                bookID: bid,
+                point: pt,
                 onJump: (blockID: string) => {
                     closeFloatPopover();
-                    void prog.readThisPiece(blockID);
+                    if (isPiece) void prog.openOriginBook(bid, blockID);
+                    else void prog.readThisPiece(blockID);
                 },
             },
         });
@@ -357,7 +380,7 @@
             await siyuan.pushMsg(tomatoI18n.未安装仿写提示, 2500);
             return;
         }
-        const protyle = resolveSubrankProtyle();
+        const protyle = resolveFloatDocProtyle();
         if (!protyle) {
             await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪);
             return;
@@ -438,6 +461,7 @@
         switch (id) {
             case "digest":
                 digOpen.set(!$digOpen);
+                void digSubrankOpen.write(); // □2 持久记忆：set 只写内存，write 落盘（跨分片/跨会话记住）
                 break;
             case "cards":
                 await prog.openBookCards($bookID);
@@ -477,8 +501,18 @@
                 // 预览等非编辑器宿主劫持（setReadingPointMap 对一切带 .event 的 loaded 事件
                 // 都写），光标兜底又是全局 selection——不校验会拿别文档的块去跳片、甚至
                 // 改写别书的断点。解析按 $noteID 过滤，取块后 element.contains 再验一道。
+                // □10：own 分支补「宿主是编辑器页签」过滤但不要求激活——按钮链身份源=浮条
+                // 宿主 $noteID（分屏下可挂非激活页签），与命令链 getActiveProtyle 恒取激活
+                // 页签语义不同构故不共用；块引浮窗预览恰为同文档时 own 只比 rootID 会劫持
+                // 成功，element.contains 把主编辑器的合法选择误拒成 toast。判定=element
+                // 自身带 data-id（编辑器页签的 protyle.element 即 tab.panelElement，唯一
+                // 自带者；与出场链 isEditor 同构，不 import domUtils 避循环依赖）——勿改用
+                // closest 上溯：搜索/反链/自定义页签的 protyle 是 panel 后代，closest 会把
+                // 同型劫持误放行（review P1-1）。被滤后回落 find 兜底（页签编辑器在
+                // getAllEditor editor 组恒先命中，依赖 app/src/layout/getAll.ts 组序）；移动端
+                // 无页签 DOM 恒走 find 兜底，mobile.editor 在列行为等价。
                 const own = events.protyle?.protyle;
-                const protyle = own?.block?.rootID === $noteID
+                const protyle = own?.block?.rootID === $noteID && own?.element?.getAttribute("data-id") != null
                     ? own
                     : getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle ?? null;
                 const info = events.selectedDivsSync(protyle);
@@ -667,11 +701,13 @@
     const isAdvPro = (id: string) => ADV_ITEM_MAP.get(id)?.spec.vip === true;
     const proNote = (pro: boolean) => (pro && $progPaid === false) ? `\n${tomatoI18n.Pro功能尾注}` : "";
 
-    /** 高级面板动作的 protyle 解析：events.protyle 只在点过编辑器后有值（?id= 冷启动不算）——
-     * 兜底用浮条出场文档 ID 直查编辑器。不 import docUtils（circular dep 破坏构建） */
-    function resolveAdvProtyle(): IProtyle | null {
-        return events.protyle?.protyle
-            ?? getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle
+    /** 浮条身份文档的 protyle 解析（whole/adv/仿写本片族：操作对象=浮条所示文档）：
+     *  $noteID 直查优先——出场链 300ms debounce 窗口内 events.protyle 已指向新文档而
+     *  浮条仍显示旧文档，events 优先会静默操作错对象（□3 review P1-1）。不 import
+     *  docUtils（circular dep 破坏构建） */
+    function resolveFloatDocProtyle(): IProtyle | null {
+        return getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle
+            ?? events.protyle?.protyle
             ?? null;
     }
 
@@ -681,7 +717,7 @@
             await siyuan.pushMsg(tomatoI18n.Pro功能尾注, 2500);
             return;
         }
-        const protyle = resolveAdvProtyle();
+        const protyle = resolveFloatDocProtyle();
         if (!protyle) {
             // □10 常驻化后失去旧 toggleAdv 的「解析不出编辑器不展开」守卫——格可见但点了
             // 没反应违反直觉，toast 兜底（reasoning review P2）
@@ -709,9 +745,11 @@
 
     // ============ 摘抄子排（✂ inline 展开的去向分诊，docs/prog-v5-floatbar-design.md §4） ============
 
-    /** 子排动作的 protyle 解析兜底（runDigest/runWord 共用）：events.protyle 只在点过
-     * 编辑器后有值（?id= 冷启动不算）——按浮条出场文档 ID 直查编辑器；解析不出 toast
-     * （与 runAdv 同口径，review P2：静默 return=点了没反应违反直觉） */
+    /** 子排选中类动作的 protyle 解析兜底（runDigest/runWord 共用）：语义=跟随用户当前
+     *  操作现场，events.protyle（点过编辑器才有值，?id= 冷启动不算）优先——用户刚在
+     *  别的文档选中块时摘的是现场选中块；解析不出按浮条出场文档 ID 直查兜底，再不出
+     *  toast（与 runAdv 同口径，review P2：静默 return=点了没反应违反直觉）。whole/
+     *  adv/仿写本片族走 resolveFloatDocProtyle（浮条身份），勿混用 */
     function resolveSubrankProtyle(): IProtyle | null {
         return events.protyle?.protyle
             ?? getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle
@@ -758,7 +796,7 @@
         await word.digest(false, ai); // □19：ai=true 走 AI 翻译造句（Pro 门禁在 wordsUtils 层，unpaid 引导）
     }
 
-    async function onDig(id: string, ev?: MouseEvent) {
+    async function onDig(id: DigSubrankId, ev?: MouseEvent) {
         switch (id) {
             case "inbox":
                 await runDigest();
@@ -794,10 +832,10 @@
                     await openReviewSchedMenu(ids, ev ?? { clientX: innerWidth / 2, clientY: innerHeight / 2 });
                 }
                 break;
-                case "whole": // □16 整摘：整片/整文 → digest 副本上散吧散吧（无需选中）
+                case "whole": // □16 整摘：整片/整文 → digest 副本上散吧散吧（无需选中）；
+                    // 浮条身份解析（□3 review P1-1：错位窗口内 events 优先会摘错文档）
                     {
-                        const protyle = events.protyle?.protyle
-                            ?? getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle;
+                        const protyle = resolveFloatDocProtyle();
                         if (protyle) {
                             await digestWholeDoc(protyle);
                         } else {
@@ -806,6 +844,11 @@
                         }
                     }
                     break;
+            default: {
+                // 穷尽断言（review P2 备案）：联合加新 id 漏写 case = 编译错而非点击静默
+                const _exhaustive: never = id;
+                void _exhaustive;
+            }
         }
     }
 
@@ -948,12 +991,11 @@
             {/each}
         </div>
     {/if}
-    {#if $digOpen && $kind !== "digest"}
-        <!-- 子排常驻（2026-08-31）：digOpen 默认开、展开浮条即出现，✂ 仅作收起/找回切换；
-             摘抄态没有 ✂（渲染了就无法收起）故不渲染——摘抄文档再摘抄落札记匣本就低频 -->
+    {#if $digOpen && digIds.length > 0}
+        <!-- 子排开合（□2 持久记忆）：digOpen 随 digSubrankOpen 跨分片/跨会话记住用户选择，
+             未存过值=开；摘抄态没有 ✂（渲染了就无法收起）故不渲染——摘抄文档再摘抄落札记匣本就低频 -->
         <div class="prog-fb-dig">
-            <!-- whole（整摘）限片态：书态整本复制不实用，整书场景走选中摘抄 -->
-            {#each Object.keys(DIG_ICONS).filter(id => id !== "whole" || $kind === "piece") as id (id)}
+            {#each digIds as id (id)}
                 <button
                     class="prog-fb-btn--sm prog-fbtip"
                     aria-label={DIG_TIPS[id]?.() ?? id}

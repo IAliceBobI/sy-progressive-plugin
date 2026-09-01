@@ -24,7 +24,6 @@
         pairBarEntryIconMenu,
         pairBarEntryMenu,
         pairBarEntryStatus,
-        pairBarGuideMode,
     } from "./libs/stores";
     import {
         LinkBoxbilink,
@@ -63,7 +62,7 @@
         </div>
         {#if $pairBarEnabled}
             <div>
-                {tomatoI18n.块配对浮条}（{tomatoI18n.快捷键入口}）
+                {tomatoI18n.块配对浮条}
                 <HotkeyCap hk={PairBar触发} pluginName="sy-tomato-plugin"></HotkeyCap>
             </div>
             <div class="softBox">
@@ -95,10 +94,6 @@
                 <div>
                     <input type="checkbox" class="b3-switch" bind:checked={$pairBarEntryIconMenu} />
                     {tomatoI18n.块图标菜单入口}
-                </div>
-                <div>
-                    <input type="checkbox" class="b3-switch" bind:checked={$pairBarGuideMode} />
-                    {tomatoI18n.引导模式}
                 </div>
             </div>
         {/if}
@@ -242,7 +237,7 @@
     </div>
     <!-- 高级：单功能快捷键（老 12 命令兼容层，默认收起；行序沿用原 ConfLinks 出现顺序） -->
     <details class="settingBox">
-        <summary class="section-title">{tomatoI18n.高级单功能快捷键}</summary>
+        <summary class="section-title">{tomatoI18n.高级单功能快捷键}<span class="setting-count">12</span><!-- 计数与下方键帽行同步增删 --></summary>
         <div class="softBox">
             <div>{tomatoI18n.快捷键如有冲突请调整}</div>
             <div>

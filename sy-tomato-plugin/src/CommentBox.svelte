@@ -16,7 +16,7 @@
 <script lang="ts">
     import { confirm, Protyle } from "siyuan";
     import type { IProtyle, Dock } from "siyuan";
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import { commentBox, CommentBox刷新文档正引 } from "./CommentBox";
     import {
         deleteBlock,
@@ -61,6 +61,14 @@
         shouldSkipRefresh,
         type AnnoPanelItem,
     } from "./libs/annoPanelList";
+    import {
+        destroyPanelTip,
+        hidePanelTip,
+        showPanelTip,
+    } from "./libs/panelTip";
+
+    // 面板卸载摘自建 tip 单例（dock/tab 双实例同卸也幂等无害：下次 hover 自动重建）
+    onDestroy(destroyPanelTip);
     export function destroy() {}
 
     interface Props {
@@ -116,6 +124,7 @@
 
     onMount(() => {
         updateStop();
+        // 滚动即弃 tip 防线已上提 panelTip 模块级单例（□3），组件层不再挂
         if (isDock) {
             commentBox.svelteCallback = svelteCallback;
             commentBox.svelteResize = updateStop;
@@ -136,6 +145,7 @@
     });
 
     function release() {
+        hidePanelTip(); // dock 折窄隐藏不销毁、无 mouseleave——tip 显着时悬留到用户动鼠标（P2-1 一行了结）
         if (docThrottleTimer != null) {
             clearTimeout(docThrottleTimer);
             docThrottleTimer = undefined;
@@ -169,6 +179,7 @@
     }
 
     async function _svelteCallback(protyle: IProtyle, force = false) {
+        hidePanelTip(); // 刷新=卡片/条目/chip 可能整批重建，锚被摘除不派 mouseleave——先弃 tip
         if (getAttribute(protyle.element, TOMATO_BK_IGNORE)) return;
 
         if ($commentBoxStaticOutlink) {
@@ -607,86 +618,132 @@
     style:--tomato-card-h={$commentBoxMaxProtyleHeight + "px"}
 >
     <div class="tomato-toolbar">
-        <label
-            class="tomato-toolbar__item b3-tooltips b3-tooltips__n"
-            aria-label={tomatoI18n.文档正引说明}
-        >
-            {tomatoI18n.文档}
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$commentBoxStaticOutlink}
-                onchange={() => commentBoxStaticOutlink.write()}
-            />
-        </label>
-        {#if $commentBoxStaticOutlink}
-            <button
-                class="tomato-icon-btn b3-tooltips b3-tooltips__n"
-                aria-label={tomatoI18n.刷新文档正引 +
-                    SPACE +
-                    CommentBox刷新文档正引.w()}
-                onclick={() => {
-                    _svelteCallback_doc_throttled(true);
-                }}><svg><use xlink:href="#iconRefresh"></use></svg></button
+        <span class="tomato-toolbar__group tomato-toolbar__group--mode">
+            <label
+                class="tomato-toolbar__item"
+                aria-label={tomatoI18n.文档模式说明}
+                onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                onmouseleave={hidePanelTip}
             >
-        {:else}
-            <label class="tomato-toolbar__item" aria-label={tomatoI18n.正引}>
-                {tomatoI18n.正引}
+                {tomatoI18n.文档}
                 <input
                     type="checkbox"
                     class="b3-switch"
-                    bind:checked={$commentBoxForwardRef}
-                    onchange={() => commentBoxForwardRef.write()}
+                    bind:checked={$commentBoxStaticOutlink}
+                    onchange={() => commentBoxStaticOutlink.write()}
                 />
             </label>
-            <label class="tomato-toolbar__item" aria-label={tomatoI18n.反引}>
-                {tomatoI18n.反引}
+            {#if $commentBoxStaticOutlink}
+                <button
+                    class="tomato-icon-btn"
+                    aria-label={tomatoI18n.刷新文档正引 +
+                        SPACE +
+                        CommentBox刷新文档正引.w()}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
+                    onclick={() => {
+                        _svelteCallback_doc_throttled(true);
+                    }}><svg><use xlink:href="#iconRefresh"></use></svg></button
+                >
+            {:else}
+                <label
+                    class="tomato-toolbar__item"
+                    aria-label={tomatoI18n.正引过滤说明}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
+                >
+                    {tomatoI18n.正引}
+                    <input
+                        type="checkbox"
+                        class="b3-switch"
+                        bind:checked={$commentBoxForwardRef}
+                        onchange={() => commentBoxForwardRef.write()}
+                    />
+                </label>
+                <label
+                    class="tomato-toolbar__item"
+                    aria-label={tomatoI18n.反引过滤说明}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
+                >
+                    {tomatoI18n.反引}
+                    <input
+                        type="checkbox"
+                        class="b3-switch"
+                        bind:checked={$commentBoxBackwardRef}
+                        onchange={() => commentBoxBackwardRef.write()}
+                    />
+                </label>
+                <label
+                    class="tomato-toolbar__item"
+                    aria-label={tomatoI18n.虚引过滤说明}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
+                >
+                    {tomatoI18n.虚引}
+                    <input
+                        type="checkbox"
+                        class="b3-switch"
+                        bind:checked={$commentBoxVirtualRef}
+                        onchange={() => commentBoxVirtualRef.write()}
+                    />
+                </label>
+            {/if}
+        </span>
+        <span class="tomato-toolbar__group">
+            <label
+                class="tomato-toolbar__item"
+                aria-label={tomatoI18n.批注分区说明}
+                onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                onmouseleave={hidePanelTip}
+            >
+                {tomatoI18n.批注}
                 <input
                     type="checkbox"
                     class="b3-switch"
-                    bind:checked={$commentBoxBackwardRef}
-                    onchange={() => commentBoxBackwardRef.write()}
+                    bind:checked={$commentBoxAnnotations}
+                    onchange={() => commentBoxAnnotations.write()}
                 />
             </label>
-            <label class="tomato-toolbar__item" aria-label={tomatoI18n.虚引}>
-                {tomatoI18n.虚引}
+        </span>
+        <span class="tomato-toolbar__group">
+            <label
+                class="tomato-toolbar__item"
+                aria-label={tomatoI18n.预览高度说明}
+                onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                onmouseleave={hidePanelTip}
+            >
                 <input
-                    type="checkbox"
-                    class="b3-switch"
-                    bind:checked={$commentBoxVirtualRef}
-                    onchange={() => commentBoxVirtualRef.write()}
+                    type="number"
+                    min="1"
+                    class="b3-text-field tomato-num"
+                    bind:value={$commentBoxMaxProtyleHeight}
+                    onchange={() => {
+                        // 清空时 number 输入 bind 进来的是 null，小数/0/负值/非有限数同非法
+                        //——统一回落默认，防 --tomato-card-h 拼出 "nullpx"/"0.5px" 与空值落盘
+                        //（min="1" 只钳 spinner，手输小数须在此拦）；落盘在 change（失焦/回车）
+                        // 而非 input，消除逐键 write 的乱序中间值
+                        const v = $commentBoxMaxProtyleHeight as number | null;
+                        if (typeof v !== "number" || !Number.isFinite(v) || !Number.isInteger(v) || v <= 0) {
+                            commentBoxMaxProtyleHeight.set(commentBoxMaxProtyleHeight.default());
+                        }
+                        commentBoxMaxProtyleHeight.write();
+                        onCommentBoxMaxProtyleHeightChange();
+                    }}
                 />
+                <span class="tomato-toolbar__unit">px</span>
             </label>
-        {/if}
-        <span class="tomato-toolbar__divider"></span>
-        <label class="tomato-toolbar__item">
-            {tomatoI18n.批注}
-            <input
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$commentBoxAnnotations}
-                onchange={() => commentBoxAnnotations.write()}
-            />
-        </label>
-        <span class="tomato-toolbar__divider"></span>
-        <label class="tomato-toolbar__item" aria-label={tomatoI18n.高度}>
-            <input
-                class="b3-text-field tomato-num"
-                bind:value={$commentBoxMaxProtyleHeight}
-                oninput={() => {
-                    commentBoxMaxProtyleHeight.write();
-                    onCommentBoxMaxProtyleHeightChange();
-                }}
-            />
-        </label>
+        </span>
     </div>
 
     {#if $commentBoxShowID}
         <div class="tomato-ids">
             {#if notebookId}
                 <button
-                    class="tomato-id-chip b3-tooltips b3-tooltips__n"
+                    class="tomato-id-chip"
                     aria-label={`${tomatoI18n.复制} Box id`}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
                     onclick={() => copyText(notebookId)}
                 >
                     <span class="tomato-id-chip__label">Box</span>
@@ -695,8 +752,10 @@
             {/if}
             {#if docID}
                 <button
-                    class="tomato-id-chip b3-tooltips b3-tooltips__n"
+                    class="tomato-id-chip"
                     aria-label={`${tomatoI18n.复制} Doc id`}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
                     onclick={() => copyText(docID)}
                 >
                     <span class="tomato-id-chip__label">Doc</span>
@@ -705,8 +764,10 @@
             {/if}
             {#if listID}
                 <button
-                    class="tomato-id-chip b3-tooltips b3-tooltips__n"
+                    class="tomato-id-chip"
                     aria-label={`${tomatoI18n.复制} List id`}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
                     onclick={() => copyText(listID)}
                 >
                     <span class="tomato-id-chip__label">List</span>
@@ -715,8 +776,10 @@
             {/if}
             {#if superID}
                 <button
-                    class="tomato-id-chip b3-tooltips b3-tooltips__n"
+                    class="tomato-id-chip"
                     aria-label={`${tomatoI18n.复制} Super id`}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
                     onclick={() => copyText(superID)}
                 >
                     <span class="tomato-id-chip__label">Super</span>
@@ -725,8 +788,10 @@
             {/if}
             {#if quoteID}
                 <button
-                    class="tomato-id-chip b3-tooltips b3-tooltips__n"
+                    class="tomato-id-chip"
                     aria-label={`${tomatoI18n.复制} Quote id`}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
                     onclick={() => copyText(quoteID)}
                 >
                     <span class="tomato-id-chip__label">Quote</span>
@@ -735,8 +800,10 @@
             {/if}
             {#if currentID}
                 <button
-                    class="tomato-id-chip b3-tooltips b3-tooltips__n"
+                    class="tomato-id-chip"
                     aria-label={`${tomatoI18n.复制} Block id`}
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
                     onclick={() => copyText(currentID)}
                 >
                     <span class="tomato-id-chip__label">Block</span>
@@ -753,15 +820,19 @@
                     <div class="tomato-card__head">
                         <span class="tomato-card__title">{ref.content}</span>
                         <button
-                            class="tomato-icon-btn b3-tooltips b3-tooltips__n"
+                            class="tomato-icon-btn"
                             aria-label={`${tomatoI18n.vip功能}: ${tomatoI18n.在当前文档中定位}`}
+                            onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                            onmouseleave={hidePanelTip}
                             onclick={() => vipLocate(ref)}
                         >
                             <svg><use xlink:href="#iconVIP"></use></svg>
                         </button>
                         <button
-                            class="tomato-icon-btn b3-tooltips b3-tooltips__n"
+                            class="tomato-icon-btn"
                             aria-label={tomatoI18n.定位 + SPACE + ref.content}
+                            onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                            onmouseleave={hidePanelTip}
                             onclick={() => locate(ref.def_block_root_id)}
                         >
                             <svg><use xlink:href="#iconFocus"></use></svg>
@@ -792,33 +863,41 @@
                             >{backLink.row?.content ?? tomatoI18n.定位}</span
                         >
                         <button
-                            class="tomato-icon-btn b3-tooltips b3-tooltips__n"
+                            class="tomato-icon-btn"
                             aria-label={tomatoI18n.定位 +
                                 SPACE +
-                                backLink.row?.content}
+                                (backLink.row?.content ?? tomatoI18n.定位)}
+                            onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                            onmouseleave={hidePanelTip}
                             onclick={() => locate(backLink.blockID)}
                         >
                             <svg><use xlink:href="#iconFocus"></use></svg>
                         </button>
                         <!-- svelte-ignore a11y_consider_explicit_label -->
                         <button
-                            class="tomato-icon-btn b3-tooltips b3-tooltips__n"
+                            class="tomato-icon-btn"
                             aria-label={tomatoI18n.收起卡片}
                             id={getButtonID(backLink)}
+                            onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                            onmouseleave={hidePanelTip}
                             onclick={() => toggle(backLink)}
                         ><!-- 初始即有图标：懒加载卡未进视口时 doUnFold 尚未注入（reasoning P2-5） -->{@html
                                 SVG_UP
                             }</button>
                         <button
-                            class="tomato-icon-btn tomato-tail b3-tooltips b3-tooltips__n"
+                            class="tomato-icon-btn tomato-tail"
                             aria-label={tomatoI18n.复制为引用}
+                            onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                            onmouseleave={hidePanelTip}
                             onclick={() => copyRef(backLink)}
                         >
                             <svg><use xlink:href="#iconCopy"></use></svg>
                         </button>
                         <button
-                            class="tomato-icon-btn tomato-icon-btn--danger b3-tooltips b3-tooltips__n"
+                            class="tomato-icon-btn tomato-icon-btn--danger"
                             aria-label={tomatoI18n.删除}
+                            onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                            onmouseleave={hidePanelTip}
                             onclick={() => deleteRef(backLink)}
                         >
                             <svg><use xlink:href="#iconTrashcan"></use></svg>
@@ -844,10 +923,12 @@
         <div class="tomato-anno-list">
             {#each annoItems as item (`${item.hostID}#${item.entry.id}`)}
                 <div
-                    class="tomato-anno-item b3-tooltips b3-tooltips__n"
+                    class="tomato-anno-item"
                     aria-label={tomatoI18n.定位}
                     role="button"
                     tabindex="0"
+                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                    onmouseleave={hidePanelTip}
                     onclick={() => locate(item.hostID)}
                     onkeydown={(e) => {
                         if (e.key === "Enter") locate(item.hostID);
@@ -915,11 +996,28 @@
         background: var(--b3-theme-background);  /* 不透明底，滚动时不透卡 */
         display: flex;
         flex-wrap: wrap;                         /* 200px 窄板换行不溢出 */
-        align-items: center;
-        gap: 4px 8px;            /* 行距 4 列距 8：换行不粘、同排不散 */
+        align-items: stretch;    /* P1-1 修复：三舱同排等高（各舱跟本行最高舱，舱内件仍居中）；
+                                    原 center 会露出 5~7px 顶/底边错位——三舱内容件高天然不等
+                                    （刷新钮 22/文字+switch 17/输入框 24），stretch 自适应免硬编码 */
+        gap: 6px 8px;            /* 行距 6：舱自带 1px 描边，换行两描边间 4px 视觉过近；列距 8 不变 */
         padding: 6px 8px;        /* 6 纵贴密度，8 横与面板对齐 */
         margin: -8px -8px 0;     /* 抵消面板 padding 实现通栏 */
         border-bottom: 1px solid var(--b3-border-color);  /* 官方线条档划界 */
+    }
+
+    /* ---- 分组舱（v3：divider 的替代物——分组从 1px 小竖线升级为轮廓清晰的可交互容器） ---- */
+    .tomato-toolbar__group {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;                                  /* 舱内件间：比 item 内文字-switch 的 4px 松一档 */
+        padding: 2px 6px;                          /* 舱总高 20px：switch 14 + 4 内衬 + 2 描边 */
+        border: 1px solid var(--b3-border-color);  /* 官方线条档=全面板卡片同款边，可感性有保 */
+        border-radius: 4px;                        /* 4=小件圆角基数（对齐徽章/图标钮/chip） */
+        transition: background 0.15s;
+    }
+
+    .tomato-toolbar__group:hover {
+        background: var(--b3-list-hover);          /* 热区反馈：整舱=「这组可交互」，对齐批注条目整行 hover 先例 */
     }
 
     .tomato-toolbar__item {
@@ -927,22 +1025,30 @@
         align-items: center;
         gap: 4px;              /* 文字与 switch 的最小可读缝 */
         font-size: 12px;       /* 工具栏降一档：14 基准下的密度档 */
-        color: var(--b3-theme-on-surface);
+        color: var(--b3-theme-on-background);  /* 控制条是高频交互件，正文色级（次级灰读似说明文字） */
         margin: 0;
     }
 
-    .tomato-toolbar__divider {
-        width: 1px;                  /* 1px 官方线条档 */
-        height: 14px;                /* 与 b3-switch 同高，视觉对齐 */
-        background: var(--b3-border-color);
-        margin: 0 2px;               /* 2=最小呼吸，分组靠 gap 已有 8px */
-        flex-shrink: 0;
+    /* ---- 高度单位注记（v3：给裸数字一个语境） ---- */
+    .tomato-toolbar__unit {
+        font-size: 11px;                   /* 辅文最小档（对齐徽章/时间戳） */
+        color: var(--b3-theme-on-surface); /* 注记不是控件，次级色与数字区分 */
+        opacity: 0.62;                     /* 对齐时间戳/chip label 既有透明度档 */
+        margin-left: -2px;                 /* 贴向数字：输入框自带 padding 2px 4px，-2 视觉成组 */
     }
 
     .tomato-num {
-        width: 56px;                          /* 容 4 位数 px 值的最小稳定宽 */
+        width: 48px;                          /* 12px tabular 数字 4 位有富余，给右侧 px 让位 */
         font-variant-numeric: tabular-nums;   /* 数字跳动时宽度不抖 */
         padding: 2px 4px;
+        margin: 0;
+    }
+
+    /* spinner 兜底隐藏：实测本环境 focus 态已被压制不出箭头，防跨环境（不同
+       Chromium/Electron 版本）复活后挤爆 48px 窄框——48px 容不下数字+箭头 */
+    .tomato-num::-webkit-inner-spin-button,
+    .tomato-num::-webkit-outer-spin-button {
+        -webkit-appearance: none;
         margin: 0;
     }
 
@@ -1350,4 +1456,25 @@
     .tomato-panel[data-skin="airy"] .tomato-anno-item__quote { font-size: 13px; margin-bottom: 6px; }
     .tomato-panel[data-skin="airy"] .tomato-anno-item__text { font-size: 13px; line-height: 1.7; }
     .tomato-panel[data-skin="airy"] .tomato-empty { padding: 32px 0; }
+
+    /* ============ v3 工具条分组舱 · 三皮肤适配（spec §11.3） ============ */
+    /* candy 果酱胶囊舱：「件圆化」语言先例（icon-btn/id-chip 999px）；果酱底对齐
+       anno-item hover 7% 档家族，深度红线沿 10.6「15% 底盖字」结论，6% 余量充足 */
+    .tomato-panel[data-skin="candy"] .tomato-toolbar__group {
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--tomato-anno-color) 6%, transparent);
+        border-color: color-mix(in srgb, var(--tomato-anno-color) 20%, var(--b3-border-color));
+    }
+    .tomato-panel[data-skin="candy"] .tomato-toolbar__group:hover {
+        background: color-mix(in srgb, var(--tomato-anno-color) 10%, transparent);  /* hover 提浓一档 */
+    }
+    /* paper 印刷描边舱：静置即「印刷标签」（同卡 hover 边 18% 混入式，10.4 #2）；
+       工具条已有 surface+阴影底（10.4 #3），舱不叠底色，层次交给既有明度差 */
+    .tomato-panel[data-skin="paper"] .tomato-toolbar__group {
+        border-color: color-mix(in srgb, var(--b3-theme-on-surface) 18%, var(--b3-border-color));
+    }
+    /* airy 舱内衬提档：总高 22px；壳 padding 与工具栏负边距成对契约无接触（§11.6 #4） */
+    .tomato-panel[data-skin="airy"] .tomato-toolbar__group {
+        padding: 3px 8px;
+    }
 </style>

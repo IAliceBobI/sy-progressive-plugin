@@ -6,7 +6,7 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
-import { digestmenu } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, digestmenu } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { kind, openDigestSubrank, show, toggleFreeFloat } from "./ProgressiveBtn";
@@ -38,7 +38,8 @@ class DigestProgressiveBox {
 
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
         if (!this.plugin) return;
-        if (digestmenu.get()) {
+        // □7：块图标菜单换独立开关（digestmenu 继续只管右键 open-menu-content）
+        if (blockIconMenu.get()) {
             detail.menu.addItem({
                 label: digest渐进阅读摘抄模式.langText(),
                 iconHTML: digest渐进阅读摘抄模式.icon,

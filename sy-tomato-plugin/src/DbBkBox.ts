@@ -263,7 +263,7 @@ class DbBkBox {
             click: () => {
                 this.refreshDBBK(protyle);
             },
-        });
+        }, dbBkBoxRefreshMenu.get());
         addIfVisible(menu, "m.dbBk.moveDown", {
             label: tomatoI18n.将选中的内容移到下边,
             icon: "iconDown",

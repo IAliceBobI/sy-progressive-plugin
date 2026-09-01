@@ -16,8 +16,10 @@ declare global {
             tools: any;
             pairBar?: {
                 trigger: () => Promise<void>;
-                pick: (funcID: string) => Promise<void>;
-                confirmTarget: () => Promise<void>;
+                pickFunc: (funcID: string) => Promise<void>;
+                backToFuncs: () => void;
+                confirm: () => Promise<void>;
+                clearBox: (slot: 1 | 2 | 3) => void;
                 cancel: () => void;
                 toggleCopy: () => void;
             };

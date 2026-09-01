@@ -70,6 +70,7 @@
     import { bgUploadAssetName, isValidBgUrl, opacityPercentOf, opacityToStore } from "./libs/TomatoBg";
     import { onDestroy } from "svelte";
     import { MENU_MANAGE_GROUPS, type ManagedMenuItem } from "./libs/menuItemRegistry";
+    import { menuKeyHidden, menuHiddenKeys } from "./libs/menuManager";
     import { siyuan } from "./libs/utils";
     import { tomatoClock } from "./TomatoClock";
 
@@ -117,20 +118,23 @@
     // 无开关项读写 hiddenMenuItems 隐藏集。toggle 只改内存，面板关闭由 IndexConf 统一落盘。
     let menuManageTick = $state(0);
     // checkbox 忠实反映「菜单项当前是否显示」：隐藏集优先 + 有独立开关的还要开关开
-    // （两层数据源合成一个视图）；toggle 统一走隐藏集——隐藏=加 key，显示=删 key 且确保开关开
-    // （有 store 的项在此开 = 功能区开关同步开，同一数据两个视图）
+    // + 挂 master（功能区总开关）的还要总开关开（三层合成一个视图，master 关时勾了也不出现，
+    // 故 toggle 显示分支连 master 一并打开）；toggle 统一走隐藏集——隐藏=加 key，
+    // 显示=删 key 且确保开关开（有 store 的项在此开 = 功能区开关同步开，同一数据两个视图）
     function menuItemSelected(item: ManagedMenuItem): boolean {
-        if (hiddenMenuItems.get().includes(item.key)) return false;
+        if (menuKeyHidden(item.key)) return false;
+        if (item.master && !item.master.get()) return false;
         return item.store ? item.store.get() : true;
     }
     function toggleMenuItem(item: ManagedMenuItem, ev: Event) {
         const target = ev.currentTarget as HTMLInputElement;
         const checked = target?.checked ?? !menuItemSelected(item);
         if (checked) {
-            hiddenMenuItems.set(hiddenMenuItems.get().filter((k: string) => k !== item.key));
+            hiddenMenuItems.set(menuHiddenKeys().filter((k: string) => k !== item.key));
             item.store?.set(true);
+            item.master?.set(true);
         } else {
-            const arr = [...hiddenMenuItems.get()];
+            const arr = [...menuHiddenKeys()];
             if (!arr.includes(item.key)) arr.push(item.key);
             hiddenMenuItems.set(arr);
         }

@@ -32,11 +32,11 @@ export class TomatoI18n extends TomatoI18nABC {
     }
     public get 无默认() {
         switch (this.lang) {
-            case "zh_CN": return "无默认（每次选择）";
-            case "zh_CHT": return "無默認（每次選擇）";
-            case "ja_JP": return "なし（毎回選択）";
+            case "zh_CN": return "无默认（出场先选功能）";
+            case "zh_CHT": return "無默認（出場先選功能）";
+            case "ja_JP": return "なし（起動時に機能を選択）";
             case "en_US":
-            default: return "None (pick each time)";
+            default: return "None (pick an action on open)";
         }
     }
     public get 快捷键入口() {
@@ -68,20 +68,12 @@ export class TomatoI18n extends TomatoI18nABC {
     }
     public get 块图标菜单入口() {
         switch (this.lang) {
-            case "zh_CN": return "块图标右键菜单入口";
-            case "zh_CHT": return "塊圖標右鍵選單入口";
+            // □11：块图标菜单=左键点块前小圆点唤出，非右键（2026-09-01 勘误去「右键」）
+            case "zh_CN": return "块图标菜单入口";
+            case "zh_CHT": return "塊圖標選單入口";
             case "ja_JP": return "ブロックアイコンメニュー入口";
             case "en_US":
             default: return "Block icon menu entry";
-        }
-    }
-    public get 选择功能() {
-        switch (this.lang) {
-            case "zh_CN": return "选择功能";
-            case "zh_CHT": return "選擇功能";
-            case "ja_JP": return "機能を選択";
-            case "en_US":
-            default: return "Pick an action";
         }
     }
     public get 嵌入互链() {
@@ -120,31 +112,14 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Move blocks";
         }
     }
-    public get 未锁源() {
+    // target 态键帽提示两段式（spec §2-A3）：键帽 span 嵌中间，接缝由 .pairbar-kbd margin 兜
+    public get 等目标前段() {
         switch (this.lang) {
-            case "zh_CN": return "未锁源";
-            case "zh_CHT": return "未鎖源";
-            case "ja_JP": return "ソース未ロック";
+            case "zh_CN": return "在目标块上按";
+            case "zh_CHT": return "在目標塊上按";
+            case "ja_JP": return "目標ブロックで";
             case "en_US":
-            default: return "No source locked";
-        }
-    }
-    public 已锁n块(n: number) {
-        switch (this.lang) {
-            case "zh_CN": return `已锁 ${n} 块`;
-            case "zh_CHT": return `已鎖 ${n} 塊`;
-            case "ja_JP": return `${n} 個ロック済み`;
-            case "en_US":
-            default: return `${n} locked`;
-        }
-    }
-    public 等目标提示(key: string) {
-        switch (this.lang) {
-            case "zh_CN": return `在目标块上按 ${key}，或点 ✓ 完成`;
-            case "zh_CHT": return `在目標塊上按 ${key}，或點 ✓ 完成`;
-            case "ja_JP": return `目標ブロックで ${key} を押すか ✓ で完了`;
-            case "en_US":
-            default: return `Press ${key} on the target block, or click ✓`;
+            default: return "Press";
         }
     }
     public get 目标与源相同() {
@@ -192,6 +167,15 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Source block unavailable";
         }
     }
+    public get 目标块不可用() {
+        switch (this.lang) {
+            case "zh_CN": return "目标块不可用（可能已被删除）";
+            case "zh_CHT": return "目標塊不可用（可能已被刪除）";
+            case "ja_JP": return "ターゲットブロックが利用できません";
+            case "en_US":
+            default: return "Target block unavailable";
+        }
+    }
     public get 请先打开文档() {
         switch (this.lang) {
             case "zh_CN": return "请先打开一个文档";
@@ -202,41 +186,136 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
-    // 块配对工具 □3 V2 新增键（2026-08-31）：引导模式三步文案 + 设置开关
-    public get 引导模式() {
+    // 块配对双槽浮条（二轮 □3）：槽标签/填槽提示/删槽/单源限制/目标块不可用
+    public get 槽一() {
         switch (this.lang) {
-            case "zh_CN": return "引导模式";
-            case "zh_CHT": return "引導模式";
-            case "ja_JP": return "ガイドモード";
+            case "zh_CN": return "① 源块";
+            case "zh_CHT": return "① 來源塊";
+            case "ja_JP": return "① ソース";
             case "en_US":
-            default: return "Guide mode";
+            default: return "① Source";
         }
     }
-    public get 引导步骤1() {
+    public get 槽二() {
         switch (this.lang) {
-            case "zh_CN": return "① 点击选中源块";
-            case "zh_CHT": return "① 點擊選中源塊";
-            case "ja_JP": return "① ブロックをクリックしてソースに";
+            case "zh_CN": return "② 目标块";
+            case "zh_CHT": return "② 目標塊";
+            case "ja_JP": return "② 目標";
             case "en_US":
-            default: return "① Click a block as source";
+            default: return "② Target";
         }
     }
-    public get 引导步骤2() {
+    public get 填槽提示() {
         switch (this.lang) {
-            case "zh_CN": return "② 点击选择功能";
-            case "zh_CHT": return "② 點擊選擇功能";
-            case "ja_JP": return "② 機能をクリックして選択";
+            case "zh_CN": return "点击或拖入块填入高亮槽位";
+            case "zh_CHT": return "點擊或拖入塊填入高亮槽位";
+            case "ja_JP": return "クリックまたはドラッグで強調スロットにブロックを入れる";
             case "en_US":
-            default: return "② Click an action";
+            default: return "Click or drop blocks into the highlighted slot";
         }
     }
-    public get 引导步骤3() {
+    public get 删除槽块() {
         switch (this.lang) {
-            case "zh_CN": return "③ 点击目标块完成 · 或拖上方源块到目标";
-            case "zh_CHT": return "③ 點擊目標塊完成 · 或拖上方源塊到目標";
-            case "ja_JP": return "③ 目標ブロックをクリック · 上のソースをドラッグでも可";
+            case "zh_CN": return "删除该槽块";
+            case "zh_CHT": return "刪除該槽塊";
+            case "ja_JP": return "このスロットのブロックを削除";
             case "en_US":
-            default: return "③ Click the target block · or drag the source onto it";
+            default: return "Clear this slot";
+        }
+    }
+    public 仅支持单块源(name: string) {
+        switch (this.lang) {
+            case "zh_CN": return `「${name}」仅支持单个源块`;
+            case "zh_CHT": return `「${name}」僅支援單個來源塊`;
+            case "ja_JP": return `「${name}」はソース 1 個のみ対応です`;
+            case "en_US":
+            default: return `"${name}" supports a single source block only`;
+        }
+    }
+
+    // 功能优先浮条 V4（R3 □2）：功能面板/三框标签/换功能/✓ 影响面/跨文档拦截
+    /** 面板 hint 三态（R4）：无暂存 / 真选区暂存 / 「最近用过的块」伪预填（lastSrc 标记） */
+    public 选择功能(stash?: { ids: string[]; lastSrc?: boolean } | null) {
+        const has = (stash?.ids?.length ?? 0) > 0;
+        switch (this.lang) {
+            case "zh_CN": return !has ? "选择功能" : stash?.lastSrc ? "选择功能（上次源块将自动填入）" : "选择功能（当前选区将自动填入）";
+            case "zh_CHT": return !has ? "選擇功能" : stash?.lastSrc ? "選擇功能（上次源塊將自動填入）" : "選擇功能（當前選區將自動填入）";
+            case "ja_JP": return !has ? "機能を選択" : stash?.lastSrc ? "機能を選択（前回のソースを自動挿入）" : "機能を選択（現在の選択範囲を自動挿入）";
+            case "en_US":
+            default: return !has ? "Pick an action" : stash?.lastSrc ? "Pick an action (last source will auto-fill)" : "Pick an action (selection will auto-fill)";
+        }
+    }
+    /** funcs 面板高亮上次功能的 tooltip 后缀（R4：直跳退役后 lastFunc 的残留价值） */
+    public get 上次使用() {
+        switch (this.lang) {
+            case "zh_CN": return "上次使用";
+            case "zh_CHT": return "上次使用";
+            case "ja_JP": return "前回使用";
+            case "en_US":
+            default: return "Last used";
+        }
+    }
+    public 换功能(name: string) {
+        switch (this.lang) {
+            case "zh_CN": return `更换功能（当前：${name}）`;
+            case "zh_CHT": return `更換功能（當前：${name}）`;
+            case "ja_JP": return `機能を変更（現在：${name}）`;
+            case "en_US":
+            default: return `Change action (current: ${name})`;
+        }
+    }
+    public get 起始框() {
+        switch (this.lang) {
+            case "zh_CN": return "① 起始块";
+            case "zh_CHT": return "① 起始塊";
+            case "ja_JP": return "① 開始";
+            case "en_US":
+            default: return "① Start";
+        }
+    }
+    public get 结束框() {
+        switch (this.lang) {
+            case "zh_CN": return "② 结束块";
+            case "zh_CHT": return "② 結束塊";
+            case "ja_JP": return "② 終了";
+            case "en_US":
+            default: return "② End";
+        }
+    }
+    public get 三号框() {
+        switch (this.lang) {
+            case "zh_CN": return "③ 目标块";
+            case "zh_CHT": return "③ 目標塊";
+            case "ja_JP": return "③ 目標";
+            case "en_US":
+            default: return "③ Target";
+        }
+    }
+    public get 起止须同文档() {
+        switch (this.lang) {
+            case "zh_CN": return "起始块与结束块须在同一文档";
+            case "zh_CHT": return "起始塊與結束塊須在同一文件";
+            case "ja_JP": return "開始ブロックと終了ブロックは同じドキュメント内にある必要があります";
+            case "en_US":
+            default: return "Start and end blocks must be in the same document";
+        }
+    }
+    public 移动块数(n: number | null) {
+        switch (this.lang) {
+            case "zh_CN": return n == null ? "移动" : `移动 ${n} 块`;
+            case "zh_CHT": return n == null ? "移動" : `移動 ${n} 塊`;
+            case "ja_JP": return n == null ? "移動" : `${n} 個のブロックを移動`;
+            case "en_US":
+            default: return n == null ? "Move" : `Move ${n} block${n === 1 ? "" : "s"}`;
+        }
+    }
+    public 复制块数(n: number | null) {
+        switch (this.lang) {
+            case "zh_CN": return n == null ? "复制" : `复制 ${n} 块`;
+            case "zh_CHT": return n == null ? "複製" : `複製 ${n} 塊`;
+            case "ja_JP": return n == null ? "複製" : `${n} 個のブロックを複製`;
+            case "en_US":
+            default: return n == null ? "Copy" : `Copy ${n} block${n === 1 ? "" : "s"}`;
         }
     }
 
@@ -387,15 +466,6 @@ export class TomatoI18n extends TomatoI18nABC {
             case "ja_JP": return "注釈を追加";
             case "en_US":
             default: return "Add annotation";
-        }
-    }
-    public get 输入批注() {
-        switch (this.lang) {
-            case "zh_CN": return "输入批注内容…";
-            case "zh_CHT": return "輸入批註內容…";
-            case "ja_JP": return "注釈を入力…";
-            case "en_US":
-            default: return "Write an annotation…";
         }
     }
     public get 批注内容为空() {
@@ -654,6 +724,69 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Preparing editor…";
         }
     }
+    public get 切换为纯文本编辑器() {
+        switch (this.lang) {
+            case "zh_CN": return "切换为纯文本编辑器（打开更快）";
+            case "zh_CHT": return "切換為純文本編輯器（打開更快）";
+            case "ja_JP": return "プレーンテキストエディタに切り替え（高速）";
+            case "en_US":
+            default: return "Switch to plain text editor (faster)";
+        }
+    }
+    public get 切换为富文本编辑器() {
+        switch (this.lang) {
+            case "zh_CN": return "切换为富文本编辑器";
+            case "zh_CHT": return "切換為富文本編輯器";
+            case "ja_JP": return "リッチテキストエディタに切り替え";
+            case "en_US":
+            default: return "Switch to rich text editor";
+        }
+    }
+    public get 批注占位() {
+        switch (this.lang) {
+            case "zh_CN": return "输入批注内容…";
+            case "zh_CHT": return "輸入批註內容…";
+            case "ja_JP": return "注釈を入力…";
+            case "en_US":
+            default: return "Type annotation…";
+        }
+    }
+    public get 富文本() {
+        switch (this.lang) {
+            case "zh_CN": return "富文本";
+            case "zh_CHT": return "富文本";
+            case "ja_JP": return "リッチテキスト";
+            case "en_US":
+            default: return "Rich text";
+        }
+    }
+    public get 纯文本() {
+        switch (this.lang) {
+            case "zh_CN": return "纯文本";
+            case "zh_CHT": return "純文本";
+            case "ja_JP": return "プレーンテキスト";
+            case "en_US":
+            default: return "Plain text";
+        }
+    }
+    public get 增大字号() {
+        switch (this.lang) {
+            case "zh_CN": return "增大字号（12~22）";
+            case "zh_CHT": return "增大字號（12~22）";
+            case "ja_JP": return "フォントサイズを大きく（12~22）";
+            case "en_US":
+            default: return "Increase font size (12-22)";
+        }
+    }
+    public get 减小字号() {
+        switch (this.lang) {
+            case "zh_CN": return "减小字号（12~22）";
+            case "zh_CHT": return "減小字號（12~22）";
+            case "ja_JP": return "フォントサイズを小さく（12~22）";
+            case "en_US":
+            default: return "Decrease font size (12-22)";
+        }
+    }
     public get 批注已被删除() {
         switch (this.lang) {
             case "zh_CN": return "这条批注已被删除（可能在其他设备）";
@@ -664,21 +797,22 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
-    // 渐进设置页卡片化（2026-08-24）新增的分区标题键
-    public get 右键菜单() {
+    // 渐进设置页卡片化（2026-08-24）新增的分区标题键。□11（2026-09-01）：区内除右键
+    // 三项外还有块图标菜单与移动端菜单开关，标题宽化为「菜单入口」（各条目自说明入口类型）
+    public get 菜单入口() {
         switch (this.lang) {
-            case "zh_CN": return "右键菜单";
-            case "es_ES": return "Menú contextual";
-            case "fr_FR": return "Menu contextuel";
-            case "ja_JP": return "右クリックメニュー";
-            case "zh_CHT": return "右鍵選單";
-            case "it_IT": return "Menu contestuale";
-            case "de_DE": return "Kontextmenü";
-            case "he_IL": return "תפריט הקשר";
-            case "ru_RU": return "Контекстное меню";
-            case "pl_PL": return "Menu kontekstowe";
-            case "en_US": return "Context menu";
-            default: return "Context menu";
+            case "zh_CN": return "菜单入口";
+            case "es_ES": return "Entradas de menú";
+            case "fr_FR": return "Entrées de menu";
+            case "ja_JP": return "メニュー入口";
+            case "zh_CHT": return "選單入口";
+            case "it_IT": return "Voci di menu";
+            case "de_DE": return "Menüeinträge";
+            case "he_IL": return "כניסות תפריט";
+            case "ru_RU": return "Элементы меню";
+            case "pl_PL": return "Elementy menu";
+            case "en_US": return "Menu entries";
+            default: return "Menu entries";
         }
     }
 
@@ -3631,17 +3765,6 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Unlimited";
         }
     }
-    public get 推荐() {
-        switch (this.lang) {
-            case "zh_CN": return "推荐";
-            case "zh_CHT": return "推薦";
-            case "es_ES": return "Recomendado";
-            case "fr_FR": return "Recommandé";
-            case "ja_JP": return "おすすめ";
-            case "en_US":
-            default: return "Recommended";
-        }
-    }
     public get 粗体() {
         switch (this.lang) {
             case "zh_CN": return "粗体";
@@ -4115,6 +4238,20 @@ export class TomatoI18n extends TomatoI18nABC {
     }
 
     // ===== □22 重插翻新（2026-08-30）：清空+可选断句，菜单/确认文案 =====
+    /** □1 重插失真（2026-09-01）：no 档升首位且标签从「不断句」换「原样插回」——用户心智
+     * 「重插=清空+抹痕迹+按原文原样插回」，断句三档在前易被当成默认档点中，产物结构重写 */
+    public get 原样插回() {
+        switch (this.lang) {
+            case "zh_CN": return "原样插回";
+            case "zh_CHT": return "原樣插回";
+            case "es_ES": return "Restaurar tal cual";
+            case "fr_FR": return "Restaurer tel quel";
+            case "ja_JP": return "原文のまま再挿入";
+            case "en_US":
+            default: return "Restore as-is";
+        }
+    }
+
     public get 按书的断句设置() {
         switch (this.lang) {
             case "zh_CN": return "按书的断句设置";
@@ -4210,10 +4347,10 @@ export class TomatoI18n extends TomatoI18nABC {
 
     public get tip制日卡() {
         switch (this.lang) {
-            case "zh_CN": return "选中/光标块制卡，存入 Daily Card 文件夹";
-            case "zh_CHT": return "選中/游標塊製卡，存入 Daily Card 資料夾";
+            case "zh_CN": return "选中/光标块制卡，并入当天 dailycard 文档";
+            case "zh_CHT": return "選中/游標塊製卡，併入當天 dailycard 文檔";
             case "en_US":
-            default: return "Card selected/cursor blocks and file them in the Daily Card folder";
+            default: return "Card selected/cursor blocks and merge them into today's dailycard document";
         }
     }
 
@@ -4222,7 +4359,7 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CN": return "同制日卡，但卡面不带原文引用";
             case "zh_CHT": return "同製日卡，但卡面不帶原文引用";
             case "en_US":
-            default: return "Like Daily card, but the card omits the source reference";
+            default: return "Like 制日卡 (daily card), but the card omits the source reference";
         }
     }
 
@@ -4774,10 +4911,19 @@ export class TomatoI18n extends TomatoI18nABC {
     // ---- □18 加书常驻各态浮条：AddBook 知情警告（reasoning review P1）+ 路线指引清单同步（P2）----
     public get 加书警告已注册() {
         switch (this.lang) {
-            case "zh_CN": return "⚠ 本书已在渐进阅读中：确认将重置阅读进度，并按本次设置重新分片（重新分片请留意原分片内容）";
-            case "zh_CHT": return "⚠ 本書已在漸進閱讀中：確認將重置閱讀進度，並按本次設定重新分片（重新分片請留意原分片內容）";
+            case "zh_CN": return "⚠ 本书已在渐进阅读中：确认将重置阅读进度，删除现有全部分片并按本次设置重新分片（片内如有手写内容请先转移）";
+            case "zh_CHT": return "⚠ 本書已在漸進閱讀中：確認將重置閱讀進度，刪除現有全部分片並按本次設定重新分片（片內如有手寫內容請先轉移）";
             case "en_US":
-            default: return "⚠ Already in progressive reading: confirming will reset reading progress and re-split pieces with current settings";
+            default: return "⚠ Already in progressive reading: confirming will reset progress, delete all existing pieces and re-split with current settings (move handwritten notes in pieces first)";
+        }
+    }
+    /** 重划分清旧片期间的反馈（2026-08-31 重划分删旧片，review P2-1） */
+    public get 正在重建分片() {
+        switch (this.lang) {
+            case "zh_CN": return "正在清理旧分片并重建…";
+            case "zh_CHT": return "正在清理舊分片並重建…";
+            case "en_US":
+            default: return "Cleaning old pieces and re-splitting…";
         }
     }
     public get 加书警告已分片() {
@@ -5487,6 +5633,14 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Digest docs go into today's dailycard folder under the daily note; by default they go to the book's digest folder in prog-data";
         }
     }
+    public get tip设置制卡daily() {
+        switch (this.lang) {
+            case "zh_CN": return "默认制卡（⌥E/浮条制卡钮）并入当天 dailycard 文档集中放；关闭后回落 cards 夹（此时「分片内制卡」开关决定书下还是片下）";
+            case "zh_CHT": return "默認製卡（⌥E/浮條製卡鈕）併入當天 dailycard 文檔集中放；關閉後回落 cards 夾（此時「分片內製卡」開關決定書下還是片下）";
+            case "en_US":
+            default: return "Cards made by the default Make-Card entry (⌥E / floatbar button) go into today's dailycard document; turn off to fall back to the cards folder (where the under-piece switch then decides book vs piece)";
+        }
+    }
     public get tip设置摘抄背景() {
         switch (this.lang) {
             case "zh_CN": return "原书里已摘抄过的块显示背景色作痕迹，只改显示不写正文";
@@ -5521,18 +5675,18 @@ export class TomatoI18n extends TomatoI18nABC {
     }
     public get tip设置同步开卡() {
         switch (this.lang) {
-            case "zh_CN": return "附属卡=汇集本书全部卡片的文档；开启后打开分片时同步打开它";
-            case "zh_CHT": return "附屬卡=匯集本書全部卡片的文檔；開啟後打開分片時同步打開它";
+            case "zh_CN": return "附属卡=汇集本书全部卡片的文档；开启后打开分片时同步打开它——「制卡并入 dailycard」开启时改为打开当天 dailycard 文档（新卡的汇合处）";
+            case "zh_CHT": return "附屬卡=匯集本書全部卡片的文檔；開啟後打開分片時同步打開它——「製卡併入 dailycard」開啟時改為打開當天 dailycard 文檔（新卡的匯合處）";
             case "en_US":
-            default: return "\"Attached cards\" is the doc collecting all cards of the book; turn on to open it together with the piece";
+            default: return "\"Attached cards\" is the doc collecting all cards of the book; turn on to open it together with the piece — when merging into dailycard is on, today's dailycard doc opens instead (where new cards land)";
         }
     }
     public get tip设置卡位置() {
         switch (this.lang) {
-            case "zh_CN": return "开启后分片内制的卡收进分片的子文档；关闭则收进本书附属卡文档";
-            case "zh_CHT": return "開啟後分片內製的卡收進分片的子文檔；關閉則收進本書附屬卡文檔";
+            case "zh_CN": return "开启后分片内制的卡收进分片的子文档；关闭则收进本书附属卡文档（仅在关闭「制卡并入 dailycard 当天文档」时生效）";
+            case "zh_CHT": return "開啟後分片內製的卡收進分片的子文檔；關閉則收進本書附屬卡文檔（僅在關閉「製卡併入 dailycard 當天文檔」時生效）";
             case "en_US":
-            default: return "Cards made inside a piece go to a child doc of the piece; turn off to send them to the book's attached-cards doc";
+            default: return "Cards made inside a piece go to a child doc of the piece; turn off to send them to the book's attached-cards doc (only takes effect when merging cards into the dailycard doc is off)";
         }
     }
     public get tip设置复习隐藏() {
@@ -5920,6 +6074,41 @@ export class TomatoI18n extends TomatoI18nABC {
             case "ja_JP": return "中断しました";
             case "en_US":
             default: return "Aborted";
+        }
+    }
+
+    // ===== □6 加书 chips 全选/清空轻量钮（2026-09-01）：默认全勾后收窄到单级的反向操作成本。
+    // 清空=取消勾选（非清空内容），非拉丁语系按「取消选择」口径译防歧义 =====
+    public get 全选() {
+        switch (this.lang) {
+            case "zh_CN": return "全选";
+            case "zh_CHT": return "全選";
+            case "es_ES": return "Seleccionar todo";
+            case "fr_FR": return "Tout sélectionner";
+            case "ja_JP": return "すべて選択";
+            case "it_IT": return "Seleziona tutto";
+            case "de_DE": return "Alle auswählen";
+            case "he_IL": return "בחר הכול";
+            case "ru_RU": return "Выбрать всё";
+            case "pl_PL": return "Zaznacz wszystko";
+            case "en_US":
+            default: return "Select all";
+        }
+    }
+    public get 清空() {
+        switch (this.lang) {
+            case "zh_CN": return "清空";
+            case "zh_CHT": return "清空";
+            case "es_ES": return "Deseleccionar";
+            case "fr_FR": return "Désélectionner";
+            case "ja_JP": return "選択解除";
+            case "it_IT": return "Deseleziona";
+            case "de_DE": return "Auswahl aufheben";
+            case "he_IL": return "בטל בחירה";
+            case "ru_RU": return "Снять выделение";
+            case "pl_PL": return "Wyczyść wybór";
+            case "en_US":
+            default: return "Clear";
         }
     }
 }

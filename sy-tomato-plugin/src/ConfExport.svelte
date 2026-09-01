@@ -34,9 +34,18 @@
     import { SuperRefBox全局修复引用, SuperRefBox全局加固引用 } from "./SuperRefBox";
     import { tomatoI18n } from "./tomatoI18n";
     import HotkeyCap from "./HotkeyCap.svelte";
+    import { onDestroy } from "svelte";
+    import { destroyPanelTip, hidePanelTip, showPanelTip } from "./libs/panelTip";
 
     let { codeValid }: { codeValid: boolean } = $props();
     let codeNotValid = $derived(!codeValid);
+
+    // □3 迁 panelTip：设置弹窗 b3-dialog__body 同为 ov:auto 滚动容器，b3-tooltips__n 纯 CSS
+    // 气泡贴顶/贴缘即裁；滚动即弃防线已上提 panelTip 模块级单例（勿在组件层再挂）。
+    // 注意收尾现状：Svelte 5 mount() 返回 exports，d.destroy() 是 IndexConf export 的空函数，
+    // 本组件 onDestroy 实际不触发——tip 摘除由 openSettings 的 dm.add("tip") 兜底；此处
+    // onDestroy 留作 unmount 链修复后的自动生效位（同款死代码先例=CommentBox export destroy）
+    onDestroy(destroyPanelTip);
 </script>
 
     <!-- 导出工作空间（2026-08 翻新 spec：docs/tomato-export-settings-revamp.md）。
@@ -74,11 +83,14 @@
                             <div class="tomato-list-item">
                                 <button
                                     type="button"
-                                    class="b3-button b3-button--text tomato-item-del b3-tooltips b3-tooltips__n"
+                                    class="b3-button b3-button--text tomato-item-del"
                                     aria-label={tomatoI18n.从名单中移除}
+                                    onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                                    onmouseleave={hidePanelTip}
                                     onclick={() => {
                                         $exportWhiteList.splice(index, 1);
                                         $exportWhiteList = $exportWhiteList;
+                                        hidePanelTip(); // 摘行无 mouseleave，锚没了 tip 会悬空
                                     }}
                                 >
                                     {@html icon("Trashcan", 14)}
@@ -112,11 +124,14 @@
                         <div class="tomato-list-item">
                             <button
                                 type="button"
-                                class="b3-button b3-button--text tomato-item-del b3-tooltips b3-tooltips__n"
+                                class="b3-button b3-button--text tomato-item-del"
                                 aria-label={tomatoI18n.从名单中移除}
+                                onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                                onmouseleave={hidePanelTip}
                                 onclick={() => {
                                     $exportBlackList.splice(index, 1);
                                     $exportBlackList = $exportBlackList;
+                                    hidePanelTip(); // 摘行无 mouseleave，锚没了 tip 会悬空
                                 }}
                             >
                                 {@html icon("Trashcan", 14)}
@@ -179,8 +194,10 @@
                 <TomatoVIP {codeValid}></TomatoVIP>
                 {#if $exportIntervalSecOn}
                     <input
-                        class="b3-text-field tomato-timer-input b3-tooltips b3-tooltips__n"
+                        class="b3-text-field tomato-timer-input"
                         aria-label={tomatoI18n.可以填写小数}
+                        onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                        onmouseleave={hidePanelTip}
                         bind:value={$exportIntervalSec}
                     />
                     <span class="tomato-row-label">{tomatoI18n.增量导出间隔秒}</span>
@@ -195,8 +212,10 @@
                 <TomatoVIP {codeValid}></TomatoVIP>
                 {#if $exportCleanFilesOn}
                     <input
-                        class="b3-text-field tomato-timer-input b3-tooltips b3-tooltips__n"
+                        class="b3-text-field tomato-timer-input"
                         aria-label={tomatoI18n.可以填写小数}
+                        onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                        onmouseleave={hidePanelTip}
                         bind:value={$exportCleanFiles}
                     />
                     <span class="tomato-row-label">{tomatoI18n.确保导出间隔分钟}</span>

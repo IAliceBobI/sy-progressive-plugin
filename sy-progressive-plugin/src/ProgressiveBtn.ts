@@ -8,7 +8,7 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
-import { hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { digSubrankOpen, hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
 import { FloatDocKind, detectFloatDoc } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
@@ -30,8 +30,8 @@ let noteID = writableWithGet("")
 let bookID = writableWithGet("")
 let zIndexPlus = writableWithGet(false)
 let dueText = writableWithGet("")        // 附属卡到期胶囊文案（空=不渲染，formatDueCount 产出）
-let digOpen = writableWithGet(true)     // 摘抄子排：2026-08-31 起默认展开常驻——展开浮条即出现，
-                                        // ✂ 仅作收起/找回切换（⇧⌥Z 改道入口也驱动它）
+const digOpen = digSubrankOpen          // □2 摘抄子排开合：持久记忆（digSubrankOpen，收起跨分片/
+                                         // 跨会话记住）；开合只归 ✂ 管与显式命令（⌥Z 改道），出场链不再强制展开
 let userCollapsed = false;               // session 级：用户点 ✕ 后本会话片态也收起成球
 
 export function progFloatStores() {
@@ -41,24 +41,27 @@ export function progFloatStores() {
 // DigestProgressiveBox ⌥z 改道需要读出场态（show+kind=当前文档在三态内）
 export { show, kind };
 
-/** 展开浮条（球点击 / 命令通道）；userCollapsed 随之清掉，摘抄子排随展开重新出现 */
+/** 展开浮条（球点击 / 命令通道）；userCollapsed 随之清掉。子排不联动——□2 起开合持久
+ *  记忆只归 ✂ 与显式命令管，点球展开浮条尊重用户上次的子排状态 */
 export function expandFloatBar() {
     userCollapsed = false;
     expanded.set(true);
-    digOpen.set(true);
 }
 
 /** 收起为球（浮条 ✕）；记住用户偏好，本会话片态出场不再强展开。
- *  digOpen 不清——子排开合只归 ✂ 管，下次 expandFloatBar 会重新置开 */
+ *  digOpen 不清——子排开合只归 ✂ 管，且随 digSubrankOpen 持久记忆 */
 export function collapseFloatBar() {
     userCollapsed = true;
     expanded.set(false);
 }
 
-/** 展开浮条并打开摘抄子排（⌥z 摘抄模式命令在三态文档内的改道出口） */
+/** 展开浮条并打开摘抄子排（⌥z 摘抄模式命令在三态文档内的改道出口）。
+ *  write 与 ✂ 对称（review P1-1）：显式展开也是「对子排的一次意志」，落盘防被
+ *  settingCfg 搭车写反转——set 只写内存，任何整文件 saveData 都会带走它 */
 export function openDigestSubrank() {
     expandFloatBar();
     digOpen.set(true);
+    void digSubrankOpen.write();
 }
 
 // □11 自由态（第四态）：会话级上岗/下班——上岗后本会话所有普通文档浮条都到场，
@@ -90,7 +93,10 @@ export async function toggleFreeFloat(withSubrank = false) {
     }
     if (protyle) {
         await progressiveBtnFloating(protyle);
-        if (withSubrank && kind.get() === "free") digOpen.set(true);
+        if (withSubrank && kind.get() === "free") {
+            digOpen.set(true);
+            void digSubrankOpen.write(); // 同 openDigestSubrank：显式意志落盘（review P1-1）
+        }
     }
 }
 
@@ -221,7 +227,8 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     point.set(nextPoint);
     bookID.set(nextBookID);
     if (docChanged) {
-        digOpen.set(true); // 子排常驻：每次出场/换文档重新展开（✂ 收起仅同文档会话有效）
+        // □2（2026-09-01）：digOpen 不再强制置开——子排开合随 digSubrankOpen 持久记忆，
+        // 用户收起后切分片/换文档保持收起（原「每次出场重新展开」拍板随用户反馈推翻）
         // 片态直接展开（尊重 userCollapsed）；free 态出场直接展开不收球（□11）
         expanded.set((nextKind === "piece" && !userCollapsed) || nextKind === "free");
         if (nextBookID) refreshDue(nextBookID);

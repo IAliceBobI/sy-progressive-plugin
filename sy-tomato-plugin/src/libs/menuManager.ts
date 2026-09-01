@@ -6,8 +6,14 @@
 // 透传其判定结果——总开关关或 key 在隐藏集，任一命中即不显示；快捷键/命令零改动。
 import { hiddenMenuItems } from "./stores";
 
+/** 隐藏集读取统一出口：非数组脏值（手改 petal JSON 等）收敛为空，写路径经此取值即自愈 */
+export function menuHiddenKeys(): string[] {
+    const v = hiddenMenuItems.get();
+    return Array.isArray(v) ? v : [];
+}
+
 export function menuKeyHidden(key: string): boolean {
-    return hiddenMenuItems.get().includes(key);
+    return menuHiddenKeys().includes(key);
 }
 
 /**
