@@ -772,6 +772,41 @@ export abstract class TomatoI18nABC10 extends TomatoI18nABC11 {
         }
     }
 
+    // 2026-09-02 用户反馈落地：「留档（纯摘抄）」与「背诵（摘抄并制卡）」分别独立命令/快捷键
+    public get 执行摘抄留档() {
+        switch (this.lang) {
+            case "zh_CN": return "执行摘抄(留档)";
+            case "es_ES": return "Ejecutar resaltado (archivo)";
+            case "fr_FR": return "Exécuter l'extrait (archivage)";
+            case "ja_JP": return "抜粋を実行（保存）";
+            case "zh_CHT": return "執行摘抄（留檔）";
+            case "it_IT": return "Esegui estratto (archivio)";
+            case "de_DE": return "Auszug ausführen (Archiv)";
+            case "he_IL": return "בצע ציטוט (ארכיון)";
+            case "ru_RU": return "Выполнить выдержку (архив)";
+            case "pl_PL": return "Wykonaj cytowanie (archiwum)";
+            case "en_US":
+            default: return "Execute highlight (archive)";
+        }
+    }
+
+    public get 执行摘抄背诵() {
+        switch (this.lang) {
+            case "zh_CN": return "执行摘抄(背诵)";
+            case "es_ES": return "Ejecutar resaltado (memorizar)";
+            case "fr_FR": return "Exécuter l'extrait (mémorisation)";
+            case "ja_JP": return "抜粋を実行（暗記）";
+            case "zh_CHT": return "執行摘抄（背誦）";
+            case "it_IT": return "Esegui estratto (memorizzazione)";
+            case "de_DE": return "Auszug ausführen (Auswendiglernen)";
+            case "he_IL": return "בצע ציטוט (שינון)";
+            case "ru_RU": return "Выполнить выдержку (заучивание)";
+            case "pl_PL": return "Wykonaj cytowanie (zapamiętywanie)";
+            case "en_US":
+            default: return "Execute highlight (recite)";
+        }
+    }
+
     public get 执行摘抄并断句() {
         switch (this.lang) {
             case "zh_CN": return "执行摘抄并断句";

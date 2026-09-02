@@ -13,6 +13,7 @@
         Progressive跳到分片或回到原文, Progressive添加当前文档到渐进阅读分片模式,
     } from "./Progressive";
     import { HtmlCBType } from "./constants";
+    import { CARD_RECITE } from "./digestCardMode";
     import { buildFloatButtons, buildFlatCells, digestSubrankIds, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, type FloatDocKind } from "./progFloatState";
     import { digSubrankOpen, floatbarFlatCollapsed, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { progPaid } from "./theme";
@@ -805,7 +806,7 @@
                 await runDigest(false, true);
                 break;
             case "card":
-                await runDigest(false, false, "2"); // 每个摘抄都加入闪卡（cardMode 档位）
+                await runDigest(false, false, CARD_RECITE); // 每个摘抄都加入闪卡（cardMode 档位，与「执行摘抄(背诵)」命令同源）
                 break;
             case "word":
                 await runWord();

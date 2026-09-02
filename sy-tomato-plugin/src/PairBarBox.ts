@@ -29,6 +29,7 @@ import {
     pairFillBox,
     pairFirstEmpty,
     pairPickFunc,
+    pairRangeSyncWanted,
     pairSetMode,
     pairTrigger,
     resolveRangeIDs,
@@ -66,9 +67,26 @@ import {
     LinkBox修复双向链接,
     LinkBox删除双向链接,
     LinkBox链接到块底部,
+    LinkBox双向互链选择块,
+    LinkBox双向互链创建往返链,
+    LinkBox嵌入互链选择,
+    LinkBox嵌入互链创建,
+    LinkBox关联两个块选择,
+    LinkBox关联两个块创建,
+    LinkBox互相插入引用于下方选择,
+    LinkBox互相插入引用于下方创建,
+    LinkBox查看所有同步位置,
+    LinkBox同步块选择,
+    LinkBox同步块创建,
     linkBox,
 } from "./LinkBox";
-import { LongContentOpsLock } from "./CpBox";
+import {
+    CpBox批量删除大量连续内容块,
+    CpBox批量移动大量连续内容块,
+    CpBox批量复制大量连续内容块,
+    LongContentOpsLock,
+} from "./CpBox";
+import { getPairCmd } from "./libs/pairCmdRegistry";
 import PairBar from "./PairBar.svelte";
 
 // 默认键位 ⌥⇧V：四插件 winHotkey 全量 + 官方 keymap 排除后 alt+shift 系唯一空位
@@ -287,8 +305,10 @@ class PairBarBox {
             return;
         }
         this.state.set(r.state);
-        // 填的是结束框（三框）→ 起止齐了，解析区间并提示跨文档
-        if (k === 2 && pairBoxCount(cur.func) === 3) void this.syncRangeCount(true);
+        // 填的是起/止框且起止齐 → 解析区间并提示跨文档。□1 顺序洞：只认槽 2 会令
+        // 「先结束框后起始框」的填法 rangeCount 恒 null（✓ 三档恒灰）；填目标框不触发
+        //（起止未变，防重复跨文档提示）
+        if (k !== 3 && pairRangeSyncWanted(r.state)) void this.syncRangeCount(true);
     }
 
     /** 点编辑器块回填进焦点框（两框源框多块整组入；焦点框有内容=直接覆盖） */
@@ -304,7 +324,8 @@ class PairBarBox {
             return;
         }
         this.state.set(r.state);
-        if (slot === 2 && pairBoxCount(cur.func) === 3) void this.syncRangeCount(true);
+        // □1 顺序洞：填起/止任一框且起止齐即解析（槽 1 后填同样触发）；目标框不触发防重复跨文档提示
+        if (slot !== 3 && pairRangeSyncWanted(r.state)) void this.syncRangeCount(true);
     }
 
     /** 框位 dragover：认领思源 gutter 块拖拽才放行（AV 族变体键解析不出块 id 不认领，
@@ -336,7 +357,8 @@ class PairBarBox {
             return;
         }
         this.state.set(r.state);
-        if (slot === 2 && pairBoxCount(cur.func) === 3) void this.syncRangeCount(true);
+        // □1 顺序洞：填起/止任一框且起止齐即解析（多块整组进框①=首末同时进起止，原 slot===2 判据漏此路径）
+        if (slot !== 3 && pairRangeSyncWanted(r.state)) void this.syncRangeCount(true);
     }
 
     /** chip ✕ 删框：清该框焦点落回（PairBar 组件回调） */
@@ -421,16 +443,21 @@ class PairBarBox {
     }
 
     /** 三框起止齐后回填区间预览数（✓ 影响面文本「移动 N 块」）；解析失败置 null。
-     *  warnCrossDoc：由「填结束框」的动作调用时提示起止不同文档（其余路径静默） */
+     *  warnCrossDoc：由填起/止框的动作调用时提示起止不同文档（其余路径静默） */
     private async syncRangeCount(warnCrossDoc = false): Promise<void> {
         const cur = get(this.state);
-        if (cur.phase !== "slots" || cur.func !== "transport" || !cur.srcIDs[0] || !cur.endID) {
+        if (!pairRangeSyncWanted(cur)) {
             if (cur.rangeCount !== null) this.state.update(s => ({ ...s, rangeCount: null }));
             return;
         }
         const range = await this.resolveRange(cur.srcIDs[0], cur.endID);
         const n = range ? range.length : null;
-        this.state.update(s => (s.rangeCount === n ? s : { ...s, rangeCount: n }));
+        // await 窗口内起/止框被改（清框重填/覆盖）时旧解析结果不得写回（慢 sync 后落
+        // 会压掉新对的预览数，旧 null 落最后=✓ 卡灰——同款症状的窄产道，评审 P1；
+        // syncEndSummary 同款「对身份」守卫先例）
+        this.state.update(s => (s.srcIDs[0] === cur.srcIDs[0] && s.endID === cur.endID
+            ? (s.rangeCount === n ? s : { ...s, rangeCount: n })
+            : s));
         if (!range && warnCrossDoc) await siyuan.pushMsg(tomatoI18n.起止须同文档);
     }
 
@@ -440,6 +467,7 @@ class PairBarBox {
      *  independent 第三参防单例被同次 click 冒泡清空；open 包 setTimeout 防边缘。 */
     more(anchor: HTMLElement) {
         const menu = new (Menu as any)("tomatoPairBarMore", undefined, true) as Menu;
+        menu.addItem(this.quickRefItem());
         menu.addItem({
             label: LinkBox链接到块底部.langText(),
             accelerator: LinkBox链接到块底部.m,
@@ -462,6 +490,57 @@ class PairBarBox {
         });
         const rect = anchor.getBoundingClientRect();
         setTimeout(() => menu.open({ x: rect.left, y: rect.bottom + 4 }), 0);
+    }
+
+    /** 快捷键速查子菜单（R5 □3）：四组=浮条触发+互链族 8+同步块 3+长内容 3，项可点执行。
+     *  键位 .w() 现读 keymap（每次点 ⋯ 现构造菜单=永远新鲜，沿状态栏 tooltip 先例）；
+     *  点击查 langKey→callback 注册表直调（登记点=LinkBox/CpBox addCommand，总开关关
+     *  =表空=落空，正确语义）；VIP 门禁（嵌入互链）在命令 callback 内部自验不变。
+     *  组名用 disabled 菜单项（灰显不可点=纯标题语义）。 */
+    private quickRefItem(): any {
+        type Hk = { langKey: string; langText(): string; w(): string };
+        const groups: Array<[string, Hk[]]> = [
+            [tomatoI18n.互链族, [
+                LinkBox双向互链选择块, LinkBox双向互链创建往返链,
+                LinkBox嵌入互链选择, LinkBox嵌入互链创建,
+                LinkBox关联两个块选择, LinkBox关联两个块创建,
+                LinkBox互相插入引用于下方选择, LinkBox互相插入引用于下方创建,
+            ]],
+            [tomatoI18n.同步块, [
+                LinkBox查看所有同步位置, LinkBox同步块选择, LinkBox同步块创建,
+            ]],
+            [tomatoI18n.长内容工具, [
+                CpBox批量删除大量连续内容块, CpBox批量移动大量连续内容块, CpBox批量复制大量连续内容块,
+            ]],
+        ];
+        const submenu: any[] = [{
+            label: PairBar触发.langText(),
+            icon: PairBar触发.icon,
+            accelerator: PairBar触发.w(),
+            // 浮条已开着：点击=同一触发器推进一步（funcs 收面板/slots 填下一空框），与快捷键/状态栏同款
+            click: () => void this.trigger(),
+        }];
+        for (const [group, cmds] of groups) {
+            submenu.push({ type: "separator" }, { label: group, disabled: true });
+            for (const c of cmds) {
+                submenu.push({
+                    label: c.langText(),
+                    accelerator: c.w(),
+                    click: () => this.runQuickCmd(c.langKey),
+                });
+            }
+        }
+        return { label: tomatoI18n.快捷键速查, icon: "iconKeymap", submenu };
+    }
+
+    /** 速查直调（R5 □3）：先收浮条再执行（一次性操作不进接力流，沿 runOverflowCmd 先例）；
+     *  editorCallback 型命令传当前 protyle，callback 型（长内容）忽略该参 */
+    private runQuickCmd(langKey: string) {
+        const fn = getPairCmd(langKey);
+        if (!fn) return;
+        const protyle = this.curProtyle();
+        this.hideBar();
+        void fn(protyle);
     }
 
     /** 3 条单功能执行链（LinkBox 老命令开放直调）：源解析（框 1 优先，

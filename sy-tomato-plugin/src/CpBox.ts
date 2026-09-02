@@ -6,14 +6,16 @@ import { getDocBlocks, OpenSyFile2 } from "./libs/docUtils";
 import { events } from "./libs/Events";
 import { winHotkey } from "./libs/winHotkey";
 import { addIfVisible } from "./libs/menuManager";
+import { regPairCmd } from "./libs/pairCmdRegistry";
 import { IProtyle } from "siyuan";
 
 /** 长内容批量操作跨入口并发锁（R5 □2 起浮条删除档与老三键共用同款防并发） */
 export const LongContentOpsLock = "LongContentOpsLock";
 
 export const CpBox批量删除大量连续内容块 = winHotkey("alt+shift+;", "deleteBlocks", "iconTrashcan", () => tomatoI18n.批量删除大量连续内容块, false, deleteBlocksMenu)
-export const CpBox批量移动大量连续内容块 = winHotkey("alt+shift+'", "moveBlocks")
-export const CpBox批量复制大量连续内容块 = winHotkey("alt+shift+q", "copyBlocks")
+// langText 第四参补齐（R5 □3）：速查子菜单/tooltip 键位行消费 langText()/.w()，缺参即崩
+export const CpBox批量移动大量连续内容块 = winHotkey("alt+shift+'", "moveBlocks", "", () => tomatoI18n.批量移动大量连续内容块)
+export const CpBox批量复制大量连续内容块 = winHotkey("alt+shift+q", "copyBlocks", "", () => tomatoI18n.批量复制大量连续内容块)
 
 class CpBox {
     private plugin: BaseTomatoPlugin;
@@ -23,6 +25,12 @@ class CpBox {
         if (!pairBarEnabled.get()) return;
 
         this.plugin = plugin;
+
+        // addCommand+速查登记二合一（R5 □3）：⋯ 菜单速查子菜单点击查表直调
+        const addPairCmd = (cmd: any) => {
+            this.plugin.addCommand(cmd);
+            regPairCmd(cmd.langKey, cmd.editorCallback ?? cmd.callback);
+        };
 
         const deleteBlocks = async () => {
             navigator.locks.request(LongContentOpsLock, { ifAvailable: true }, async (lock) => {
@@ -35,13 +43,13 @@ class CpBox {
         };
 
 
-        this.plugin.addCommand({
+        addPairCmd({
             langKey: CpBox批量删除大量连续内容块.langKey,
             langText: CpBox批量删除大量连续内容块.langText(),
             hotkey: CpBox批量删除大量连续内容块.m,
             callback: deleteBlocks,
         });
-        this.plugin.addCommand({
+        addPairCmd({
             langKey: CpBox批量移动大量连续内容块.langKey,
             langText: tomatoI18n.批量移动大量连续内容块,
             hotkey: CpBox批量移动大量连续内容块.m,
@@ -55,7 +63,7 @@ class CpBox {
                 });
             },
         });
-        this.plugin.addCommand({
+        addPairCmd({
             langKey: CpBox批量复制大量连续内容块.langKey,
             langText: tomatoI18n.批量复制大量连续内容块,
             hotkey: CpBox批量复制大量连续内容块.m,

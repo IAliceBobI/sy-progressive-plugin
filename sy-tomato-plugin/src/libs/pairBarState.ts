@@ -49,18 +49,22 @@ export interface PairFuncSpec {
     boxes: 2 | 3;
     /** i18n 文案 key（tomatoI18n getter 名） */
     labelKey: string;
+    /** tooltip 键位行的老命令 winHotkey langKey 引用（R5 □3）：互链族/同步块=[选, 建]，
+     *  transport=[移, 复, 删]。只存 langKey 字符串（渲染层查常量表调 .w() 现读 keymap，
+     *  与速查子菜单同一批常量=同源不漂移；本层不 import LinkBox/CpBox，单测链不受牵连） */
+    hkKeys?: readonly [string, string] | readonly [string, string, string];
 }
 
 /** 六功能 spec：id 顺序即浮条图标横排顺序，也是设置默认功能下拉顺序（勿随意重排）。
  *  R5 □1 总开关化：gate 字段退役——功能注册全由 pairBarEnabled 总开关管（命令注册制，
  *  开关关=功能压根不在，浮条无需按功能灰态）；浮条灰态只剩 VIP 档 */
 export const PAIR_FUNCS: PairFuncSpec[] = [
-    { id: "bilink", icon: "iconLink", vip: false, multiSrc: false, boxes: 2, labelKey: "双向互链" },
-    { id: "embedBilink", icon: "iconSQL", vip: true, multiSrc: true, boxes: 2, labelKey: "嵌入互链" },
-    { id: "refOnly", icon: "iconRef", vip: false, multiSrc: false, boxes: 2, labelKey: "关联两个块" },
-    { id: "insRefs", icon: "iconBoth", vip: false, multiSrc: false, boxes: 2, labelKey: "互相插入引用" },
-    { id: "sync", icon: "iconRefresh", vip: false, multiSrc: true, boxes: 2, labelKey: "同步块" },
-    { id: "transport", icon: "iconMove", vip: false, multiSrc: true, boxes: 3, labelKey: "搬运" },
+    { id: "bilink", icon: "iconLink", vip: false, multiSrc: false, boxes: 2, labelKey: "双向互链", hkKeys: ["bilinkSelectBlock", "bilinkSelectBlock roundtrip"] },
+    { id: "embedBilink", icon: "iconSQL", vip: true, multiSrc: true, boxes: 2, labelKey: "嵌入互链", hkKeys: ["bilinkSelectBlock embed", "bilinkCreateLnk"] },
+    { id: "refOnly", icon: "iconRef", vip: false, multiSrc: false, boxes: 2, labelKey: "关联两个块", hkKeys: ["bilinkSelectBlockRefOnly", "bilinkCreateLnkRefOnly"] },
+    { id: "insRefs", icon: "iconBoth", vip: false, multiSrc: false, boxes: 2, labelKey: "互相插入引用", hkKeys: ["bidirection refs select", "bidirection refs create"] },
+    { id: "sync", icon: "iconRefresh", vip: false, multiSrc: true, boxes: 2, labelKey: "同步块", hkKeys: ["list refs select", "list refs create"] },
+    { id: "transport", icon: "iconMove", vip: false, multiSrc: true, boxes: 3, labelKey: "搬运", hkKeys: ["moveBlocks", "copyBlocks", "deleteBlocks"] },
 ];
 
 export const initialPairState: PairState = {
@@ -166,6 +170,14 @@ export function pairFirstEmpty(s: PairState): 1 | 2 | 3 | null {
 /** 全框填齐判定（✓ 亮出条件） */
 export function pairBoxesFilled(s: PairState): boolean {
     return pairFirstEmpty(s) === null;
+}
+
+/** 区间预览解析触发判据（控制器填框后调 syncRangeCount 的条件；2026-09-02 □1）：搬运
+ *  三框起止两端齐即触发——与填框顺序无关。「只在填槽 2 时解析」的顺序洞：先填结束框
+ *  后补起始框（清框①重填/多块整组进框①/覆盖起/止任一端同款）rangeCount 恒 null 或停
+ *  留旧值 → ✓ 三档恒灰/预览数错。纯函数层不写 rangeCount（控制器异步解析回填）。 */
+export function pairRangeSyncWanted(s: PairState): boolean {
+    return s.phase === "slots" && s.func === "transport" && !!s.srcIDs[0] && !!s.endID;
 }
 
 /** 从选区暂存预填框区（出场直跳/funcs 点功能共用）：两框整组进源框；三框首/末进起止框

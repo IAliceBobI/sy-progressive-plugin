@@ -231,13 +231,27 @@ export function dom2div(dom: string) {
 
 export function isSearchUI(protyle: Protyle) {
     const e = protyle?.protyle?.element as HTMLElement;
-    return e?.id === "searchPreview"
+    // searchUnRefPreview=搜索「未引用块」预览，与 searchPreview 同场景（内核 search/util.ts:252/262）
+    return e?.id === "searchPreview" || e?.id === "searchUnRefPreview"
 }
 
 export function isFloatUI(protyle: Protyle) {
+    // 内核 BlockPanel 给所有浮层编辑器容器统一打 block__edit（Panel.ts:553），
+    // 纯悬停预览与可编辑浮窗无 DOM 二分 → isFloatUI ≡ popover 内（2026-09-02 □1 评审轮实证）
     const e = protyle?.protyle?.element as HTMLElement;
-    if (e.classList.contains("block__edit")) return true;
+    if (e?.classList?.contains("block__edit")) return true;
     return false;
+}
+
+/** 内核悬浮浮层（BlockPanel 容器 .block__popover，内核 Panel.ts:71）内的 protyle：
+ * 悬停块引/反链计数弹出的预览浮层加载也 emit loaded-protyle-static，守卫链不认
+ * 会把完整反链面板挂进浮层、盖住真面板（2026-09-02 □1 实锤）。浮层编辑器容器
+ * 一律带 block__edit 类（见 isFloatUI 注释），纯预览与编辑浮窗无 DOM 二分，故只认
+ * popover 容器祖先、不豁免 block__edit。挂载链上必须排在 isFloatUI 的
+ * back_link_show_floatUI 设置开关之前无条件拦，否则设置 true 时浮层照吞面板。 */
+export function isPopoverUI(protyle: Protyle) {
+    const e = protyle?.protyle?.element as HTMLElement;
+    return !!e?.closest(".block__popover");
 }
 
 export function isCardUI(protyle: Protyle) {

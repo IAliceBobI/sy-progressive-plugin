@@ -5,6 +5,7 @@ import { tomatoI18n } from "../tomatoI18n";
 import { getHierarchyConcepts, OpenSyFile2 } from "./docUtils";
 import { back_link_passup_heading, back_link_passup_quote, back_link_passup_super, storeAttrManager } from "./stores";
 import { SortType } from "./types";
+import { applyDocResponse, applyListResponse, BkListState, knownDocRevision, knownListRevision, makeBkQueryKey, pruneBkDocs, resetBkStateIfQueryChanged } from "./bkRevision";
 import { newID } from "stonev5-utils";
 
 // export async function shouldInsertDiv(lastID: string, docID: string) {
@@ -163,6 +164,13 @@ export async function scanAllRef(backlinkSv: BacklinkSv, div: HTMLElement, docID
             await addRef(backlinkSv, txt, id, docID, allRefs, getID(element));
         }
     }
+}
+
+/** 概念 chip 可见性唯一判定源（□2）：日期文档名（日记）不当概念；hideThis=「暂时隐藏本文档链接」
+ *  即时 UI 开关不进数据层。计数与 chips 渲染必须同用本函数，否则数画分裂。 */
+export function conceptChipVisible(concept: Pick<LinkItem, "text" | "attrs">, hideThis: boolean): boolean {
+    if (/\d{4}-\d{2}-\d{2}/.test(concept.text)) return false;
+    return !(hideThis && concept.attrs.isThisDoc);
 }
 
 export async function addRef(backlinkSv: BacklinkSv, txt: string, id: string, docID: string, allRefs: RefCollector, dataNodeID?: string) {
@@ -325,39 +333,64 @@ export async function doGetBackLinks(
     menDocCount = Number.MAX_SAFE_INTEGER,
     docName: string,
     idsFilter: ReturnType<typeof storeAttrManager> = null,
-    page = 0
+    page = 0,
+    bkState: BkListState = null,
 ) {
+    // □3 knownRevision：queryKey 含 keyword/排序/分页（翻页必全量）；未变携带上轮 revision，
+    // 列表级 unchanged → 文档级请求与本地重组全部跳过（近零开销轮询）
+    if (bkState) {
+        resetBkStateIfQueryChanged(bkState, makeBkQueryKey(globalSearchText, globalSearchText, sortBy, page, refDocCount, menDocCount));
+    }
+    const listResp = await siyuan.getBacklink2(docID, globalSearchText, globalSearchText, sortBy, sortBy, bkState ? knownListRevision(bkState) : "");
+    if (bkState && applyListResponse(bkState, listResp)) {
+        return { unchanged: true } as any;
+    }
     const allRefs: RefCollector = new Map();
     const allRefsHierarchy: RefCollector = new Map();
     const task3 = getHierarchyConcepts(docName).then(async ret => {
         await Promise.all(ret.map((r) => addRef(null, r.content, r.id, docID, allRefsHierarchy)))
         return ret;
     });
-    const { backLinks, bkDocs } = await siyuan.getBacklink2(docID, globalSearchText, globalSearchText, sortBy, sortBy)
+    const { backLinks, bkDocs } = await Promise.resolve(listResp)
         .then(async bkDocs => {
             if (!bkDocs) return { bks: [], bkDocs };
+            // 文档级缓存 key 加 bk:/me: 前缀：同一来源文档的引用与提及是两个 API、两个 revision 域
             const bkTask = bkDocs.backlinks.slice(page * refDocCount, (page + 1) * refDocCount)
                 .map(async bkDoc => {
-                    const items = await siyuan.getBacklinkDoc(docID, bkDoc.id, globalSearchText);
-                    return items.backlinks.map(bkItem => {
-                        return { isMention: false, bkDoc, bkItem }
+                    const key = "bk:" + bkDoc.id;
+                    const resp = await siyuan.getBacklinkDoc(docID, bkDoc.id, globalSearchText, bkState ? knownDocRevision(bkState, key) : "");
+                    const { items, keywords } = bkState
+                        ? applyDocResponse(bkState, key, { unchanged: resp?.unchanged, revision: resp?.revision, items: resp?.backlinks ?? [], keywords: resp?.keywords })
+                        : { items: resp?.backlinks ?? [], keywords: resp?.keywords ?? [] };
+                    return items.map(bkItem => {
+                        return { isMention: false, bkDoc, bkItem, keywords }
                     });
                 });
             const meTask = bkDocs.backmentions.slice(page * menDocCount, (page + 1) * menDocCount)
                 .map(async bkDoc => {
-                    const items = await siyuan.getBackmentionDoc(docID, bkDoc.id, globalSearchText);
-                    return items.backmentions.map(bkItem => {
-                        return { isMention: true, bkDoc, bkItem }
+                    const key = "me:" + bkDoc.id;
+                    const resp = await siyuan.getBackmentionDoc(docID, bkDoc.id, globalSearchText, bkState ? knownDocRevision(bkState, key) : "");
+                    const { items, keywords } = bkState
+                        ? applyDocResponse(bkState, key, { unchanged: resp?.unchanged, revision: resp?.revision, items: resp?.backmentions ?? [], keywords: resp?.keywords })
+                        : { items: resp?.backmentions ?? [], keywords: resp?.keywords ?? [] };
+                    return items.map(bkItem => {
+                        return { isMention: true, bkDoc, bkItem, keywords }
                     })
                 });
             const bk = Promise.all(bkTask).then(i => i.flat());
             const me = Promise.all(meTask).then(i => i.flat());
+            if (bkState) {
+                pruneBkDocs(bkState, [
+                    ...bkDocs.backlinks.map(d => "bk:" + d.id),
+                    ...bkDocs.backmentions.map(d => "me:" + d.id),
+                ]);
+            }
             return { bks: [...(await bk), ...(await me)], bkDocs };
         })
         .then(async t => {
             const bks = t.bks
                 .filter(i => i.bkItem?.dom != null)
-                .map(({ isMention, bkItem, bkDoc }) => {
+                .map(({ isMention, bkItem, bkDoc, keywords }) => {
                     const bkDiv = dom2div(bkItem.dom);
                     const dataType = bkDiv.getAttribute(DATA_TYPE)
                     if (dataType === BlockNodeEnum.NODE_BLOCK_QUERY_EMBED) return;
@@ -380,6 +413,7 @@ export async function doGetBackLinks(
                         blockID: id,
                         atBottom: idsFilter?.getListString()?.has(id) ?? false,
                         sortBy,
+                        keywords,
                     } as BacklinkSv;
                 })
                 .filter(i => i != null);

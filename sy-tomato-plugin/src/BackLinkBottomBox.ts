@@ -4,7 +4,7 @@ import {
     ConTreeNode,
     disableBK, enableBK,
 } from "./libs/bkUtils";
-import { icon, isCardUI, isFloatUI, isProtyleVisible, isSearchUI, siyuan, } from "./libs/utils";
+import { icon, isCardUI, isFloatUI, isPopoverUI, isProtyleVisible, isSearchUI, siyuan, } from "./libs/utils";
 import { MarkKey, TEMP_CONTENT, TOMATO_BK_IGNORE } from "./libs/gconst";
 import BackLinkBottom from "./BackLinkBottom.svelte";
 import { DestroyManager } from "./libs/destroyer";
@@ -15,12 +15,22 @@ import { OpenSyFile2 } from "./libs/docUtils";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { verifyKeyTomato } from "./libs/user";
 import { debugLog } from "./libs/logUtils";
+import { applyEntryCount, cachedEntryCount } from "./libs/bkRevision";
 import { winHotkey } from "./libs/winHotkey";
 import { addIfVisible } from "./libs/menuManager";
 import { newID } from "stonev5-utils";
 import { mount } from "svelte";
 
 const BKMAKER_ADD = "BKMAKER_ADD";
+const BKENTRY_ADD = "BKENTRY_ADD";
+
+function bkEntryDivID(docID: string) {
+    return "tomatoBKEntry" + docID;
+}
+
+function removeBkEntryBar(docID: string) {
+    document.querySelectorAll(`div[${BKENTRY_ADD}="${bkEntryDivID(docID)}"]`).forEach(e => e.remove());
+}
 
 export class BKMaker {
     public goDownID: string;
@@ -200,6 +210,13 @@ class BackLinkBottomBox {
                             debugLog("bk.evt.skip", "TOMATO_BK_IGNORE on element", "bk");
                             return;
                         }
+                        // 悬浮浮层（.block__popover，含纯预览/编辑浮窗，无 DOM 二分）内的
+                        // protyle 一概不挂面板/入口条（□1 吞面板根因）。上提到 attrs 往返
+                        // 之前：同步拒掉，覆盖 disabled 分支 mountBkEntryBar 的姊妹入口
+                        if (isPopoverUI(detail)) {
+                            debugLog("bk.evt.skip", "popoverUI", "bk");
+                            return;
+                        }
 
                         const docID = protyle.block.rootID;
                         if (!docID) {
@@ -208,7 +225,7 @@ class BackLinkBottomBox {
                         }
 
                         if (events.isMobile) {
-                            [...document.querySelectorAll(`[${BKMAKER_ADD}]`)]
+                            [...document.querySelectorAll(`[${BKMAKER_ADD}],div[${BKENTRY_ADD}]`)]
                                 .forEach(d => d.parentElement?.removeChild(d));
                         }
 
@@ -218,46 +235,113 @@ class BackLinkBottomBox {
                             debugLog("bk.evt.skip", `disabled doc=${docID}`, "bk");
                             BKMaker.removeBkDiv(docID);
                             protyle.wysiwyg.element.style.paddingBottom = "200px";
+                            // □3 默认关可发现性：计数>0 才渲染 28px 极轻入口条（spec §10）
+                            if (back_link_default_off.get()) {
+                                this.mountBkEntryBar(detail, docID);
+                            }
                             return;
                         }
 
-                        if (BKMaker.installed(docID)) return;
-                        if (!back_link_show_floatUI.get() && isFloatUI(detail)) {
-                            debugLog("bk.evt.skip", "floatUI hidden", "bk");
-                            return;
-                        }
-                        if (isSearchUI(detail)) {
-                            debugLog("bk.evt.skip", "searchUI", "bk");
-                            return;
-                        }
-                        if (isCardUI(detail)) {
-                            debugLog("bk.evt.skip", "cardUI", "bk");
-                            return;
-                        }
-                        if (isDocFlow(detail)) {
-                            debugLog("bk.evt.skip", "docFlow", "bk");
-                            return;
-                        }
-                        if (await skipByAttrs(docID, attrs)) {
-                            debugLog("bk.evt.skip", `skipByAttrs doc=${docID} keys=${Object.keys(attrs).join(",")}`, "bk");
-                            return;
-                        }
-
-                        // create maker
-                        let maker = new BKMaker(this, docID);
-                        maker.disabled = false;
-                        debugLog("bk.mount", `doTheWork doc=${docID} type=${eventType}`, "bk");
-
-                        // update current doc
-                        maker.docName = protyle.title?.editElement?.textContent;
-                        maker.doTheWork(detail, attrs);
-                        if (back_link_goto_bottom_btn.get() && await verifyKeyTomato() && !events.isMobile) {
-                            this.addIcon2Title(maker);
-                        }
+                        removeBkEntryBar(docID);
+                        await this.attachMaker(detail, eventType);
                     }
                 });
             }
         });
+    }
+
+    /** 从环境检查到 BKMaker 挂载的完整链（事件驱动与入口条开启钮共用） */
+    private async attachMaker(detail: Protyle, eventType = "") {
+        const protyle = detail?.protyle;
+        const docID = protyle?.block?.rootID;
+        if (!docID) return;
+        if (BKMaker.installed(docID)) return;
+        const attrs = await siyuan.getBlockAttrs(docID);
+        // isPopoverUI 必须先于 isFloatUI：浮层容器一律带 block__edit（无纯预览/编辑
+        // 二分），若排在 back_link_show_floatUI 开关之后，设置 true 时浮层照吞面板
+        if (isPopoverUI(detail)) {
+            debugLog("bk.evt.skip", "popoverUI", "bk");
+            return;
+        }
+        if (!back_link_show_floatUI.get() && isFloatUI(detail)) {
+            debugLog("bk.evt.skip", "floatUI hidden", "bk");
+            return;
+        }
+        if (isSearchUI(detail)) {
+            debugLog("bk.evt.skip", "searchUI", "bk");
+            return;
+        }
+        if (isCardUI(detail)) {
+            debugLog("bk.evt.skip", "cardUI", "bk");
+            return;
+        }
+        if (isDocFlow(detail)) {
+            debugLog("bk.evt.skip", "docFlow", "bk");
+            return;
+        }
+        if (await skipByAttrs(docID, attrs)) {
+            debugLog("bk.evt.skip", `skipByAttrs doc=${docID} keys=${Object.keys(attrs).join(",")}`, "bk");
+            return;
+        }
+
+        // create maker
+        let maker = new BKMaker(this, docID);
+        maker.disabled = false;
+        debugLog("bk.mount", `doTheWork doc=${docID} type=${eventType}`, "bk");
+
+        // update current doc
+        maker.docName = protyle.title?.editElement?.textContent;
+        maker.doTheWork(detail, attrs);
+        if (back_link_goto_bottom_btn.get() && await verifyKeyTomato() && !events.isMobile) {
+            this.addIcon2Title(maker);
+        }
+    }
+
+    /**
+     * □3 默认关入口条：列表级反链计数（knownRevision 加持，未变化近零开销），
+     * >0 才渲染；点击整条=enableBK 后走 attachMaker 挂载面板。
+     */
+    private async mountBkEntryBar(detail: Protyle, docID: string) {
+        removeBkEntryBar(docID);
+        let count: number;
+        try {
+            const cached = cachedEntryCount(docID);
+            const resp = await siyuan.getBacklink2(docID, "", "", "3", "3", cached?.revision ?? "");
+            count = applyEntryCount(docID, resp);
+        } catch (e) {
+            debugLog("bk.entry", `count failed doc=${docID}: ${e}`, "bk");
+            return;
+        }
+        if (count <= 0) {
+            debugLog("bk.entry", `count=0 skip doc=${docID}`, "bk");
+            return;
+        }
+        // await 间隙文档可能已切走或重新开启：挂载前核验现场
+        const wysiwyg = detail?.protyle?.wysiwyg?.element;
+        if (!document.contains(wysiwyg) || BKMaker.installed(docID)) return;
+        removeBkEntryBar(docID);
+
+        const bar = document.createElement("div");
+        bar.classList.add("tomato-bk-entry-bar");
+        bar.setAttribute(BKENTRY_ADD, bkEntryDivID(docID));
+        bar.setAttribute("aria-label", tomatoI18n.底部反链入口文案.replace("{n}", String(count)));
+        bar.innerHTML = icon("LayoutBottom", 14);
+        const text = document.createElement("span");
+        text.className = "tomato-bk-entry-bar__text";
+        text.textContent = tomatoI18n.底部反链入口文案.replace("{n}", String(count));
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tomato-bk-entry-bar__btn";
+        btn.textContent = tomatoI18n.开启;
+        bar.append(text, btn);
+        bar.onclick = async () => {
+            debugLog("bk.entry", `enable doc=${docID}`, "bk");
+            await enableBK(docID);
+            removeBkEntryBar(docID);
+            await this.attachMaker(detail);
+        };
+        wysiwyg.insertAdjacentElement("afterend", bar);
+        debugLog("bk.entry", `mounted doc=${docID} count=${count}`, "bk");
     }
     private addIcon2Title(maker: BKMaker) {
         if (!maker) return;

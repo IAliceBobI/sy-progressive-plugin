@@ -274,6 +274,34 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Last used";
         }
     }
+    // R5 □3 快捷键速查：⋯ 菜单子菜单标题+组名×2（同步块/长内容工具/选择复用基类现有裸键）+tooltip 键位行「创建」动词
+    public get 快捷键速查() {
+        switch (this.lang) {
+            case "zh_CN": return "快捷键速查";
+            case "zh_CHT": return "快捷鍵速查";
+            case "ja_JP": return "ショートカット一覧";
+            case "en_US":
+            default: return "Hotkey cheatsheet";
+        }
+    }
+    public get 互链族() {
+        switch (this.lang) {
+            case "zh_CN": return "互链族";
+            case "zh_CHT": return "互鏈族";
+            case "ja_JP": return "相互リンク";
+            case "en_US":
+            default: return "Bilinks";
+        }
+    }
+    public get 创建() {
+        switch (this.lang) {
+            case "zh_CN": return "创建";
+            case "zh_CHT": return "建立";
+            case "ja_JP": return "作成";
+            case "en_US":
+            default: return "Create";
+        }
+    }
     public 换功能(name: string) {
         switch (this.lang) {
             case "zh_CN": return `更换功能（当前：${name}）`;
@@ -6147,6 +6175,191 @@ export class TomatoI18n extends TomatoI18nABC {
             case "pl_PL": return "Wyczyść wybór";
             case "en_US":
             default: return "Clear";
+        }
+    }
+
+    // ===== 思维导线词级两步流（□3，spec tomato-mindwire-visual-spec.md §6）：zh+en 一等，
+    // zh_CHT/ja_JP 随键给，其余语种 default(en) 兜底 =====
+    public get 关联起点() {
+        switch (this.lang) {
+            case "zh_CN": return "关联起点";
+            case "zh_CHT": return "關聯起點";
+            case "ja_JP": return "関連起点";
+            case "en_US":
+            default: return "Link start";
+        }
+    }
+    public get 连到() {
+        switch (this.lang) {
+            case "zh_CN": return "连到";
+            case "zh_CHT": return "連到";
+            case "ja_JP": return "連接先";
+            case "en_US":
+            default: return "Connect to";
+        }
+    }
+    public get 已选() {
+        switch (this.lang) {
+            case "zh_CN": return "已选";
+            case "zh_CHT": return "已選";
+            case "ja_JP": return "選択済み";
+            case "en_US":
+            default: return "Picked";
+        }
+    }
+    public get 请选终点() {
+        switch (this.lang) {
+            case "zh_CN": return "请选终点";
+            case "zh_CHT": return "請選終點";
+            case "ja_JP": return "終点を選択してください";
+            case "en_US":
+            default: return "pick the end word";
+        }
+    }
+    public get 起点终点相同() {
+        switch (this.lang) {
+            case "zh_CN": return "起点与终点是同一个词";
+            case "zh_CHT": return "起點與終點是同一個詞";
+            case "ja_JP": return "起点と終点が同じ語です";
+            case "en_US":
+            default: return "Start and end are the same word";
+        }
+    }
+    public get 词级导线仅限本文档() {
+        switch (this.lang) {
+            case "zh_CN": return "词级导线只能连接同一文档内的词";
+            case "zh_CHT": return "詞級導線只能連接同一文檔內的詞";
+            case "ja_JP": return "語レベル導線は同一文書内のみ接続できます";
+            case "en_US":
+            default: return "Word wires connect within one document";
+        }
+    }
+    public get 关联() {
+        switch (this.lang) {
+            case "zh_CN": return "关联";
+            case "zh_CHT": return "關聯";
+            case "ja_JP": return "関連";
+            case "en_US":
+            default: return "Related";
+        }
+    }
+    public get 首尾呼应() {
+        switch (this.lang) {
+            case "zh_CN": return "首尾呼应";
+            case "zh_CHT": return "首尾呼應";
+            case "ja_JP": return "首尾呼応";
+            case "en_US":
+            default: return "Echo (opening & ending)";
+        }
+    }
+    public get 伏笔() {
+        switch (this.lang) {
+            case "zh_CN": return "伏笔";
+            case "zh_CHT": return "伏筆";
+            case "ja_JP": return "伏線";
+            case "en_US":
+            default: return "Foreshadowing";
+        }
+    }
+    public get 比喻() {
+        switch (this.lang) {
+            case "zh_CN": return "比喻";
+            case "zh_CHT": return "比喻";
+            case "ja_JP": return "比喩";
+            case "en_US":
+            default: return "Metaphor";
+        }
+    }
+    public get 对比() {
+        switch (this.lang) {
+            case "zh_CN": return "对比";
+            case "zh_CHT": return "對比";
+            case "ja_JP": return "対比";
+            case "en_US":
+            default: return "Contrast";
+        }
+    }
+    public get 因果() {
+        switch (this.lang) {
+            case "zh_CN": return "因果";
+            case "zh_CHT": return "因果";
+            case "ja_JP": return "因果";
+            case "en_US":
+            default: return "Cause & effect";
+        }
+    }
+    public get 删除导线() {
+        switch (this.lang) {
+            case "zh_CN": return "删除导线";
+            case "zh_CHT": return "刪除導線";
+            case "ja_JP": return "導線を削除";
+            case "en_US":
+            default: return "Delete wire";
+        }
+    }
+
+    // ===== 思维导线设置分区（□5，spec §4.8/§6）：ConfMindWire.svelte 专用 =====
+    public get 划词连线() {
+        switch (this.lang) {
+            case "zh_CN": return "词级导线（划词连线）";
+            case "zh_CHT": return "詞級導線（劃詞連線）";
+            case "ja_JP": return "語レベル導線（選択して接続）";
+            case "en_US":
+            default: return "Word-level wires (select to link)";
+        }
+    }
+    public get 线型() {
+        switch (this.lang) {
+            case "zh_CN": return "线型";
+            case "zh_CHT": return "線型";
+            case "ja_JP": return "線種";
+            case "en_US":
+            default: return "Line style";
+        }
+    }
+    public get 虚线() {
+        switch (this.lang) {
+            case "zh_CN": return "虚线";
+            case "zh_CHT": return "虛線";
+            case "ja_JP": return "破線";
+            case "en_US":
+            default: return "Dashed";
+        }
+    }
+    public get 流动() {
+        switch (this.lang) {
+            case "zh_CN": return "流动";
+            case "zh_CHT": return "流動";
+            case "ja_JP": return "流動";
+            case "en_US":
+            default: return "Flowing";
+        }
+    }
+    public get 实线() {
+        switch (this.lang) {
+            case "zh_CN": return "实线";
+            case "zh_CHT": return "實線";
+            case "ja_JP": return "実線";
+            case "en_US":
+            default: return "Solid";
+        }
+    }
+    public get 线宽建议() {
+        switch (this.lang) {
+            case "zh_CN": return "建议 1–4";
+            case "zh_CHT": return "建議 1–4";
+            case "ja_JP": return "1–4 推奨";
+            case "en_US":
+            default: return "Suggest 1–4";
+        }
+    }
+    public get 关系配色帮助() {
+        switch (this.lang) {
+            case "zh_CN": return "词级线按关系类型着色：呼应/伏笔/比喻/对比/因果";
+            case "zh_CHT": return "詞級線按關係類型著色：呼應/伏筆/比喻/對比/因果";
+            case "ja_JP": return "語レベルの線は関係タイプで着色します：呼応/伏線/比喩/対比/因果";
+            case "en_US":
+            default: return "Word wires are colored by relation: echo / foreshadow / metaphor / contrast / cause";
         }
     }
 }

@@ -467,7 +467,6 @@ export const back_link_dailynote_off = settingFactory("back-link-dailynote-off",
 export const back_link_refresh_off = settingFactory("back_link_refresh_off", true, STORAGE_SETTINGS, null as TSK);
 export const bk_refresh_interval_sec = settingFactory("bk_refresh_interval_sec", 15, STORAGE_SETTINGS, null as TSK);
 export const bk_visible_only = settingFactory("bk_visible_only", true, STORAGE_SETTINGS, null as TSK);
-export const back_link_more_btns = settingFactory("back_link_more_btns", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_goto_bottom_btn = settingFactory("back_link_goto_bottom_btn", false, STORAGE_SETTINGS, null as TSK);
 export const back_link_concept_fold = settingFactory("back_link_concept_fold", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_copy = settingFactory("back_link_copy", false, STORAGE_SETTINGS, null as TSK);
@@ -480,6 +479,8 @@ export const back_link_move_with_backlink = settingFactory("back_link_move_with_
 export const back_link_show_floatUI = settingFactory("back_link_show_floatUI", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_protyle_height = settingFactory("back_link_protyle_height", "200", STORAGE_SETTINGS, null as TSK);
 export const back_link_show_path = settingFactory("back_link_show_path", false, STORAGE_SETTINGS, null as TSK);
+// □4 面板宽度模式：false=全宽（历史现状），true=跟随编辑器内容盒宽
+export const back_link_follow_width = settingFactory("back_link_follow_width", false, STORAGE_SETTINGS, null as TSK);
 export const back_link_passup_heading = settingFactory("back_link_passup_heading", false, STORAGE_SETTINGS, null as TSK);
 export const back_link_passup_quote = settingFactory("back_link_passup_quote", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_passup_super = settingFactory("back_link_passup_super", true, STORAGE_SETTINGS, null as TSK);
@@ -535,6 +536,8 @@ export const mindWireWidth = settingFactory("mindWireWidth", 2, STORAGE_SETTINGS
 export const mindWireLine = settingFactory("mindWireLine", false, STORAGE_SETTINGS, null as TSK);
 export const mindWireColorfull = settingFactory("mindWireColorfull", false, STORAGE_SETTINGS, null as TSK);
 export const mindWireStarRefOnly = settingFactory("mindWireStarRefOnly", true, STORAGE_SETTINGS, null as TSK);
+// □2 词级导线（划词连线）总开关（spec §4.8 行 5；设置 UI 行随 □5 ConfMindWire 落地）
+export const mindWireWordWire = settingFactory("mindWireWordWire", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxMenuShow = settingFactory("aiBoxMenuShow", true, STORAGE_SETTINGS, null as TSK);
 export const cozeSearchMenuShow = settingFactory("cozeSearchMenuShow", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxPrompts = settingFactory("aiBoxPrompts", [], STORAGE_SETTINGS, null as TSK);

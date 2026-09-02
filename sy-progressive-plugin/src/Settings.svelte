@@ -41,6 +41,8 @@
         digest渐进阅读摘抄模式,
         digest执行摘抄,
         digest执行摘抄并断句,
+        digest执行摘抄留档,
+        digest执行摘抄背诵,
     } from "./DigestProgressiveBox";
     import {
         Progressive开始学习,
@@ -375,6 +377,15 @@
             <div>
                 {digest执行摘抄并断句.icon}
                 {digest执行摘抄并断句.langText()}<HotkeyCap hk={digest执行摘抄并断句} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <!-- 2026-09-02 用户反馈：留档/背诵去向独立成命令（去向级 cardMode 覆盖，不跟书设置漂移） -->
+            <div>
+                {digest执行摘抄留档.icon}
+                {digest执行摘抄留档.langText()}<HotkeyCap hk={digest执行摘抄留档} pluginName="sy-progressive-plugin"></HotkeyCap>
+            </div>
+            <div>
+                {digest执行摘抄背诵.icon}
+                {digest执行摘抄背诵.langText()}<HotkeyCap hk={digest执行摘抄背诵} pluginName="sy-progressive-plugin"></HotkeyCap>
             </div>
         </div>
     </section>

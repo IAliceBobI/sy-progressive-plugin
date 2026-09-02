@@ -24,6 +24,7 @@
     import ConfBacklink from "./ConfBacklink.svelte";
     import ConfCards from "./ConfCards.svelte";
     import ConfBlocks from "./ConfBlocks.svelte";
+    import ConfMindWire from "./ConfMindWire.svelte";
     import ConfDailyNote from "./ConfDailyNote.svelte";
     import ConfMisc from "./ConfMisc.svelte";
     interface Props {
@@ -123,6 +124,7 @@
     <section class="conf-group"><ConfBacklink {codeValid}></ConfBacklink></section>
     <section class="conf-group"><ConfCards {codeValid}></ConfCards></section>
     <section class="conf-group"><ConfBlocks {codeValid}></ConfBlocks></section>
+    <section class="conf-group"><ConfMindWire {codeValid}></ConfMindWire></section>
     <section class="conf-group"><ConfDailyNote {codeValid}></ConfDailyNote></section>
     <section class="conf-group"><ConfMisc {codeValid}></ConfMisc></section>
     <!-- save（□3）：52px sticky footer 收底，主色「保存并关闭」（原面板末位 outline 保存行退役） -->

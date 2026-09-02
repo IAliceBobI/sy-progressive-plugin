@@ -10,10 +10,17 @@ import { blockIconMenu, digestmenu } from "../../sy-tomato-plugin/src/libs/store
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { kind, openDigestSubrank, show, toggleFreeFloat } from "./ProgressiveBtn";
+import { cardModeFor, type DigestIntent } from "./digestCardMode";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "🍕", () => tomatoI18n.执行摘抄)
 export const digest执行摘抄并断句 = winHotkey("⇧⌥X", "执行摘抄并断句", "✂", () => tomatoI18n.执行摘抄并断句)
+// 2026-09-02 用户反馈：留档/背诵此前只是浮条子排两按钮，快捷键通道唯一且行为跟 cardMode 设置
+// 漂移；补两命令各带独立默认键，用户可在插件设置/思源键位设置里分别改。
+// 键位按 winHotkey 规范化后形态比对过全仓（ctrl+alt+X 写法会归一成 ⌘⌥X）：⇧⌥P/⌘⌥Z 均无冲突
+// （⌘⌥P 曾人选，与 recite reciteCopyPrompt=alt+ctrl+p 规范化后撞键，dev 实例 console 实锤）
+export const digest执行摘抄留档 = winHotkey("⇧⌥P", "执行摘抄留档", "🍕", () => tomatoI18n.执行摘抄留档)
+export const digest执行摘抄背诵 = winHotkey("⌘⌥Z", "执行摘抄背诵", "＋🗃️", () => tomatoI18n.执行摘抄背诵)
 
 /**
  * □11 入口统一（设计共识 2）：⌥Z/右键/块图标「渐进阅读摘抄模式」全收——三态（含自由态）
@@ -34,6 +41,19 @@ class DigestProgressiveBox {
         } else {
             toggleFreeFloat(true);
         }
+    }
+
+    /** 「执行摘抄」族命令共用的回调工厂：intent 决定 cardMode 去向级覆盖
+     *  （archive=强制不入卡 / recite=每摘必入卡 / auto=跟随书设置），与浮条
+     *  子排「留档/背诵」按钮同构——不 saveCardMode 不改书全局。 */
+    private execDigest(intent: DigestIntent, split = false) {
+        return async (protyle: IProtyle) => {
+            const s = await events.selectedDivs(protyle);
+            const di = await initDi(s, protyle, this.settings);
+            const cm = cardModeFor(intent);
+            if (cm) di.cardMode = cm;
+            await di.digest(split);
+        };
     }
 
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
@@ -134,22 +154,28 @@ class DigestProgressiveBox {
             langKey: digest执行摘抄.langKey,
             langText: digest执行摘抄.langText(),
             hotkey: digest执行摘抄.m,
-            editorCallback: async (protyle) => {
-                const s = await events.selectedDivs(protyle);
-                const di = await initDi(s, protyle, settings);
-                di.digest();
-            }
+            editorCallback: this.execDigest("auto")
         });
 
         this.plugin.addCommand({
             langKey: digest执行摘抄并断句.langKey,
             langText: digest执行摘抄并断句.langText(),
             hotkey: digest执行摘抄并断句.m,
-            editorCallback: async (protyle) => {
-                const s = await events.selectedDivs(protyle);
-                const di = await initDi(s, protyle, settings);
-                di.digest(true);
-            }
+            editorCallback: this.execDigest("auto", true)
+        });
+
+        this.plugin.addCommand({
+            langKey: digest执行摘抄留档.langKey,
+            langText: digest执行摘抄留档.langText(),
+            hotkey: digest执行摘抄留档.m,
+            editorCallback: this.execDigest("archive")
+        });
+
+        this.plugin.addCommand({
+            langKey: digest执行摘抄背诵.langKey,
+            langText: digest执行摘抄背诵.langText(),
+            hotkey: digest执行摘抄背诵.m,
+            editorCallback: this.execDigest("recite")
         });
 
         // □16 整摘命令通道（无默认热键；片态另有浮条子排按钮、任意文档另有右键项）

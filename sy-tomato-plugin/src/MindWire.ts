@@ -1,5 +1,6 @@
 import { getAllEditor, IEventBusMap, IProtyle, Protyle } from "siyuan";
-import { mindWireCheckbox, mindWireColorfull, mindWireDocMenu, mindWireDynamicLine, mindWireEnable, mindWireGlobalMenu, mindWireLine, mindWireStarRefOnly, mindWireWidth, } from "./libs/stores";
+import { mount, unmount } from "svelte";
+import { mindWireCheckbox, mindWireColorfull, mindWireDocMenu, mindWireDynamicLine, mindWireEnable, mindWireGlobalMenu, mindWireLine, mindWireStarRefOnly, mindWireWidth, mindWireWordWire, } from "./libs/stores";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { events, EventType } from "./libs/Events";
 import { getAttribute, getID, isEditor, siyuan } from "./libs/utils";
@@ -8,15 +9,841 @@ import { winHotkey } from "./libs/winHotkey";
 import { addIfVisible } from "./libs/menuManager";
 import { tomatoI18n } from "./tomatoI18n";
 import { lastVerifyResult, verifyKeyTomato } from "./libs/user";
-import { setGlobal } from "stonev5-utils";
+import { debugLog } from "./libs/logUtils";
+import { blockWirePath, clampStubX, getEdgePoint, shiftRect, stubDir, stubEdgeShift, stubPos, toContentRect, toolbarPos, wireViewState, wordWireGeometry } from "./libs/mindWireGeom";
+import { RELATIONS_ATTR, RELATION_COLOR, RelationKey, WORD_WIRE_HREF_PREFIX, checkWireEnd, cleanupRelations, groupWordWires, makeWireId, parseRelations, relationColor, wireIdFromHref, wordClip } from "./libs/mindWireData";
+import MindWirePending from "./MindWirePending.svelte";
+
+const dlog = (msg: string) => debugLog("mindwire", msg, "mindwire");
 
 export const MindWire启用或禁用思维导线 = winHotkey("ctrl+alt+enter", "MindWire global", "iconGlobalGraph", () => tomatoI18n.启用或禁用全局思维导线, false, mindWireGlobalMenu)
 export const MindWire启用或禁用文档思维导线 = winHotkey("ctrl+shift+z", "MindWire doc", "iconGraph", () => tomatoI18n.启用或禁用文档思维导线, false, mindWireDocMenu)
 type TomatoMenu = IEventBusMap["click-blockicon"] & IEventBusMap["open-menu-content"];
 
+// ---------------------------------------------------------------------------
+// 渲染层地基（□1 · 内容坐标系，spec docs/tomato-mindwire-visual-spec.md §2）
+// 层挂每个 protyle 的滚动容器内（absolute 随内容走），线全长一次画足、裁剪交给容器
+// overflow，滚动期零重算；刷新走事件骨架 + MutationObserver/ResizeObserver，
+// 旧「body 挂 svg + wheel 清空 200ms 重画 + 2s 轮询」整套退役。
+// ---------------------------------------------------------------------------
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const LAYER_CLASS = "tomato-mind-wire-layer";
+const SVG_CLASS = "tomato-mind-wire-svg";
+const PATH_CLASS = "tomato-mind-wire-path";
+const WORD_PATH_CLASS = "tomato-mind-wire-path--word";
+const FLOW_CLASS = "tomato-mind-wire-path--flow";
+const HIT_CLASS = "tomato-mind-wire-hit";
+const HOT_CLASS = "tomato-mind-wire-hot";
+const FLASH_CLASS = "tomato-mind-wire-flash";
+const TOOLBAR_CLASS = "tomato-mind-wire-toolbar";
+const STUB_CLASS = "tomato-mind-wire-stub";
+/** 残端 chip 隐藏态（双端同屏/双端离屏）：visibility 保布局（挂载期 offsetWidth 可测），滚动期切换不触发重排 */
+const STUB_OFF_CLASS = "tomato-mind-wire-stub--off";
+const CONTENT_ATTR = "tomato-mind-wire-content";
+const ACCENT_VAR = "--tomato-mind-wire-accent";
+/** 两步流菜单项 key（menuManager 隐藏集体系，spec §4.3） */
+const WORD_MENU_KEY = "m.mindwire.wordwire";
+
+/** 关系名 i18n getter（spec §4.7 六档；RELATION_COLOR 键序即渲染序） */
+const RELATION_KEYS = Object.keys(RELATION_COLOR) as RelationKey[];
+const RELATION_I18N: Record<RelationKey, () => string> = {
+    related: () => tomatoI18n.关联,
+    echo: () => tomatoI18n.首尾呼应,
+    foreshadow: () => tomatoI18n.伏笔,
+    metaphor: () => tomatoI18n.比喻,
+    contrast: () => tomatoI18n.对比,
+    cause: () => tomatoI18n.因果,
+};
+
+interface WireLayer {
+    /** 宿主 protyle（词级交互：改关系/删除写文档根属性需要 rootID 与 toolbar） */
+    protyle: IProtyle;
+    /** 宿主 protyle.element（锚点查询范围） */
+    element: HTMLElement;
+    layer: HTMLDivElement;
+    svg: SVGSVGElement;
+    /** 滚动容器（层的挂载父，坐标换算原点） */
+    scroller: HTMLElement;
+    mo: MutationObserver;
+    ro: ResizeObserver;
+    timer: number | undefined;
+    /** 重画代际：await 门禁查询期间被新重画取代的旧代不再动 DOM */
+    gen: number;
+    /** 残端 chip 记录（□4 spec §4.2）：双 chip 挂层内锚词旁随内容走，滚动期只切显隐 */
+    stubs: StubRec[];
+    /** 滚动三态监听（rAF 节流切 chip 显隐；dispose 摘除） */
+    scrollHandler: () => void;
+    rafId: number;
+    /** 锚词点击跳转（capture 拦截内核 a 链接处理；dispose 移除） */
+    clickHandler: (e: Event) => void;
+}
+
+/** 残端 chip 记录：ys=两端内容坐标纵向区间（滚动期纯数字判定免布局读取）；
+ *  chips[0] 挂端1旁、chips[1] 挂端2旁（方向由内容序在挂载时定死） */
+interface StubRec {
+    ys: [{ top: number; bottom: number }, { top: number; bottom: number }];
+    chips: [HTMLButtonElement, HTMLButtonElement];
+}
+
+/** key = protyle.element（每编辑器一份层；isEditor 守卫下反链/搜索副本不进表） */
+const wireLayers = new Map<HTMLElement, WireLayer>();
+
+/** 滚动容器：.protyle-content，无则 wysiwyg.parentElement 兜底（spec §2.1） */
+function scrollerOf(protyle: IProtyle): HTMLElement | null {
+    const el = protyle?.element as HTMLElement;
+    if (!el) return null;
+    return (el.querySelector(".protyle-content") as HTMLElement)
+        ?? (protyle?.wysiwyg?.element?.parentElement ?? null);
+}
+
+function clearAnchors(element: HTMLElement) {
+    element?.querySelectorAll(`[${CONTENT_ATTR}]`).forEach((e: HTMLElement) => {
+        e.removeAttribute(CONTENT_ATTR);
+        e.style.border = "none";
+    });
+}
+
+function disposeLayer(key: HTMLElement, wl: WireLayer) {
+    wl.mo.disconnect();
+    wl.ro.disconnect();
+    if (wl.timer) clearTimeout(wl.timer);
+    cancelAnimationFrame(wl.rafId);
+    wl.scroller.removeEventListener("scroll", wl.scrollHandler);
+    key.removeEventListener("click", wl.clickHandler, true);
+    wl.layer.remove(); // chip 挂层内随层移除，stubs 数组随 wl 丢弃
+    removeWireToolbar(); // 单例迷你条（一指针同时刻只可能挂在本层）
+    wireLayers.delete(key);
+}
+
+function removeWireLayer(protyle: IProtyle) {
+    const element = protyle?.element as HTMLElement;
+    const wl = element && wireLayers.get(element);
+    if (wl) disposeLayer(element, wl);
+    clearAnchors(element);
+}
+
+function ensureLayer(protyle: IProtyle): WireLayer | null {
+    const element = protyle?.element as HTMLElement;
+    const scroller = scrollerOf(protyle);
+    if (!element || !scroller || !protyle?.wysiwyg?.element) return null;
+    const old = wireLayers.get(element);
+    if (old) return old;
+
+    const layer = document.createElement("div");
+    layer.className = LAYER_CLASS;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", SVG_CLASS);
+    layer.appendChild(svg);
+    scroller.appendChild(layer);
+    // absolute 层的 containing block：滚动容器 static 时会向上逃逸到别的定位祖先
+    if (getComputedStyle(scroller).position === "static") scroller.style.position = "relative";
+
+    // 锚词点击=点线跳转同款（□3 spec §4.5）：capture 阶段拦截（内核对 data-type="a" 的
+    // 链接点击处理先于我们），拖选产生的非 collapsed 选区不触发（按下即拖动是选词）
+    const clickHandler = (e: Event) => {
+        if (!(mindWireEnable.get() && mindWireWordWire.get())) return;
+        const span = (e.target as HTMLElement)?.closest?.(`span[data-type="a"][data-href^="${WORD_WIRE_HREF_PREFIX}"]`);
+        if (!span || !element.contains(span)) return;
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const href = getAttribute(span, "data-href");
+        const other = [...element.querySelectorAll(`span[data-href="${href}"]`)]
+            .find((s) => s !== span) as HTMLElement | undefined;
+        if (other) {
+            other.scrollIntoView({ behavior: "smooth", block: "center" });
+            flashSpan(other);
+        }
+        flashSpan(span as HTMLElement);
+    };
+    element.addEventListener("click", clickHandler, true);
+
+    const wl: WireLayer = { protyle, element, layer, svg, scroller, mo: null, ro: null, timer: undefined, gen: 0, stubs: [], scrollHandler: () => {}, rafId: 0, clickHandler };
+    // 滚动三态（□4 spec §4.1.4）：只切残端 chip 显隐（rAF 节流合并滚动帧），
+    // 线本体/裁剪零滚动监听（内容坐标系自然涌现）；chip 几何挂载时定死随内容走
+    wl.scrollHandler = () => {
+        if (wl.rafId) return;
+        wl.rafId = requestAnimationFrame(() => {
+            wl.rafId = 0;
+            updateStubs(wl);
+        });
+    };
+    scroller.addEventListener("scroll", wl.scrollHandler, { passive: true });
+    // 刷新时机（spec §2.2）：内容增删/关键属性变更 debounce 200ms 全量重画；
+    // attributeFilter 排除自身写入（CONTENT_ATTR/style），防自触发循环
+    wl.mo = new MutationObserver(() => scheduleRedraw(protyle, wl));
+    wl.mo.observe(protyle.wysiwyg.element, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-node-id", "data-type", "data-id", "data-href", "custom-lnk-my-id", "custom-lnk-to-ids", "custom-mindwire-enable"],
+    });
+    wl.ro = new ResizeObserver(() => scheduleRedraw(protyle, wl));
+    wl.ro.observe(scroller);
+    wireLayers.set(element, wl);
+    return wl;
+}
+
+function scheduleRedraw(protyle: IProtyle, wl: WireLayer) {
+    if (wl.timer) clearTimeout(wl.timer);
+    wl.timer = window.setTimeout(() => {
+        wl.timer = undefined;
+        drawWireLayer(protyle, wl);
+    }, 200);
+}
+
+/** 清词级锚词痕迹（accent 变量+跨行类+hot/flash/降级藏点残留）：重画前/门禁拒绝态/单端孤儿统一还原（与块级 clearAnchors 同模式） */
+function clearWordMarks(element: HTMLElement) {
+    element?.querySelectorAll(`span[data-type="a"][data-href^="${WORD_WIRE_HREF_PREFIX}"]`).forEach((e: HTMLElement) => {
+        e.style.removeProperty(ACCENT_VAR);
+        e.classList.remove("tomato-mind-wire-ml", "tomato-mind-wire-nodot", HOT_CLASS, FLASH_CLASS);
+    });
+}
+
+/** 门禁拒绝态：清空画（层壳与 observer 保留——custom-mindwire-enable 属性变更仍被
+ *  监听，恢复 en 时 MutationObserver 可自行回画；dispose 只属于层生命周期终点） */
+function blankLayer(wl: WireLayer) {
+    wl.svg.innerHTML = "";
+    wl.layer.style.height = "";
+    removeStubs(wl);
+    removeWireToolbar(); // 迷你条/chip 挂层（非 svg），须单独清
+    clearAnchors(wl.element);
+    clearWordMarks(wl.element);
+}
+
+/** 全量重画：清锚点染色→收线对→逐对画线；锚点未渲染（虚拟滚动）跳过由下轮补 */
+async function drawWireLayer(protyle: IProtyle, wl: WireLayer) {
+    try {
+        const element = protyle?.element as HTMLElement;
+        if (!element || !document.contains(element)) {
+            if (element) disposeLayer(element, wl);
+            return;
+        }
+        const gen = ++wl.gen;
+        const attr = await siyuan.getBlockAttrs(protyle.block.rootID)
+        if (wl.gen != gen) return;
+        const en = attr?.["custom-mindwire-enable"]
+        if (!(mindWireEnable.get() && en != "di")) {
+            dlog(`draw skip gate enable=${mindWireEnable.get()} en=${en}`);
+            blankLayer(wl);
+            return;
+        }
+
+        clearAnchors(element);
+        clearWordMarks(element);
+        wl.svg.innerHTML = "";
+        removeWireToolbar(); // 迷你条闭包引用旧 path/span，重画后必须重建
+        removeStubs(wl); // 残端 chip 同理（与迷你条单例分开管理）
+        const sc = wl.scroller;
+        // 内容坐标原点 = 滚动容器视口左上 − 已滚距离（rect 差值只对齐容器视口顶，
+        // 非 scrollTop=0 时重画必须补偿，否则线整体上偏 scrollTop）
+        const origin = { left: sc.getBoundingClientRect().left, top: sc.getBoundingClientRect().top - sc.scrollTop };
+        // 层高 = 内容全长（高度 100% 对 absolute 元素只是容器视口高，须显式铺满）
+        wl.layer.style.height = sc.scrollHeight + "px";
+
+        const set = new Set<string>();
+        let n = 0;
+        for (const [id1, id2] of collectPairs(element)) {
+            if (set.has(id1 + id2) || set.has(id2 + id1)) continue;
+            set.add(id1 + id2);
+            set.add(id2 + id1);
+            drawOne(wl, origin, id1, id2);
+            n++;
+        }
+        // 词级线（□2 数据链，spec §3）：标记 span 对按 wireId 配对 → 词级贝塞尔。
+        // 关 mindWireWordWire 时不扫不清（功能关着不动数据）
+        let nw = 0;
+        wl.layer.removeAttribute("data-degrade");
+        if (mindWireWordWire.get()) {
+            const relations = parseRelations(attr?.[RELATIONS_ATTR]);
+            const { pairs, seen } = collectWordWires(element);
+            // 长文自动降级 D11（spec §4.1.5）：>120 条=砍装饰（流动+圆点）不砍功能
+            // （整线/跳转/残端 chip/迷你条保留）；线数回落自动恢复。层属性=e2e 断言锚。
+            // 值必须写实 "1"：toggleAttribute 只设空串，[data-degrade="1"] 选择器与
+            // 断言均不命中（□5 D11 造数补验实锤，CSS 藏点+断言此前恒假）
+            const degraded = pairs.length > 120;
+            if (degraded) {
+                wl.layer.setAttribute("data-degrade", "1");
+            } else {
+                wl.layer.removeAttribute("data-degrade");
+            }
+            for (const { wireId, ends } of pairs) {
+                drawWordOne(wl, origin, wireId, ends[0], ends[1], relations[wireId], protyle, degraded);
+                nw++;
+            }
+            // 孤儿清理（spec §3.2）：属性条目 − DOM 扫集，差集非空才回写（避免无谓写）
+            const cleaned = cleanupRelations(attr?.[RELATIONS_ATTR], seen);
+            if (cleaned != null) {
+                try {
+                    await siyuan.setBlockAttrs(protyle.block.rootID, { [RELATIONS_ATTR]: cleaned } as AttrType);
+                    dlog(`orphan cleanup root=${protyle.block.rootID} cleaned="${cleaned}"`);
+                } catch (err) {
+                    dlog(`orphan cleanup error ${err}`);
+                }
+            }
+        }
+        dlog(`draw ok root=${protyle.block.rootID} pairs=${n} word=${nw} scrollTop=${sc.scrollTop}`);
+        // 残端 chip 水平钳制（spec §4.2）：挂载循环结束后统一测量（免逐个交错读写
+        // 强制回流）；visibility 隐藏态保布局，offsetWidth 可测。最后按当前滚动位首判显隐
+        const layerW = wl.layer.clientWidth;
+        for (const rec of wl.stubs) {
+            for (const c of rec.chips) {
+                const half = c.offsetWidth / 2;
+                if (half > 0) c.style.left = clampStubX(parseFloat(c.style.left), half, layerW) + "px";
+            }
+        }
+        updateStubs(wl);
+    } catch (err) {
+        dlog(`draw error ${err}`);
+    }
+}
+
+/** 线对收集：块引用 + 互链（均限定本编辑器内；跨编辑器锚点在内容坐标系下无法表达，跳过） */
+function collectPairs(element: HTMLElement): [string, string][] {
+    const pairs: [string, string][] = [];
+    element.querySelectorAll(`span[data-type="block-ref"]`).forEach((e: HTMLElement) => {
+        if (mindWireStarRefOnly.get() && e.textContent.trim() != "*") return;
+        const id2 = getAttribute(e, "data-id");
+        const id1 = getID(e);
+        if (id1 && id2 && id1 != id2) pairs.push([id1, id2]);
+    });
+    element.querySelectorAll(`div[custom-lnk-my-id]`).forEach((e: HTMLElement) => {
+        const id1 = getAttribute(e, "data-node-id");
+        getAttribute(e, "custom-lnk-to-ids")
+            ?.split(",")
+            ?.forEach(lnk => {
+                const t = element.querySelector(`div[custom-lnk-my-id="${lnk}"]`);
+                const id2 = t ? getAttribute(t as HTMLElement, "data-node-id") : "";
+                if (id1 && id2 && id1 != id2) pairs.push([id1, id2]);
+            });
+    });
+    return pairs;
+}
+
+/** 词级线收集（spec §3）：本编辑器内词级标记 span 按 wireId 分组配对；
+ *  前缀选择器天然不命中批注（#tomato-anno-）与普通链接 */
+function collectWordWires(element: HTMLElement) {
+    const items: { href: string; end: HTMLElement }[] = [];
+    element.querySelectorAll(`span[data-type="a"][data-href^="${WORD_WIRE_HREF_PREFIX}"]`).forEach((e: HTMLElement) => {
+        const href = getAttribute(e, "data-href");
+        if (href) items.push({ href, end: e });
+    });
+    return groupWordWires(items);
+}
+
+/** 跨行 inline span 的 getBoundingClientRect 是联合盒（横向中心落在两行间空白），
+ *  端点几何取 Range.getClientRects 的第一行 fragment（读序起点行）；无 range 时回退联合盒 */
+function firstFragmentRect(s: HTMLElement): { rect: DOMRect; multiline: boolean } {
+    try {
+        const range = document.createRange();
+        range.selectNodeContents(s);
+        const rects = range.getClientRects();
+        if (rects.length > 1) return { rect: rects[0], multiline: true };
+        if (rects.length === 1) return { rect: rects[0], multiline: false };
+    } catch { /* 回退联合盒 */ }
+    return { rect: s.getBoundingClientRect(), multiline: false };
+}
+
+/** 词级单线（spec §4.1）：端点=词底缘中点 +8px 下出线、wordWireGeometry 贝塞尔+中点；
+ *  accent 写两端 span inline（圆点/hot/flash 同源）；rect 全零=未渲染跳过由下轮补。
+ *  跨行词的 CSS ::after 圆点挂实现定义 fragment 会与端点分离（P0-1）：改由 svg circle
+ *  在端点正下方画点（同 fragment 同心），CSS 点藏掉。
+ *  □3：同 d 隐形命中走廊（pointer-events:stroke）挂交互——hover 高亮/点线跳转/长按迷你条
+ *  □4 D11：降级档（>120 条）不加流动、藏圆点（跨行 svg circle 同跳过——CSS 只藏 ::after 罩不到它） */
+function drawWordOne(wl: WireLayer, origin: { left: number; top: number }, wireId: string, s1: HTMLElement, s2: HTMLElement, relation: string | undefined, protyle: IProtyle, degraded: boolean) {
+    const f1 = firstFragmentRect(s1);
+    const f2 = firstFragmentRect(s2);
+    if ((!f1.rect.width && !f1.rect.height) || (!f2.rect.width && !f2.rect.height)) return;
+    const a1 = toContentRect(f1.rect, origin);
+    const a2 = toContentRect(f2.rect, origin);
+    const color = mindWireColorfull.get() && lastVerifyResult()
+        ? relationColor(relation)
+        : "var(--b3-font-color4)";
+    s1.style.setProperty(ACCENT_VAR, color);
+    s2.style.setProperty(ACCENT_VAR, color);
+    s1.classList.toggle("tomato-mind-wire-ml", f1.multiline);
+    s2.classList.toggle("tomato-mind-wire-ml", f2.multiline);
+    s1.classList.toggle("tomato-mind-wire-nodot", degraded);
+    s2.classList.toggle("tomato-mind-wire-nodot", degraded);
+
+    const p1 = { x: a1.cx, y: a1.bottom + 8 };
+    const p2 = { x: a2.cx, y: a2.bottom + 8 };
+    const geo = wordWireGeometry(p1, p2, a1.w, a2.w);
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("class", `${PATH_CLASS} ${WORD_PATH_CLASS}`);
+    path.setAttribute("d", geo.d);
+    path.style.stroke = color;
+    path.style.strokeWidth = mindWireWidth.get().toString() + "px";
+    // 虚实/流动三档同块级；词级 dasharray 用 "6 4" 新值（块级保持 "10"，spec §4.1.3）
+    if (mindWireLine.get() && lastVerifyResult()) {
+        path.style.strokeDasharray = "none";
+    } else {
+        path.style.strokeDasharray = "6 4";
+        if (mindWireDynamicLine.get() && !degraded) path.classList.add(FLOW_CLASS);
+    }
+    wl.svg.appendChild(path);
+
+    // 跨行端点：CSS 圆点已藏，svg 补画（中心=字底+4.5 与 CSS ::after 底偏移同款）；
+    // 降级档藏圆点时跨行端同跳过（线端点本身即视觉锚，spec §4.1.5）
+    for (const [a, ml] of [[a1, f1.multiline], [a2, f2.multiline]] as const) {
+        if (!ml || degraded) continue;
+        const dot = document.createElementNS(SVG_NS, "circle");
+        dot.setAttribute("class", "tomato-mind-wire-dot");
+        dot.setAttribute("cx", a.cx.toString());
+        dot.setAttribute("cy", (a.bottom + 4.5).toString());
+        dot.setAttribute("r", "2.5");
+        dot.style.fill = color;
+        dot.style.stroke = "var(--b3-theme-background)";
+        dot.style.strokeWidth = "1px";
+        wl.svg.appendChild(dot);
+    }
+
+    // 命中走廊（□3 spec §4.5）：与可见 path 同 d、stroke:none + pointer-events:stroke
+    const hit = document.createElementNS(SVG_NS, "path");
+    hit.setAttribute("class", HIT_CLASS);
+    hit.setAttribute("d", geo.d);
+    wl.svg.appendChild(hit);
+    attachWireInteraction(wl, protyle, wireId, path, hit, s1, s2, geo.mid, relation);
+    // 残端 chip（□4）：标签取对端词；点击与点线/锚词跳转共用 jumpWire。
+    // □5 拍板：锚上方可用空间（到所在块上一有盒兄弟）<38px 时上态 chip 下置防贴碰
+    attachStubs(wl, a1, a2, s1.textContent ?? "", s2.textContent ?? "", color, () => jumpWire(wl, s1, s2),
+        [availAboveOf(s1, a1.top, origin.top), availAboveOf(s2, a2.top, origin.top)]);
+}
+
+/** 锚词上方可用空间（内容坐标）：锚词 top 减所在块上一个有盒兄弟的底缘（文档
+ *  顶/无兄弟时减 0=层顶）。零高度兄弟（hr 残影等）跳过继续上溯 */
+function availAboveOf(span: HTMLElement, anchorTop: number, originTop: number): number {
+    let prev = span.closest("div[data-node-id]")?.previousElementSibling as HTMLElement | null;
+    while (prev && prev.getBoundingClientRect().height === 0) prev = prev.previousElementSibling as HTMLElement | null;
+    const obstacleBottom = prev ? prev.getBoundingClientRect().bottom - originTop : 0;
+    return anchorTop - obstacleBottom;
+}
+
+// ---------------------------------------------------------------------------
+// 线交互（□3 · spec §4.5）：走廊 hover 高亮两端 / 点线跳转+闪高亮 / 线中点迷你条
+// （6 关系色点+×删除；触屏长按 350ms 唤出）；迷你条单例挂层内、重画/换线即重建。
+// ---------------------------------------------------------------------------
+
+/** 闪高亮重放（spec §4.6）：加类前先移除+强制 reflow，animationend 自摘；1.2s 兜底（后台 tab 不派发） */
+function flashSpan(s: HTMLElement) {
+    if (!s?.isConnected) return;
+    s.classList.remove(FLASH_CLASS);
+    void s.offsetWidth;
+    s.classList.add(FLASH_CLASS);
+    const off = () => s.classList.remove(FLASH_CLASS);
+    s.addEventListener("animationend", off, { once: true });
+    setTimeout(off, 1200);
+}
+
+/** 点线跳转（spec §4.5）：整线=两端闪；一端离屏=平滑滚到离屏端（block:center）+其词闪高亮 */
+function jumpWire(wl: WireLayer, s1: HTMLElement, s2: HTMLElement) {
+    if (!s1.isConnected || !s2.isConnected) return;
+    const sc = wl.scroller.getBoundingClientRect();
+    const off = (s: HTMLElement) => {
+        const r = s.getBoundingClientRect();
+        return r.bottom < sc.top || r.top > sc.bottom;
+    };
+    const away = [s1, s2].filter(off);
+    if (away.length) away[away.length - 1].scrollIntoView({ behavior: "smooth", block: "center" });
+    flashSpan(s1);
+    flashSpan(s2);
+}
+
+/** 迷你条单例：一次只一条线的（spec §4.5），换线/重画/删线即拆 */
+let wireToolbar: HTMLDivElement | null = null;
+function removeWireToolbar() {
+    wireToolbar?.remove();
+    wireToolbar = null;
+}
+
+/** 关系写入（spec §3.2/D12）：只动文档根属性不碰标记 DOM，写后重画刷新两端 accent */
+async function setRelation(protyle: IProtyle, wireId: string, key: RelationKey) {
+    try {
+        const attr = await siyuan.getBlockAttrs(protyle.block.rootID);
+        const map = parseRelations(attr?.[RELATIONS_ATTR]);
+        map[wireId] = key;
+        await siyuan.setBlockAttrs(protyle.block.rootID, { [RELATIONS_ATTR]: JSON.stringify(map) } as AttrType);
+    } catch (err) {
+        dlog(`setRelation error ${err}`);
+    } finally {
+        removeWireToolbar();
+        redrawWire(protyle);
+    }
+}
+
+/** 删除线（spec §4.5 × 钮）：逐端反选摘除标记（事务可 Ctrl+Z）；每摘一端内核重建块 DOM，
+ *  必须按 href 现查下一端（旧引用已 detach）；属性条目由重画 cleanupRelations 差集兜 */
+async function deleteWordWire(protyle: IProtyle, wireId: string) {
+    const href = WORD_WIRE_HREF_PREFIX + wireId;
+    let guard = 0;
+    while (guard++ < 4) {
+        const span = protyle.element?.querySelector(`span[data-href="${href}"]`) as HTMLElement | null;
+        if (!span || !span.isConnected) break;
+        if (!removeWordMark(protyle, span)) break;
+    }
+    removeWireToolbar();
+    redrawWire(protyle);
+    dlog(`delete wire ${wireId}`);
+}
+
+/** 走廊交互挂接：桌面 pointerenter=hot+迷你条、leave=还原+300ms 延迟隐藏（给指针移入
+ *  迷你条留路）；触屏无 hover——长按 350ms 唤迷你条；click=点线跳转（拖选不触发 click） */
+function attachWireInteraction(
+    wl: WireLayer, protyle: IProtyle, wireId: string,
+    path: SVGPathElement, hit: SVGPathElement, s1: HTMLElement, s2: HTMLElement,
+    mid: { x: number; y: number }, relation: string | undefined,
+) {
+    let hideTimer: number | undefined;
+    const setHot = (on: boolean) => {
+        path.style.strokeWidth = (mindWireWidth.get() + (on ? 1 : 0)) + "px";
+        for (const s of [s1, s2]) s.classList.toggle(HOT_CLASS, on);
+    };
+    const hideToolbar = () => {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = window.setTimeout(removeWireToolbar, 300);
+    };
+    const showToolbar = () => {
+        removeWireToolbar();
+        const pos = toolbarPos(mid);
+        const bar = document.createElement("div");
+        bar.className = TOOLBAR_CLASS + (pos.below ? " tomato-mind-wire-toolbar--below" : "");
+        bar.style.left = pos.left + "px";
+        bar.style.top = pos.top + "px";
+        // 关系色点行：Pro 门禁（colorfull+验签）关时迷你条退化为纯删除条（spec §4.5）
+        if (mindWireColorfull.get() && lastVerifyResult()) {
+            for (const key of RELATION_KEYS) {
+                const dot = document.createElement("button");
+                dot.className = "tomato-mind-wire-rel-dot";
+                dot.style.color = RELATION_COLOR[key];
+                dot.setAttribute("aria-pressed", String(key === relation));
+                dot.title = RELATION_I18N[key]();
+                dot.addEventListener("click", () => void setRelation(protyle, wireId, key));
+                bar.appendChild(dot);
+            }
+            const sep = document.createElement("span");
+            sep.className = "tomato-mind-wire-toolbar-sep";
+            bar.appendChild(sep);
+        }
+        const x = document.createElement("button");
+        x.className = "tomato-mind-wire-x";
+        x.setAttribute("aria-label", tomatoI18n.删除导线);
+        x.innerHTML = `<svg><use xlink:href="#iconClose"></use></svg>`;
+        x.addEventListener("click", () => void deleteWordWire(protyle, wireId));
+        bar.appendChild(x);
+        bar.addEventListener("pointerenter", () => { if (hideTimer) { clearTimeout(hideTimer); hideTimer = undefined; } });
+        bar.addEventListener("pointerleave", hideToolbar);
+        wl.layer.appendChild(bar);
+        wireToolbar = bar;
+    };
+
+    hit.addEventListener("pointerenter", (e) => {
+        if ((e as PointerEvent).pointerType === "touch") return;
+        setHot(true);
+        showToolbar();
+    });
+    hit.addEventListener("pointerleave", (e) => {
+        if ((e as PointerEvent).pointerType === "touch") return;
+        setHot(false);
+        hideToolbar();
+    });
+    let holdTimer: number | undefined;
+    hit.addEventListener("pointerdown", (e) => {
+        if ((e as PointerEvent).pointerType !== "touch") return;
+        holdTimer = window.setTimeout(showToolbar, 350);
+    });
+    const cancelHold = () => {
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = undefined; }
+    };
+    hit.addEventListener("pointerup", cancelHold);
+    hit.addEventListener("pointercancel", cancelHold);
+    hit.addEventListener("click", () => jumpWire(wl, s1, s2));
+}
+
+// ---------------------------------------------------------------------------
+// 滚动三态 + 线头残端（□4 · spec §4.1.4/§4.2）：双 chip 预建挂层内锚词旁
+// （内容坐标随滚动走，方向由两端内容序定死——挂「较上端」的 chip 显示时必然是
+// 下端离屏）；滚动事件 rAF 节流只切显隐，线本体/裁剪零滚动监听（D1 不破）。
+// ---------------------------------------------------------------------------
+
+/** 残端 chip 制造（spec §4.2 模板）：chevron+色点+目标词标签（8 字截断），
+ *  accent=线色同源；点击=jumpWire（滚到离屏端+双端闪，离屏端检测在役）。
+ *  availAbove=锚上方可用空间（词级；上态 <38px 下置防贴碰，spec §4.2 □5 拍板） */
+function makeStub(
+    wl: WireLayer, anchor: { cx: number; top: number; bottom: number }, dir: "down" | "up",
+    word: string, color: string, onJump: () => void, availAbove = Infinity,
+): HTMLButtonElement {
+    const pos = stubPos(anchor, dir, availAbove);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `${STUB_CLASS} tomato-mind-wire-stub--${dir} ${STUB_OFF_CLASS}`;
+    chip.style.left = pos.left + "px";
+    chip.style.top = pos.top + "px";
+    chip.style.setProperty(ACCENT_VAR, color);
+    chip.innerHTML = `<svg class="tomato-mind-wire-stub-arrow"><use xlink:href="#iconArrowDown"></use></svg><span class="tomato-mind-wire-stub-dot"></span>`;
+    const label = document.createElement("span");
+    label.className = "tomato-mind-wire-stub-label";
+    label.textContent = wordClip(word.trim(), 8);
+    chip.appendChild(label);
+    chip.setAttribute("aria-label", `${tomatoI18n.连到}：「${wordClip(word.trim(), 8)}」`);
+    chip.addEventListener("click", onJump);
+    wl.layer.appendChild(chip);
+    return chip;
+}
+
+/** 双 chip 挂接（词级/块级共用）：两端各一（锚自己旁、标签取对端词），
+ *  rec.ys 预存内容坐标供滚动期纯数字判定；availAbove 可选 [端1,端2] 上方可用空间
+ *  （词级传——上态贴碰下置用；块级不传，骑块顶是块级既有形态） */
+function attachStubs(
+    wl: WireLayer,
+    a1: { cx: number; top: number; bottom: number }, a2: { cx: number; top: number; bottom: number },
+    word1: string, word2: string, color: string,
+    onJump: () => void, availAbove?: [number, number],
+) {
+    const c1 = makeStub(wl, a1, stubDir(a1, a2), word2, color, onJump, availAbove?.[0]);
+    const c2 = makeStub(wl, a2, stubDir(a2, a1), word1, color, onJump, availAbove?.[1]);
+    wl.stubs.push({
+        ys: [{ top: a1.top, bottom: a1.bottom }, { top: a2.top, bottom: a2.bottom }],
+        chips: [c1, c2],
+    });
+}
+
+function removeStubs(wl: WireLayer) {
+    for (const rec of wl.stubs) rec.chips.forEach((c) => c.remove());
+    wl.stubs = [];
+}
+
+/** 三态显隐：视口=滚动容器 [scrollTop, scrollTop+clientHeight] 映射到内容坐标，
+ *  wireViewState 判定后只切 --off 类（visibility 不触发重排）；
+ *  □5 拍板：可见 chip 贴视口顶/底缘被裁时 marginTop 精确让位（stubEdgeShift） */
+function updateStubs(wl: WireLayer) {
+    const top = wl.scroller.scrollTop;
+    const view = { top, bottom: top + wl.scroller.clientHeight };
+    for (const rec of wl.stubs) {
+        const st = wireViewState(rec.ys[0], rec.ys[1], view);
+        rec.chips.forEach((chip, i) => {
+            const on = st.state === "stub" && st.visibleEnd === i;
+            chip.classList.toggle(STUB_OFF_CLASS, !on);
+            const mt = on ? stubEdgeShift(parseFloat(chip.style.top), view) : 0;
+            const mtPx = mt + "px";
+            if (chip.style.marginTop !== mtPx) chip.style.marginTop = mtPx;
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 划词两步流（□3 · spec §4.3/§4.4）：第一步「关联起点」即写起点标记（单端不成线只
+// 圆点，跨刷新不丢——比内存存选区稳）；第二步「连到」写终点标记+首写关系条目成线；
+// pending 期间状态芯片（MindWirePending，Esc/移动端 × 取消=摘起点标记）。
+// ---------------------------------------------------------------------------
+
+interface WordPending {
+    wireId: string;
+    /** 起点词全文（显示处 wordClip 截断） */
+    word: string;
+    rootId: string;
+}
+let pending: WordPending | null = null;
+let pendingChip: { dismiss: () => void } | null = null;
+
+/** 划词选区判定（菜单项显隐与两步写入共用）：非 collapsed + 单块（a 类型跨块
+ *  setInlineMark 直接 return 静默失败，词粒度划选天然单块）+ 非代码块 + 有实文本 */
+function currentTextRange(): Range | null {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed || !range.toString().trim()) return null;
+    const asEl = (n: Node) => (n.nodeType === 3 ? n.parentElement : (n as HTMLElement));
+    const startBlock = asEl(range.startContainer)?.closest?.("div[data-node-id]");
+    const endBlock = asEl(range.endContainer)?.closest?.("div[data-node-id]");
+    if (!startBlock || !endBlock || startBlock !== endBlock) return null;
+    if (startBlock.getAttribute("data-type") === "NodeCodeBlock") return null;
+    return range;
+}
+
+/** 选区锚点落着的既有词级标记 wireId（「划在起点同一 span」判定用） */
+function selExistingWireId(range: Range): string | null {
+    const asEl = (n: Node) => (n.nodeType === 3 ? n.parentElement : (n as HTMLElement));
+    const span = asEl(range.startContainer)?.closest?.(`span[data-type="a"][data-href^="${WORD_WIRE_HREF_PREFIX}"]`);
+    return span ? wireIdFromHref(getAttribute(span, "data-href")) : null;
+}
+
+/** 写词级标记（批注同款 API，Annotations.ts:393 先例）；写后清菜单防 linkMenu 残留 */
+function setWordMark(protyle: IProtyle, range: Range, href: string): boolean {
+    try {
+        protyle.toolbar.range = range.cloneRange();
+        protyle.toolbar.setInlineMark(protyle, "a", "range", { type: "a", color: href });
+        (globalThis as any).siyuan?.menus?.menu?.remove();
+        return true;
+    } catch (err) {
+        dlog(`setWordMark error ${err}`);
+        return false;
+    }
+}
+
+/** 反选摘除标记（spec §11 验证点 1）：range 须落在 span 的 text node 上
+ *  （startContainer.nodeType===3）——rangeTypes 才会从 parent span 收到 data-type="a"，
+ *  不带 textObj 调用即走 shouldRemove 移除路径（updateBatchTransaction 可 Ctrl+Z） */
+function removeWordMark(protyle: IProtyle, span: HTMLElement): boolean {
+    const first = span.firstChild;
+    const last = span.lastChild;
+    if (!first || !last || first.nodeType !== 3 || last.nodeType !== 3) return false;
+    try {
+        const range = document.createRange();
+        range.setStart(first, 0);
+        range.setEnd(last, (last.textContent ?? "").length);
+        protyle.toolbar.range = range;
+        protyle.toolbar.setInlineMark(protyle, "a", "range");
+        (globalThis as any).siyuan?.menus?.menu?.remove();
+        return true;
+    } catch (err) {
+        dlog(`removeWordMark error ${err}`);
+        return false;
+    }
+}
+
+/** 关系条目首写（默认「关联」灰，spec §4.7：线成后迷你条改色，不强迫先选） */
+async function ensureRelation(protyle: IProtyle, wireId: string) {
+    try {
+        const attr = await siyuan.getBlockAttrs(protyle.block.rootID);
+        const map = parseRelations(attr?.[RELATIONS_ATTR]);
+        if (map[wireId]) return;
+        map[wireId] = "related";
+        await siyuan.setBlockAttrs(protyle.block.rootID, { [RELATIONS_ATTR]: JSON.stringify(map) } as AttrType);
+    } catch (err) {
+        dlog(`ensureRelation error ${err}`);
+    }
+}
+
+/** 按 wireId 找编辑器内标记 span（Esc 取消/替换起点时摘除用；找不到=用户已手动删词，静默过） */
+function findEndSpan(protyle: IProtyle, wireId: string): HTMLElement | null {
+    return protyle?.element?.querySelector(`span[data-href="${WORD_WIRE_HREF_PREFIX}${wireId}"]`) as HTMLElement | null;
+}
+
+/** 闪两端（线成确认反馈，spec §4.3 第二步）：写入重建 DOM 后现查新 span */
+function flashWireEnds(protyle: IProtyle, wireId: string) {
+    protyle.element?.querySelectorAll(`span[data-href="${WORD_WIRE_HREF_PREFIX}${wireId}"]`).forEach((s) => flashSpan(s as HTMLElement));
+}
+
+function showPendingChip() {
+    hidePendingChip();
+    if (!pending) return;
+    const app = mount(MindWirePending, {
+        target: document.body,
+        props: {
+            word: wordClip(pending.word),
+            accent: "var(--b3-font-color5)",
+            isMobile: events.isMobile,
+            oncancel: () => cancelPending(),
+            onclosed: () => unmount(app),
+        },
+    });
+    pendingChip = { dismiss: () => app.dismiss() };
+}
+
+function hidePendingChip() {
+    pendingChip?.dismiss();
+    pendingChip = null;
+}
+
+/** 取消 pending（Esc/芯片 ×）：摘起点标记（若还在 DOM）+ 芯片退场；标记已被用户手动删则静默 */
+function cancelPending() {
+    const p = pending;
+    pending = null;
+    hidePendingChip();
+    if (!p) return;
+    const prot = events.protyle?.protyle;
+    if (!prot) return;
+    const span = findEndSpan(prot, p.wireId);
+    if (span) {
+        removeWordMark(prot, span);
+        redrawWire(prot);
+    }
+    dlog(`pending cancel ${p.wireId}`);
+}
+
+// ---------------------------------------------------------------------------
+// 块级线（现役行为原样：直线/裸端点/hash 色，spec §4.9 块级现状不动）
+// ---------------------------------------------------------------------------
+
+/** 锚点五级回退（现役 getAnchor 原样迁移，查询范围从全编辑器收窄到本 element） */
+function getAnchor(element: HTMLElement, id: string): HTMLElement | null {
+    return element.querySelector(`div[data-node-id="${id}"] > div[contenteditable] > span[data-type="block-ref"]`)
+        ?? element.querySelector(`div[data-node-id="${id}"] > div[contenteditable] > span[data-type="a"]`)
+        ?? element.querySelector(`div[data-node-id="${id}"] > div[contenteditable] > span`)
+        ?? element.querySelector(`div[data-node-id="${id}"] > div[contenteditable]`)
+        ?? element.querySelector(`div[data-node-id="${id}"]`);
+}
+
+function wireColor(id1: string, id2: string) {
+    if (mindWireColorfull.get() && lastVerifyResult()) {
+        const hashcolor = murmurHash3(id1 + id2)
+        return `var(--b3-font-color${1 + (hashcolor % 12)})`
+    }
+    return "var(--b3-font-color4)"
+}
+
+/** 锚块染色（现役 borderAndLine 的 border 侧，视觉照旧） */
+function paintAnchor(e: HTMLElement, c: string) {
+    e.setAttribute(CONTENT_ATTR, "1");
+    e.style.borderColor = c;
+    e.style.borderWidth = mindWireWidth.get().toString() + "px";
+    if (mindWireLine.get() && lastVerifyResult()) {
+        e.style.borderStyle = "solid";
+    } else {
+        e.style.borderStyle = "dashed";
+    }
+}
+
+function drawOne(wl: WireLayer, origin: { left: number; top: number }, id1: string, id2: string) {
+    const a1 = getAnchor(wl.element, id1);
+    const a2 = getAnchor(wl.element, id2);
+    if (!a1 || !a2) return;
+    const r1 = shiftRect(a1.getBoundingClientRect(), origin);
+    const r2 = shiftRect(a2.getBoundingClientRect(), origin);
+    const p1 = getEdgePoint(r1, r2);
+    const p2 = getEdgePoint(r2, r1);
+
+    paintAnchor(a1, wireColor(id1, id2));
+    paintAnchor(a2, wireColor(id1, id2));
+
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("class", PATH_CLASS);
+    path.setAttribute("d", blockWirePath(p1, p2));
+    path.style.stroke = wireColor(id1, id2);
+    path.style.strokeWidth = mindWireWidth.get().toString() + "px";
+    // 虚实/流动三档（块级 dasharray 保持 "10" 现状，spec §4.1.3）
+    if (mindWireLine.get() && lastVerifyResult()) {
+        path.style.strokeDasharray = "none";
+    } else {
+        path.style.strokeDasharray = "10";
+        if (mindWireDynamicLine.get()) path.classList.add(FLOW_CLASS);
+    }
+    wl.svg.appendChild(path);
+    // 残端 chip（□4，块级同适用三态）：锚=块 rect 中心/上下缘，标签=对端文本前 8 字；
+    //  星引用锚文本恒为「*」零信息（mindWireStarRefOnly 连线全是它），回退取所在块文本
+    const c = wireColor(id1, id2);
+    const blockWord = (a: HTMLElement) => {
+        const t = (a.closest("div[data-node-id]")?.textContent ?? a.textContent ?? "").trim();
+        return t || (a.textContent ?? "*").trim();
+    };
+    attachStubs(
+        wl,
+        { cx: (r1.left + r1.right) / 2, top: r1.top, bottom: r1.bottom },
+        { cx: (r2.left + r2.right) / 2, top: r2.top, bottom: r2.bottom },
+        blockWord(a1), blockWord(a2), c,
+        () => jumpWire(wl, a1, a2),
+    );
+}
+
+function redrawWire(protyle: IProtyle) {
+    const wl = ensureLayer(protyle);
+    if (wl) drawWireLayer(protyle, wl);
+}
+
 class MindWire {
     plugin: BaseTomatoPlugin;
-    protyle: IProtyle
 
     private globalEnable() {
         if (mindWireEnable.get()) {
@@ -26,6 +853,12 @@ class MindWire {
             mindWireEnable.write(true)
             siyuan.pushMsg(tomatoI18n.启用思维导线)
         }
+        // 开关翻转即刻刷新可见编辑器（旧实现要等下一次点击/切换页签）
+        getAllEditor().forEach(p => {
+            if (isEditor(p.protyle)) {
+                mindWireEnable.get() ? redrawWire(p.protyle) : removeWireLayer(p.protyle);
+            }
+        });
     }
 
     private mindMenu(detail: TomatoMenu) {
@@ -42,16 +875,124 @@ class MindWire {
             accelerator: MindWire启用或禁用文档思维导线.m,
             click: () => toggleDocMindWire(events.protyle?.protyle),
         }, MindWire启用或禁用文档思维导线.menu());
+        this.wordWireMenu(menu);
+    }
+
+    /** 划词两步流菜单（□3 spec §4.3）：显隐=门禁链+划词选区有效（单块非空）；
+     *  无 pending=「关联起点」一项；有 pending=「连到：××」（主意图在前）+
+     *  「关联起点」（替换起点，芯片文案热更新）两项 */
+    private wordWireMenu(menu: any) {
+        if (!(mindWireCheckbox.get() && mindWireWordWire.get() && mindWireEnable.get())) return;
+        const protyle = events.protyle?.protyle;
+        if (!protyle) return;
+        // 菜单构造时判定选区（划词右键选区仍在）；点击回调里再验一次防选区被菜单交互顶掉
+        if (!currentTextRange()) return;
+        addIfVisible(menu, WORD_MENU_KEY, pending ? {
+            label: `${tomatoI18n.连到}：「${wordClip(pending.word)}」`,
+            icon: "iconLink",
+            click: () => void this.finishWordWire(protyle),
+        } : {
+            label: tomatoI18n.关联起点,
+            icon: "iconLink",
+            click: () => this.startWordWire(protyle),
+        });
+        if (pending) {
+            addIfVisible(menu, WORD_MENU_KEY, {
+                label: tomatoI18n.关联起点,
+                icon: "iconLink",
+                click: () => this.startWordWire(protyle),
+            });
+        }
+    }
+
+    /** 第一步/替换起点（spec §4.3）：写起点标记（单端不成线只圆点，刷新不丢）+
+     *  芯片出场；pending 期重复执行=摘旧标记换新起点（芯片文案随重挂热更新） */
+    private startWordWire(protyle: IProtyle) {
+        const range = currentTextRange();
+        if (!range) return;
+        if (pending) {
+            const old = findEndSpan(protyle, pending.wireId);
+            if (old) removeWordMark(protyle, old);
+            pending = null;
+        }
+        const wireId = makeWireId();
+        const href = WORD_WIRE_HREF_PREFIX + wireId;
+        if (!setWordMark(protyle, range, href)) return;
+        pending = { wireId, word: range.toString().trim(), rootId: protyle.block.rootID };
+        showPendingChip();
+        dlog(`pending start ${wireId} word=${pending.word}`);
+    }
+
+    /** 第二步连终点（spec §4.3）：同词/跨文档边界 toast 且 pending 保留；
+     *  成线=关系条目首写（属性先落防丢）→ 终点标记 → 主动重画+两端闪高亮 */
+    private async finishWordWire(protyle: IProtyle) {
+        const p = pending;
+        if (!p) return;
+        const range = currentTextRange();
+        if (!range) return;
+        const check = checkWireEnd(
+            { wireId: p.wireId, rootId: p.rootId },
+            { selWireId: selExistingWireId(range), rootId: protyle.block.rootID },
+        );
+        if (check === "same") {
+            siyuan.pushMsg(tomatoI18n.起点终点相同);
+            return;
+        }
+        if (check === "crossdoc") {
+            siyuan.pushMsg(tomatoI18n.词级导线仅限本文档);
+            return;
+        }
+        await ensureRelation(protyle, p.wireId);
+        if (!setWordMark(protyle, range, WORD_WIRE_HREF_PREFIX + p.wireId)) return;
+        pending = null;
+        hidePendingChip();
+        redrawWire(protyle);
+        flashWireEnds(protyle, p.wireId);
+        dlog(`wire done ${p.wireId}`);
     }
 
     async onload(plugin: BaseTomatoPlugin) {
+        dlog(`onload checkbox=${mindWireCheckbox.get()}`);
         if (!mindWireCheckbox.get()) return;
         this.plugin = plugin;
+
+        // 事件监听须先于 verifyKeyTomato 的网络往返注册：loaded-protyle-* 在窗口期
+        // 先发走会永久错过（旧实现靠 wheel 重画无意兜住此竞态，内容坐标系删 wheel 后裸露）
+        events.addListener("mind wire events 2025-5-24 17:24:22", (eventType, detail: Protyle) => {
+            // destroy 的 detail=IProtyle 本体（Events.ts setReadingPointMap 对其单独绕行）
+            if (eventType == EventType.destroy_protyle) {
+                removeWireLayer((detail as any)?.protyle ?? detail);
+                return;
+            }
+            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                navigator.locks.request("lock 2025-5-24 17:24:27", { ifAvailable: true }, async (lock) => {
+                    const element = detail?.protyle?.element;
+                    if (lock && element && isEditor(detail?.protyle)) {
+                        if (mindWireEnable.get()) {
+                            redrawWire(detail.protyle);
+                        } else {
+                            removeWireLayer(detail.protyle);
+                        }
+                    }
+                });
+            }
+        });
         await verifyKeyTomato()
-        // if (events.isMobile) return;
+
+        // 插件重载跨代残留：window.eval 无模块缓存，旧层 DOM 会被本轮继承，先清扫
+        document.querySelectorAll(`.${LAYER_CLASS}`).forEach(e => e.remove());
 
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             this.mindMenu(detail as any);
+        });
+
+        // □5 拍板：抑制思源原生链接 tooltip 对导线锚词泄露裸 wireId
+        // （before-show-tooltip 官方钩子置空 message，批注 Annotations.ts 同款配方）
+        this.plugin.eventBus.on("before-show-tooltip", (e) => {
+            const t = (e as any).detail?.target;
+            if (t?.closest?.(`span[data-type="a"][data-href^="${WORD_WIRE_HREF_PREFIX}"]`)) {
+                (e as any).detail.message = "";
+            }
         });
 
         this.plugin.addCommand({
@@ -68,44 +1009,24 @@ class MindWire {
             editorCallback: (protyle: IProtyle) => toggleDocMindWire(protyle),
         });
 
-        events.addListener("mind wire events 2025-5-24 17:24:22", (eventType, detail: Protyle) => {
-            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
-                navigator.locks.request("lock 2025-5-24 17:24:27", { ifAvailable: true }, async (lock) => {
-                    const element = detail?.protyle?.element;
-                    if (lock && element && isEditor(detail?.protyle)) {
-                        const attr = await siyuan.getBlockAttrs(detail.protyle.block.rootID)
-                        const en = attr["custom-mindwire-enable"]
+        // 补画当前已打开的编辑器（deploy 钩子 setPetalEnabled 重载插件时 loaded 事件
+        // 不会再发；onload 与文档加载的竞态也由此自愈）
+        if (mindWireEnable.get()) {
+            // rootID 空=编辑器尚未完成初始化（reload 竞态窗口），交还给 loaded 事件补
+            getAllEditor().forEach(p => {
+                if (isEditor(p.protyle) && p.protyle?.block?.rootID) redrawWire(p.protyle);
+            });
+        }
+    }
 
-                        const clearBorder = () => {
-                            getAllEditor().forEach(p => p.protyle.element.removeEventListener('wheel', listenWheel));
-                            element
-                                .querySelectorAll("[tomato-mind-wire-content]")
-                                .forEach((e: HTMLElement) => {
-                                    e.removeAttribute('tomato-mind-wire-content')
-                                    e.style.border = "none"
-                                });
-                        }
-
-                        if (mindWireEnable.get() && (en != "di")) {
-                            this.protyle = detail.protyle;
-                            clearBorder();
-                            drawLines(element);
-                            element.removeEventListener('wheel', listenWheel);
-                            element.addEventListener('wheel', listenWheel);
-                        } else {
-                            clearBorder();
-                            cleanWire()
-                        }
-                    }
-                });
-            }
-        });
-
-        clearInterval(setGlobal("mind wire", setInterval(() => {
-            if (getAllEditor().length == 0) {
-                cleanWire();
-            }
-        }, 2000)));
+    onunload() {
+        // 两步流会话态收尾：芯片退场；pending 起点标记不摘（单端无害，数据侧 singles 语义）
+        pending = null;
+        hidePendingChip();
+        removeWireToolbar();
+        for (const [element, wl] of [...wireLayers]) {
+            disposeLayer(element, wl);
+        }
     }
 }
 
@@ -121,239 +1042,8 @@ async function toggleDocMindWire(protyle: IProtyle) {
         attr["custom-mindwire-enable"] = ""
     }
     await siyuan.setBlockAttrs(docID, attr)
-}
-
-const svgID = "tomato-mind-wire-svg-container"
-
-function drawLines(_elem: HTMLElement) {
-    cleanWire();
-    const idPairs = [...document.querySelectorAll(`span[data-type="block-ref"]`)]
-        .map(e => {
-            if (mindWireStarRefOnly.get()) {
-                if (e.textContent.trim() != "*")
-                    return;
-            }
-            const id2 = getAttribute(e, "data-id");
-            const id1 = getID(e);
-            if (id1 && id2 && id1 != id2) {
-                return [id1, id2];
-            }
-        }).filter(i => i != null);
-
-    idPairs.push(...[...document.querySelectorAll(`div[custom-lnk-my-id]`)]
-        .map(e => {
-            const id1 = getAttribute(e, "data-node-id");
-            const id2s = getAttribute(e, "custom-lnk-to-ids")
-                ?.split(",")
-                ?.map(lnk => {
-                    const e = document.querySelector(`div[custom-lnk-my-id="${lnk}"]`)
-                    return getAttribute(e, "data-node-id")
-                })
-                ?.filter(i => i != null) ?? [];
-            return id2s.map(i => { return [id1, i] })
-        })
-        .flat())
-    const set = new Set<string>();
-    idPairs.forEach(pair => {
-        if (pair && pair.length == 2) {
-            const id1 = pair.at(0)
-            const id2 = pair.at(1)
-            if (id1 && id2 && id1 != id2) {
-                if (set.has(id1 + id2) || set.has(id2 + id1)) return;
-                set.add(id1 + id2)
-                set.add(id2 + id1)
-                drawWire(id1, id2)
-            }
-        }
-    });
-}
-
-function cleanWire() {
-    let svg = document.getElementById(svgID) as unknown as SVGSVGElement;
-    if (!svg) {
-        svg = document.body.appendChild(
-            document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-        );
-        svg.id = svgID;
-    }
-    svg.innerHTML = ''; // 清空旧线条 
-}
-
-function listenWheel(_event: WheelEvent) {
-    cleanWire();
-    setTimeout(() => {
-        drawLines(mindWire.protyle.element)
-    }, 200);
-}
-
-function getAnchor(id: string) {
-    const es = getAllEditor()
-        .filter(p => p?.protyle?.element != null && isEditor(p.protyle))
-        .map(p => p.protyle.element);
-    for (const div of es) {
-        let anchor = div.querySelector(`div[data-node-id="${id}"] > div[contenteditable] > span[data-type="block-ref"]`)
-        if (!anchor) {
-            anchor = div.querySelector(`div[data-node-id="${id}"] > div[contenteditable] > span[data-type="a"]`)
-        }
-        if (!anchor) {
-            anchor = div.querySelector(`div[data-node-id="${id}"] > div[contenteditable] > span`)
-        }
-        if (!anchor) {
-            anchor = div.querySelector(`div[data-node-id="${id}"] > div[contenteditable]`)
-        }
-        if (!anchor) {
-            anchor = div.querySelector(`div[data-node-id="${id}"]`)
-        }
-        if (anchor) {
-            return { e: anchor as HTMLElement }
-        }
-    }
-    return {}
-}
-
-function getCenter(rect: DOMRect) {
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    return { cx, cy }
-}
-
-function getEdgePoint(source: DOMRect, target: DOMRect) {
-    const sc = getCenter(source);
-    const tc = getCenter(target);
-
-    const THRESHOLD = 20;
-    const dx = Math.abs(sc.cx - tc.cx);
-    const dy = Math.abs(sc.cy - tc.cy);
-
-    if (dx > THRESHOLD && dx > dy) {
-        if (sc.cx < tc.cx) {
-            return { x: source.right, y: sc.cy };
-        } else {
-            return { x: source.left, y: sc.cy };
-        }
-    }
-
-    if (sc.cy < tc.cy) {
-        return { x: sc.cx, y: source.bottom };
-    } else if (sc.cy > tc.cy) {
-        return { x: sc.cx, y: source.top };
-    }
-
-    if (sc.cx < tc.cx) {
-        return { x: source.right, y: sc.cy };
-    } else {
-        return { x: source.left, y: sc.cy };
-    }
-}
-
-function getConnectPoint(anchor1: HTMLElement, anchor2: HTMLElement) {
-    // const x = rect1.left + window.scrollX;
-    // const y = rect1.top + window.scrollY + rect1.height / 2;
-    if (!anchor1 || !anchor2) return {};
-    const rect1 = anchor1.getBoundingClientRect();
-    const rect2 = anchor2.getBoundingClientRect();
-    const { x: x1, y: y1 } = getEdgePoint(rect1, rect2);
-    const { x: x2, y: y2 } = getEdgePoint(rect2, rect1);
-    return { x1: x1, y1: y1, x2: x2, y2: y2 }
-}
-
-function drawWire(id1: string, id2: string) {
-    let svg = document.getElementById(svgID) as unknown as SVGSVGElement;
-    const { e: anchor1 } = getAnchor(id1)
-    const { e: anchor2 } = getAnchor(id2)
-    const { x1, y1, x2, y2 } = getConnectPoint(anchor1, anchor2)
-    if (!(x1 > 5)) return
-    if (!(x2 > 5)) return
-    if (!(y1 > 5)) return
-    if (!(y2 > 5)) return
-
-    anchor1.setAttribute('tomato-mind-wire-content', "1")
-    anchor2.setAttribute('tomato-mind-wire-content', "1")
-
-    // 创建曲线路径
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-
-    // 计算两点几何关系
-    // 选择连线的形状
-    // const deltaY = Math.abs(y1 - y2)
-    // const deltaX = Math.abs(x1 - x2)
-    // const L1 = 50;
-    // const L2 = 400;
-    // let pathData: string;
-    // if (deltaY < L1) {
-    //     pathData = calcCurvePathData(x2, x1, y2, y1, 0.01);
-    // } else if (deltaY < L2 && deltaX < L2) {
-    //     pathData = calcCurvePathData(x2, x1, y2, y1, 0.1);
-    // } else {
-    //     pathData = calcCurvePathData(x2, x1, y2, y1);
-    // }
-    const pathData = calcStraightPathData(x2, x1, y2, y1);
-
-    path.setAttribute('d', pathData);
-    let color = "var(--b3-font-color4)"
-    if (mindWireColorfull.get() && lastVerifyResult()) {
-        const hashcolor = murmurHash3(id1 + id2)
-        color = `var(--b3-font-color${1 + (hashcolor % 12)})`
-    }
-    borderAndLine(path, color)
-    borderAndLine(anchor1, color)
-    borderAndLine(anchor2, color)
-    svg.appendChild(path);
-}
-
-function borderAndLine(e: HTMLElement | SVGElement, c: string) {
-    e.style.stroke = c;
-    e.style.strokeWidth = mindWireWidth.get().toString() + "px";
-    e.style.borderWidth = e.style.strokeWidth;
-    e.style.borderColor = c;
-    e.style.fill = "none"
-    e.style.strokeDasharray = "10"
-    setLine(e)
-}
-
-function setLine(e: HTMLElement | SVGElement) {
-    if (mindWireLine.get() && lastVerifyResult()) {
-        e.style.strokeDasharray = "none"
-        e.style.borderStyle = "solid"
-    } else {
-        e.style.borderStyle = "dashed";
-        if (mindWireDynamicLine.get()) {
-            e.classList.add('tomato-mind-wire-connector-animation')
-        }
-    }
+    // 属性变更走 MutationObserver 有 200ms debounce，主动重画让菜单/快捷键即时反馈
+    if (mindWireEnable.get()) redrawWire(protyle);
 }
 
 export const mindWire = new MindWire();
-
-function calcStraightPathData(x2: number, x1: number, y2: number, y1: number) {
-    return `M ${x1} ${y1} L ${x2} ${y2}`;
-}
-
-// calcCurvePathData
-// function calcCurvePathData(x2: number, x1: number, y2: number, y1: number, t = 0.3) {
-//     const curveIntensity = Math.abs(x2 - x1) * t; // 动态弯曲强度
-//     const pathData = `M ${x1} ${y1} 
-//                     Q ${x1 + curveIntensity} ${y1},
-//                         ${(x1 + x2) / 2} ${(y1 + y2) / 2}
-//                     T ${x2} ${y2}`;
-//     return pathData;
-// }
-
-// calcCirclePathData
-// function calcCirclePathData(x2: number, x1: number, y2: number, y1: number) {
-//     const dx = x2 - x1;
-//     const dy = y2 - y1;
-//     const distance = Math.sqrt(dx * dx + dy * dy);
-//     const bendDirection = 1; // 控制方向：1=向右，-1=向左
-
-//     // 计算圆弧参数
-//     const radius = distance / 2;
-//     const angle = Math.atan2(dy, dx) * 180 / Math.PI; // 转换为角度制
-//     const sweepFlag = bendDirection > 0 ? 1 : 0; // 控制绘制方向
-
-//     // 生成正确的圆弧路径命令（关键修正点）
-//     const pathData = `M ${x1},${y1} 
-//                  A ${radius} ${radius} ${angle} 0 ${sweepFlag} ${x2},${y2}`;
-//     return pathData;
-// }
-

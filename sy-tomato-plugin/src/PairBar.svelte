@@ -17,6 +17,36 @@
         type PairTransportMode,
     } from "./libs/pairBarState";
     import { vipVerified } from "./libs/user";
+    // tooltip 键位行消费的老命令 winHotkey 常量（R5 □3）：langKey→常量映射，与 ⋯ 菜单
+    // 速查子菜单同一批常量（PairBarBox.more）=同源不漂移；.w() 调用时现读 keymap
+    import {
+        LinkBox双向互链选择块,
+        LinkBox双向互链创建往返链,
+        LinkBox嵌入互链选择,
+        LinkBox嵌入互链创建,
+        LinkBox关联两个块选择,
+        LinkBox关联两个块创建,
+        LinkBox互相插入引用于下方选择,
+        LinkBox互相插入引用于下方创建,
+        LinkBox同步块选择,
+        LinkBox同步块创建,
+    } from "./LinkBox";
+    import {
+        CpBox批量删除大量连续内容块,
+        CpBox批量移动大量连续内容块,
+        CpBox批量复制大量连续内容块,
+    } from "./CpBox";
+
+    const HK_BY_LANG = new Map(
+        [
+            LinkBox双向互链选择块, LinkBox双向互链创建往返链,
+            LinkBox嵌入互链选择, LinkBox嵌入互链创建,
+            LinkBox关联两个块选择, LinkBox关联两个块创建,
+            LinkBox互相插入引用于下方选择, LinkBox互相插入引用于下方创建,
+            LinkBox同步块选择, LinkBox同步块创建,
+            CpBox批量删除大量连续内容块, CpBox批量移动大量连续内容块, CpBox批量复制大量连续内容块,
+        ].map(h => [h.langKey, h])
+    );
 
     let {
         pairState,
@@ -59,6 +89,16 @@
         if (err === "srcMulti") return tomatoI18n.仅支持单块源(label(f.labelKey));
         if (err === "sameTarget") return tomatoI18n.目标与源相同;
         return label(f.labelKey);
+    }
+
+    /** 可用态 tooltip 键位行（R5 □3）：互链族/同步块=[选, 建] 两键、搬运=[移, 复, 删] 三键，
+     *  .w() 现读 keymap 与速查同源；灰态/VIP 态不追加（错误提示语义不变） */
+    function hkLine(f: PairFuncSpec) {
+        if (!f.hkKeys) return "";
+        const ks = f.hkKeys.map(k => HK_BY_LANG.get(k)?.w() ?? "").filter(Boolean);
+        if (ks.length === 0) return "";
+        if (f.id === "transport") return `${tomatoI18n.移动} ${ks[0]} · ${tomatoI18n.复制} ${ks[1]} · ${tomatoI18n.删除} ${ks[2]}`;
+        return `${tomatoI18n.选择} ${ks[0]} · ${tomatoI18n.创建} ${ks[1]}`;
     }
 
     // ---- slots 框区 ----
@@ -187,7 +227,7 @@
                         class:off={!!err}
                         class:last={isLast}
                         aria-disabled={!!err ? "true" : undefined}
-                        aria-label={isLast ? `${label(f.labelKey)} · ${tomatoI18n.上次使用}` : errText(err, f)}
+                        aria-label={err ? errText(err, f) : `${label(f.labelKey)}${isLast ? ` · ${tomatoI18n.上次使用}` : ""}\n${hkLine(f)}`.trimEnd()}
                         onclick={() => { if (!err) api.pickFunc(f.id); }}
                     >
                         <svg><use xlink:href={"#" + f.icon}></use></svg>

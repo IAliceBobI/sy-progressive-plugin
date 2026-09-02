@@ -370,37 +370,16 @@ export abstract class TomatoI18nABC11 extends TomatoI18nABC12 {
 
     public get 思维导线帮助() {
         switch (this.lang) {
-            case "zh_CN": return "引用渲染为连线。可根据引用，在段落块间添加连线";
-            case "es_ES": return "Las referencias se representan como conexiones. Puedes añadir conexiones entre bloques de párrafos según las referencias";
-            case "fr_FR": return "Les références sont rendues sous forme de connexions. Vous pouvez ajouter des connexions entre les blocs de paragraphes en fonction des références";
-            case "ja_JP": return "参照は接続線として描画されます。参照に応じて、段落ブロック間の接続線を追加できます";
-            case "zh_CHT": return "引用渲染為連線。可根據引用，在段落塊間添加連線";
-            case "it_IT": return "Le citazioni vengono rese come connessioni. È possibile aggiungere collegamenti tra blocchi di paragrafi in base alle citazioni";
-            case "de_DE": return "Referenzen werden als Verbindungen dargestellt. Anhand von Referenzen können Sie Verbindungen zwischen Absatzblöcken hinzufügen";
-            case "he_IL": return "הפניות מצוירות כקווים חיבור. ניתן להוסיף קווי חיבור בין בלוקי פסקאות על פי הפניות";
-            case "ru_RU": return "Ссылки отображаются в виде соединительных линий. Можно добавлять линии между блоками абзацев на основе ссылок";
-            case "pl_PL": return "Cytowania są renderowane jako połączenia. Możesz dodawać połączenia między blokami akapitów na podstawie cytowań";
+            // □5 改文案（spec §6）：旧「引用渲染为连线」说明退役，改为划词连线操作说明；
+            // 其余语种 default(en) 兜底（旧多语种译文语义已过时，不再逐语种维护）
+            case "zh_CN": return "划词建线：划选第一个词点「关联起点」，再划选第二个词点「连到」即成线；悬停线可改关系色/删除，点击残端跳到另一端";
+            case "zh_CHT": return "劃詞建線：劃選第一個詞點「關聯起點」，再劃選第二個詞點「連到」即成線；懸停線可改關係色/刪除，點擊殘端跳到另一端";
+            case "ja_JP": return "語を選んで「関連起点」をクリックし、別の語を選んで「連接先」をクリックすると線が引かれます。線にホバーすると関係色の変更・削除ができ、残端をクリックすると反対側へジャンプします";
             case "en_US":
-            default: return "References are rendered as connections. You can add connections between paragraph blocks based on references"
+            default: return "Select a word and pick \"Link start\", then select another and pick \"Connect to\". Hover a wire to recolor or delete; tap a stub to jump to the other end";
         }
     }
 
-    public get 流动线条效果() {
-        switch (this.lang) {
-            case "zh_CN": return "流动线条效果";
-            case "es_ES": return "Efecto de líneas fluidas";
-            case "fr_FR": return "Effet de lignes fluides";
-            case "ja_JP": return "流動線効果";
-            case "zh_CHT": return "流動線條效果";
-            case "it_IT": return "Effetto linee fluide";
-            case "de_DE": return "Fließende Linien Effekt";
-            case "he_IL": return "אפקט קווי זרימה";
-            case "ru_RU": return "Эффект текущих линий";
-            case "pl_PL": return "Efekt płynących linii";
-            case "en_US":
-            default: return "Flowing lines effect";
-        }
-    }
 
     public get 启用思维导线() {
         switch (this.lang) {
@@ -572,36 +551,14 @@ export abstract class TomatoI18nABC11 extends TomatoI18nABC12 {
         }
     }
 
-    public get 使用实线() {
-        switch (this.lang) {
-            case "zh_CN": return "使用实线";
-            case "es_ES": return "Usar línea sólida";
-            case "fr_FR": return "Utiliser une ligne pleine";
-            case "ja_JP": return "実線を使用";
-            case "zh_CHT": return "使用實線";
-            case "it_IT": return "Usa linea continua";
-            case "de_DE": return "Durchgezogene Linie verwenden";
-            case "he_IL": return "השתמש בקו מלא";
-            case "ru_RU": return "Использовать сплошную линию";
-            case "pl_PL": return "Użyj ciągłej linii";
-            case "en_US":
-            default: return "Use solid line";
-        }
-    }
     public get 使用多种颜色() {
         switch (this.lang) {
-            case "zh_CN": return "使用多种颜色";
-            case "es_ES": return "Usar múltiples colores";
-            case "fr_FR": return "Utiliser plusieurs couleurs";
-            case "ja_JP": return "複数の色を使用";
-            case "zh_CHT": return "使用多種顏色";
-            case "it_IT": return "Usa più colori";
-            case "de_DE": return "Mehrere Farben verwenden";
-            case "he_IL": return "השתמש במספר צבעים";
-            case "ru_RU": return "Использовать несколько цветов";
-            case "pl_PL": return "Użyj wielu kolorów";
+            // □5 改文案（spec §6/D7）：键名零迁移，显示文案改为「关系配色」语义
+            case "zh_CN": return "关系配色";
+            case "zh_CHT": return "關係配色";
+            case "ja_JP": return "関係配色";
             case "en_US":
-            default: return "Use multiple colors";
+            default: return "Relation colors";
         }
     }
     public get 线条宽度() {
