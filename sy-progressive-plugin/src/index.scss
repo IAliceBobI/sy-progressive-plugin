@@ -1245,6 +1245,19 @@ html:not([data-theme-mode="dark"]) .prog-skin-card.locked .skin-name {
 .prog-freebtn:hover {
   opacity: 1;
 }
+/* 状态栏左端钮 tooltip 防出窗：内核 b3-tooltips__n 是居中锚定（right:50%+translateX(50%)）
+   且纯 CSS 无视口钳制，按钮贴窗口左缘时气泡左半出窗被硬裁；改左缘对齐向右展开——
+   本组即窗口最左元素，向右展开必在窗内（非 hover/hover 两态 transform 须同步覆盖内核） */
+.prog-flame.b3-tooltips__n::after,
+.prog-freebtn.b3-tooltips__n::after {
+  right: auto;
+  left: 0;
+  transform: scale(.8);
+}
+.prog-flame.b3-tooltips__n:hover::after,
+.prog-freebtn.b3-tooltips__n:hover::after {
+  transform: scale(1);
+}
 
 // ---- 浮层族共享容器（FloatPopover.svelte）----
 .prog-popover {

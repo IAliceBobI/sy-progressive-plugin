@@ -217,6 +217,8 @@ type TomatoSettings = {
     storeFillMemoMenu: boolean,
     writingBoxCheckbox: boolean,
     tag2RefBoxCheckbox: boolean,
+    spaceRefEnabled: boolean,
+    spaceRefLinkType: "ref" | "lnk",
     toolbarBoxCheckbox: boolean,
     toolbarEN2CHBtn: boolean,
     toolbarTidy: boolean,

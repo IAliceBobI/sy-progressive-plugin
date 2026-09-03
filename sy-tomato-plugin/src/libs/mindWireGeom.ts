@@ -150,9 +150,12 @@ export function wordWireGeometry(
 }
 
 /** 线中点迷你条锚位（spec §4.5）：left/top=中点（上浮 8px 由 CSS transform 承担）；
- *  距层顶 <40px 翻到线下方（below 变体 translateY(+8px)，防被滚动容器顶裁） */
-export function toolbarPos(mid: Pt): { left: number; top: number; below: boolean } {
-    return { left: mid.x, top: mid.y, below: mid.y < 40 };
+ *  距层顶 <40px 翻到线下方（below 变体 translateY(+8px)，防被滚动容器顶裁）。
+ *  □5 P2 补：条挂内容坐标随滚动走，上浮 8px+条高 ~28px 后越**滚动视口顶**同样被容器
+ *  overflow 裁掉（DOM alive/computed visible 但用户看不见，vision 像素实锤）——below
+ *  判定改按 viewTop=scrollTop 与层顶取严：中点离两顶任一 <40px 即翻下方 */
+export function toolbarPos(mid: Pt, viewTop = 0): { left: number; top: number; below: boolean } {
+    return { left: mid.x, top: mid.y, below: mid.y < Math.max(40, viewTop + 40) };
 }
 
 // ---------------------------------------------------------------------------

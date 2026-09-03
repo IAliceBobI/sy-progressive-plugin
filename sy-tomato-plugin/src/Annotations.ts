@@ -236,9 +236,9 @@ class Annotations {
         (globalThis as any)[CLEANUP_REG] = null;
     }
 
-    // ---------- 创建链路（旧 findDivs 的新流程，入口语义不变：右键菜单/⇧⌥F） ----------
+    // ---------- 创建链路（旧 findDivs 的新流程，入口语义不变：右键菜单/⌥⇧F） ----------
 
-    /** 创建链路（入口语义不变：右键菜单/⇧⌥F）。□2 统一：弹窗=AnnoEdit 完整功能面
+    /** 创建链路（入口语义不变：右键菜单/⌥⇧F）。□2 统一：弹窗=AnnoEdit 完整功能面
      *  （内嵌 Protyle 草稿+问 AI，与编辑同一 Dialog 形态/同一份尺寸记忆）；写链 doSave 不变 */
     async create(protyle: IProtyle) {
         const t0 = Date.now(); // debugLog 打点锚：量化创建弹窗各段耗时（debugging/plugin-eng.md loki 节）

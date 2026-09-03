@@ -21,7 +21,7 @@ export const MindWire启用或禁用文档思维导线 = winHotkey("ctrl+shift+z
 // ⌥⌘L 撞官方 keymap editor.table.moveToLeft（e2e 实锤：官方分支先吞+幽灵 Enter 触发
 // 全局导线开关）；官方 ⌥⌘ 字母仅 H/O/V/Y 空闲（H 有 macOS「隐藏其他」系统键嫌疑），
 // 取 Y（Y 形分叉=连线意象；winHotkey 官方 keymap 对照是注释态，静态比对看不见这类撞）
-export const MindWire划词连线 = winHotkey("ctrl+alt+y", "MindWire word", "iconLink", () => tomatoI18n.划词连线)
+export const MindWire划词连线 = winHotkey("ctrl+alt+y", "MindWire word", "iconWire", () => tomatoI18n.划词连线)
 type TomatoMenu = IEventBusMap["click-blockicon"] & IEventBusMap["open-menu-content"];
 
 // ---------------------------------------------------------------------------
@@ -536,7 +536,8 @@ function attachWireInteraction(
     };
     const showToolbar = () => {
         removeWireToolbar();
-        const pos = toolbarPos(mid);
+        // viewTop=当前滚动位（□5 P2：中点贴视口顶时上浮会被容器 overflow 裁掉，翻 below）
+        const pos = toolbarPos(mid, wl.scroller.scrollTop);
         const bar = document.createElement("div");
         bar.className = TOOLBAR_CLASS + (pos.below ? " tomato-mind-wire-toolbar--below" : "");
         bar.style.left = pos.left + "px";
@@ -1099,17 +1100,17 @@ class MindWire {
         if (!currentTextRange()) return;
         addIfVisible(menu, WORD_MENU_KEY, pending ? {
             label: wordWireTip(pending.word, tomatoI18n.关联起点, tomatoI18n.连到),
-            icon: "iconLink",
+            icon: "iconWire",
             click: () => void this.finishWordWire(protyle),
         } : {
             label: tomatoI18n.关联起点,
-            icon: "iconLink",
+            icon: "iconWire",
             click: () => this.startWordWire(protyle),
         });
         if (pending) {
             addIfVisible(menu, WORD_MENU_KEY, {
                 label: tomatoI18n.关联起点,
-                icon: "iconLink",
+                icon: "iconWire",
                 click: () => this.startWordWire(protyle),
             });
         }
@@ -1190,7 +1191,7 @@ class MindWire {
     updateProtyleToolbar(toolbar: Array<string | IMenuItem>): Array<string | IMenuItem> {
         toolbar.push({
             name: WORD_TOOLBAR_NAME,
-            icon: "iconLink",
+            icon: "iconWire",
             tip: wordWireTip(pending?.word ?? null, tomatoI18n.关联起点, tomatoI18n.连到),
             hotkey: MindWire划词连线.m,
             // 官方 click 实参=Protyle 包装类（ToolbarItem 调 getInstance()=>this），
