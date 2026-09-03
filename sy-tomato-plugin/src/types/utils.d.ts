@@ -15,6 +15,9 @@ type Overlay = { left: number, top: number, width: number, height: number, angle
 type TSK = keyof TomatoSettings
 
 type TomatoSettings = {
+    annoCollectScope: string,
+    annoCollectDest: string,
+    annoCollectTargetDoc: string,
     dailyQuota: string,
     prefixArticlesSoftLimit: string,
     toolbarTidyExt: string,
@@ -101,6 +104,7 @@ type TomatoSettings = {
     dailyNoteCopyMenu: boolean,
     dailyNoteGoToBottomMenu: boolean,
     commentBoxMenu: boolean,
+    commentBoxAnnoToolbar: boolean,
     cardPriorityBoxPriorityMenu: boolean,
     cardPriorityBoxSpradDelayMenu: boolean,
     cardPriorityBoxPostponeCardMenu: boolean,
@@ -256,7 +260,6 @@ type TomatoSettings = {
     back_link_ref: boolean,
     back_link_move_here: boolean,
     back_link_move_with_backlink: boolean,
-    back_link_show_floatUI: boolean,
     back_link_protyle_height: string,
     back_link_show_path: boolean,
     back_link_follow_width: boolean,

@@ -9,7 +9,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
-export const PieceSummaryBox收集内容到文件 = winHotkey("shift+alt+o", "收集内容到文件", "💼", () => tomatoI18n.收集内容到文件, true) // □14 收费门恢复（收集=合并导出型，Pro）
+export const PieceSummaryBox收集内容到文件 = winHotkey("shift+alt+o", "收集内容到文件", "iconProgInbox", () => tomatoI18n.收集内容到文件, true) // □14 收费门恢复（收集=合并导出型，Pro）
 
 class PieceSummaryBox {
     private plugin: Plugin;

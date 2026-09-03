@@ -8,8 +8,8 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
-export const PieceMovingBox移动到上一分片内 = winHotkey("ctrl+alt+u", "移动到上一分片内", "🚚⬆️", () => tomatoI18n.移动到上一分片内) // □14 拍板免费（挪片=核心阅读流，不设门）
-export const PieceMovingBox移动到下一分片内 = winHotkey("ctrl+alt+i", "移动到下一分片内", "🚚⬇️", () => tomatoI18n.移动到下一分片内) // □14 拍板免费（挪片=核心阅读流，不设门）
+export const PieceMovingBox移动到上一分片内 = winHotkey("ctrl+alt+u", "移动到上一分片内", "iconProgMoveUp", () => tomatoI18n.移动到上一分片内) // □14 拍板免费（挪片=核心阅读流，不设门）
+export const PieceMovingBox移动到下一分片内 = winHotkey("ctrl+alt+i", "移动到下一分片内", "iconProgMoveDown", () => tomatoI18n.移动到下一分片内) // □14 拍板免费（挪片=核心阅读流，不设门）
 
 class PieceMovingBox {
     private plugin: Plugin;

@@ -27,21 +27,19 @@ export function refillModeLabel(stype: RefillMode): string {
     }
 }
 
-/** 纯逻辑：档位图标（功能信号，与 reviewMenu emoji 口径一致）。锁定态换思源 sprite
- * 小锁（□30：🔒 emoji 退役，用户 emoji 装饰土口径收口）。类挂官方 .b3-menu__icon 拿
- * 菜单 icon 的 margin 排版（运行时产物实测该类管 18px+边距），inline 13px 盖过其尺寸
- * 与 AddBook chip 锁统一并兜底类缺失（裸 svg 无 CSS 命中时按替换元素默认 300×150
- * 撑爆菜单项，review 双通道实锤）。任务块用空选框 ☐（用户实测二轮：☑️ 打勾像已选中）；
- * 不断句=保持整块。 */
+/** 纯逻辑：档位图标（菜单翻新 2026-09-02：emoji 全量换 sprite 类名走 `icon:`，仅锁定态保留
+ * iconHTML=思源 sprite 小锁 svg（□30：🔒 emoji 退役）。锁 svg 自带 `b3-menu__icon` 类+13px
+ * （教训见文件头注释：裸 svg 无 CSS 命中按 300×150 撑爆菜单项）。t 档用 iconListItem 空选框
+ * （顺带消灭「空选框像没选中」旧心病，用户实测二轮：☑️ 打勾像已选中）。 */
 const LOCK_ICON_SVG = '<svg class="b3-menu__icon" style="width:13px;height:13px"><use xlink:href="#iconLock"></use></svg>';
-export function refillModeIcon(stype: RefillMode, locked: boolean): string {
-    if (locked) return LOCK_ICON_SVG;
+export function refillModeIcon(stype: RefillMode, locked: boolean): { icon?: string; iconHTML?: string } {
+    if (locked) return { iconHTML: LOCK_ICON_SVG };
     switch (stype) {
-        case "no": return "🧱";
-        case "p": return "📃";
-        case "t": return "☐";
-        case "i": return "📋";
-        default: return "📖";
+        case "no": return { icon: "iconProgPiece" };
+        case "p": return { icon: "iconProgMulti" };
+        case "t": return { icon: "iconListItem" };
+        case "i": return { icon: "iconList" };
+        default: return { icon: "iconProgBook" };
     }
 }
 
@@ -61,7 +59,7 @@ export function openRefillMenu(
     for (const stype of REFILL_MODES) {
         const locked = refillModeLocked(stype, paid);
         menu.addItem({
-            iconHTML: refillModeIcon(stype, locked),
+            ...refillModeIcon(stype, locked),
             label: refillModeLabel(stype),
             click: locked
                 ? () => void siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500)

@@ -23,19 +23,17 @@
     } from "./libs/utils";
     import { debugLog } from "./libs/logUtils";
     import {
-        getConceptTrees,
         sortDiv,
         doGetBackLinks,
-        insertConcepts,
         createProtyle,
         closeProtyle,
         conceptChipVisible,
     } from "./libs/bkUtils";
-    import { makeBkListState } from "./libs/bkRevision";
+    import { makeBkListState, bkIndexCommitRelated, invalidateBkRevisions } from "./libs/bkRevision";
     import { clearSearchMarksFor, isSearchMarkSupported, setSearchMarksFor, whenContentReady } from "./libs/searchMark";
     import { Dialog, Menu, Protyle } from "siyuan";
     import { BlockNodeEnum, DATA_ID, DATA_NODE_ID } from "./libs/gconst";
-    import { BKMaker, showBkConTree } from "./BackLinkBottomBox";
+    import { BKMaker, registerBkIndexCommitTarget } from "./BackLinkBottomBox";
     import { SearchEngine } from "./libs/search";
     import { applyBkWidthMode } from "./libs/bkWidthMode";
     import { events } from "./libs/Events";
@@ -90,9 +88,7 @@
     let autoRefreshChecked = writable(!maker.shouldFreeze);
     let maxPage = $state(1);
     let backLinks: BacklinkSv<Protyle>[] = $state([]);
-    let hierarchyConcepts: Block[] = $state([]);
     let linkItems: LinkItem[] = $state([]);
-    let linkItemsHierarchy: LinkItem[] = $state([]);
     let searchText = $state("");
     let globalSearchText = $state("");
     let keepHeight: HTMLElement = $state();
@@ -210,6 +206,18 @@
         });
         protyle.protyle.wysiwyg.element.style.paddingBottom = "0px";
 
+        // □13 数据失效通道：纯内容编辑对列表级 revision 不可见（unchanged 短路会让
+        // 卡片内容永驻缓存），内核索引提交广播是唯一失效信号（官方 markIndexDirty
+        // 同款）。来源文档变更（引用块被编辑/增删）自动态即时重查；仅目标文档自身
+        // 变更（普通打字也广播）只失效不即时刷——REFRESH 分支整卡重建会闪烁+滚动
+        // 归零，下轮轮询自然全量（评审 P1-1）。full=rootIDs 不可信 → 全清（P2-1）。
+        const offInvalidate = registerBkIndexCommitTarget(({ rootIDs, full }) => {
+            const rel = bkIndexCommitRelated(bkState, maker.docID, rootIDs, full);
+            if (rel === false) return;
+            invalidateBkRevisions(bkState, full ? undefined : rootIDs);
+            if (rel === "src" && $autoRefreshChecked) getBackLinks({ ifAvailable: true }, REFRESH);
+        });
+
         // 列宽变化（分屏拖动/列数覆盖）重测截断溢出：display:none 的卡量高恒 0 须换地方补测
         const gridRO = new ResizeObserver(() => remeasureClamp());
         if (gridEle) gridRO.observe(gridEle);
@@ -220,6 +228,7 @@
             closeProtyle(...tmp);
             observer.disconnect();
             gridRO.disconnect();
+            offInvalidate();
             clearSearchMarksFor(bkState); // □3 编辑态马克笔随组件卸载摘槽位（Highlight 协议：卸载即消失；不动别家面板）
         });
 
@@ -254,7 +263,6 @@
                         sortBy,
                         refDocCount,
                         menDocCount,
-                        maker.docName,
                         idsFilter,
                         page,
                         bkState,
@@ -267,12 +275,9 @@
                     const {
                         linkItems: a,
                         backLinks: b,
-                        hierarchyConcepts: h,
-                        linkItemsHierarchy: hi,
                         maxPage: mp,
                     } = ret;
                     linkItems = a;
-                    linkItemsHierarchy = hi;
                     if (caller == REFRESH) {
                         closeProtyle(...backLinks);
                         carryExpanded(backLinks, b);
@@ -295,7 +300,6 @@
                     // 恒 undefined，必须统一补测（rAF 后 DOM 已 patch，读布局安全）
                     requestAnimationFrame(remeasureClamp);
                     maxPage = mp;
-                    hierarchyConcepts = h;
                     debugLog("bk.get", `caller=${caller} docs=${b.length}/${mp + 1}p concepts=${a.length} g="${globalSearchText}" l="${searchText}"`, "bk");
                     if (start > 0) {
                         const end = new Date().getTime();
@@ -345,8 +349,13 @@
         }
     }
 
-    function refreshNow() {
+    async function refreshNow() {
         $autoRefreshChecked = false;
+        // □13 手动刷新=强制全量重查（对齐官方 refresh 按钮）：先让内核刷索引队列
+        // （刚编辑完可能未提交）。siyuan.call 内部吞异常永不 reject——失败返回 null
+        // 静默降级为只清客户端缓存（仍失效+重查，退回旧行为，用户再点一次即可）
+        await siyuan.refreshBacklink(maker.docID);
+        invalidateBkRevisions(bkState);
         getBackLinks({ ifAvailable: true }, REFRESH);
     }
     function refreshOnPage() {
@@ -831,22 +840,6 @@
                 (v) => back_link_show_path.write(v),
             ),
         });
-        menuGroup(menu, tomatoI18n.工具);
-        menu.addItem({
-            icon: "iconGraph",
-            label: tomatoI18n.openConceptForest打开层级概念,
-            click: () => {
-                const roots = getConceptTrees(linkItemsHierarchy);
-                showBkConTree(roots);
-            },
-        });
-        menu.addItem({
-            icon: "iconKey",
-            label: tomatoI18n.插入相关的层级概念,
-            click: () => {
-                insertConcepts(maker.plugin, maker.docID, hierarchyConcepts);
-            },
-        });
         openAt(anchor, menu);
     }
 
@@ -959,14 +952,19 @@
     <div class="bk-toolbar">
         <!-- 控制行：自动/暂停 + 立即刷新 + 分页 + 排序 + 收缩概念区 + ⋯ 偏好（spec §3.1） -->
         <div class="bk-toolbar-row">
-            <input
-                type="checkbox"
-                class="b3-switch bk-toggle b3-tooltips b3-tooltips__s"
+            <!-- tooltip 须挂包裹 span：input 是置换元素不渲染 ::after 伪元素（b3-tooltips 气泡） -->
+            <span
+                class="bk-toggle-wrap b3-tooltips b3-tooltips__s"
                 aria-label={`${tomatoI18n.自动刷新}（${$autoRefreshChecked
                     ? tomatoI18n.刷新中
                     : tomatoI18n.不刷新}）`}
-                bind:checked={$autoRefreshChecked}
-            />
+            >
+                <input
+                    type="checkbox"
+                    class="b3-switch bk-toggle"
+                    bind:checked={$autoRefreshChecked}
+                />
+            </span>
             <button
                 class="bk-icon-btn b3-tooltips b3-tooltips__s"
                 aria-label={tomatoI18n.立即刷新}
@@ -1066,7 +1064,10 @@
         <!-- 概念行（收缩时整行消失，仅控制行收缩钮带计数） -->
         {#if expandStatus}
             <div class="bk-concepts">
-                {#each visibleConcepts as { text, id, count, attrs } (id)}
+                <!-- key 必须含 text：不同文字的引用可指向同一目标块（锚甲/锚甲2→同文档），
+                     仅按 id 会重复 key 抛 each_key_duplicate，同一 flush 批次把卡片区的
+                     更新一并打死=整面板冻结（□10-B「毒卡杀面板」真根因） -->
+                {#each visibleConcepts as { text, id, count, attrs } (id + "#" + text)}
                     <button
                         {...attrs}
                         class="bk-chip b3-tooltips b3-tooltips__s"
@@ -1157,7 +1158,10 @@
                     }
                 }}>{@html icon("Add", 14)}</button
             >
-            {#each searchList as i (i.global + "#" + i.local)}
+            <!-- key 用 JSON 数组而非 "#" 拼接：global/local 均自由文本且 # 是搜索语法活跃字符，
+                 前缀错位的两条已存查询会拼出同键抛 each_key_duplicate（同 1047 行机制）；
+                 且条目持久化在 custom-bkSavedQueries，中招=该文档面板每次打开即冻 -->
+            {#each searchList as i (JSON.stringify([i.global, i.local]))}
                 <span class="bk-saved-chip">
                     <button
                         class="bk-chip b3-tooltips b3-tooltips__s"
@@ -1318,7 +1322,9 @@
     .bk-toolbar {
         position: sticky;
         top: 0;
-        z-index: 1;
+        /* 10 = 浮层安全档：sticky 头本就该压住滚动内容，同时让 b3-tooltips 气泡
+           （z-index 被锁在本 stacking context）不被卡片 protyle 内容盖住 */
+        z-index: 10;
         background: var(--b3-theme-background);
         padding: 4px 2px 2px;
     }
@@ -1327,6 +1333,23 @@
         align-items: center;
         gap: 6px;
         flex-wrap: wrap;
+    }
+    .bk-toggle-wrap {
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+    /* 最左元素 + __s 居中锚定 = 气泡左半溢出面板被裁（AGENTS 踩坑索引同款）：
+       左缘对齐开关左缘，废除 translateX 居中（hover 态选择器须压过内核 __s 的特异性） */
+    .bk-toolbar .bk-toggle-wrap.b3-tooltips::after {
+        left: 0;
+        right: auto;
+        transform: none;
+    }
+    .bk-toolbar .bk-toggle-wrap.b3-tooltips:hover::after,
+    .bk-toolbar .bk-toggle-wrap.b3-tooltips:focus-within::after {
+        transform: none;
     }
     .bk-toggle {
         flex-shrink: 0;

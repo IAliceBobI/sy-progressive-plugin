@@ -302,6 +302,23 @@ body.prog-unpaid .prog-fb-pro:hover {
   max-width: 520px;
 }
 
+/* 到期胶囊防裁 V2（2026-09-02 二连报障修复）：V1 的「负 margin 抵消正 padding」两头
+   副作用——负右 margin 使首行盒恒外凸 4px 出滚动容器（body overflow-y:auto 把横轴
+   隐式算成 auto → 原生横向滚动条），负顶 margin 把安全区在滚动口层面抵消回零（徽章
+   上半仍被裁）。V2 改容器级安全区：padding 内移滚动口原点，徽章 -3px 外凸 + hover
+   translateY(-1px) 全含在容器内，无外凸盒。max-width 520 随降为内容 512（可接受）；
+   只桌面浮条（移动端顶栏 .prog-topbar-btns 无滚动容器不裁，勿扩散） */
+.floatbar.prog-fb .floatbar-body {
+  padding-top: 4px;
+  padding-right: 4px;
+}
+/* 首行可折行：digest 态面包屑+8 钮在窄窗（用户实测浮条被压到 306px）真溢出，row
+   原生 nowrap 只能溢出滚动口出横条。⚠️ 必须带 .floatbar.prog-fb 前缀——移动端
+   顶栏根是 .prog-topbar，共用 .prog-fb-row 且故意横滚+mask，裸类会砸掉移动端设计 */
+.floatbar.prog-fb .floatbar-body .prog-fb-row {
+  flex-wrap: wrap;
+}
+
 // ============================================================
 // □10 方案 B 平铺区（docs/prog-floatbar-ux-redesign.md □10 视觉规格 2026-08-29）：
 // 首行下方常驻铺开（无 [+]、无开合态），替代 moreOpen 候选区 + advOpen 高级面板。
@@ -371,6 +388,13 @@ body.prog-unpaid .prog-fb-pro:hover {
 .prog-fb-flat .prog-fb-flat-btn--on {
   background: color-mix(in srgb, var(--prog-accent) 22%, var(--b3-theme-surface));
   box-shadow: inset 0 0 0 1.5px var(--prog-accent);
+}
+/* 亮色轨对比提档（□2，2026-09-02 vision 两轮实证）：12px 标签+14px 细线稿叠薄余量——
+   六皮肤亮轨仅 4.36~9.62:1，苍山雾雪 4.36 低于 4.5 文字线、绯樱 4.88 贴线「读得清但不通
+   透」；深一档换 strong 后 6.10~7.83 全过线（标签无独立 color 随按钮继承，一条规则图标+
+   文字同提）。暗轨勿动：dark 的 strong(ds) 比 accent(da) 更深，全局换会反向压低对比 */
+html:not([data-theme-mode="dark"]) .prog-fb-flat .prog-fb-flat-btn {
+  color: var(--prog-accent-strong);
 }
 .prog-fb-flat .prog-fb-flat-lbl {
   font-size: 12px;

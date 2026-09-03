@@ -26,11 +26,30 @@
     });
 
     function onkeydown(e: KeyboardEvent) {
-        if (e.key === "Escape" && !closing) oncancel();
+        // 只认真键盘（复评 P2-1）：内核 wysiwyg/index.ts:4472 移动端块引用流程会向
+        // window 合成派发 Esc（isTrusted=false），让位判定对合成键全部空过
+        if (!e.isTrusted) return;
+        if (e.key !== "Escape" || closing) return;
+        // 让位判定（□2 评审 P1-4+复评 P1-1）：IME 组合态的 Esc=取消组词；内核浮层
+        // 开着时第一次 Esc 关浮层、第二次才轮到芯片——避免「关个联想层顺手删了起点
+        // 标记」（cancelPending 摘标记是写事务）。浮层开闭判定须用 fn__none 类：
+        // 内核 Menu.removeImmediately 只加类不摘 element（isConnected 恒 true，e2e
+        // 实锤开过一次菜单后 Esc 永久让位）；.b3-menu DOM 查询一并覆盖非单例 Menu
+        // 实例（av 筛选等十余处 new Menu 不走 window.siyuan.menus.menu），单例读法
+        // 留兜底。.protyle-toolbar 本体有意不进——终点词选中时工具条亮着「连到」，
+        // 此刻 Esc 意图是弃线，取消应赢，内核顺手藏工具条无害
+        if (e.isComposing || e.keyCode === 229) return;
+        const menuEl = (globalThis as any).siyuan?.menus?.menu?.element as HTMLElement | undefined;
+        if (document.querySelector(".b3-dialog--open, .protyle-hint:not(.fn__none), .protyle-util:not(.fn__none), .b3-menu:not(.fn__none)") ||
+            (menuEl && !menuEl.classList.contains("fn__none"))) return;
+        oncancel();
     }
+    // capture（二期 □2）：内核 wysiwyg keydown 挂 protyle.element 冒泡阶段，Esc 多分支
+    // stopPropagation——冒泡挂 window 收不到（□1 e2e 实锤两轮 Esc 不触发取消）；capture
+    // 是传播首站恒可达；不拦传播，内核自己的 Esc 语义（关菜单/工具条）照常走
     $effect(() => {
-        window.addEventListener("keydown", onkeydown);
-        return () => window.removeEventListener("keydown", onkeydown);
+        window.addEventListener("keydown", onkeydown, true);
+        return () => window.removeEventListener("keydown", onkeydown, true);
     });
 
     let fired = false;

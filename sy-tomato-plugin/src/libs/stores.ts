@@ -181,6 +181,9 @@ function notebookStoreFactory(k = "storeNoteBox_selectedNotebook") {
 
 export const storeNoteBox_selectedNotebook = notebookStoreFactory();
 export const storeNoteBox_fastnote = notebookStoreFactory("storeNoteBox_fastnote");
+/** 批注草稿文档存放笔记本（2026-09-02）：未配置默认跟随系统日记本（annoDraft.initAnnoDraftNotebookDefault 注入） */
+export const DRAFT_NOTEBOOK_KEY = "commentBoxAnnoDraftNotebook";
+export const commentBoxAnnoDraftNotebook = notebookStoreFactory(DRAFT_NOTEBOOK_KEY);
 
 export const storeAttrManager = () => {
     const store = writableWithGet({} as AttrType);
@@ -323,6 +326,10 @@ export const userID = settingFactory("userID", "", STORAGE_SETTINGS, null as TSK
 // 语义 = 已回填激活码的 md5 指纹（libs/redeem.ts fingerprintOf，spec admin-codes 批次 B1）；
 // 升级前老值为布尔——读到的代码走指纹比对自然处理（布尔必然不等 → 触发一次幂等回填）
 export const licenseCloudSynced = settingFactory("licenseCloudSynced", "", STORAGE_SETTINGS, null as TSK);
+/** 批注收集使用记忆（2026-09-02，不出设置面板行——是记忆不是偏好）：范围/去向/指定文件目标 */
+export const annoCollectScope = settingFactory("annoCollectScope", "doc", STORAGE_SETTINGS, null as TSK);
+export const annoCollectDest = settingFactory("annoCollectDest", "daily", STORAGE_SETTINGS, null as TSK);
+export const annoCollectTargetDoc = settingFactory("annoCollectTargetDoc", "", STORAGE_SETTINGS, null as TSK);
 export const exportIntervalSec = settingFactory("exportIntervalSec", "5", STORAGE_SETTINGS, null as TSK);
 export const exportIntervalSecOn = settingFactory("exportIntervalSecOn", true, STORAGE_SETTINGS, null as TSK);
 export const exportCleanFiles = settingFactory("exportCleanFiles", "60", STORAGE_SETTINGS, null as TSK);
@@ -476,7 +483,6 @@ export const back_link_embed = settingFactory("back_link_embed", false, STORAGE_
 export const back_link_ref = settingFactory("back_link_ref", false, STORAGE_SETTINGS, null as TSK);
 export const back_link_move_here = settingFactory("back_link_move_here", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_move_with_backlink = settingFactory("back_link_move_with_backlink", false, STORAGE_SETTINGS, null as TSK);
-export const back_link_show_floatUI = settingFactory("back_link_show_floatUI", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_protyle_height = settingFactory("back_link_protyle_height", "200", STORAGE_SETTINGS, null as TSK);
 export const back_link_show_path = settingFactory("back_link_show_path", false, STORAGE_SETTINGS, null as TSK);
 // □4 面板宽度模式：false=全宽（历史现状），true=跟随编辑器内容盒宽
@@ -554,6 +560,8 @@ export const fastNoteBoxDelAfterCreating = settingFactory("fastNoteBoxDelAfterCr
 export const fastNoteBoxDocPrefix = settingFactory("fastNoteBoxDocPrefix", true, STORAGE_SETTINGS, null as TSK);
 export const commentBoxCheckbox = settingFactory("commentBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const commentBoxMenu = settingFactory("commentBoxMenu", true, STORAGE_SETTINGS, null as TSK);
+// 划词工具条批注入口（□4 2026-09-03）：官方划词菜单直加批注钮；默认开，gates 还叠批注总开关
+export const commentBoxAnnoToolbar = settingFactory("commentBoxAnnoToolbar", true, STORAGE_SETTINGS, null as TSK);
 export const commentBoxMaxProtyleHeight = settingFactory("commentBoxMaxProtyleHeight", 300, STORAGE_SETTINGS, null as TSK);
 export const commentBoxAnnoUnderlineThickness = settingFactory("commentBoxAnnoUnderlineThickness", 2, STORAGE_SETTINGS, null as TSK);
 // □1 标记形态主档：underline 下划线式（现状）/ marker 马克笔式 / frame 花边框（文字流蝴蝶），

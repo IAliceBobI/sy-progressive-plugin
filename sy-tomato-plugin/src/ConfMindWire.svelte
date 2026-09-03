@@ -18,9 +18,10 @@
     } from "./libs/stores";
     import { siyuan } from "./libs/siyuanApi";
     import { lastVerifyResult } from "./libs/user";
-    import { MindWire启用或禁用思维导线, MindWire启用或禁用文档思维导线 } from "./MindWire";
+    import { MindWire启用或禁用思维导线, MindWire启用或禁用文档思维导线, MindWire划词连线 } from "./MindWire";
     import { tomatoI18n } from "./tomatoI18n";
     import HotkeyCap from "./HotkeyCap.svelte";
+    import ConfHelpIcon from "./ConfHelpIcon.svelte";
 
     let { codeValid }: { codeValid: boolean } = $props();
     let codeNotValid = $derived(!codeValid);
@@ -54,6 +55,7 @@
     <div class="section-title">
         <input type="checkbox" class="b3-switch" bind:checked={$mindWireCheckbox} />
         {tomatoI18n.思维导线}
+        <ConfHelpIcon token="QNArdYNuuoH34qxGHdCcHmE6nic" />
     </div>
     {#if $mindWireCheckbox}
         <div>
@@ -79,6 +81,7 @@
         <div>
             <input type="checkbox" class="b3-switch" bind:checked={$mindWireWordWire} />
             {tomatoI18n.划词连线}
+            <HotkeyCap hk={MindWire划词连线} pluginName="sy-tomato-plugin"></HotkeyCap>
         </div>
         <div>
             {tomatoI18n.线型}

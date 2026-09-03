@@ -106,3 +106,33 @@ export function checkWireEnd(
 export function wordClip(text: string, n: number = 12): string {
     return text.length > n ? text.slice(0, n) + "…" : text;
 }
+
+/** 单端锚词拾回（二期 □2 孤儿自救）：孤儿起点标记 span 的 href+文本重建 WordPending，
+ *  wireId 沿用原线 id（不新造——续连成线须与存量 span/属性条目同 id）；词文本剥
+ *  ZWSP+内部换行（跨行 span；芯片 nowrap 渲染与截断计数不含它）+trim，与 startWordWire
+ *  词快照同规；href 坏前缀/空词/空 rootId 一律 null 不拾 */
+export function reviveWordPending(
+    href: string | null, text: string, rootId: string,
+): { wireId: string; word: string; rootId: string } | null {
+    const wireId = wireIdFromHref(href);
+    const word = text.replace(/[\u200b\n]/g, "").trim();
+    if (!wireId || !word || !rootId) return null;
+    return { wireId, word, rootId };
+}
+
+/** 两步流两态文案单一事实源（二期 □1）：右键菜单/划词工具条 tooltip/命令通道同源。
+ *  pendingWord 空串视为无 pending（startWordWire 的 range.toString().trim() 保证非空）。 */
+export function wordWireTip(pendingWord: string | null, i18nStart: string, i18nConnect: string): string {
+    if (!pendingWord) return i18nStart;
+    return `${i18nConnect}：「${wordClip(pendingWord)}」`;
+}
+
+/** 两态换 tip 时保留内核拼进 aria-label 的热键尾注（ToolbarItem：tip + " " + updateHotkeyTip）。
+ *  tip 本身可含空格，从尾部剥一个词元判是否键形（mac 修饰字形须起始、win 修饰名、裸 F 档；
+ *  mac 不加 ^ 锚会把「含修饰字形的普通词」误当热键保留并逐轮自延续垃圾尾——评审 P2-1） */
+export function mergeTipKeepHotkey(label: string, nextTip: string): string {
+    const idx = label.lastIndexOf(" ");
+    const last = idx > -1 ? label.slice(idx + 1) : "";
+    const isHotkey = /^[⌘⌥⇧⌃]/.test(last) || /^(Ctrl|Shift|Alt)/.test(last) || /^F\d+$/.test(last);
+    return isHotkey ? `${nextTip} ${last}` : nextTip;
+}

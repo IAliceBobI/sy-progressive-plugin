@@ -9,6 +9,7 @@
     import { STORAGE_SETTINGS } from "./constants";
     import { tomatoI18n } from "./tomatoI18n";
     import HotkeyCap from "./HotkeyCap.svelte";
+    import ConfHelpIcon from "./ConfHelpIcon.svelte";
     import { saveRestorePagePosition } from "./libs/utils";
     import UpgradeBar from "./UpgradeBar.svelte";
     import { lastVerifyResult } from "./libs/user";
@@ -102,7 +103,7 @@
     <!-- 快捷键 -->
     <section class="conf-group">
         <div class="settingBox">
-            <div class="section-title">{tomatoI18n.快捷键如有冲突请调整}</div>
+            <div class="section-title">{tomatoI18n.快捷键如有冲突请调整}<ConfHelpIcon token="XyFPdPBbsol477xl5TFcX9Ttn2e" /></div>
             <div>
                 {tomatoSettingsOpenHK.langText()}<HotkeyCap hk={tomatoSettingsOpenHK} pluginName="sy-tomato-plugin"></HotkeyCap>
             </div>

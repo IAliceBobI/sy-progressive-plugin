@@ -37,11 +37,11 @@ function getBlockDOM(dom: HTMLElement): { dom: HTMLElement, blockID: string } {
     return { dom, blockID };
 }
 
-export const flashBox制卡 = winHotkey("⌥E", "制卡", "＋🗃️", () => tomatoI18n.制卡)
-export const flashBox原地制卡 = winHotkey("⌥`", "原地制卡", "＋🗃️⬇️", () => tomatoI18n.原地制卡)
-export const flashBox制卡并发到dailycard = winHotkey("⌘`", "制卡并发到dailycard", "🗓️🗃️⭐", () => tomatoI18n.制卡并发到dailycard)
-export const flashBox制卡并发到dailycard无引用 = winHotkey("⌥S", "制卡并发到dailycard无引用", "🗓️🗃️", () => tomatoI18n.制卡并发到dailycard无引用) // □14 拍板免费（制卡=核心复习流，不设门）
-export const flashBox多行标记 = winHotkey("shift+alt+enter", "多行标记", "🪧", () => tomatoI18n.多行标记)
+export const flashBox制卡 = winHotkey("⌥E", "制卡", "iconProgCardAdd", () => tomatoI18n.制卡)
+export const flashBox原地制卡 = winHotkey("⌥`", "原地制卡", "iconProgCardHere", () => tomatoI18n.原地制卡)
+export const flashBox制卡并发到dailycard = winHotkey("⌘`", "制卡并发到dailycard", "iconProgCardDaily", () => tomatoI18n.制卡并发到dailycard)
+export const flashBox制卡并发到dailycard无引用 = winHotkey("⌥S", "制卡并发到dailycard无引用", "iconProgCardDailyN", () => tomatoI18n.制卡并发到dailycard无引用) // □14 拍板免费（制卡=核心复习流，不设门）
+export const flashBox多行标记 = winHotkey("shift+alt+enter", "多行标记", "iconProgMulti", () => tomatoI18n.多行标记)
 
 class FlashBox {
     private plugin: BaseTomatoPlugin;
@@ -205,7 +205,7 @@ class FlashBox {
             // SiYuan 3.8.0 起事务会校验 addFlashcards 的目标块已存在于块树，新卡片块不能在同一事务内注册；
             // /api/transactions 返回前事务已落盘（FlushTxQueue），此处注册安全
             siyuan.addRiffCards([cardID])
-            siyuan.pushMsg("⚡🗃" + text, 2000);
+            siyuan.pushMsg(text, 2000);
         })
     }
 

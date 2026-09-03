@@ -40,28 +40,39 @@ export async function applyReviewAction(ids: string[], action: "complete" | "def
 }
 
 /**
- * 设/改调度子菜单（平铺：曲线 + 五档日程 + 移除；当前模式 ✓ 标记、点击不重置进度）。
- * current=done 或 null 一律按「无调度」处理（设新值自然覆盖旧态）。
+ * 设/改调度子菜单（平铺：曲线 + 五档日程 + 标为心得 + 移除；当前模式 ✓ 标记、点击不重置进度）。
+ * current=done 时曲线/日程按「无调度」处理（设新值自然覆盖旧态），心得项显示 ✓ 已标；
+ * raw=块上 IAL 原始值，非空即出移除项（done 态移除=取消心得，脏值也能清）。
+ * 菜单翻新（2026-09-02）：原右键一级「标为心得/取消心得标记」并入本子菜单（iconStar 项）。
  */
-export function schedSubmenuItems(ids: string[], current: ReviewState | null): MenuItemOption[] {
+export function schedSubmenuItems(ids: string[], current: ReviewState | null, raw = ""): MenuItemOption[] {
     if (ids.length === 0) return [];
     const live = current && current.mode !== "done" ? current : null;
+    const done = current?.mode === "done";
     const items: MenuItemOption[] = [{
-        iconHTML: "📈",
+        icon: "iconGraph",
         label: (live?.mode === "curve" ? "✓ " : "") + tomatoI18n.曲线重访,
         ...(live?.mode === "curve" ? {} : { click: () => setReview(ids, markQuestion(Date.now()), tomatoI18n.已设曲线重访) }),
     }];
     for (const n of SCHED_PRESETS) {
         const on = live?.mode === "sched" && live.every === n;
         items.push({
-            iconHTML: "📅",
+            icon: "iconCalendar",
             label: (on ? "✓ " : "") + tomatoI18n.每N天重访(n),
             ...(on ? {} : { click: () => setReview(ids, markSched(Date.now(), n), tomatoI18n.已设每N天重访(n)) }),
         });
     }
-    if (live) {
+    items.push(done ? {
+        icon: "iconStar",
+        label: "✓ " + tomatoI18n.已标心得不再重访,
+    } : {
+        icon: "iconStar",
+        label: tomatoI18n.标为心得不再重访,
+        click: () => setReview(ids, "done", tomatoI18n.已完成转心得),
+    });
+    if (live || done || raw) {
         items.push({
-            iconHTML: "🧹",
+            icon: "iconTrashcan",
             label: tomatoI18n.移除重访调度,
             click: () => setReview(ids, "", tomatoI18n.调度已移除),
         });
@@ -81,12 +92,13 @@ function menuPos(ev: { clientX: number; clientY: number }) {
 export async function openReviewSchedMenu(ids: string[], ev: { clientX: number; clientY: number }) {
     if (ids.length === 0) return;
     const attrs = await siyuan.getBlockAttrs(ids[0]);
-    const current = parseReview(attrs?.[ReviewKey]);
+    const raw = attrs?.[ReviewKey] ?? "";
+    const current = parseReview(raw);
     const menu = new (Menu as any)("progReviewSchedMenu", undefined, true) as Menu;
     menu.addItem({
-        iconHTML: "⏱",
+        icon: "iconProgSched",
         label: tomatoI18n.重访调度,
-        submenu: schedSubmenuItems(ids, current),
+        submenu: schedSubmenuItems(ids, current, raw),
     });
     setTimeout(() => menu.open(menuPos(ev)), 0);
 }
@@ -116,7 +128,7 @@ export async function openDueReviewList(ev: { clientX: number; clientY: number }
         if (!s || s.mode === "done") continue;
         const curve = s.mode === "curve";
         menu.addItem({
-            iconHTML: curve ? "❓" : "📅",
+            icon: curve ? "iconProgThink" : "iconCalendar",
             label: clip(r.content ?? r.id, 40),
             click: async () => {
                 await OpenSyFile2(
@@ -125,17 +137,17 @@ export async function openDueReviewList(ev: { clientX: number; clientY: number }
             },
             submenu: [
                 {
-                    iconHTML: "✅",
+                    icon: "iconCheck",
                     label: curve ? tomatoI18n.问题已解决 : tomatoI18n.本轮已完成,
                     click: () => applyReviewAction([r.id], "complete", r.v),
                 },
                 {
-                    iconHTML: "⏰",
+                    icon: curve ? "iconProgThink" : "iconClock",
                     label: curve ? tomatoI18n.还没懂稍后再看 : tomatoI18n.推迟到明天,
                     click: () => applyReviewAction([r.id], "defer", r.v),
                 },
                 {
-                    iconHTML: "🧹",
+                    icon: "iconTrashcan",
                     label: tomatoI18n.移除重访调度,
                     click: () => applyReviewAction([r.id], "remove", r.v),
                 },

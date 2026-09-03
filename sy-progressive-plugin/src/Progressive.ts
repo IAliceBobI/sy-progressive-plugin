@@ -31,13 +31,13 @@ import { fullfilContent } from "./helper";
 import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
 import { pressSkip, showCardAnswer } from "../../sy-tomato-plugin/src/libs/cardUtils";
 
-export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK", "⚙️", () => tomatoI18n.渐进学习的设置)
-export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn", "📖", () => tomatoI18n.开始今日阅读)
-export const Progressive开始随机学习 = winHotkey("⌥⇧-", "Progressive startToLearnRand", "🔀📖", () => tomatoI18n.开始随机学习)
-export const Progressive上一页 = winHotkey("ctrl+left", "上一页", "⏫", () => tomatoI18n.上一页)
-export const Progressive下一页 = winHotkey("ctrl+right", "下一页", "⏬", () => tomatoI18n.下一页)
-export const Progressive跳到分片或回到原文 = winHotkey("⇧⌥w", "跳到分片或回到原文", "🎯📖", () => tomatoI18n.跳到分片或回到原文)
-export const Progressive添加当前文档到渐进阅读分片模式 = winHotkey("⇧⌥m", "添加当前文档到渐进阅读(分片模式)", "＋📗", () => tomatoI18n.添加当前文档到渐进阅读分片模式)
+export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK", "iconSettingsProg", () => tomatoI18n.渐进学习的设置)
+export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn", "iconProgPlay", () => tomatoI18n.开始今日阅读)
+export const Progressive开始随机学习 = winHotkey("⌥⇧-", "Progressive startToLearnRand", "iconProgShuffle", () => tomatoI18n.开始随机学习)
+export const Progressive上一页 = winHotkey("ctrl+left", "上一页", "iconProgPrev", () => tomatoI18n.上一页)
+export const Progressive下一页 = winHotkey("ctrl+right", "下一页", "iconProgFFast", () => tomatoI18n.下一页)
+export const Progressive跳到分片或回到原文 = winHotkey("⇧⌥w", "跳到分片或回到原文", "iconProgSwap", () => tomatoI18n.跳到分片或回到原文)
+export const Progressive添加当前文档到渐进阅读分片模式 = winHotkey("⇧⌥m", "添加当前文档到渐进阅读(分片模式)", "iconProgAddBook", () => tomatoI18n.添加当前文档到渐进阅读分片模式)
 
 class Progressive {
     plugin: Plugin;
@@ -116,7 +116,7 @@ class Progressive {
             const menu = detail.menu;
             if (piecesmenu.get()) {
                 menu.addItem({
-                    iconHTML: Progressive添加当前文档到渐进阅读分片模式.icon,
+                    icon: Progressive添加当前文档到渐进阅读分片模式.icon,
                     label: Progressive添加当前文档到渐进阅读分片模式.langText(),
                     accelerator: Progressive添加当前文档到渐进阅读分片模式.m,
                     click: async () => {
@@ -126,7 +126,7 @@ class Progressive {
             }
             if (ProgressiveJumpMenu.get()) {
                 menu.addItem({
-                    iconHTML: Progressive跳到分片或回到原文.icon,
+                    icon: Progressive跳到分片或回到原文.icon,
                     label: Progressive跳到分片或回到原文.langText(),
                     accelerator: Progressive跳到分片或回到原文.m,
                     click: () => {
@@ -247,7 +247,7 @@ class Progressive {
         // 跳哪块，消掉「按全局选中块跳」的错位（□8-B）
         if (blockIconMenu.get()) {
             menu.addItem({
-                iconHTML: Progressive跳到分片或回到原文.icon,
+                icon: Progressive跳到分片或回到原文.icon,
                 label: Progressive跳到分片或回到原文.langText(),
                 accelerator: Progressive跳到分片或回到原文.m,
                 click: () => {
@@ -263,7 +263,7 @@ class Progressive {
     private addMenu() {
         const menu = new Menu("progressiveMenu");
         menu.addItem({
-            iconHTML: Progressive添加当前文档到渐进阅读分片模式.icon,
+            icon: Progressive添加当前文档到渐进阅读分片模式.icon,
             label: Progressive添加当前文档到渐进阅读分片模式.langText(),
             accelerator: Progressive添加当前文档到渐进阅读分片模式.m,
             click: async () => {
@@ -271,7 +271,7 @@ class Progressive {
             }
         });
         menu.addItem({
-            iconHTML: Progressive跳到分片或回到原文.icon,
+            icon: Progressive跳到分片或回到原文.icon,
             label: Progressive跳到分片或回到原文.langText(),
             accelerator: Progressive跳到分片或回到原文.m,
             click: () => {
@@ -280,7 +280,7 @@ class Progressive {
         });
         if (ProgressiveStart2learn.get()) {
             menu.addItem({
-                iconHTML: Progressive开始学习.icon,
+                icon: Progressive开始学习.icon,
                 label: Progressive开始学习.langText(),
                 accelerator: Progressive开始学习.m,
                 click: () => {

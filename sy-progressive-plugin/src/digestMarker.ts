@@ -104,7 +104,7 @@ async function openDigestListMenu(ev: MouseEvent, ids: string[]) {
     const menu = new (Menu as any)("progDigestListMenu", undefined, true) as Menu;
     for (const it of items) {
         menu.addItem({
-            iconHTML: "✒",
+            icon: "iconProgQuill",
             label: it.label,
             click: () => { if (pluginRef) OpenSyFile2(pluginRef, it.id); },
         });

@@ -294,7 +294,7 @@
                                 disabled={totalOf(b) === 0}
                                 aria-label={`${tomatoI18n.阅读}《${b.name}》`}
                                 onclick={() => btnStartToLearn(b.bookID)}
-                            >📖 {tomatoI18n.阅读}</button
+                            >{tomatoI18n.阅读}</button
                             >
                             <button
                                 class="btn ghost"
@@ -302,7 +302,7 @@
                                 aria-label={`${tomatoI18n.重新分片}《${b.name}》`}
                                 onclick={() =>
                                     btnAddProgressiveReading(b.bookID)}
-                            >🍕 {tomatoI18n.重新分片}</button
+                            >{tomatoI18n.重新分片}</button
                             >
                             <button
                                 class="switch"

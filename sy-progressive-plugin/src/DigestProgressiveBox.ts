@@ -12,15 +12,15 @@ import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { kind, openDigestSubrank, show, toggleFreeFloat } from "./ProgressiveBtn";
 import { cardModeFor, type DigestIntent } from "./digestCardMode";
 
-export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "＋🍕", () => tomatoI18n.渐进阅读摘抄模式)
-export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "🍕", () => tomatoI18n.执行摘抄)
-export const digest执行摘抄并断句 = winHotkey("⇧⌥X", "执行摘抄并断句", "✂", () => tomatoI18n.执行摘抄并断句)
+export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "iconProgScissors", () => tomatoI18n.渐进阅读摘抄模式)
+export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "iconProgScissors", () => tomatoI18n.执行摘抄)
+export const digest执行摘抄并断句 = winHotkey("⇧⌥X", "执行摘抄并断句", "iconSplitTB", () => tomatoI18n.执行摘抄并断句)
 // 2026-09-02 用户反馈：留档/背诵此前只是浮条子排两按钮，快捷键通道唯一且行为跟 cardMode 设置
 // 漂移；补两命令各带独立默认键，用户可在插件设置/思源键位设置里分别改。
 // 键位按 winHotkey 规范化后形态比对过全仓（ctrl+alt+X 写法会归一成 ⌘⌥X）：⇧⌥P/⌘⌥Z 均无冲突
 // （⌘⌥P 曾人选，与 recite reciteCopyPrompt=alt+ctrl+p 规范化后撞键，dev 实例 console 实锤）
-export const digest执行摘抄留档 = winHotkey("⇧⌥P", "执行摘抄留档", "🍕", () => tomatoI18n.执行摘抄留档)
-export const digest执行摘抄背诵 = winHotkey("⌘⌥Z", "执行摘抄背诵", "＋🗃️", () => tomatoI18n.执行摘抄背诵)
+export const digest执行摘抄留档 = winHotkey("⇧⌥P", "执行摘抄留档", "iconProgArchive", () => tomatoI18n.执行摘抄留档)
+export const digest执行摘抄背诵 = winHotkey("⌘⌥Z", "执行摘抄背诵", "iconProgRecite", () => tomatoI18n.执行摘抄背诵)
 
 /**
  * □11 入口统一（设计共识 2）：⌥Z/右键/块图标「渐进阅读摘抄模式」全收——三态（含自由态）
@@ -62,7 +62,7 @@ class DigestProgressiveBox {
         if (blockIconMenu.get()) {
             detail.menu.addItem({
                 label: digest渐进阅读摘抄模式.langText(),
-                iconHTML: digest渐进阅读摘抄模式.icon,
+                icon: digest渐进阅读摘抄模式.icon,
                 accelerator: digest渐进阅读摘抄模式.m,
                 click: () => {
                     this.enterDigestMode();
@@ -90,7 +90,7 @@ class DigestProgressiveBox {
             if (digestmenu.get()) {
                 menu.addItem({
                     label: digest渐进阅读摘抄模式.langText(),
-                    iconHTML: digest渐进阅读摘抄模式.icon,
+                    icon: digest渐进阅读摘抄模式.icon,
                     accelerator: digest渐进阅读摘抄模式.m,
                     click: () => {
                         this.enterDigestMode();
@@ -99,54 +99,50 @@ class DigestProgressiveBox {
                 // □16 整摘双通道之一：任意文档（剧本等）无浮条载体，右键整篇摘抄落札记匣/摘抄集
                 menu.addItem({
                     label: tomatoI18n.整篇摘抄,
-                    iconHTML: "📋",
+                    icon: "iconProgContents",
                     click: () => { digestWholeDoc(detail.protyle); },
                 });
             }
         });
 
         // v5 □12 重访调度右键（thinkQueue 推广为通用 reviewQueue）：调度态按模式分完成/推迟
-        // 文案（曲线=问题已解决/还没懂；日程=本轮完成/推迟到明天）；「重访调度…」子菜单设/改/移。
-        this.plugin.eventBus.on("open-menu-content", async ({ detail }) => {
+        // 文案（曲线=已解决转心得/还没懂；日程=本轮完成/推迟到明天）；「重访调度…」子菜单设/改/移。
+        // 菜单翻新（2026-09-02）：原一级「标为心得/取消心得标记」两项退役——心得=reviewQueue
+        // done 终态语义同源，并入「重访调度…」子菜单（iconStar 项）；常驻噪音从两项减到一项。
+        // 2026-09-02 撞见修复（此前右键重访调度在 3.9 内核静默失效，双重死因）：
+        // ① 内核 open-menu-content detail={protyle, range, element}，blockElements 是
+        //   click-blockicon 专属——原实现 ids 恒空早退；② emitToPlugins 同步收集菜单项，
+        //   原 await getBlockAttrs 后 addItem 迟到不进菜单。修=目标块走 element/--select
+        //   同步取，调度态改读块 DOM 的 custom-prog-think 属性（custom IAL 渲染为块 div
+        //   同名属性，setBlockAttrs 即刷），全程零 await。
+        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
-            const ids = Object.keys((detail as any).blockElements ?? {});
+            let els: HTMLElement[] = Object.values((detail as any).blockElements ?? {});
+            if (els.length === 0) {
+                els = [...(detail.protyle?.wysiwyg?.element?.querySelectorAll<HTMLElement>(".protyle-wysiwyg--select") ?? [])];
+                if (els.length === 0 && (detail as any).element) els = [(detail as any).element];
+            }
+            const ids = els.map(el => el?.getAttribute("data-node-id")).filter(Boolean) as string[];
             if (ids.length === 0) return;
-            const attrs = await siyuan.getBlockAttrs(ids[0]);
-            const s = parseReview(attrs[ReviewKey]);
+            const raw = els[0].getAttribute(ReviewKey) ?? "";
+            const s = parseReview(raw);
             if (s && s.mode !== "done") {
                 const curve = s.mode === "curve";
                 menu.addItem({
                     label: curve ? tomatoI18n.问题已解决 : tomatoI18n.本轮已完成,
-                    iconHTML: "✅",
-                    click: () => applyReviewAction(ids, "complete", attrs[ReviewKey]),
+                    icon: "iconCheck",
+                    click: () => applyReviewAction(ids, "complete", raw),
                 });
                 menu.addItem({
                     label: curve ? tomatoI18n.还没懂稍后再看 : tomatoI18n.推迟到明天,
-                    iconHTML: curve ? "❓" : "⏰",
-                    click: () => applyReviewAction(ids, "defer", attrs[ReviewKey]),
-                });
-            }
-            if (s?.mode === "done") {
-                menu.addItem({
-                    label: tomatoI18n.取消心得标记,
-                    iconHTML: "✱",
-                    click: async () => {
-                        for (const id of ids) await siyuan.setBlockAttrs(id, { [ReviewKey]: "" } as AttrType);
-                    },
-                });
-            } else {
-                menu.addItem({
-                    label: tomatoI18n.标为心得,
-                    iconHTML: "✱",
-                    click: async () => {
-                        for (const id of ids) await siyuan.setBlockAttrs(id, { [ReviewKey]: "done" } as AttrType);
-                    },
+                    icon: curve ? "iconProgThink" : "iconClock",
+                    click: () => applyReviewAction(ids, "defer", raw),
                 });
             }
             menu.addItem({
                 label: tomatoI18n.重访调度,
-                iconHTML: "⏱",
-                submenu: schedSubmenuItems(ids, s),
+                icon: "iconProgSched",
+                submenu: schedSubmenuItems(ids, s, raw),
             });
         });
 

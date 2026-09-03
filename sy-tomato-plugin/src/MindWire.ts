@@ -1,23 +1,27 @@
-import { getAllEditor, IEventBusMap, IProtyle, Protyle } from "siyuan";
+import { getAllEditor, IEventBusMap, IMenuItem, IProtyle, Protyle } from "siyuan";
 import { mount, unmount } from "svelte";
 import { mindWireCheckbox, mindWireColorfull, mindWireDocMenu, mindWireDynamicLine, mindWireEnable, mindWireGlobalMenu, mindWireLine, mindWireStarRefOnly, mindWireWidth, mindWireWordWire, } from "./libs/stores";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { events, EventType } from "./libs/Events";
-import { getAttribute, getID, isEditor, siyuan } from "./libs/utils";
+import { getAttribute, getID, isEditor, normalizeWordRange, siyuan } from "./libs/utils";
 import { murmurHash3 } from "./libs/hash";
 import { winHotkey } from "./libs/winHotkey";
 import { addIfVisible } from "./libs/menuManager";
 import { tomatoI18n } from "./tomatoI18n";
 import { lastVerifyResult, verifyKeyTomato } from "./libs/user";
 import { debugLog } from "./libs/logUtils";
-import { blockWirePath, clampStubX, getEdgePoint, shiftRect, stubDir, stubEdgeShift, stubPos, toContentRect, toolbarPos, wireViewState, wordWireGeometry } from "./libs/mindWireGeom";
-import { RELATIONS_ATTR, RELATION_COLOR, RelationKey, WORD_WIRE_HREF_PREFIX, checkWireEnd, cleanupRelations, groupWordWires, makeWireId, parseRelations, relationColor, wireIdFromHref, wordClip } from "./libs/mindWireData";
+import { blockWirePath, clampStubX, getEdgePoint, shiftRect, stubAvoidShift, stubDir, stubEdgeShift, stubPos, toolbarAvoidShift, toolbarPos, toContentRect, wireViewState, wordWireGeometry } from "./libs/mindWireGeom";
+import { RELATIONS_ATTR, RELATION_COLOR, RelationKey, WORD_WIRE_HREF_PREFIX, checkWireEnd, cleanupRelations, groupWordWires, makeWireId, mergeTipKeepHotkey, parseRelations, relationColor, reviveWordPending, wireIdFromHref, wordClip, wordWireTip } from "./libs/mindWireData";
 import MindWirePending from "./MindWirePending.svelte";
 
 const dlog = (msg: string) => debugLog("mindwire", msg, "mindwire");
 
 export const MindWire启用或禁用思维导线 = winHotkey("ctrl+alt+enter", "MindWire global", "iconGlobalGraph", () => tomatoI18n.启用或禁用全局思维导线, false, mindWireGlobalMenu)
 export const MindWire启用或禁用文档思维导线 = winHotkey("ctrl+shift+z", "MindWire doc", "iconGraph", () => tomatoI18n.启用或禁用文档思维导线, false, mindWireDocMenu)
+// ⌥⌘L 撞官方 keymap editor.table.moveToLeft（e2e 实锤：官方分支先吞+幽灵 Enter 触发
+// 全局导线开关）；官方 ⌥⌘ 字母仅 H/O/V/Y 空闲（H 有 macOS「隐藏其他」系统键嫌疑），
+// 取 Y（Y 形分叉=连线意象；winHotkey 官方 keymap 对照是注释态，静态比对看不见这类撞）
+export const MindWire划词连线 = winHotkey("ctrl+alt+y", "MindWire word", "iconLink", () => tomatoI18n.划词连线)
 type TomatoMenu = IEventBusMap["click-blockicon"] & IEventBusMap["open-menu-content"];
 
 // ---------------------------------------------------------------------------
@@ -40,10 +44,14 @@ const TOOLBAR_CLASS = "tomato-mind-wire-toolbar";
 const STUB_CLASS = "tomato-mind-wire-stub";
 /** 残端 chip 隐藏态（双端同屏/双端离屏）：visibility 保布局（挂载期 offsetWidth 可测），滚动期切换不触发重排 */
 const STUB_OFF_CLASS = "tomato-mind-wire-stub--off";
+/** chip 水平避让无可推位兜底态（□5 P1）：满行段落推不出 12px 间隙时毛玻璃紧凑态（背景 88%+blur2） */
+const STUB_TIGHT_CLASS = "tomato-mind-wire-stub--tight";
 const CONTENT_ATTR = "tomato-mind-wire-content";
 const ACCENT_VAR = "--tomato-mind-wire-accent";
 /** 两步流菜单项 key（menuManager 隐藏集体系，spec §4.3） */
 const WORD_MENU_KEY = "m.mindwire.wordwire";
+/** 划词工具条项名（二期 □1）=命令 langKey：共享 keymap.plugin 节点，键位改一处工具条/快捷键两通道同生效 */
+const WORD_TOOLBAR_NAME = "MindWire word";
 
 /** 关系名 i18n getter（spec §4.7 六档；RELATION_COLOR 键序即渲染序） */
 const RELATION_KEYS = Object.keys(RELATION_COLOR) as RelationKey[];
@@ -198,7 +206,7 @@ function scheduleRedraw(protyle: IProtyle, wl: WireLayer) {
 function clearWordMarks(element: HTMLElement) {
     element?.querySelectorAll(`span[data-type="a"][data-href^="${WORD_WIRE_HREF_PREFIX}"]`).forEach((e: HTMLElement) => {
         e.style.removeProperty(ACCENT_VAR);
-        e.classList.remove("tomato-mind-wire-ml", "tomato-mind-wire-nodot", HOT_CLASS, FLASH_CLASS);
+        e.classList.remove("tomato-mind-wire-ml", "tomato-mind-wire-nodot", "tomato-mind-wire-top", HOT_CLASS, FLASH_CLASS);
     });
 }
 
@@ -285,13 +293,24 @@ async function drawWireLayer(protyle: IProtyle, wl: WireLayer) {
             }
         }
         dlog(`draw ok root=${protyle.block.rootID} pairs=${n} word=${nw} scrollTop=${sc.scrollTop}`);
-        // 残端 chip 水平钳制（spec §4.2）：挂载循环结束后统一测量（免逐个交错读写
-        // 强制回流）；visibility 隐藏态保布局，offsetWidth 可测。最后按当前滚动位首判显隐
+        // 残端 chip 水平钳制（spec §4.2）+ 占位带避让（□5 P1）：挂载循环结束后统一测量
+        // （免逐个交错读写强制回流）；visibility 隐藏态保布局，offsetWidth 可测。避让先于
+        // 钳制（避让后的位置仍受层缘 8px 钳制约束）；最后按当前滚动位首判显隐
         const layerW = wl.layer.clientWidth;
         for (const rec of wl.stubs) {
             for (const c of rec.chips) {
                 const half = c.offsetWidth / 2;
-                if (half > 0) c.style.left = clampStubX(parseFloat(c.style.left), half, layerW) + "px";
+                if (half <= 0) continue;
+                const left = parseFloat(c.style.left);
+                const top = parseFloat(c.style.top);
+                const h = c.offsetHeight || 24;
+                const obstacles = probeChipObstacles(wl, { left: left - half, top, w: half * 2, h });
+                if (obstacles.length) {
+                    const { dx, tight } = stubAvoidShift({ left: left - half, right: left + half, top, bottom: top + h }, obstacles, layerW);
+                    if (tight) c.classList.add(STUB_TIGHT_CLASS);
+                    else if (dx) c.style.left = left + dx + "px";
+                }
+                c.style.left = clampStubX(parseFloat(c.style.left), half, layerW) + "px";
             }
         }
         updateStubs(wl);
@@ -346,10 +365,11 @@ function firstFragmentRect(s: HTMLElement): { rect: DOMRect; multiline: boolean 
     return { rect: s.getBoundingClientRect(), multiline: false };
 }
 
-/** 词级单线（spec §4.1）：端点=词底缘中点 +8px 下出线、wordWireGeometry 贝塞尔+中点；
+/** 词级单线（spec §4.1+§12）：方向感知锚点——同行双底缘 +8px 下出线（现状），跨行对端
+ *  在上→本端顶缘出线；缘/端点/圆点几何全在 wordWireGeometry 一次判定。
  *  accent 写两端 span inline（圆点/hot/flash 同源）；rect 全零=未渲染跳过由下轮补。
  *  跨行词的 CSS ::after 圆点挂实现定义 fragment 会与端点分离（P0-1）：改由 svg circle
- *  在端点正下方画点（同 fragment 同心），CSS 点藏掉。
+ *  画点（dotY=端点靠词一侧 3.5px，底/顶缘同构），CSS 点藏掉。
  *  □3：同 d 隐形命中走廊（pointer-events:stroke）挂交互——hover 高亮/点线跳转/长按迷你条
  *  □4 D11：降级档（>120 条）不加流动、藏圆点（跨行 svg circle 同跳过——CSS 只藏 ::after 罩不到它） */
 function drawWordOne(wl: WireLayer, origin: { left: number; top: number }, wireId: string, s1: HTMLElement, s2: HTMLElement, relation: string | undefined, protyle: IProtyle, degraded: boolean) {
@@ -368,9 +388,14 @@ function drawWordOne(wl: WireLayer, origin: { left: number; top: number }, wireI
     s1.classList.toggle("tomato-mind-wire-nodot", degraded);
     s2.classList.toggle("tomato-mind-wire-nodot", degraded);
 
-    const p1 = { x: a1.cx, y: a1.bottom + 8 };
-    const p2 = { x: a2.cx, y: a2.bottom + 8 };
-    const geo = wordWireGeometry(p1, p2, a1.w, a2.w);
+    // 上方空间 hoist 共用（□3 spec §12.6.3：顶缘端点收窄与 □5 chip 下置同一量，零新增布局读）
+    const gap1 = availAboveOf(s1, a1.top, origin.top);
+    const gap2 = availAboveOf(s2, a2.top, origin.top);
+    // □3 方向感知锚点（spec §12）：跨行时对端在上→本端顶缘出线，几何（缘/端点/圆点）全在
+    // wordWireGeometry 内一次判定；top 类名给 CSS ::after 圆点翻字顶（svg 路走 ends.dotY）
+    const geo = wordWireGeometry(a1, a2, gap1, gap2);
+    s1.classList.toggle("tomato-mind-wire-top", geo.ends[0].edge === "top");
+    s2.classList.toggle("tomato-mind-wire-top", geo.ends[1].edge === "top");
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("class", `${PATH_CLASS} ${WORD_PATH_CLASS}`);
     path.setAttribute("d", geo.d);
@@ -385,14 +410,18 @@ function drawWordOne(wl: WireLayer, origin: { left: number; top: number }, wireI
     }
     wl.svg.appendChild(path);
 
-    // 跨行端点：CSS 圆点已藏，svg 补画（中心=字底+4.5 与 CSS ::after 底偏移同款）；
-    // 降级档藏圆点时跨行端同跳过（线端点本身即视觉锚，spec §4.1.5）
-    for (const [a, ml] of [[a1, f1.multiline], [a2, f2.multiline]] as const) {
+    // 跨行端点：CSS 圆点已藏，svg 补画（dotY 按 缘：底缘=字底+4.5 / 顶缘=(top−eTop)+3.5，
+    // spec §12.3）；降级档藏圆点时跨行端同跳过（线端点本身即视觉锚，spec §4.1.5）
+    const ends = [
+        { cx: a1.cx, end: geo.ends[0] },
+        { cx: a2.cx, end: geo.ends[1] },
+    ];
+    for (const [{ cx, end }, ml] of [[ends[0], f1.multiline], [ends[1], f2.multiline]] as const) {
         if (!ml || degraded) continue;
         const dot = document.createElementNS(SVG_NS, "circle");
         dot.setAttribute("class", "tomato-mind-wire-dot");
-        dot.setAttribute("cx", a.cx.toString());
-        dot.setAttribute("cy", (a.bottom + 4.5).toString());
+        dot.setAttribute("cx", cx.toString());
+        dot.setAttribute("cy", end.dotY.toString());
         dot.setAttribute("r", "2.5");
         dot.style.fill = color;
         dot.style.stroke = "var(--b3-theme-background)";
@@ -408,8 +437,9 @@ function drawWordOne(wl: WireLayer, origin: { left: number; top: number }, wireI
     attachWireInteraction(wl, protyle, wireId, path, hit, s1, s2, geo.mid, relation);
     // 残端 chip（□4）：标签取对端词；点击与点线/锚词跳转共用 jumpWire。
     // □5 拍板：锚上方可用空间（到所在块上一有盒兄弟）<38px 时上态 chip 下置防贴碰
+    // （□3 后 gap 已在上方 hoist，此处直传共用——chip 几何零改动，spec §12.5）
     attachStubs(wl, a1, a2, s1.textContent ?? "", s2.textContent ?? "", color, () => jumpWire(wl, s1, s2),
-        [availAboveOf(s1, a1.top, origin.top), availAboveOf(s2, a2.top, origin.top)]);
+        [gap1, gap2]);
 }
 
 /** 锚词上方可用空间（内容坐标）：锚词 top 减所在块上一个有盒兄弟的底缘（文档
@@ -536,6 +566,18 @@ function attachWireInteraction(
         bar.addEventListener("pointerleave", hideToolbar);
         wl.layer.appendChild(bar);
         wireToolbar = bar;
+        // □5 P2 避弧：弧 bbox（细线近似为盒）与条相交时水平让位（近垂直弧下移无效，
+        // vision □5 评审）——挂层后测实矩形换算内容坐标，让位后不再二次钳制（瞬态件）
+        const bb = path.getBBox();
+        if (bb.width || bb.height) {
+            const lr = wl.layer.getBoundingClientRect();
+            const br = bar.getBoundingClientRect();
+            const dx = toolbarAvoidShift(
+                { left: br.left - lr.left, right: br.right - lr.left, top: br.top - lr.top, bottom: br.bottom - lr.top },
+                { left: bb.x, right: bb.x + bb.width, top: bb.y, bottom: bb.y + bb.height },
+                wl.layer.clientWidth);
+            if (dx) bar.style.left = parseFloat(bar.style.left) + dx + "px";
+        }
     };
 
     hit.addEventListener("pointerenter", (e) => {
@@ -567,9 +609,62 @@ function attachWireInteraction(
 // 下端离屏）；滚动事件 rAF 节流只切显隐，线本体/裁剪零滚动监听（D1 不破）。
 // ---------------------------------------------------------------------------
 
+/** chip 占位带文本探测（□5 P1）：box=层内容坐标拟占位矩形，3 点采样（横向 25/50/75%），
+ *  命中 wysiwyg 内文本时返回该行行盒（Range.getClientRects 取含采样点的 rect，行级水平
+ *  边界——块盒满宽会把段落末行右侧空白误判成无空隙）。采样带在视口外时同步虚拟滚动
+ *  （设-探-恢复，scroll 事件异步派发，同步窗口内无监听执行=零闪烁）。层 pointer-events:none
+ *  与 chip visibility:hidden 都被 elementFromPoint 穿透；弧 path 不在 wysiwyg 内天然排除 */
+function probeChipObstacles(wl: WireLayer, box: { left: number; top: number; w: number; h: number }): { left: number; right: number; top: number; bottom: number }[] {
+    const out: { left: number; right: number; top: number; bottom: number }[] = [];
+    const seen = new Set<Element>();
+    for (const xr of [0.25, 0.5, 0.75]) {
+        const lr = wl.layer.getBoundingClientRect();
+        const vx = lr.left + box.left + box.w * xr;
+        const vy = lr.top + box.top + box.h / 2;
+        // 带中点在视口外：虚拟滚动挪到视口中部（保存-恢复防浮点漂移）
+        const needScroll = vy < 0 || vy > window.innerHeight;
+        const saved = wl.scroller.scrollTop;
+        if (needScroll) wl.scroller.scrollTop = saved + vy - window.innerHeight / 2;
+        try {
+            const lr2 = needScroll ? wl.layer.getBoundingClientRect() : lr;
+            const y2 = lr.top + box.top + box.h / 2 - (lr.top - lr2.top);
+            const el = document.elementFromPoint(vx, y2);
+            if (!el?.closest?.(".protyle-wysiwyg")) continue;
+            if (!Array.from(el.childNodes).some((n) => n.nodeType === 3 && (n.textContent ?? "").trim())) continue;
+            if (seen.has(el)) continue;
+            // 行盒=命中元素内与采样点同行的 text node 矩形联合（文字实宽；块盒满宽会把
+            // 段落末行右侧空白误判成无空隙、窄标题误判成满行——selectNodeContents 整块
+            // 在 Chromium 返回聚合块盒，不可用）
+            const range = document.createRange();
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+            for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+                if (!(n.textContent ?? "").trim()) continue;
+                range.selectNode(n);
+                for (const r of range.getClientRects()) {
+                    if (y2 >= r.top && y2 <= r.bottom && r.width > 0) {
+                        left = Math.min(left, r.left);
+                        right = Math.max(right, r.right);
+                        top = Math.min(top, r.top);
+                        bottom = Math.max(bottom, r.bottom);
+                    }
+                }
+            }
+            if (right < left) continue;
+            seen.add(el);
+            const org = wl.layer.getBoundingClientRect();
+            out.push({ left: left - org.left, right: right - org.left, top: top - org.top, bottom: bottom - org.top });
+        } finally {
+            if (needScroll) wl.scroller.scrollTop = saved;
+        }
+    }
+    return out;
+}
+
 /** 残端 chip 制造（spec §4.2 模板）：chevron+色点+目标词标签（8 字截断），
  *  accent=线色同源；点击=jumpWire（滚到离屏端+双端闪，离屏端检测在役）。
- *  availAbove=锚上方可用空间（词级；上态 <38px 下置防贴碰，spec §4.2 □5 拍板） */
+ *  availAbove=锚上方可用空间（词级；上态 <38px 下置防贴碰，spec §4.2 □5 拍板）。
+ *  □5 P1：上置位拟占带内有字形（availAbove 块级测不到的块内上一行/贴邻窄块）也下置 */
 function makeStub(
     wl: WireLayer, anchor: { cx: number; top: number; bottom: number }, dir: "down" | "up",
     word: string, color: string, onJump: () => void, availAbove = Infinity,
@@ -589,6 +684,12 @@ function makeStub(
     chip.setAttribute("aria-label", `${tomatoI18n.连到}：「${wordClip(word.trim(), 8)}」`);
     chip.addEventListener("click", onJump);
     wl.layer.appendChild(chip);
+    if (dir === "up" && pos.top === anchor.top - 38) {
+        const w = chip.offsetWidth;
+        if (w && probeChipObstacles(wl, { left: pos.left - w / 2, top: pos.top, w, h: 24 }).length) {
+            chip.style.top = anchor.bottom + 14 + "px";
+        }
+    }
     return chip;
 }
 
@@ -647,19 +748,41 @@ interface WordPending {
 let pending: WordPending | null = null;
 let pendingChip: { dismiss: () => void } | null = null;
 
-/** 划词选区判定（菜单项显隐与两步写入共用）：非 collapsed + 单块（a 类型跨块
- *  setInlineMark 直接 return 静默失败，词粒度划选天然单块）+ 非代码块 + 有实文本 */
+/** 划词选区判定（菜单项显隐与两步写入共用）：window 选区过词级有效性提纯
+ *  （非 collapsed + 单块（a 类型跨块 setInlineMark 直接 return 静默失败，
+ *  词粒度划选天然单块）+ 非代码块 + 有实文本，判定体在 domUtils normalizeWordRange） */
 function currentTextRange(): Range | null {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed || !range.toString().trim()) return null;
-    const asEl = (n: Node) => (n.nodeType === 3 ? n.parentElement : (n as HTMLElement));
-    const startBlock = asEl(range.startContainer)?.closest?.("div[data-node-id]");
-    const endBlock = asEl(range.endContainer)?.closest?.("div[data-node-id]");
-    if (!startBlock || !endBlock || startBlock !== endBlock) return null;
-    if (startBlock.getAttribute("data-type") === "NodeCodeBlock") return null;
-    return range;
+    return normalizeWordRange(sel.getRangeAt(0));
+}
+
+/** 工具条/快捷键触发时的选区兜底（二期 □1）：选区未被顶掉走 window 选区（须落在本
+ *  编辑器内——分屏下别把 A 屏选区写进 B 屏事务，评审 P1-1）；被顶掉（工具条点击吞选区/
+ *  焦点漂移）回退 protyle.toolbar.range——内核划词渲染时留存，与 setWordMark 的前置赋值
+ *  同一通道，过同一有效性判定（含脱离文档拦截） */
+function wordWireRange(protyle: IProtyle): Range | null {
+    const sel = currentTextRange();
+    if (sel && protyle.wysiwyg?.element?.contains(sel.startContainer)) return sel;
+    return normalizeWordRange(protyle?.toolbar?.range);
+}
+
+/** 划词工具条两态钮状态同步（二期 □1）：内核只在工具条构建/插件装载时收项、划词
+ *  渲染不重调，挂 document selectionchange 补态——显隐=三层开关+选区落在本编辑器且
+ *  有效；aria-label 两态换写（wordWireTip 同源右键菜单），保留内核拼的热键尾注 */
+function syncWordWireToolbar() {
+    const tip = wordWireTip(pending?.word ?? null, tomatoI18n.关联起点, tomatoI18n.连到);
+    const selRange = currentTextRange();
+    getAllEditor().forEach(({ protyle }) => {
+        const btn = (protyle as any)?.toolbar?.element?.querySelector(`button[data-type="${WORD_TOOLBAR_NAME}"]`) as HTMLButtonElement | null;
+        if (!btn) return;
+        const gates = mindWireCheckbox.get() && mindWireWordWire.get() && mindWireEnable.get();
+        const inEditor = !!selRange && !!protyle.wysiwyg?.element?.contains(selRange.startContainer);
+        // 不用 fn__none：内核「条目可见性」设置同用 fn__none 管隐藏，互写会打架（评审 P1-4）；
+        // style.display 独立通道，用户在外观设置里隐藏本钮后插件不再顶回
+        btn.style.display = gates && inEditor ? "" : "none";
+        btn.setAttribute("aria-label", mergeTipKeepHotkey(btn.getAttribute("aria-label") ?? "", tip));
+    });
 }
 
 /** 选区锚点落着的既有词级标记 wireId（「划在起点同一 span」判定用） */
@@ -747,20 +870,81 @@ function hidePendingChip() {
     pendingChip = null;
 }
 
-/** 取消 pending（Esc/芯片 ×）：摘起点标记（若还在 DOM）+ 芯片退场；标记已被用户手动删则静默 */
+/** 取消 pending（Esc/芯片 ×）：摘起点标记（若还在 DOM）+ 芯片退场；span 不在 DOM
+ *  （内核重建间隙/用户已删词）不再纯静默——dlog 记命中态，标记若仍在文档以单端
+ *  圆点存在，点击锚词拾回可再删（二期 □2 后无死路） */
 function cancelPending() {
     const p = pending;
     pending = null;
     hidePendingChip();
+    syncWordWireToolbar();
     if (!p) return;
-    const prot = events.protyle?.protyle;
-    if (!prot) return;
+    // fallback 收紧为同根才用（□2 P2-3）：异文档编辑器里 findEndSpan 恒 miss，只产误导日志
+    const fallback = events.protyle?.protyle;
+    const prot = protyleByRootId(p.rootId)
+        ?? (fallback?.block?.rootID === p.rootId ? fallback : null);
+    if (!prot) {
+        // 兜底也找不到（文档已关页签）：标记留在文档，可拾回再删；无死路不打断芯片退场
+        dlog(`pending cancel ${p.wireId} no-protyle`);
+        return;
+    }
     const span = findEndSpan(prot, p.wireId);
     if (span) {
         removeWordMark(prot, span);
         redrawWire(prot);
     }
-    dlog(`pending cancel ${p.wireId}`);
+    dlog(`pending cancel ${p.wireId} span=${span ? "hit" : "miss"}`);
+}
+
+/** DOM 元素 → 所属编辑器（拾回点击定位目标 protyle；分屏下按 DOM 归属判，不依赖激活态）。
+ *  isEditor 守卫（评审 P1-2）：反链面板/搜索预览等嵌入副本只渲染部分块——成线在其内
+ *  会被数成单端误判孤儿，一律跳过只在真编辑器里判 */
+function protyleByElement(el: HTMLElement): IProtyle | null {
+    for (const { protyle } of getAllEditor()) {
+        if (isEditor(protyle) && protyle?.element?.contains(el)) return protyle;
+    }
+    return null;
+}
+
+/** 文档根 id → 所属编辑器（cancelPending 摘标记定位）：events.protyle 是「最后点击的
+ *  编辑器」——拾回点击 preventDefault 拦 click-editorcontent 后/冷启动未点过内容时为
+ *  空或旧值（e2e 实锤芯片退场标记不摘），pending.rootId 才是摘除的语义归属 */
+function protyleByRootId(rootId: string): IProtyle | null {
+    for (const { protyle } of getAllEditor()) {
+        if (isEditor(protyle) && protyle?.block?.rootID === rootId) return protyle;
+    }
+    return null;
+}
+
+/** 孤儿拾回（二期 □2）：点击单端锚词 span → 沿用原 wireId 重建 pending + 芯片重现，
+ *  之后照常「连到」成线 / Esc 摘除——孤儿圆点由此获得删除与续连双出口。已有 pending
+ *  且非同线=替换语义（摘旧起点标记，与 startWordWire 替换一致）；同线重拾幂等（点着的
+ *  span 就是起点本体，不能摘自己）。调用方已保证开关在开 + span 单端 */
+function reviveWordWire(protyle: IProtyle, span: HTMLElement) {
+    const p = reviveWordPending(getAttribute(span, "data-href"), span.textContent ?? "", protyle.block.rootID);
+    if (!p) return;
+    // 同线同文档重拾幂等短路（□2 P2-1：点着的 span 就是起点本体，重挂芯片必闪出场
+    // 动画）；wireId 同而 rootId 异=块复制出的跨文档副本（复评 P2-2），走替换分支
+    // 改挂本端防「B 文档连终点恒 crossdoc」困局
+    if (pending?.wireId === p.wireId && pending?.rootId === p.rootId) {
+        dlog(`pending revive idem ${p.wireId}`);
+        return;
+    }
+    if (pending) {
+        // 替换摘旧按 pending 的语义归属定位（□2 P1-3）：被点击编辑器与 pending 可能异
+        // 文档（芯片跨文档常驻），在被点击编辑器里查旧标记恒 miss 留脏孤儿；同 wireId
+        // 跨文档副本场景 fallback 到被点击编辑器会命中刚点的 span 自噬（终签 P2）——
+        // 宁 miss 走 replace-miss 日志，旧标记留 A 文档可再拾回
+        const oldProt = protyleByRootId(pending.rootId)
+            ?? (pending.wireId === p.wireId ? null : protyle);
+        const old = oldProt ? findEndSpan(oldProt, pending.wireId) : null;
+        if (old && oldProt) removeWordMark(oldProt, old);
+        else dlog(`pending revive replace-miss ${pending.wireId}`);
+    }
+    pending = p;
+    showPendingChip();
+    syncWordWireToolbar();
+    dlog(`pending revive ${p.wireId} word=${p.word}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -844,6 +1028,32 @@ function redrawWire(protyle: IProtyle) {
 
 class MindWire {
     plugin: BaseTomatoPlugin;
+    /** 划词工具条补态监听（二期 □1）：document 级 selectionchange，onunload 摘除 */
+    private onSelectionChange = () => syncWordWireToolbar();
+    /** 孤儿拾回点击监听（二期 □2）：document click capture（先于内核 element 冒泡链，
+     *  拦链接打开/选区默认行为）；命中单端锚词（孤儿）→ 拾回重现芯片；成线锚词（同
+     *  href ≥2 span）不拦——点击交互另有归属。onunload 摘除 */
+    private onWordMarkClick = (e: MouseEvent) => {
+        // gate 含 checkbox 而成线锚词跳转（ensureLayer clickHandler）不含：拾回属两步流
+        // 功能族（wordWire），跳转属线交互渲染族——门禁集合有意不同（□2 评审 P2-2）
+        if (!(mindWireCheckbox.get() && mindWireWordWire.get() && mindWireEnable.get())) return;
+        const span = (e.target as HTMLElement | null)?.closest?.(`span[data-type="a"][data-href^="${WORD_WIRE_HREF_PREFIX}"]`) as HTMLElement | null;
+        if (!span || !span.isConnected) return;
+        const protyle = protyleByElement(span);
+        if (!protyle) return;
+        // 拖选让位（评审 P1-1，ensureLayer clickHandler 同款）：按下即拖动选词 mouseup 仍
+        // 派发 click 且选区非 collapsed——是选词手势不是点击，不当拾回
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) return;
+        const href = getAttribute(span, "data-href");
+        // 单端判定：同 href ≥2 span=成线不拦（放行给 ensureLayer 的跳转链）；wireId 仅
+        // [0-9a-z] 可直接进属性选择器
+        const ends = protyle.element?.querySelectorAll(`span[data-type="a"][data-href="${href}"]`);
+        if (!ends || ends.length !== 1) return;
+        e.preventDefault();
+        e.stopPropagation();
+        reviveWordWire(protyle, span);
+    };
 
     private globalEnable() {
         if (mindWireEnable.get()) {
@@ -888,7 +1098,7 @@ class MindWire {
         // 菜单构造时判定选区（划词右键选区仍在）；点击回调里再验一次防选区被菜单交互顶掉
         if (!currentTextRange()) return;
         addIfVisible(menu, WORD_MENU_KEY, pending ? {
-            label: `${tomatoI18n.连到}：「${wordClip(pending.word)}」`,
+            label: wordWireTip(pending.word, tomatoI18n.关联起点, tomatoI18n.连到),
             icon: "iconLink",
             click: () => void this.finishWordWire(protyle),
         } : {
@@ -906,9 +1116,10 @@ class MindWire {
     }
 
     /** 第一步/替换起点（spec §4.3）：写起点标记（单端不成线只圆点，刷新不丢）+
-     *  芯片出场；pending 期重复执行=摘旧标记换新起点（芯片文案随重挂热更新） */
-    private startWordWire(protyle: IProtyle) {
-        const range = currentTextRange();
+     *  芯片出场；pending 期重复执行=摘旧标记换新起点（芯片文案随重挂热更新）。
+     *  preRange=工具条/快捷键通道传入的兜底选区（右键菜单路径不传，走现场选区） */
+    private startWordWire(protyle: IProtyle, preRange?: Range | null) {
+        const range = preRange ?? currentTextRange();
         if (!range) return;
         if (pending) {
             const old = findEndSpan(protyle, pending.wireId);
@@ -917,18 +1128,29 @@ class MindWire {
         }
         const wireId = makeWireId();
         const href = WORD_WIRE_HREF_PREFIX + wireId;
-        if (!setWordMark(protyle, range, href)) return;
-        pending = { wireId, word: range.toString().trim(), rootId: protyle.block.rootID };
+        // 词文本必须在 setWordMark 前取：内核写标记会手术块 DOM（选已标记词时 extract
+        // 重建文本节点），事后 range 指向脱离节点 toString 读出空串（e2e 实锤空词起点）；
+        // ZWSP 一并剥净（评审 P2-2：词内隐形字符会进芯片文案与截断计数）；跨行选区
+        // 内部换行同剥（□2 P2-4：芯片 nowrap 渲染与截断计数不含它，与 revive 同规）
+        const word = range.toString().replace(/[\u200b\n]/g, "").trim();
+        // 替换起点失败不留孤儿芯片（评审 P2-3：pending 已清而芯片还挂着旧词，Esc/× 变空操作）
+        if (!setWordMark(protyle, range, href)) {
+            hidePendingChip();
+            syncWordWireToolbar();
+            return;
+        }
+        pending = { wireId, word, rootId: protyle.block.rootID };
         showPendingChip();
+        syncWordWireToolbar();
         dlog(`pending start ${wireId} word=${pending.word}`);
     }
 
     /** 第二步连终点（spec §4.3）：同词/跨文档边界 toast 且 pending 保留；
      *  成线=关系条目首写（属性先落防丢）→ 终点标记 → 主动重画+两端闪高亮 */
-    private async finishWordWire(protyle: IProtyle) {
+    private async finishWordWire(protyle: IProtyle, preRange?: Range | null) {
         const p = pending;
         if (!p) return;
-        const range = currentTextRange();
+        const range = preRange ?? currentTextRange();
         if (!range) return;
         const check = checkWireEnd(
             { wireId: p.wireId, rootId: p.rootId },
@@ -948,11 +1170,43 @@ class MindWire {
         hidePendingChip();
         redrawWire(protyle);
         flashWireEnds(protyle, p.wireId);
+        syncWordWireToolbar();
         dlog(`wire done ${p.wireId}`);
+    }
+
+    /** 入口三通道统一两态入口（二期 □1）：划词工具条项与命令快捷键共用（右键菜单
+     *  仍走 wordWireMenu 双验路径）；无 pending=标起点，有 pending=连终点 */
+    private wordWireAction(protyle: IProtyle) {
+        if (!(mindWireCheckbox.get() && mindWireWordWire.get() && mindWireEnable.get())) return;
+        const range = wordWireRange(protyle);
+        if (!range) return;
+        if (pending) void this.finishWordWire(protyle, range);
+        else this.startWordWire(protyle, range);
+    }
+
+    /** 官方划词工具条扩展（Plugin.updateProtyleToolbar 委托自 index.ts，二期 □1 本仓
+     *  首用）：恒附项——插件构造期收项早于设置落库，门禁与两态交给 selectionchange
+     *  同步（syncWordWireToolbar）；name=命令 langKey 共享 keymap 节点，键位可改 */
+    updateProtyleToolbar(toolbar: Array<string | IMenuItem>): Array<string | IMenuItem> {
+        toolbar.push({
+            name: WORD_TOOLBAR_NAME,
+            icon: "iconLink",
+            tip: wordWireTip(pending?.word ?? null, tomatoI18n.关联起点, tomatoI18n.连到),
+            hotkey: MindWire划词连线.m,
+            // 官方 click 实参=Protyle 包装类（ToolbarItem 调 getInstance()=>this），
+            // toolbar/setInlineMark 在内层 .protyle（IProtyle）——e2e 实锤缺这层解包
+            click: (protyle: Protyle) => this.wordWireAction(protyle.protyle),
+        });
+        return toolbar;
     }
 
     async onload(plugin: BaseTomatoPlugin) {
         dlog(`onload checkbox=${mindWireCheckbox.get()}`);
+        // 补态监听先于总开关早退挂上（评审 P1-3）：工具条项恒附（构造期内核已收项），
+        // checkbox 关闭态冷启动若无监听，按钮裸露成点击无反馈的死按钮；sync 的 gates
+        // 含 checkbox，off 态自动隐藏；拾回点击同策略常驻（监听体内运行时 gate）
+        document.addEventListener("selectionchange", this.onSelectionChange);
+        document.addEventListener("click", this.onWordMarkClick, true);
         if (!mindWireCheckbox.get()) return;
         this.plugin = plugin;
 
@@ -1009,6 +1263,15 @@ class MindWire {
             editorCallback: (protyle: IProtyle) => toggleDocMindWire(protyle),
         });
 
+        // 二期 □1 入口三通道之一：命令快捷键一键两态（editorCallback 不弹菜单，
+        // 选区不被顶掉，比右键菜单更稳；与工具条项共享 keymap 节点 WORD_TOOLBAR_NAME）
+        this.plugin.addCommand({
+            langKey: MindWire划词连线.langKey,
+            langText: MindWire划词连线.langText(),
+            hotkey: MindWire划词连线.m,
+            editorCallback: (protyle: IProtyle) => this.wordWireAction(protyle),
+        });
+
         // 补画当前已打开的编辑器（deploy 钩子 setPetalEnabled 重载插件时 loaded 事件
         // 不会再发；onload 与文档加载的竞态也由此自愈）
         if (mindWireEnable.get()) {
@@ -1020,6 +1283,8 @@ class MindWire {
     }
 
     onunload() {
+        document.removeEventListener("selectionchange", this.onSelectionChange);
+        document.removeEventListener("click", this.onWordMarkClick, true);
         // 两步流会话态收尾：芯片退场；pending 起点标记不摘（单端无害，数据侧 singles 语义）
         pending = null;
         hidePendingChip();

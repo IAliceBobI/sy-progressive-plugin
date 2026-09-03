@@ -7,7 +7,15 @@
     let wsGen = $state(0); // ws 事务代数：只前进不重置（比较式失效，刷新失败不清脏）
     const docContentCache = new Map<string, string>(); // 目标文档级：def_block_root_id → docContent
 
-    eventsShared.addWsListener("tomato commentbox perf 2026-08-31", () => {
+    eventsShared.addWsListener("tomato commentbox perf 2026-08-31", (ws: WsMain) => {
+        // □13 减噪：databaseIndexCommit 每次索引批量提交都广播（原被 Events 上游
+        // 过滤，放行后到了这里），只在本批 rootIDs 命中缓存目标或 backlinkFull 时
+        // 才算内容变化；跳过无关广播=代数不涨，消费方正确视为数据仍新鲜
+        if (ws?.cmd === "databaseIndexCommit") {
+            const d = ws.data as { rootIDs?: string[]; backlinkFull?: boolean };
+            const hit = d?.backlinkFull || (d?.rootIDs ?? []).some(id => docContentCache.has(id));
+            if (!hit) return;
+        }
         wsGen++;
         docContentCache.clear();
     });
@@ -18,6 +26,7 @@
     import type { IProtyle, Dock } from "siyuan";
     import { onDestroy, onMount } from "svelte";
     import { commentBox, CommentBox刷新文档正引 } from "./CommentBox";
+    import { openAnnoCollectDialog } from "./AnnoCollectDialog";
     import {
         deleteBlock,
         getAttribute,
@@ -710,6 +719,15 @@
                     onchange={() => commentBoxAnnotations.write()}
                 />
             </label>
+            <button
+                class="tomato-icon-btn"
+                aria-label={tomatoI18n.收集批注说明}
+                onmouseenter={(e) => showPanelTip(e.currentTarget)}
+                onmouseleave={hidePanelTip}
+                onclick={() => openAnnoCollectDialog(docID || events.docID)}
+            >
+                <svg><use xlink:href="#iconDownload"></use></svg>
+            </button>
         </span>
         <span class="tomato-toolbar__group">
             <label

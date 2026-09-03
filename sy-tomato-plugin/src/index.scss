@@ -177,7 +177,6 @@
 .protyle-wysiwyg span[data-type="a"][data-href^="#tomato-mindwire-"] {
   color: inherit;
   text-decoration-line: none;
-  background-color: transparent;
   cursor: pointer;
   position: relative;
   transition: background-color 0.15s;
@@ -228,7 +227,7 @@
 
 @keyframes tomato-mind-wire-flash {
   0% {
-    background-color: transparent;
+    background-color: var(--tomato-mind-wire-word-bg, transparent);
   }
 
   20% {
@@ -244,7 +243,7 @@
   }
 
   100% {
-    background-color: transparent;
+    background-color: var(--tomato-mind-wire-word-bg, transparent);
   }
 }
 
@@ -305,6 +304,13 @@
   &--off {
     visibility: hidden;
     pointer-events: none;
+  }
+
+  // □5 P1 水平避让无可推位兜底（满行段落推不出 12px 间隙）：背景降不透明度+毛玻璃，
+  // 被盖文字轻透轮廓、前景保持实心可读（vision □5：缩小牺牲可读性、整体半透明互透更差）
+  &--tight {
+    background: color-mix(in srgb, var(--b3-theme-surface) 88%, transparent);
+    backdrop-filter: blur(2px);
   }
 
   &-arrow {
@@ -981,4 +987,32 @@ html[data-tomato-anno-underline="ring-bead"] .protyle-wysiwyg {
 ::highlight(bk-search-mark) {
   background-color: var(--b3-highlight-background);
   color: var(--b3-highlight-color);
+}
+
+/* =====================================================================
+   思维导线 · 二期 □3 增补：方向感知锚点 + 锚词常态淡背景
+   （唯一事实源 docs/tomato-mindwire-visual-spec.md §12，2026-09-02）
+   ===================================================================== */
+
+// 锚词常态淡背景（D14）：关系色 10%（暗 13%）——「这个字是线的端头」的常态信号，
+// 触屏无 hover 也可辨（非 hover 等价天然满足）。变量化供 flash keyframes 首尾帧
+// 引用（防首尾 transparent 洗掉常态底的二次闪烁）。hot 18% 特异性更高，单值覆盖
+// 不叠加（勿在此再加混合）
+.protyle-wysiwyg span[data-type="a"][data-href^="#tomato-mindwire-"] {
+  --tomato-mind-wire-word-bg: color-mix(in srgb, var(--tomato-mind-wire-accent, var(--b3-font-color4)) 10%, transparent);
+  background-color: var(--tomato-mind-wire-word-bg);
+  border-radius: 2px; // 常态底色有了可见边界，圆角对齐 hot 档
+}
+
+// 暗色提档：思源权威判别通道 html[data-theme-mode]（批注段同款，不裸用 prefers-color-scheme）；
+// 暗底同比例混合可感性低，批注 12→15 先例同构收 13%
+html[data-theme-mode="dark"] .protyle-wysiwyg span[data-type="a"][data-href^="#tomato-mindwire-"] {
+  --tomato-mind-wire-word-bg: color-mix(in srgb, var(--tomato-mind-wire-accent, var(--b3-font-color4)) 13%, transparent);
+}
+
+// 顶缘锚圆点（D13）：对端在上方时本端词顶出线，点翻字顶上方悬浮（底缘镜像：
+// 中心≈字顶−4.5px，与曲线起点 y=top−8 衔接）；隔离环/hot scale(1.4) 规格沿用
+.protyle-wysiwyg span[data-type="a"][data-href^="#tomato-mindwire-"].tomato-mind-wire-top::after {
+  bottom: auto;
+  top: -7px;
 }
