@@ -12,7 +12,11 @@ import { Menu } from "siyuan";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { PDIGEST_CTIME, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
-import { buildDigestMenuItems, digestJumpOf, mergeRefRows, DigestRow } from "./digestList";
+import { PdigestReviewKey, ReviewKey } from "./reviewQueue";
+import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { findDocByIal, getDocIalDigestDir } from "./progData";
+import { buildDigestMenuItems, digestJumpOf, groupDigestRows, mergeRefRows, DigestRow } from "./digestList";
+import { digestStateOf, digestStateIcon } from "./digestState";
 
 const MARK_CLASS = "prog-digest-mark";
 const CACHE_TTL_MS = 60_000;
@@ -82,29 +86,78 @@ export async function markDigests(protyle: any, bookID: string, force = false) {
             if (!pluginRef) return;
             const jump = digestJumpOf(digestIDs);
             if (jump) OpenSyFile2(pluginRef, jump);
-            else openDigestListMenu(ev, digestIDs);
+            else openDigestListMenu(ev, digestIDs, bookID);
         });
         div.insertBefore(span, div.firstChild);
     });
 }
 
 /**
- * 多摘列表（□15 拍板：思源原生 Menu 轻量列表，每项=摘抄文档标题 · 首行，点击跳；
- * 最新在前）。independent 第三参 + setTimeout open——click 处理器内弹菜单惯例
- * （reviewMenu 同款，单例菜单会被同次冒泡清空）。
+ * 摘抄文档已入卡的块 ID set（期2 □2 A 背诵态判定数据源，微拍板方案 a）：
+ * digest 夹 IAL **只读认回**（findDocByIal 不建——无夹=无卡，非 ensure 的写语义），
+ * 卡挂摘抄文档块（setDigestCard(digestID)），card.id 即块 ID。
+ * 夹不存在/查询异常 → 空 set 静默降级（四态退三态，不崩列表）。
  */
-async function openDigestListMenu(ev: MouseEvent, ids: string[]) {
+async function cardIDSetOf(bookID: string): Promise<Set<string>> {
+    try {
+        const dirID = await findDocByIal(getDocIalDigestDir(bookID));
+        if (!dirID) return new Set();
+        const cards = await siyuan.getTreeRiffCardsAll(dirID);
+        return new Set(cards.map(c => c.id));
+    } catch {
+        return new Set();
+    }
+}
+
+/**
+ * 多摘列表（□15 拍板：思源原生 Menu 轻量列表，点击跳；可见性期1 □1 B：按摘抄文档分组
+ * （同 root_id 多块合并一行）+ 悬空孤儿剔除（SQL 查无此块不显示）+ 头部「共 N 条摘抄」，
+ * N=去重后文档数；最新文档排最上）。期2 □2 A：行首四态活图标（实时 IAL 现查）。
+ * 标题行无 click + addSeparator——reviewMenu 标题行同款（vision P1：同级列表扫不出标题）。
+ * independent 第三参 + setTimeout open——click 处理器内弹菜单惯例（reviewMenu 同款，
+ * 单例菜单会被同次冒泡清空）。
+ */
+async function openDigestListMenu(ev: MouseEvent, ids: string[], bookID = "") {
     const rows: DigestRow[] = ((await siyuan.sql(
-        `select b.id, b.content, d.content as doc from blocks b left join blocks d on d.id = b.root_id `
+        `select b.id, b.content, b.root_id, d.content as doc from blocks b left join blocks d on d.id = b.root_id `
         + `where b.id in (${ids.map(id => `"${id}"`).join(",")}) limit 1000`,
     )) ?? []) as any[];
-    const byID = new Map(rows.map(r => [r.id, r]));
-    const items = buildDigestMenuItems(ids.map(id => byID.get(id) ?? { id }));
+    // 文档真实块序（getChildBlocks）——断句块 id 序≠文档序（实测），预览拼接/跳转落点都靠它
+    const rootIDs = [...new Set(rows.map(r => r.root_id).filter(Boolean))] as string[];
+    const docOrders = new Map<string, string[]>(
+        (await Promise.all(rootIDs.map(async rid => [rid, (await siyuan.getChildBlocks(rid)).map(b => b.id)])))
+            .filter(([, order]) => (order as string[]).length > 0) as [string, string[]][],
+    );
+    const groups = groupDigestRows(ids, rows, docOrders);
+    // 四态判定数据（期2 □2 A）：复访/思考双键一次 SQL（think 多块任一有效即思考）+ 卡组 set
+    const schedRows = ((await siyuan.sql(
+        `select name, root_id, value from attributes where root_id in (${rootIDs.map(id => `"${id}"`).join(",")}) `
+        + `and name in ("${PdigestReviewKey}", "${ReviewKey}") limit 10000`,
+    )) ?? []) as any[];
+    const schedByDoc = new Map<string, { pdigest?: string; think?: string }>();
+    for (const r of schedRows) {
+        if (!r?.root_id) continue;
+        const m = schedByDoc.get(r.root_id) ?? {};
+        if (r.name === PdigestReviewKey) m.pdigest = r.value;
+        else if (r.name === ReviewKey && !m.think) m.think = r.value;
+        schedByDoc.set(r.root_id, m);
+    }
+    const cardSet = bookID ? await cardIDSetOf(bookID) : new Set<string>();
+    const items = buildDigestMenuItems(groups).map((it, i) => {
+        const g = groups[i];
+        const m = schedByDoc.get(g.rootId) ?? {};
+        return {
+            ...it,
+            icon: digestStateIcon(digestStateOf(m.pdigest ?? "", m.think ?? "", cardSet.has(g.rootId))),
+        };
+    });
     if (items.length === 0) return;
     const menu = new (Menu as any)("progDigestListMenu", undefined, true) as Menu;
+    menu.addItem({ label: `<span style="font-weight:600">${tomatoI18n.摘抄列表共(items.length)}</span>` });
+    menu.addSeparator();
     for (const it of items) {
         menu.addItem({
-            icon: "iconProgQuill",
+            icon: it.icon,
             label: it.label,
             click: () => { if (pluginRef) OpenSyFile2(pluginRef, it.id); },
         });

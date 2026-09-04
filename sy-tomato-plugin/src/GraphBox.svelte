@@ -42,13 +42,18 @@
     } from "./libs/stores";
     import { OpenSyFile2 } from "./libs/docUtils";
     import { copyToClipboard } from "./libs/domUtils";
-    import { events } from "./libs/Events";
     import { debugLog } from "./libs/logUtils";
     import { pickGraphChannel, formatCharsVolume } from "./libs/graphSkeleton";
     import {
-        buildTreeIndex, initialCollapsedRows, computeVisible, filterEdges, expandAncestors, expandSubtree,
+        buildTreeIndex, initialCollapsedRows, computeVisible, filterEdges, expandAncestors,
         serializeCollapsed, parseCollapsed, type ExpandLevel, type GraphEdgeSpec, type RenderEdge,
     } from "./libs/graphCollapse";
+    import {
+        normalizeLayoutForm, rankdirOf, isTextVertical, migrateIsVertical, nextLayoutForm,
+        type LayoutForm,
+    } from "./libs/graphLayout";
+    import { mergeParagraphChains } from "./libs/graphParaMerge";
+    import { graphDefaultLayout } from "./libs/stores";
     import { tomatoI18n } from "./tomatoI18n";
 
     interface ProposType {
@@ -69,7 +74,9 @@
     let lastDocID = "";
     let currentDocName = ""; // 完整加载时 getData 需要文档名（根节点 label）
     let stop = false;
-    let isVertical = false;
+    // 布局形态四态（期7）：lr/tb=横排文字，vlr/vtb=竖排文字（writing-mode）；
+    // 树生长方向 rankdirOf(form)，持久化 custom-graph-layout（旧 custom-graph-isVertical 读时迁移）
+    let layoutForm: LayoutForm = "lr";
     const edgeTypes = { labeledEdge: EdgeWithLabel };
     const nodeTypes = { tomatoNode: GraphNode, tomatoGroup: GraphGroup };
     export function destroy() {}
@@ -80,6 +87,10 @@
     let allLinks: GraphEdgeSpec[] = [];
     let labels = new Map<string, string>();
     let collapsedSet = new Set<string>();
+    // 期7 ¶×N 重设计：段落链在数据预处理层整链合并（链成员从 allRows 剔除、边端点重定向链头）
+    let paraByText = new Map<string, string>();  // 链头 id → 全文合并（截断后）
+    let paraCount = new Map<string, number>();   // 链头 id → 链内块数（¶×N badge）
+    let paraRedirect = new Map<string, string>();// 链成员 id → 链头 id（locateID 定位链中段重定向）
 
     // graphbox 期1 三档状态：skeleton=骨架态显示提示条；stat 驱动文案；loading=全量构建遮罩；
     // manualRefresh=当前文档处于全量态大文档（轮询已降级）
@@ -129,11 +140,17 @@
         };
         data().changeDoc = changeDoc;
         data().expandTo = expandTo;
+        // 期7 ¶ 链中段定位重定向：目标块已并进 ¶ 大节点 → 图上节点=链头（GraphControl locateID 消费）
+        data().paraRedirectOf = (id: string) => paraRedirect.get(id) ?? id;
+        // 二期 □2 定位兜底数据通道：图内全块 id 集（locateNode 上爬祖先时的「图内」判定）
+        data().graphIDsOf = () => new Set(allRows.map(r => r.id));
         // 期4 块→图定位链路消费：图当前文档/通道态/块上限（locateNode 的 toast 分支文案依据）
         data().getGraphState = () => ({
             mode: graphMode,
             docID: lastDocID,
             maxBlocks: graphMaxAllBlocks.get(),
+            // 二期 □2：文档真实块数（precheck count）——「超上限」文案只留给真超限（cnt > maxBlocks）
+            blockCount: graphStat?.cnt,
         });
 
         if (landscapeSwitchBtnID) {
@@ -145,21 +162,27 @@
                     ) as HTMLElement;
                     await sleep(1);
                 }
-                // 纯图标钮（spec §12）：状态回显 iconSplitLR/TB；键盘可达 Enter/Space
+                // 期7 形态循环钮：lr→tb→vlr→vtb→lr；图标四态回显+tooltip 报当前形态
+                const formLabel = (f: LayoutForm) => ({
+                    lr: tomatoI18n.形态横排向右, tb: tomatoI18n.形态横排向下,
+                    vlr: tomatoI18n.形态竖排向右, vtb: tomatoI18n.形态竖排向下,
+                })[f];
                 const syncIcon = () => {
                     const use = document.getElementById(landscapeSwitchBtnID + "-icon");
-                    use?.setAttribute("xlink:href", isVertical ? "#iconSplitTB" : "#iconSplitLR");
+                    use?.setAttribute("xlink:href", `#iconGraphLayout${layoutForm.toUpperCase()}`);
+                    btn.setAttribute("aria-label", tomatoI18n.切换布局形态.replace("%1", formLabel(layoutForm)));
                 };
                 const onSwitch = async () => {
-                    isVertical = !isVertical;
-                    data().isVertical = isVertical;
+                    layoutForm = nextLayoutForm(layoutForm);
+                    data().layoutForm = layoutForm;
                     syncIcon();
                     if (lastDocID) {
-                        siyuan.setBlockAttrs(lastDocID, {
-                            "custom-graph-isVertical": String(isVertical),
+                        await siyuan.setBlockAttrs(lastDocID, {
+                            "custom-graph-layout": layoutForm,
+                            "custom-graph-isVertical": "", // 旧布尔键退役置空，防读时误迁移
                         });
                     }
-                    await relayout();
+                    await relayout(true, true); // remeasure：竖排节点尺寸≠横排 measured（P0 修复）
                 };
                 btn.addEventListener("click", onSwitch);
                 btn.addEventListener("keydown", (ev: KeyboardEvent) => {
@@ -205,7 +228,7 @@
         }
         const docID = protyle.block.rootID;
         currentDocName = docName;
-        const taskLayoutDirection = getLayoutDirection(docID);
+        const taskLayoutForm = getLayoutForm(docID);
 
         // 预检三档：毫秒级 count SQL 分流，绝不无脑 getBlockDOM（巨书 25~39s/24MB）
         const stat = await precheckDocSize(docID);
@@ -237,7 +260,7 @@
         } finally {
             graphLoading = false;
         }
-        await taskLayoutDirection;
+        await taskLayoutForm;
         // 先设置 lastDocID，这样 relayout 才能正确加载保存的位置
         const isNewDoc = docID != lastDocID;
         if (isNewDoc) {
@@ -249,17 +272,24 @@
         }
     }
 
-    // rows/links → 全量树数据（折叠只影响「渲染哪些」不影响「建什么」）→ 可见子图 $nodes/$edges
+    // rows/links → 段落链合并（期7：链子树整链并 ¶ 大节点，链成员剔除+边端点重定向）→
+    // 全量树数据（折叠只影响「渲染哪些」不影响「建什么」）→ 可见子图 $nodes/$edges
     // （全量与骨架两通道共用；骨架=纯结构，无视「隐藏结构连线」开关）
     async function applyRowsAndLinks(rows: Block[], links: Ref[], docID: string, isSkeleton: boolean) {
-        allRows = rows;
-        labels = new Map(rows.map(row => [row.id, rowLabel(row, docID)]));
-        allLinks = dedupeLinks(links, isSkeleton);
-        // 折叠态：文档持久化（custom-graph-collapsed）优先；未 toggle 过的文档按「默认展开层级」推导
+        const merged = mergeParagraphChains(rows, dedupeLinks(links, isSkeleton));
+        allRows = merged.rows;
+        allLinks = merged.links;
+        paraByText = merged.paraByText;
+        paraCount = merged.paraCount;
+        paraRedirect = merged.linkRedirect;
+        labels = new Map(allRows.map(row => [row.id, rowLabel(row, docID)]));
+        // 折叠态：文档持久化（custom-graph-collapsed）优先；未 toggle 过的文档按「默认展开层级」推导。
+        // ¶ 链头过滤：旧版把链头存进折叠集（展开族），期7 起链头恒 ¶ 大节点、折叠语义不适用
         const attr = await siyuan.getBlockAttrs(docID);
         const saved = parseCollapsed(attr?.["custom-graph-collapsed"]);
         collapsedSet = new Set(
-            saved ?? initialCollapsedRows(allRows, normalizeExpandLevel(graphDefaultExpandLevel.get())),
+            (saved ?? initialCollapsedRows(allRows, normalizeExpandLevel(graphDefaultExpandLevel.get())))
+                .filter(id => !paraByText.has(id)),
         );
         applyCollapsedView();
     }
@@ -276,6 +306,9 @@
 
         // 期3（spec §8/§9）：📄 emoji 与 [X] 文字前缀退役——块类型图标/文档图标/《文档名》
         // 改由 GraphNode 按 data 字段（blockType/isDoc/docName）渲染，label 只装纯文本
+        // 三期 □2：av/tb 无可读文本，占位文案兜底（提取层 noContentBlockLabel 返回空）
+        if (row.type === "av") return tomatoI18n.属性视图块;
+        if (row.type === "tb") return tomatoI18n.分割线块;
         return (row.content ?? "").slice(0, 30);
     }
 
@@ -298,10 +331,7 @@
         return out;
     }
 
-    // ¶×N 大节点首段文本：截 80 字符（临时值，视觉定稿归期3 spec）
-    function paraClip(row: Block): string {
-        return (row.content ?? "").slice(0, 80);
-    }
+    // ¶×N 大节点全文（期7）：mergeParagraphChains 产物（链内全文合并+2000 字首尾截断），此处零加工
 
     // 折叠集 → 可见子图：$nodes 只装可见节点（type=tomatoNode 自定义节点带角标数据），
     // $edges 走 filterEdges（结构边随子可见过滤、引用边端点重定向到折叠祖先）。
@@ -313,7 +343,9 @@
         const groupIds = new Set<string>();
         for (const row of allRows) {
             if (!vis.visibleIds.has(row.id)) continue;
-            // 思源块类型码：超级块='s'（NodeSuperBlock）、引述块='b'（NodeBlockquote）
+            // 思源块类型码：超级块='s'（NodeSuperBlock）、引述块='b'（NodeBlockquote）。
+            // 三期 B'（2026-09-04 方向修正）：列表容器 l 退出 subflow 族——列表改脑图式
+            // 树形分叉（i=分叉节点+吸收项内文本），容器壳语义只剩 s 与 b
             if ((row.type === "s" || row.type === "b") && !collapsedSet.has(row.id)
                 && (tree.childrenOf.get(row.id) ?? []).some(cid => vis.visibleIds.has(cid))) {
                 groupIds.add(row.id);
@@ -332,7 +364,9 @@
         for (const row of allRows) {
             if (!vis.visibleIds.has(row.id)) continue;
             const collapsed = collapsedSet.has(row.id);
-            const isParaMerged = collapsed && row.type === "p";
+            // 期7 ¶ 大节点判定改预处理打标（mergeParagraphChains），与折叠集解耦；
+            // dagreW/H 仅作 measured 写回前的首轮估算（¶ 高钳 400，竖排窄卡 122）
+            const isParaMerged = paraByText.has(row.id);
             const isGroup = groupIds.has(row.id);
             // 容器同款爬最近容器祖先（嵌套 subflow：引述块挂超级块内）；爬不到=顶层
             const parentId = parentNodeFor(row.id);
@@ -353,9 +387,9 @@
                 data: {
                     label,
                     // hover tooltip 全文通道（GraphNode aria-label → panelTip 单例）；
-                    // ¶×N 用 paraText（80 字截断即其全文），其余= row.content 原文
-                    fullText: isParaMerged ? paraClip(row) : (row.content ?? ""),
-                    paraText: isParaMerged ? paraClip(row) : undefined,
+                    // ¶×N 用合并全文（2000 字截断即其全文），其余= row.content 原文
+                    fullText: isParaMerged ? paraByText.get(row.id)! : (row.content ?? ""),
+                    paraText: isParaMerged ? paraByText.get(row.id)! : undefined,
                     collapsed,
                     isParaMerged,
                     groupKind: row.type === "b" ? "bq" : "sb",
@@ -363,11 +397,14 @@
                     blockType: row.type,
                     isDoc,
                     docName: crossDocName,
-                    hiddenCount: vis.hiddenCount.get(row.id),
+                    // ¶ badge ¶×N = 链内合并块数（期7 起与折叠 hiddenCount 语义分家）
+                    hiddenCount: isParaMerged ? paraCount.get(row.id) : vis.hiddenCount.get(row.id),
                     hasChildren: (vis.subtreeSize.get(row.id) ?? 1) > 1,
-                    dagreW: isParaMerged ? 188 : undefined,
-                    dagreH: isParaMerged ? 80 : undefined,
-                    toggle: () => void toggleCollapseNode(row.id),
+                    // ¶ 横排 188 宽/竖排 122 宽，高钳 400（¶ 卡内滚）；普通节点竖排窄高 56×118
+                    dagreW: isParaMerged ? (isTextVertical(layoutForm) ? 122 : 188) : isTextVertical(layoutForm) ? 56 : undefined,
+                    dagreH: isParaMerged ? 400 : isTextVertical(layoutForm) ? 118 : undefined,
+                    // ¶ 无展开概念（期7）：不挂 toggle；双击=滚动链头段
+                    toggle: isParaMerged ? undefined : () => void toggleCollapseNode(row.id),
                     dblclick: () => void showBlockInEditor(row.id),
                 },
                 position: { x: 0, y: idx++ * 100 },
@@ -458,21 +495,40 @@
         );
     }
 
-    // 巨书全量态手动刷新（绕过 updated 时间戳守卫，直接重建）
+    // 巨书全量态手动刷新（绕过 updated 时间戳守卫，直接重建）。
+    // events.protyle 不能用：?id= 冷启动会话只来 loaded-protyle-static（detail 无 event 字段，
+    // Events 单例写入门槛过不去）→ 恒空 → changeDoc(undefined) no-op（2026-09-04 收官 e2e 实锤，
+    // 手动刷新钮打了点不重建）。手动刷新语义=重建图自身文档，用面板态伪造（同 GraphBox.ts
+    // protyleForChangeDoc 配方，_changeDoc_ 只读 title/block 两字段）
     async function onManualRefresh() {
         gbLog("graph.manual_refresh", `doc=${(lastDocID || "").slice(0, 8)}`);
-        await changeDoc(events.protyle?.protyle);
+        if (!lastDocID) return;
+        await changeDoc({
+            title: { editElement: { textContent: currentDocName || lastDocID } },
+            block: { rootID: lastDocID },
+        } as unknown as IProtyle);
     }
 
-    async function getLayoutDirection(docID: string) {
+    // 读文档布局形态：custom-graph-layout 四态优先 → 旧 custom-graph-isVertical 布尔迁移
+    // （true→tb / false→lr）→ 设置默认 graphDefaultLayout。顶栏钮图标随态回显。
+    async function getLayoutForm(docID: string) {
         if (docID != lastDocID) {
             const attr = await siyuan.getBlockAttrs(docID);
-            isVertical = attr["custom-graph-isVertical"] === "true";
-            data().isVertical = isVertical;
-            // 顶栏钮状态回显（spec §12：横 iconSplitLR / 纵 iconSplitTB）
+            const saved = attr?.["custom-graph-layout"] as string | undefined;
+            layoutForm = saved
+                ? normalizeLayoutForm(saved)
+                : migrateIsVertical(attr?.["custom-graph-isVertical"] as string)
+                  ?? normalizeLayoutForm(graphDefaultLayout.get() as string);
+            data().layoutForm = layoutForm;
+            // 顶栏钮状态回显（图标四态 + tooltip 报形态名）
             if (landscapeSwitchBtnID) {
                 document.getElementById(landscapeSwitchBtnID + "-icon")
-                    ?.setAttribute("xlink:href", isVertical ? "#iconSplitTB" : "#iconSplitLR");
+                    ?.setAttribute("xlink:href", `#iconGraphLayout${layoutForm.toUpperCase()}`);
+                document.getElementById(landscapeSwitchBtnID)
+                    ?.setAttribute("aria-label", tomatoI18n.切换布局形态.replace("%1", ({
+                        lr: tomatoI18n.形态横排向右, tb: tomatoI18n.形态横排向下,
+                        vlr: tomatoI18n.形态竖排向右, vtb: tomatoI18n.形态竖排向下,
+                    })[layoutForm]));
             }
         }
     }
@@ -560,31 +616,37 @@
         await new Promise(r => requestAnimationFrame(() => r(null)));
     }
 
-    async function relayout(refit = true) {
+    async function relayout(refit = true, remeasure = false) {
         // 首布局先渲染一帧拿 measured（期3 P0：dagre 估算 172×36 与实际渲染尺寸不符是多行
         // 节点重叠的根因）——两轮：估算布局→渲染测量→measured 精修一轮。
-        // 通知必须克隆元素（新对象引用）：xyflow 对同引用元素跳过 position/style 更新，
-        // 同引用 set = 布局结果永远进不了 DOM（dev 实锤 transform 停在初始装载位）
+        // remeasure（期7 形态切换）：既有 measured 是横排渲染的旧值（172×36），竖排节点实为
+        // 40~56×118——不重测则 dagre 按旧尺寸排布=纵向重叠（vision P0 实锤）。先 commit 刷
+        // form 渲染出竖排形态、等 xyflow 写回新 measured 再布局
+        const rankdir = rankdirOf(layoutForm);
         const commit = () => {
-            const vMark = isVertical ? "⇓" : "⇉"; // 容器方向标记随全局横纵刷新（spec §7）
+            const vMark = rankdir === "TB" ? "⇓" : "⇉"; // 容器方向标记随树生长方向刷新（spec §7）
             const cloned = $nodes.map(n => ({
                 ...n,
                 data: n.type === "tomatoGroup"
-                    ? { ...n.data, vMark }
-                    : { ...n.data },
+                    ? { ...n.data, vMark, form: layoutForm }
+                    : { ...n.data, form: layoutForm },
             }));
             const clonedEdges = $edges.map(e => ({ ...e }));
             const gs = data()?.graphStore;
             if (gs) { gs.nodes = cloned; gs.edges = clonedEdges; }
             else { nodes.set(cloned); edges.set(clonedEdges); }
         };
+        if (remeasure) {
+            commit(); // 渲染新形态（data.form 变更触发 GraphNode 竖排分支）
+            await warmupMeasured();
+        }
         await warmupMeasured();
         const savedPositions = lastDocID ? await loadNodePositions(lastDocID) : {};
-        getLayoutedElements($nodes, $edges, isVertical, savedPositions);
+        getLayoutedElements($nodes, $edges, layoutForm, savedPositions);
         if ($nodes.some(n => !n.measured)) {
             commit(); // 渲染一帧让 xyflow 写回 measured
             await warmupMeasured();
-            getLayoutedElements($nodes, $edges, isVertical, savedPositions);
+            getLayoutedElements($nodes, $edges, layoutForm, savedPositions);
         }
         commit();
         // fitView prop 仅初始化生效，节点重建后须手动适配视口（vision P1：骨架/全量首屏空白画布）；
@@ -620,12 +682,12 @@
         nodeMap: Map<string, Node>,
         groupChildren: Map<string, Node[]>,
         edges: Edge[],
-        isVertical: boolean,
+        form: LayoutForm,
     ): { w: number; h: number } {
         const kids = groupChildren.get(groupId) ?? [];
         for (const kid of kids) {
             if ((kid as any).type === "tomatoGroup" && groupChildren.has(kid.id)) {
-                const wh = layoutGroup(kid.id, nodeMap, groupChildren, edges, isVertical);
+                const wh = layoutGroup(kid.id, nodeMap, groupChildren, edges, form);
                 kid.data = { ...kid.data, groupW: wh.w, groupH: wh.h };
                 // 尺寸走 node.width/height 数字 prop（xyflow 官方通道，NodeWrapper 参与
                 // measured 优先级与 nodeStyle 合成；node.style 须字符串，传对象=渲染成
@@ -636,7 +698,7 @@
         }
         const g = new dagre.graphlib.Graph();
         g.setDefaultEdgeLabel(() => ({}));
-        g.setGraph({ rankdir: isVertical ? "TB" : "LR" });
+        g.setGraph({ rankdir: rankdirOf(form) });
         kids.forEach(kid => {
             const isGroup = (kid as any).type === "tomatoGroup";
             g.setNode(kid.id, {
@@ -675,9 +737,11 @@
     function getLayoutedElements(
         nodes: Node[],
         edges: Edge[],
-        isVertical: boolean,
+        form: LayoutForm,
         savedPositions: Record<string, { x: number; y: number }> = {},
     ) {
+        const rankdir = rankdirOf(form);
+        const textV = isTextVertical(form);
         const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
         // ---- 内层：subflow 容器尺寸+子相对坐标（嵌套递归，最深的先固定）
@@ -688,7 +752,7 @@
         }
         for (const n of nodes) {
             if ((n as any).type === "tomatoGroup" && groupChildren.has(n.id)) {
-                const wh = layoutGroup(n.id, nodeMap, groupChildren, edges, isVertical);
+                const wh = layoutGroup(n.id, nodeMap, groupChildren, edges, form);
                 n.data = { ...n.data, groupW: wh.w, groupH: wh.h };
                 n.width = wh.w; // 数字 prop（同上：node.style 对象会渲染成 [object Object]）
                 n.height = wh.h;
@@ -704,20 +768,17 @@
         };
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
-        if (isVertical) {
-            dagreGraph.setGraph({ rankdir: "TB" });
-        } else {
-            dagreGraph.setGraph({ rankdir: "LR" });
-        }
+        dagreGraph.setGraph({ rankdir });
         topNodes.forEach((node) => {
             const isGroup = (node as any).type === "tomatoGroup";
             dagreGraph.setNode(node.id, {
+                // 竖排普通节点窄高（56×118 首轮估算，measured 精修接管）
                 width: isGroup
                     ? (node.data as any).groupW ?? 120
-                    : node.measured?.width ?? (node as any).data?.dagreW ?? nodeWidth,
+                    : node.measured?.width ?? (node as any).data?.dagreW ?? (textV ? 56 : nodeWidth),
                 height: isGroup
                     ? (node.data as any).groupH ?? 60
-                    : node.measured?.height ?? (node as any).data?.dagreH ?? nodeHeight,
+                    : node.measured?.height ?? (node as any).data?.dagreH ?? (textV ? 118 : nodeHeight),
             });
         });
         const seenTopEdge = new Set<string>();
@@ -732,6 +793,68 @@
 
         const tDagre = performance.now();
         dagre.layout(dagreGraph, { ranker: "network-simplex" });
+
+        // 三期 □1：脑图式 y 接管——dagre 的 crossing reduction（median 排序）不保证
+        // 输入序（实测同层整列与文档序相反；换 ranker 同序=ordering 阶段与 ranker 无关），
+        // 且子节点 y 贴 rank 邻居而非父（分叉感断裂）。y 布局整体接管为经典脑图算法：
+        // 结构边序（=文档 DFS 序）先序遍历，叶子自上而下堆叠、内部节点 y=子树首尾中位
+        // （子贴父、兄弟文档序）；x/rank 沿用 dagre。手动拖拽固定的子树整树保持 dagre
+        // 原位占位（savedPositions 语义优先）；跨文档补块的孤儿节点不在结构树内、保持原位
+        const NODE_GAP = 40; // 与 dagre 默认 nodesep 视觉密度同族
+        const docOrderSiblings = new Map<string, string[]>();
+        edges.forEach((edge) => {
+            if ((edge as any).data?.isRef) return; // 结构边（父子）才承载文档序
+            const s = nodeIdTop(edge.source), t = nodeIdTop(edge.target);
+            if (s === t) return;
+            const arr = docOrderSiblings.get(s) ?? docOrderSiblings.set(s, []).get(s)!;
+            if (!arr.includes(t)) arr.push(t);
+        });
+        const fixedTop = new Set(topNodes.filter(n => savedPositions[n.id]).map(n => n.id));
+        const readRange = (id: string): [number, number] => {
+            const n = dagreGraph.node(id);
+            let min = n.y - n.height / 2, max = n.y + n.height / 2;
+            for (const k of docOrderSiblings.get(id) ?? []) {
+                const [a, b] = readRange(k);
+                min = Math.min(min, a); max = Math.max(max, b);
+            }
+            return [min, max];
+        };
+        let yCursor = 0;
+        const yAssigned = new Map<string, number>();
+        const subtreeY = (id: string): [number, number] => {
+            const node = dagreGraph.node(id);
+            const h = node?.height ?? nodeHeight;
+            const kids = docOrderSiblings.get(id) ?? [];
+            if (fixedTop.has(id) || kids.length === 0) {
+                // fixed 整树保持 dagre 原位（子树成员都不动）；叶子按游标堆叠
+                const y = fixedTop.has(id) ? node.y : yCursor + h / 2;
+                if (!fixedTop.has(id)) yCursor += h + NODE_GAP;
+                yAssigned.set(id, y);
+                return fixedTop.has(id) ? readRange(id) : [y - h / 2, y + h / 2];
+            }
+            let min = Infinity, max = -Infinity;
+            for (const k of kids) {
+                if (fixedTop.has(k)) {
+                    const [a, b] = readRange(k);
+                    yCursor = Math.max(yCursor, b + NODE_GAP);
+                    min = Math.min(min, a); max = Math.max(max, b);
+                } else {
+                    const [a, b] = subtreeY(k);
+                    min = Math.min(min, a); max = Math.max(max, b);
+                }
+            }
+            const y = (min + max) / 2;
+            yAssigned.set(id, y);
+            return [min, max];
+        };
+        // 结构真根=不在任何兄弟集合内的源点（doc/孤儿）；带子的顶层分叉节点（如嵌套
+        // 列表项）不是根——重复跑会把其子树二次分配到游标尾端（e2e 实锤）
+        const kidSet = new Set<string>();
+        docOrderSiblings.forEach(kids => kids.forEach(k => kidSet.add(k)));
+        for (const root of topNodes.map(n => n.id)) {
+            if (docOrderSiblings.has(root) && !kidSet.has(root) && !fixedTop.has(root)) subtreeY(root);
+        }
+        yAssigned.forEach((y, id) => { dagreGraph.node(id).y = y; });
         gbLog("graph.dagre", `nodes=${nodes.length} tops=${topNodes.length} edges=${edges.length} ${Math.round(performance.now() - tDagre)}ms`);
 
         // 顶层节点绝对位置（savedPositions 固定 + 碰撞检测均只作用顶层——容器内子节点跟随容器）
@@ -767,7 +890,7 @@
                     if (isOverlapping(newNode.position, fixedNode.position, nodeWidth, nodeHeight, padding)) {
                         hasOverlap = true;
                         // 向布局方向偏移
-                        if (isVertical) {
+                        if (rankdir === "TB") {
                             newNode.position.y += nodeHeight + padding;
                         } else {
                             newNode.position.x += nodeWidth + padding;
@@ -779,9 +902,9 @@
             }
         }
 
-        // Handle 方向统一（subflow 子节点同款）
+        // Handle 方向统一（subflow 子节点同款；竖排文字不改树生长方向语义）
         nodes.forEach((node) => {
-            if (isVertical) {
+            if (rankdir === "TB") {
                 node.targetPosition = Position.Top;
                 node.sourcePosition = Position.Bottom;
             } else {
@@ -812,7 +935,7 @@
                 const sp = absOf(edge.source);
                 const tp = absOf(edge.target);
                 if (!sp || !tp) return;
-                const isBackEdge = isVertical
+                const isBackEdge = rankdir === "TB"
                     ? sp.y > tp.y
                     : sp.x > tp.x;
                 if (isBackEdge) {
@@ -820,7 +943,7 @@
                     (edge as any).data = {
                         ...oldData,
                         isBackEdge: true,
-                        backEdgeDir: isVertical ? "left" : "down",
+                        backEdgeDir: rankdir === "TB" ? "left" : "down",
                     };
                     edge.type = "labeledEdge";
                 }
@@ -874,31 +997,35 @@
         if (await copyToClipboard(text)) siyuan.pushMsg(tomatoI18n.已复制, 2000);
     }
 
-    // 「展开全部段落」（¶×N 专属）：子树全展开，嵌套折叠一并摊平（toggle 只动链头单点）
-    async function expandSubtreeAll(id: string) {
-        if (expandSubtree(buildTreeIndex(allRows), collapsedSet, id)) {
-            gbLog("graph.expand_subtree", `node=${id.slice(0, 8)} visible=${computeVisible(allRows, collapsedSet).visibleIds.size}/${allRows.length}`);
-            applyCollapsedView();
-            if (lastDocID) await saveCollapsed(lastDocID);
-            await relayout();
-        }
+    // 图上右键菜单单例通道（三期 □1）：independent Menu 每次新建不清旧——右键不产
+    // click 事件，旧实例的 window click 捕获关闭监听等不到触发，元素悬在 body=
+    // 「连点右键叠一排菜单」根因。开新前显式关旧（close()=摘监听+element.remove，
+    // 双拆兜底）；节点/边两 handler 共用同一单例
+    let liveCtxMenu: Menu | null = null;
+    function closeLiveCtxMenu() {
+        if (!liveCtxMenu) return;
+        try { liveCtxMenu.close(); } catch { /* 已被全局点击拆过的二次拆除 */ }
+        liveCtxMenu.element?.remove?.();
+        liveCtxMenu = null;
     }
 
     // 节点右键：思源原生 Menu（independent 第三参防单例被同次冒泡清空；open 包 setTimeout）
     function handleNodeContextMenu({ event, node }: { event: MouseEvent; node: Node }) {
         event.preventDefault();
+        closeLiveCtxMenu();
         const d = node.data as any;
         const menu = new (Menu as any)("tomatoGraphNodeMenu", undefined, true) as Menu;
+        liveCtxMenu = menu;
         menu.addItem({ label: tomatoI18n.在编辑器中显示, click: () => void showBlockInEditor(node.id) });
         menu.addItem({ label: tomatoI18n.打开所在文档, click: () => void OpenSyFile2(plugin, node.id) });
         menu.addSeparator();
-        if (d.collapsed) {
-            menu.addItem({ label: tomatoI18n.展开此节点, click: () => void d.toggle?.() });
-        } else if (d.hasChildren) {
-            menu.addItem({ label: tomatoI18n.折叠此节点, click: () => void d.toggle?.() });
-        }
-        if (d.isParaMerged) {
-            menu.addItem({ label: tomatoI18n.展开全部段落, click: () => void expandSubtreeAll(node.id) });
+        // ¶ 大节点无展开/折叠语义（期7 永不多节点化）；isParaMerged 恒无子树角标分支
+        if (!d.isParaMerged) {
+            if (d.collapsed) {
+                menu.addItem({ label: tomatoI18n.展开此节点, click: () => void d.toggle?.() });
+            } else if (d.hasChildren) {
+                menu.addItem({ label: tomatoI18n.折叠此节点, click: () => void d.toggle?.() });
+            }
         }
         menu.addSeparator();
         menu.addItem({ label: tomatoI18n.复制块ID, click: () => void copyText(node.id) });
@@ -930,7 +1057,9 @@
         const d = (edge as any).data;
         if (!d?.isRef) return;
         event.preventDefault();
+        closeLiveCtxMenu();
         const menu = new (Menu as any)("tomatoGraphEdgeMenu", undefined, true) as Menu;
+        liveCtxMenu = menu;
         menu.addItem({ label: tomatoI18n.复制锚文本, click: () => void copyText(String(edge.label ?? "")) });
         menu.addSeparator();
         menu.addItem({

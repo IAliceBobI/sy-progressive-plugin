@@ -23,14 +23,16 @@
         getData().graphStore = flowStore;
         // graphbox 期1：借道 Provider 内上下文把 fitView 递给顶层 relayout（首屏视口适配，vision P1）
         // 期3 精修：fitView 完成后读 zoom——横向布局缩至 <0.25（大文档展开态钳 ~0.13）时
-        // toast 提示可切纵向（期2 P2 留观），60s 节流防每次 relayout 刷屏
+        // toast 提示可换形态（期2 P2 留观），60s 节流防每次 relayout 刷屏；
+        // 期7 口径：已是竖排形态（vlr/vtb）不再提示
         getData().fitView = async (opts?: { padding?: number; duration?: number }) => {
             (getData() as any)._fitAt = Date.now();
             await fitView(opts);
             setTimeout(() => {
                 const zoom = getZoom();
                 const d = getData() as any;
-                if (zoom >= 0.25 || d.isVertical === true) return;
+                const f = d.layoutForm;
+                if (zoom >= 0.25 || f === "vlr" || f === "vtb") return;
                 const now = Date.now();
                 if (now - (d._lastZoomTipAt ?? 0) < 60000) return;
                 d._lastZoomTipAt = now;
@@ -38,13 +40,15 @@
             }, 400);
         };
         // 期4：expandTo(折叠祖先链)→绝对坐标 setCenter(zoom 1.2)→主色描边脉冲两轮；
-        // 返回是否命中（locateNode 据此 toast 找不到的原因）
+        // 返回是否命中（locateNode 据此 toast 找不到的原因）。
+        // 期7：目标块并进 ¶ 大节点（链成员无图上节点）→ 重定向链头 ¶ 节点高亮脉冲
         getData().locateID = async (id: string): Promise<boolean> => {
             if (!id) return false;
+            const target = getData().paraRedirectOf?.(id) ?? id;
             // 期4 P1：定位脉冲窗口内抑制自动刷新——expandTo 写 custom-graph-collapsed 会让
             // updated 变化，ws/轮询回流 changeDoc→relayout 重建节点 DOM 打断脉冲+fitView 打回 setCenter
             (getData() as any).suppressAutoRefreshUntil = Date.now() + 2200;
-            const expanded = await getData().expandTo?.(id);
+            const expanded = await getData().expandTo?.(target);
             if (expanded) {
                 // relayout 尾部的 fitView(200ms) 是 fire-and-forget——不等它落地就 setCenter
                 // 会两动画交错致 setCenter 失效（dev 实锤 zoom 恒停 fitView 值）；真展开时等一拍
@@ -52,7 +56,7 @@
             }
             await tick();
             const ns = getNodes();
-            const n = ns.find(m => m.id === id);
+            const n = ns.find(m => m.id === target);
             if (!n) return false;
             // subflow 子节点 position 是容器相对坐标：沿 parentId 链累加绝对坐标
             const byId = new Map(ns.map(m => [m.id, m]));
@@ -68,7 +72,7 @@
             // 定位=显式视图意图：关闭「fitView 后 5s 内容器尺寸变化重跑 fitView」窗口
             // （补刷 relayout 引起尺寸变化→$effect 重跑 fitView 会打回 setCenter，0.139 竞态根因）
             (getData() as any)._fitAt = 0;
-            document.querySelectorAll(`div[data-id="${id}"].svelte-flow__node`).forEach((e: HTMLElement) => {
+            document.querySelectorAll(`div[data-id="${target}"].svelte-flow__node`).forEach((e: HTMLElement) => {
                 e.classList.remove("tomato-graph-pulse");
                 void e.offsetWidth; // reflow 重启动画
                 e.classList.add("tomato-graph-pulse");

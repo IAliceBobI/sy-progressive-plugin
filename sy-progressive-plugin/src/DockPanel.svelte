@@ -33,9 +33,16 @@
 </script>
 
 <div class="prog-fleet" data-state={state}>
-    <!-- 顶栏：标题 + recite 导流（未装灰 opacity/装了亮 yours 色） -->
+    <!-- 顶栏：标题 + 复习计划常驻钮（期3 □3：不依赖 due>0——✧ 徽章条件渲染教训） + recite 导流 -->
     <div class="prog-fleet-top">
         <span class="prog-fleet-title">{tomatoI18n.今日阅读}</span>
+        <button
+            class="prog-fleet-plan b3-tooltips b3-tooltips__w"
+            aria-label={tomatoI18n.复习计划}
+            onclick={() => actions.openReviewPlan()}
+        >
+            <svg><use xlink:href="#iconProgSched"></use></svg>
+        </button>
         <button
             class="prog-fleet-recite b3-tooltips b3-tooltips__w"
             aria-label={actions.isReciteInstalled()

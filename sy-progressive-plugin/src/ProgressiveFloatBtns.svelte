@@ -41,7 +41,7 @@
     } from "./WritingCompareBox";
     import { isProtylePiece } from "./helper";
     import { openReviewSchedMenu, openDigestReviewMenu, removeRevisitBySource } from "./reviewMenu";
-    import { PdigestReviewKey, parseReview, isDue } from "./reviewQueue";
+    import { PdigestReviewKey, ReviewKey, parseReview, isDue } from "./reviewQueue";
     import { openRefillMenu } from "./refillMenu";
 
     // v5 □5 浮条三态（docs/prog-v5-floatbar-design.md）：球（收起）↔ 浮条（展开）同屏只显示一个；
@@ -556,7 +556,8 @@
                 }
                 break;
             case "revisit": // □7 ✧ 复访动作组（digest 态）：两态菜单；动作落盘后复查红点
-                await openDigestReviewMenu($noteID, ev ?? { clientX: 0, clientY: 0 }, () => probeRevisitDue());
+                // 期2 □2 A：bookID 传 ✧ 菜单四态标题（卡组判定按书夹查）
+                await openDigestReviewMenu($noteID, ev ?? { clientX: 0, clientY: 0 }, () => probeRevisitDue(), $bookID);
                 break;
             case "nextPure": // 托盘动作勾上首行后走首行入口，同平铺区低频通道
             case "delBack":
@@ -605,15 +606,28 @@
 
     // ---- □7 复访到期红点（digest 态 revisit 钮角）：读文档 IAL 解析 due。不走出场链
     //      attrs 快照——□8 后补入口刚打的键巨书实测 24s+ 才反映进快照，直查内核真值
-    //      （单文档 getBlockAttrs 轻查询）；菜单动作后 onApplied 复查，完成/推迟/移除即灭点 ----
+    //      （单文档 getBlockAttrs 轻查询）；菜单动作后 onApplied 复查，完成/推迟/移除即灭点。
+    //      期2 □2 B 双源化：文档内 think 块级到期也点亮红点（SQL 直查真值，不走快照）----
     let revisitDue = $state(false);
     function probeRevisitDue(id = $noteID) {
         if (!id) return;
+        const now = Date.now();
         void siyuan.getBlockAttrs(id).then(attrs => {
             if (get(noteID) !== id) return; // 竞态守卫：翻页后不回写旧值（crumbs 同款）
             const s = parseReview(attrs?.[PdigestReviewKey]);
-            revisitDue = !!s && isDue(s, Date.now());
+            revisitDue = !!s && isDue(s, now);
         }).catch(() => { }); // 装饰层不报错打扰
+        void siyuan.sql(
+            `select a.value as v from attributes as a where a.name="${ReviewKey}" and a.root_id="${id}" limit 100`,
+        ).then((rows: any[]) => {
+            if (get(noteID) !== id) return;
+            // think 多块任一到期即亮；done/垃圾值 parseReview 过滤（与 digestStateOf 口径一致）
+            const thinkDue = (rows ?? []).some(r => {
+                const s = parseReview(r?.v);
+                return !!s && s.mode !== "done" && isDue(s, now);
+            });
+            if (thinkDue) revisitDue = true; // 只置亮不置灭——pdigest 分支是唯一灭点，竞态下宁误亮勿漏
+        }).catch(() => { });
     }
     $effect(() => {
         const id = $noteID;
@@ -983,7 +997,7 @@
                 class:prog-fb-btn--dragging={dragId === b.id}
                 class:prog-fb-pro={isAdvPro(b.id)}
                 aria-label={(b.id === "digest" && $digOpen) ? tomatoI18n.收起
-                    : (b.id === "origin" && $kind === "digest") ? tip3(tomatoI18n.回原书, tomatoI18n.tip回原书)
+                    : (b.id === "origin" && $kind === "digest") ? tip3(tomatoI18n.回分片, tomatoI18n.tip回分片)
                     : mainTip(b.id)}
                 onclick={(e) => onBtn(b.id, e)}
                 ondragstart={(e) => onDragStart(b.id, e)}

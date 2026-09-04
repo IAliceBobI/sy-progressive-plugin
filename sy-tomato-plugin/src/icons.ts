@@ -63,4 +63,31 @@ export const ICONS = `
     <path d="M13.5 3v5.5H19"/>
     <path d="M9 13h6"/><path d="M9 16.5h4"/>
 </symbol>
+<!-- iconGraphLayout*（2026-09-04 graphbox 期7）：布局形态四态循环钮——三节点链语法
+     （spec §20 vision 定稿）：矩形长宽比=文字横竖（横扁方=横排/竖长条=竖排），链条走向=树生长方向。
+     与 iconGraphBox「三方块节点树」同家族（24×24 stroke1.7 round） -->
+<symbol id="iconGraphLayoutLR" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2.5" y="9.5" width="5" height="5" rx="1.2"/>
+    <rect x="10" y="9.5" width="5" height="5" rx="1.2"/>
+    <rect x="17.5" y="9.5" width="5" height="5" rx="1.2"/>
+    <path d="M7.5 12H10"/><path d="M15 12h2.5"/>
+</symbol>
+<symbol id="iconGraphLayoutTB" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9.5" y="2.5" width="5" height="5" rx="1.2"/>
+    <rect x="9.5" y="10" width="5" height="5" rx="1.2"/>
+    <rect x="9.5" y="17.5" width="5" height="5" rx="1.2"/>
+    <path d="M12 7.5V10"/><path d="M12 15v2.5"/>
+</symbol>
+<symbol id="iconGraphLayoutVLR" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2.5" y="9" width="4" height="6" rx="1.2"/>
+    <rect x="10" y="9" width="4" height="6" rx="1.2"/>
+    <rect x="17.5" y="9" width="4" height="6" rx="1.2"/>
+    <path d="M6.5 12H10"/><path d="M14 12h3.5"/>
+</symbol>
+<symbol id="iconGraphLayoutVTB" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="8" y="2.25" width="4" height="5" rx="1.2"/>
+    <rect x="8" y="9.75" width="4" height="5" rx="1.2"/>
+    <rect x="8" y="17.25" width="4" height="5" rx="1.2"/>
+    <path d="M10 7.25v2.5"/><path d="M10 14.75v2.5"/>
+</symbol>
 `;

@@ -4,11 +4,9 @@
 // 引用边端点落入折叠子树时重定向到最近可见祖先（原始端点保留，删边仍删真块引用）。
 // 纯同步零 IO——持久化（custom-graph-collapsed）与渲染在 GraphBox.svelte，不进本文件。
 //
-// 两个语义拍板（handoff □2 待拍板，按倾向落地）：
-// 1. 「默认展开层级」按标题层级（h1=1，更符合用户心智）：level=N 时层级 ≥N 的标题全部折叠
-//    （全标而非只标第 N 层——展开父标题后子标题保持折叠，逐层展开语义一致）；
-//    段落链折叠独立于层级档位（含 all）——链上粒度太细，默认恒并 ¶×N。
-// 2. ¶×N 大节点显示临时值（首段文本截断/行数）归 □3 视觉 spec 定稿，本文件只出计数。
+// 期7（2026-09-04）变化：段落链不再走折叠机制——mergeParagraphChains（graphParaMerge.ts）
+// 在数据预处理层把链子树整链合并为 ¶ 大节点（永不多节点化），本文件只管标题/子树折叠；
+// expandSubtree（「展开全部段落」菜单的底座）随 ¶ 展开族退役一并删除。
 
 export type ExpandLevel = "1" | "2" | "3" | "all";
 
@@ -38,30 +36,16 @@ export function buildTreeIndex(rows: Block[]): TreeIndex {
     return { byId, childrenOf, parentOf, roots };
 }
 
-/** 段落链头：type='p' 且父不是 p（链成员排除）且图内子节点中存在 type='p'
- *  （seriesAllNodes 把连续段落串成 p→p 竖链：链头=链上第一个 p） */
-export function isParagraphChainHead(row: Block, tree: TreeIndex): boolean {
-    if (row.type !== "p") return false;
-    const pid = tree.parentOf.get(row.id);
-    if (pid && tree.byId.get(pid)?.type === "p") return false;
-    return (tree.childrenOf.get(row.id) ?? []).some(cid => tree.byId.get(cid)?.type === "p");
-}
-
 /**
- * 初始折叠集（按 rows 出现序，确定性）：
- * - level="N"：标题层级 ≥N 且有图内子节点的标题 + 段落链头
- * - level="all"：仅段落链头
- * 叶子标题（无子树）不进集——空角标点击无反应（e2e 实锤）；单段不成链不折叠；文档根不折叠。
+ * 初始折叠集（按 rows 出现序，确定性；期7 起只按标题层级，段落链已改走 ¶ 合并通道）：
+ * level="N"：标题层级 ≥N 且有图内子节点的标题；level="all"：空集。
+ * 叶子标题（无子树）不进集——空角标点击无反应（e2e 实锤）；文档根不折叠。
  */
 export function initialCollapsedRows(rows: Block[], level: ExpandLevel): string[] {
     const tree = buildTreeIndex(rows);
     const minHeading = level === "all" ? 99 : parseInt(level, 10);
     const out: string[] = [];
     for (const r of rows) {
-        if (isParagraphChainHead(r, tree)) {
-            out.push(r.id);
-            continue;
-        }
         if (r.type === "h" && r.subtype?.startsWith("h")) {
             const lv = parseInt(r.subtype.slice(1), 10);
             if (lv >= minHeading && (tree.childrenOf.get(r.id)?.length ?? 0) > 0) out.push(r.id);
@@ -188,17 +172,4 @@ export function parseCollapsed(s: string | undefined): string[] | null {
     } catch {
         return null;
     }
-}
-
-/** 期4「展开全部段落」（¶×N 专属菜单）：目标子树全部折叠态一次清空——
- * 与 toggle（单点切换）互补：链内嵌套折叠（链中标题等）也一并摊平 */
-export function expandSubtree(tree: TreeIndex, collapsedSet: Set<string>, id: string): boolean {
-    const stack = [id];
-    let changed = false;
-    while (stack.length) {
-        const cur = stack.pop()!;
-        if (collapsedSet.delete(cur)) changed = true;
-        for (const c of tree.childrenOf.get(cur) ?? []) stack.push(c);
-    }
-    return changed;
 }

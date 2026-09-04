@@ -2,6 +2,9 @@
     // graphbox 期2（2026-09-04）：GraphBox 自定义节点——折叠角标与 ¶×N 段落链大节点。
     // 期3：视觉按 docs/graphbox-visual-spec.md 定稿（§2 普通/§4 折叠/§5 角标/§6 ¶卡/
     // §8 跨文档图标/§9 块类型图标），全部走 --b3 主题变量。
+    // 期7：①布局形态四态——vlr/vtb 时节点文字竖排（writing-mode: vertical-rl，CJK 直立
+    // 拉丁旋转 90°），窄 dock 纵向叠多层子节点；②¶×N 重设计=链内全文合并展示
+    // （2000 字首尾截断+max-height 400px 内滚动），无展开概念——footer/角标/菜单项全退役。
     // 角标 pointerdown/click 双 stopPropagation：防触发节点拖拽与 nodeclick（Alt 跳转）。
     import { Handle, Position, type NodeProps } from "@xyflow/svelte";
     import { tomatoI18n } from "./tomatoI18n";
@@ -9,7 +12,7 @@
 
     let { data, targetPosition, sourcePosition }: NodeProps = $props();
     // data: { label, paraText?, collapsed, isParaMerged, hiddenCount, hasChildren, toggle,
-    //         blockType?, docName?, isDoc? }
+    //         blockType?, docName?, isDoc?, form? }
 
     function onToggle(e: MouseEvent) {
         e.stopPropagation();
@@ -19,7 +22,7 @@
         e.stopPropagation();
     }
     // 期4 双击=滚动到块（Svelte Flow 无 nodedoubleclick 事件，组件原生 dblclick 承载）；
-    // 角标/footer 双击只 stopPropagation 防误触（click×2 已各自 toggle）
+    // ¶ 大节点双击=滚动到链头段（spec 期7）；角标双击只 stopPropagation 防误触
     function onDblClick(e: MouseEvent) {
         e.stopPropagation();
         (data as any).dblclick?.();
@@ -28,36 +31,50 @@
         e.stopPropagation();
     }
 
-    // 块类型 → 内置图标（spec §9，13 席全命中内置库；未识别回退 [X] 文字）
+    // 块类型 → 内置图标（spec §9；三期 □2：补 tb=iconLine、iframe 原 iconEmbed 无 symbol 改
+    // iconGlobe、widget 自 iconHTML5 改 iconPlugin 消与 html 同形——全席位经 sprite 实测存在）
     const TYPE_ICON: Record<string, string> = {
         c: "iconCode", m: "iconMath", t: "iconTable",
-        widget: "iconHTML5", html: "iconHTML5", iframe: "iconEmbed",
+        widget: "iconPlugin", html: "iconHTML5", iframe: "iconGlobe",
         query_embed: "iconSQL", av: "iconDatabase",
-        video: "iconVideo", audio: "iconRecord",
+        video: "iconVideo", audio: "iconRecord", tb: "iconLine",
         l: "iconList", i: "iconListItem", b: "iconQuote", s: "iconSuper",
     };
     const blockType = $derived((data as any).blockType as string | undefined);
     const typeIcon = $derived(blockType ? TYPE_ICON[blockType] ?? null : null);
     const docName = $derived((data as any).docName as string | undefined);
     const isDoc = $derived(!!(data as any).isDoc);
+    // 期7 竖排分支（form 由 relayout commit 写进 data；形态切换不重建节点，只刷 form）
+    const textV = $derived((data as any).form === "vlr" || (data as any).form === "vtb");
+    // 竖排列档（spec §16）：label >8 字升 2 列档（118px 高钳单列容 8.8 字；前缀不计入）
+    const v2col = $derived(((data as any).label ?? "").length > 8);
+    // ¶ tooltip 巨幕防御（spec §17 P2）：合并全文截 300 字进 panelTip（卡片内已有全文+滚动）
+    const paraTip = $derived(((data as any).fullText ?? "").slice(0, 300));
 </script>
 
 {#if (data as any).isParaMerged}
-    <div class="gn gn-para" role="group" ondblclick={onDblClick} aria-label={(data as any).fullText ?? (data as any).label} onmouseenter={(e) => showPanelTip(e.currentTarget as HTMLElement)} onmouseleave={hidePanelTip} >
+    <div
+        class="gn-para" class:gn-para-v={textV}
+        role="group"
+        ondblclick={onDblClick}
+        aria-label={paraTip}
+        onmouseenter={(e) => showPanelTip(e.currentTarget as HTMLElement)}
+        onmouseleave={hidePanelTip}
+    >
         <div class="gn-para-head">
             <span class="gn-para-badge">¶×{(data as any).hiddenCount}</span>
         </div>
         <div class="gn-para-text">{(data as any).paraText}</div>
-        <button
-            class="gn-para-footer"
-            aria-label={tomatoI18n.展开此节点}
-            onclick={onToggle}
-            onpointerdown={stopDrag}
-            ondblclick={stopDbl}
-        ><span>{tomatoI18n.展开段前缀}{(data as any).hiddenCount}{tomatoI18n.段后缀}</span><span>▾</span></button>
     </div>
 {:else}
-    <div class="gn" class:gn-collapsed={(data as any).collapsed} role="group" ondblclick={onDblClick} aria-label={(data as any).fullText ?? (data as any).label} onmouseenter={(e) => showPanelTip(e.currentTarget as HTMLElement)} onmouseleave={hidePanelTip} >
+    <div
+        class="gn" class:gn-v={textV} class:gn-v--2col={textV && v2col} class:gn-collapsed={(data as any).collapsed}
+        role="group"
+        ondblclick={onDblClick}
+        aria-label={(data as any).fullText || (data as any).label}
+        onmouseenter={(e) => showPanelTip(e.currentTarget as HTMLElement)}
+        onmouseleave={hidePanelTip}
+    >
         {#if isDoc}
             <svg class="gn-typeicon"><use xlink:href="#iconDocTomato"></use></svg>
         {:else if typeIcon}
@@ -137,7 +154,7 @@
     .gn-typeicon {
         width: 14px;
         height: 14px;
-        margin-right: 4px;
+        margin-inline-end: 4px; /* 逻辑属性（spec §16）：横排=右侧距、竖排=列内向下次距，一处双态 */
         vertical-align: -2px;
         color: var(--b3-theme-on-surface-light);
         flex: none;
@@ -146,13 +163,13 @@
     .gn-typeabbr {
         font-size: 10px;
         color: var(--b3-theme-on-surface-light);
-        margin-right: 4px;
+        margin-inline-end: 4px;
         flex: none;
     }
     .gn-docname {
         font-size: 11px;
         color: var(--b3-theme-on-surface-light);
-        margin-right: 2px;
+        margin-inline-end: 2px;
     }
     /* ⊕/⊖ 折叠角标：状态即颜色——折叠 +N=主色实心药丸，展开 −=灰描边（spec §5） */
     .gn-toggle {
@@ -183,16 +200,50 @@
         background: var(--b3-theme-primary);
         color: var(--b3-theme-on-primary);
     }
-    /* ¶×N 段落链大节点＝「内容合并」：灰系实线+底部通栏展开 footer，与子树折叠的蓝系虚线
-     * 语义互斥（spec §6）；宽 188 与 dagreW 同步 */
+
+    /* ===== 期7 竖排普通节点（spec §16）：窄高条定宽两档——V1 单列 40px / V2 双列 56px
+     * （列厚=line-height 1.4×12px=16.8；左右 padding 10 与横排 .gn 物理同构）。
+     * flex 主轴随 writing-mode 旋转（inline 轴=纵向）；图标（replaced element）不旋转立于首列顶部；
+     * 《》由 CJK 字体 vert 特性自动转竖排形。角标保持右上角（方案 A，spec §16 拍板）。 */
+    .gn-v {
+        writing-mode: vertical-rl;
+        text-orientation: mixed; /* 拉丁横躺 90°（spec §19 拍板），显式声明防继承污染 */
+        align-items: flex-start; /* 竖排下 baseline 无意义，改起点对齐（spec §16） */
+        align-content: start;
+        width: 40px;
+        min-width: 0;
+        max-width: none;
+        max-height: 118px; /* ≈8 字/列整字截断；2 列 clamp 对应横排 2 行预算（spec §2） */
+        min-height: 64px;
+        padding: 8px 10px;
+        overflow: hidden;
+    }
+    /* 竖排 line-clamp 的「行」即「列」（spec §16）：声明组零改动生效，按档覆盖 1/2 */
+    .gn-v .gn-label {
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+        max-width: none;
+    }
+    .gn-v--2col {
+        width: 56px;
+    }
+    .gn-v--2col .gn-label {
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
+    /* ===== ¶×N 段落链大节点（期7 重设计）：链内全文合并展示——「内容卡」而非「折叠状态」。
+     * 灰系实线+¶ badge（spec §6 语义延续）；2000 字截断在数据侧（graphParaMerge），视觉钳
+     * max-height 400px 内滚动（防巨型节点把 fitView 缩爆）；无展开概念，footer/角标已退役。 */
     .gn-para {
         box-sizing: border-box;
         display: block;
         width: 188px;
         max-width: 188px;
-        padding: 7px 10px 0;
+        padding: 7px 10px;
         background: var(--b3-theme-surface);
         border: 1px solid var(--b3-border-color);
+        border-radius: var(--b3-border-radius);
     }
     .gn-para-head {
         display: flex;
@@ -208,33 +259,42 @@
     }
     .gn-para-text {
         margin-top: 3px;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        display: -webkit-box;
-        overflow: hidden;
+        max-height: 400px;
+        overflow: auto; /* 高钳内滚（spec §17）：横排滚 y、竖排块流向左自动滚 x，同一声明换轴零分叉 */
+        scrollbar-width: thin;
         word-break: break-all;
+        white-space: pre-line; /* 链内多段 \n 分段显示（graphParaMerge 以 \n 合并） */
         font-size: 11px;
         line-height: 1.5;
         color: var(--b3-theme-on-surface);
     }
-    .gn-para-footer {
-        margin: 5px -10px 0; /* 负外距通栏吃掉父 padding */
-        height: 20px;
-        padding: 0 10px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between; /* ▾ 推右端（vision P2） */
-        gap: 2px;
-        border: none;
-        border-top: 1px dashed var(--b3-border-color);
-        background: transparent;
-        color: var(--b3-theme-primary);
-        font-size: 10px;
-        cursor: pointer;
-        border-radius: 0 0 var(--b3-border-radius) var(--b3-border-radius);
+    .gn-para-text::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
     }
-    .gn-para-footer:hover {
-        background: var(--b3-theme-primary-lightest);
+    .gn-para-text::-webkit-scrollbar-thumb {
+        background: var(--b3-border-color);
+        border-radius: 2px;
+    }
+    .gn-para-text::-webkit-scrollbar-thumb:hover {
+        background: var(--b3-theme-on-surface-light);
+    }
+    /* 竖排 ¶ 卡（spec §17）：多列宽卡（122px ≈ 7 列），文字竖排、高钳同 400；
+     * badge 行保持横排（数字+× 记号竖排不可读） */
+    .gn-para-v {
+        writing-mode: vertical-rl;
+        width: auto;
+        max-width: 122px;
+        min-width: 64px;
+        padding: 8px 7px;
+    }
+    .gn-para-v .gn-para-head {
+        writing-mode: horizontal-tb;
+        flex: none;
+    }
+    .gn-para-v .gn-para-text {
+        margin-top: 0;
+        margin-left: 3px; /* 竖排块流向左：badge 在首列右侧 */
+        max-height: 400px;
     }
 </style>

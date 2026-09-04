@@ -7,6 +7,9 @@
         piecesmenu,
         digestmenu,
         blockIconMenu,
+        wholeDigestMenu,
+        reviewSchedMenu,
+        revisitRhythmMenu,
         ProgressiveStart2learn,
         ProgressiveJumpMenu,
     } from "../../sy-tomato-plugin/src/libs/stores";
@@ -40,8 +43,35 @@
         />
         {tomatoI18n.menu添加右键菜单}:
         {digest渐进阅读摘抄模式.langText()}<HotkeyCap hk={digest渐进阅读摘抄模式} pluginName="sy-progressive-plugin"></HotkeyCap>
-        <!-- digestmenu 一拖二（□3 review P2-2）：同门还有「整篇摘抄」右键项，开回即一并恢复 -->
-        （+{tomatoI18n.整篇摘抄}）
+    </div>
+
+    <!-- 可见性期4 □4 B②：右键菜单四项各自开关（整篇摘抄从 digestmenu 一拖二拆出） -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$wholeDigestMenu}
+        />
+        {tomatoI18n.menu添加右键菜单}:
+        {tomatoI18n.menu整篇摘抄}
+    </div>
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$reviewSchedMenu}
+        />
+        {tomatoI18n.menu添加右键菜单}:
+        {tomatoI18n.menu重访调度}
+    </div>
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$revisitRhythmMenu}
+        />
+        {tomatoI18n.menu添加右键菜单}:
+        {tomatoI18n.menu复访节奏}
     </div>
 
     <div>
@@ -51,7 +81,6 @@
             bind:checked={$ProgressiveJumpMenu}
         />
         {tomatoI18n.menu添加右键菜单}:
-        {Progressive跳到分片或回到原文.icon}
         {Progressive跳到分片或回到原文.langText()}
         <HotkeyCap hk={Progressive跳到分片或回到原文} pluginName="sy-progressive-plugin"></HotkeyCap>
     </div>

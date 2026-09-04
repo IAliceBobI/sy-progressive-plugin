@@ -6,11 +6,12 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
-import { blockIconMenu, digestmenu } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, digestmenu, wholeDigestMenu, reviewSchedMenu, revisitRhythmMenu } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { kind, openDigestSubrank, show, toggleFreeFloat } from "./ProgressiveBtn";
 import { cardModeFor, type DigestIntent } from "./digestCardMode";
+import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "iconProgScissors", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "iconProgScissors", () => tomatoI18n.执行摘抄)
@@ -96,7 +97,10 @@ class DigestProgressiveBox {
                         this.enterDigestMode();
                     },
                 });
-                // □16 整摘双通道之一：任意文档（剧本等）无浮条载体，右键整篇摘抄落札记匣/摘抄集
+            }
+            // 可见性期4 □4 B②：整篇摘抄从 digestmenu 一拖二拆独立开关（□16 整摘双通道之一：
+            // 任意文档无浮条载体，右键整篇摘抄落札记匣/摘抄集；替代通道=⇧⌥D?命令面板）
+            if (wholeDigestMenu.get()) {
                 menu.addItem({
                     label: tomatoI18n.整篇摘抄,
                     icon: "iconProgContents",
@@ -124,9 +128,12 @@ class DigestProgressiveBox {
             }
             const ids = els.map(el => el?.getAttribute("data-node-id")).filter(Boolean) as string[];
             if (ids.length === 0) return;
+            // 可见性期4 □4 B①：摘抄文档内去重——摘抄文档（wysiwyg 容器挂 PDIGEST_CTIME，
+            // 同 docReview 的 custom IAL 渲染通道）不显块级「重访调度」，只留文档级「复访节奏」
+            const inDigestDoc = !!detail.protyle?.wysiwyg?.element?.getAttribute(PDIGEST_CTIME);
             const raw = els[0].getAttribute(ReviewKey) ?? "";
             const s = parseReview(raw);
-            if (s && s.mode !== "done") {
+            if (reviewSchedMenu.get() && !inDigestDoc && s && s.mode !== "done") {
                 const curve = s.mode === "curve";
                 menu.addItem({
                     label: curve ? tomatoI18n.问题已解决 : tomatoI18n.本轮已完成,
@@ -139,16 +146,18 @@ class DigestProgressiveBox {
                     click: () => applyReviewAction(ids, "defer", raw),
                 });
             }
-            menu.addItem({
-                label: tomatoI18n.重访调度,
-                icon: "iconProgSched",
-                submenu: schedSubmenuItems(ids, s, raw),
-            });
+            if (reviewSchedMenu.get() && !inDigestDoc) {
+                menu.addItem({
+                    label: tomatoI18n.重访调度,
+                    icon: "iconProgSched",
+                    submenu: schedSubmenuItems(ids, s, raw),
+                });
+            }
             // 期2 复访节奏：摘抄文档级 pdigest-review（custom IAL 渲染在 wysiwyg 容器属性上，
             // DigestBuilder.init 读 PDIGEST_CTIME 同款通道）——右键改 q 曲线/s 日程/移除；
             // 同步读 DOM 零 await（emitToPlugins 同步收集，await addItem 迟到不进菜单）
             const docReview = detail.protyle?.wysiwyg?.element?.getAttribute(PdigestReviewKey);
-            if (docReview != null) {
+            if (revisitRhythmMenu.get() && docReview != null) {
                 const docID = detail.protyle?.block?.rootID;
                 menu.addItem({
                     label: tomatoI18n.复访节奏,

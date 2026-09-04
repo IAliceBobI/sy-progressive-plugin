@@ -1,11 +1,12 @@
 import { Dock, IEventBusMap, IProtyle } from "siyuan";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
-import { graphAddTopbarIcon, graphBoxCheckbox, graphMaxAllBlocks, graph定位到图中的节点Menu, graph打开块关系图Menu } from "./libs/stores";
+import { graphAddTopbarIcon, graphBoxCheckbox, graph定位到图中的节点Menu, graph打开块关系图Menu } from "./libs/stores";
 import { siyuan, getDoOperations, sleep } from "./libs/utils";
 import { events, EventType } from "./libs/Events";
 import GraphBoxSvelte from "./GraphBox.svelte";
 import { tomatoI18n } from "./tomatoI18n";
 import { getDocBlocks } from "./libs/docUtils";
+import { unfoldBlocks, nearestGraphAncestor } from "./libs/graphUnfold";
 import { winHotkey } from "./libs/winHotkey";
 import { addIfVisible } from "./libs/menuManager";
 import { newID } from "stonev5-utils";
@@ -225,14 +226,34 @@ class GraphBox {
         const found = await data.locateID(id);
         gbLog("graph.locate_done", `found=${found}`);
         if (!found) {
+            // 二期 □2 定位兜底：目标块不在图内（¶ 合并/截断剔除等）→ 沿真实 parent 链
+            // 上爬最近的图内祖先重定向定位（永不静默也永不误导——「超上限」只留给真超限）
+            const anc = await this.locateGraphAncestor(data, id);
+            if (anc && await data.locateID(anc)) {
+                siyuan.pushMsg(tomatoI18n.定位已并入所在节点, 3000);
+                return;
+            }
             const st = data.getGraphState?.();
-            siyuan.pushMsg(
-                st?.mode === "skeleton"
-                    ? tomatoI18n.定位骨架未含此块
-                    : tomatoI18n.定位超上限.replace("%1", `${st?.maxBlocks ?? graphMaxAllBlocks.get()}`),
-                4000,
-            );
+            if (st?.mode === "skeleton") {
+                siyuan.pushMsg(tomatoI18n.定位骨架未含此块, 4000);
+            } else if (st?.blockCount && st.maxBlocks && st.blockCount > st.maxBlocks) {
+                siyuan.pushMsg(tomatoI18n.定位超上限.replace("%1", `${st.maxBlocks}`), 4000);
+            } else {
+                siyuan.pushMsg(tomatoI18n.定位未找到, 4000);
+            }
         }
+    }
+
+    /** 二期 □2：SQL 拉当前文档全量 id→parent_id 映射，沿链上爬最近图内祖先（跨文档块查无父=undefined） */
+    private async locateGraphAncestor(data: GraphDockData<GraphBoxSvelte>, id: string): Promise<string | undefined> {
+        const st = data.getGraphState?.();
+        const graphIDs = data.graphIDsOf?.();
+        if (!st?.docID || !graphIDs) return undefined;
+        const rows = await siyuan.sql(
+            `select id,parent_id from blocks where root_id="${st.docID}" limit 100000`,
+        );
+        const parentOf = new Map(rows.map(r => [r.id, r.parent_id]));
+        return nearestGraphAncestor(id, pid => parentOf.get(pid) ?? undefined, graphIDs);
     }
 
     // changeDoc 只读 title.editElement.textContent 与 block.rootID 两字段；events 单例侧
@@ -312,8 +333,8 @@ class GraphBox {
                             </div>
                             <span class="fn__flex-1 fn__space"></span>
                             <span id="${landscapeSwitchBtnID}" role="button" tabindex="0"
-                                  class="block__icon b3-tooltips b3-tooltips__sw" aria-label="${tomatoI18n.切换横向与纵向}">
-                                <svg><use id="${landscapeSwitchBtnID}-icon" xlink:href="#iconSplitLR"></use></svg>
+                                  class="block__icon b3-tooltips b3-tooltips__sw" aria-label="${tomatoI18n.切换布局形态.replace("%1", tomatoI18n.形态横排向右)}">
+                                <svg><use id="${landscapeSwitchBtnID}-icon" xlink:href="#iconGraphLayoutLR"></use></svg>
                             </span>
                             <span data-type="min" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="Min"><svg><use xlink:href="#iconMin"></use></svg></span>
                         </div>
@@ -396,99 +417,6 @@ export class ColorSelector {
     constructor(colors: string[]) {
         this.colors = colors;
     }
-}
-
-function seriesAllNodes(root: Block) {
-    const children = root?.children?.slice();
-    const len = children?.length;
-    if (!(len > 0)) return;
-    for (let i = 1; i < children.length; i++) {
-        const c = children[i];
-        if (c.type === 'h') continue;
-        const p = children[i - 1];
-        p.children.push(c);
-        c.parent = p;
-        c.parent_id = p.id;
-        c.data = 'm'
-    }
-    root.children = children.filter(c => c.data !== 'm')
-    children.forEach(c => delete c.data)
-    return root;
-}
-
-function parallelHeanders(root: Block, subtypeParent: string, subtypeChild: string) {
-    const children = root?.children?.slice();
-    const len = children?.length;
-    if (!(len > 0)) return;
-    let found = false;
-    let p: Block;
-    for (let i = 1; i < children.length; i++) {
-        if (children[i - 1].subtype === subtypeParent) {
-            p = children[i - 1];
-            if (!p.children) p.children = [];
-        }
-        if (children[i - 1].subtype < subtypeParent) {
-            p = null;
-        }
-        const c = children[i];
-        if (p && c.subtype === subtypeChild) {
-            p.children.push(c);
-            c.parent = p;
-            c.parent_id = p.id;
-            c.data = 'm'
-            found = true;
-        }
-    }
-    if (found) {
-        root.children = children.filter(c => c.data !== 'm')
-        children.forEach(c => delete c.data)
-    }
-    return root;
-}
-
-function shortenList(block: Block) {
-    if (!block) return;
-    // block.isInList = true;
-    if (!(block?.children?.length > 0)) return;
-    if (block.type === 'i' || block.type === 'l') {
-        block.children.forEach(c => c.parent_id = block.parent_id)
-        block.data = 'del'
-    }
-    block.children.forEach(shortenList);
-}
-
-function unfoldBlocks(root: Block, all: Block[] = []) {
-    if (!root) return;
-    all.push(root);
-    if (root.type === 'l') {
-        shortenList(root)
-    } else if (root.subtype === 'col') {
-        // ignore
-    } else {
-        seriesAllNodes(root);
-
-        parallelHeanders(root, "h5", "h6");
-        parallelHeanders(root, "h4", "h6");
-        parallelHeanders(root, "h3", "h6");
-        parallelHeanders(root, "h2", "h6");
-        parallelHeanders(root, "h1", "h6");
-
-        parallelHeanders(root, "h4", "h5");
-        parallelHeanders(root, "h3", "h5");
-        parallelHeanders(root, "h2", "h5");
-        parallelHeanders(root, "h1", "h5");
-
-        parallelHeanders(root, "h3", "h4");
-        parallelHeanders(root, "h2", "h4");
-        parallelHeanders(root, "h1", "h4");
-
-        parallelHeanders(root, "h2", "h3");
-        parallelHeanders(root, "h1", "h3");
-
-        parallelHeanders(root, "h1", "h2");
-    }
-    root.children?.forEach(c => unfoldBlocks(c, all));
-    return all;
 }
 
 function shortenParagraphLink(rows: Block[], maxPBlocks: number) {
@@ -577,11 +505,10 @@ export async function getData(docID: string, docName: string, maxPBlocks: number
             return rows;
         })
         .then(rows => rows.filter(r => {
-            if (r.type === 'i' || r.type === 'l') {
-                if (!(r.children?.length > 0)) {
-                    return false;
-                }
-            }
+            // 三期 B'：i 恒保留（树内=吸收后的分叉节点；跨文档补块=SQL content 直填），
+            // 仅无内容孤儿 i 防御性丢弃；l 壳已被 shortenList 剔除，此处只拦跨文档补块的空壳 l
+            if (r.type === 'l') return (r.children?.length ?? 0) > 0;
+            if (r.type === 'i') return (r.children?.length ?? 0) > 0 || !!r.content;
             return true;
         }));
 

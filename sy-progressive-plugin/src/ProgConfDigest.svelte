@@ -16,6 +16,7 @@
         openCardsOnOpenPiece,
         pieceNoBacktraceLink,
         digestAddReadingpoint,
+        digestGlobalSigle,
     } from "../../sy-tomato-plugin/src/libs/stores";
 </script>
 
@@ -60,8 +61,9 @@
     </div>
 
     <div>
-        <!-- 期1 □2 落点三档：digest2dailycard 开关并入（迁移见 index.ts loadStore）；脏值兜底失效占位 -->
-        <select class="b3-select" bind:value={$digestLanding}>
+        <!-- 期1 □2 落点三档：digest2dailycard 开关并入（迁移见 index.ts loadStore）；脏值兜底失效占位。
+             vision □5：与下行「摘抄制卡模式」select 统一 min-width，右侧标签起始对齐 -->
+        <select class="b3-select" style="min-width: 160px" bind:value={$digestLanding}>
             <option value="central">{tomatoI18n.落点集中归档}</option>
             <option value="source">{tomatoI18n.落点源文档下方}</option>
             <option value="daily">{tomatoI18n.落点日记卡片}</option>
@@ -70,6 +72,20 @@
             {/if}
         </select>
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip摘抄落点}>{tomatoI18n.摘抄落点}</span>
+    </div>
+
+    <div>
+        <!-- 可见性期4 □4 A：cardMode 全局默认三档（digestGlobalSigle；书 IAL 优先级链不动）。
+             飞书帖 1 同修：saveCardMode 死代码=设置入口缺失，此处补正面回答 -->
+        <select class="b3-select" style="min-width: 160px" bind:value={$digestGlobalSigle}>
+            <option value="0">{tomatoI18n.制卡不入卡}</option>
+            <option value="1">{tomatoI18n.制卡只留最新}</option>
+            <option value="2">{tomatoI18n.制卡每摘皆卡}</option>
+            {#if !["0", "1", "2"].includes($digestGlobalSigle)}
+                <option value={$digestGlobalSigle}>{$digestGlobalSigle} {tomatoI18n.已失效请重新选择}</option>
+            {/if}
+        </select>
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置制卡模式}>{tomatoI18n.摘抄制卡模式}</span>
     </div>
 
     <div>

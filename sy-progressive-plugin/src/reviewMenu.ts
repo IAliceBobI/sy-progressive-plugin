@@ -8,6 +8,8 @@ import { getProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gl
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 import { notifyFleetChanged } from "./fleetNotify";
+import { findDocByIal, getDocIalDigestDir } from "./progData";
+import { digestStateOf, digestStateIcon, DigestState } from "./digestState";
 import {
     ReviewKey, ReviewState, SCHED_PRESETS, PdigestReviewKey,
     parseReview, markQuestion, markSched, deferReview, completeReview, completeRevisit,
@@ -115,19 +117,40 @@ function wrapApplied(items: MenuItemOption[], onApplied?: () => void): MenuItemO
  * 有键 = 标题行「复访中 · 曲线/每N天 · X 天后到期（已到期）」+ 本轮已完成/推迟到明天/
  * 复访节奏…（子菜单改档）/不再复访——与 Dock ✧ 待办摘抄行子菜单同构。
  * onApplied=动作落盘后回调（浮条红点复查：complete/defer 进未来、remove 清键均灭点）。
+ * 期2 □2 A 四态活标题：stateBadge（非复访态由调用方 digestStateBadgeOf 现查传入）在
+ * 无键态菜单顶部插只读状态行；有键态标题行 icon 用时钟（复访态图标，iconProgSched 退役到动作行）。
  */
 export function digestReviewMenuItems(
     docID: string, raw: string, now: number, onApplied?: () => void,
+    stateBadge?: { icon: string; label: string; state: DigestState } | null,
 ): MenuItemOption[] {
     if (!docID) return [];
     const current = parseReview(raw);
     if (!current || current.mode === "done") {
-        return wrapApplied(schedSubmenuItems([docID], null, "", PdigestReviewKey), onApplied);
+        const items = schedSubmenuItems([docID], null, "", PdigestReviewKey);
+        if (stateBadge) {
+            return wrapApplied([
+                { icon: stateBadge.icon, label: stateBadge.label },
+                { type: "separator" },
+                ...items,
+                // 可见性期3 □3：stateBadge 分支同样挂计划面板入口（否则该分支漏挂）
+                {
+                    icon: "iconProgSched", label: tomatoI18n.复习计划,
+                    click: () => (getProgressivePluginInstance() as any)?.openReviewPlanDialog?.(),
+                },
+            ] as MenuItemOption[], onApplied);
+        }
+        // 可见性期3 □3：无键态菜单尾部也挂计划面板入口（空态=新用户教育通道）
+        items.push({
+            icon: "iconProgSched", label: tomatoI18n.复习计划,
+            click: () => (getProgressivePluginInstance() as any)?.openReviewPlanDialog?.(),
+        });
+        return wrapApplied(items, onApplied);
     }
     const mode = current.mode === "sched" ? tomatoI18n.每N天重访(current.every) : tomatoI18n.曲线重访;
     const days = isDue(current, now) ? null : Math.ceil((current.next - now) / DAY);
     return wrapApplied([
-        { icon: "iconProgSched", label: tomatoI18n.复访中标题(mode, days) },
+        { icon: "iconClock", label: tomatoI18n.复访中标题(mode, days) },
         {
             icon: "iconCheck", label: tomatoI18n.本轮已完成,
             click: () => applyReviewAction([docID], "complete", raw, PdigestReviewKey),
@@ -144,18 +167,25 @@ export function digestReviewMenuItems(
             icon: "iconTrashcan", label: tomatoI18n.不再复访,
             click: () => applyReviewAction([docID], "remove", raw, PdigestReviewKey),
         },
+        // 可见性期3 □3：复习计划面板入口（常驻承诺的第二浮条入口；openDueReviewList 轻量场景保留）
+        {
+            icon: "iconProgSched", label: tomatoI18n.复习计划,
+            click: () => (getProgressivePluginInstance() as any)?.openReviewPlanDialog?.(),
+        },
     ], onApplied);
 }
 
 /** □7 摘抄浮条 ✧ 钮点击：直查文档 IAL 组配两态菜单（independent，openReviewSchedMenu 惯例） */
 export async function openDigestReviewMenu(
-    docID: string, ev: { clientX: number; clientY: number }, onApplied?: () => void,
+    docID: string, ev: { clientX: number; clientY: number }, onApplied?: () => void, bookID = "",
 ) {
     if (!docID) return;
     const attrs = await siyuan.getBlockAttrs(docID);
     const raw = attrs?.[PdigestReviewKey] ?? "";
     const menu = new (Menu as any)("progDigestReviewMenu", undefined, true) as Menu;
-    const items = digestReviewMenuItems(docID, raw, Date.now(), onApplied);
+    // 期2 □2 A 四态活标题：现查思考块与卡组（bookID 缺省跳过卡组查询，仅复访/思考可辨）
+    const stateBadge = await digestStateBadgeOf(docID, bookID);
+    const items = digestReviewMenuItems(docID, raw, Date.now(), onApplied, stateBadge);
     for (let i = 0; i < items.length; i++) {
         menu.addItem(items[i]);
         // 有键态标题行（无键态首项=可点的曲线档有 click）后加分隔线拉开与动作行的层级，
@@ -163,6 +193,38 @@ export async function openDigestReviewMenu(
         if (i === 0 && !items[0].click && items.length > 1) menu.addSeparator();
     }
     setTimeout(() => menu.open(menuPos(ev)), 0);
+}
+
+/**
+ * ✧ 菜单四态标题徽（期2 □2 A）：复访态在 digestReviewMenuItems 内由标题行承载，
+ * 此处只补非复访态（背诵/思考/留档）——打开 ✧ 菜单第一眼知道当前文档状态。
+ * think 取文档内任一思考块值；卡组 bookID 缺省/异常降级为无卡（查询失败不阻塞菜单）。
+ */
+async function digestStateBadgeOf(
+    docID: string, bookID = "",
+): Promise<{ icon: string; label: string; state: DigestState } | null> {
+    if (!docID) return null;
+    try {
+        const thinkRows = ((await siyuan.sql(
+            `select value from attributes where name="${ReviewKey}" and root_id="${docID}" limit 100`,
+        )) ?? []) as any[];
+        const think = (thinkRows.map(r => r?.value).find(v => v && v !== "done")) ?? "";
+        let cardInSet = false;
+        if (bookID) {
+            const dirID = await findDocByIal(getDocIalDigestDir(bookID));
+            if (dirID) {
+                const cards = await siyuan.getTreeRiffCardsAll(dirID);
+                cardInSet = cards.some(c => c.id === docID);
+            }
+        }
+        const state = digestStateOf("", think, cardInSet);
+        if (state === "review") return null; // 复访态由有键标题行自带（iconClock 在 items 内）
+        const label = state === "recite" ? tomatoI18n.背诵中
+            : state === "think" ? tomatoI18n.思考中 : tomatoI18n.留档;
+        return { icon: digestStateIcon(state), label, state };
+    } catch {
+        return null;
+    }
 }
 
 /** 浮条摘抄子排「重访调度…」：选中块当前态感知的独立菜单（independent，同 progAdvancedMenu 惯例） */

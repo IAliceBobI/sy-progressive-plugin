@@ -380,6 +380,9 @@ export const graphMaxAllBlocks = settingFactory("graphMaxAllBlocks", 800, STORAG
 export const graphHideStructEdges = settingFactory("graphHideStructEdges", false, STORAGE_SETTINGS, null as TSK);
 // graphbox 期2（2026-09-04）：折叠机制默认展开层级（"1"|"2"|"3"|"all"，按标题层级 h1=1；段落链折叠独立于档位）
 export const graphDefaultExpandLevel = settingFactory("graphDefaultExpandLevel", "2", STORAGE_SETTINGS, null as TSK);
+// graphbox 期7（2026-09-04）：默认布局形态（"lr"|"tb"|"vlr"|"vtb"；文档无 custom-graph-layout 时用，
+// 顶栏循环钮写的 per-doc 持久化优先）
+export const graphDefaultLayout = settingFactory("graphDefaultLayout", "lr", STORAGE_SETTINGS, null as TSK);
 export const graphAddTopbarIcon = settingFactory("graphAddTopbarIcon", true, STORAGE_SETTINGS, null as TSK);
 export const graph打开块关系图Menu = settingFactory("graphopengraphMenu", true, STORAGE_SETTINGS, null as TSK);
 export const graph定位到图中的节点Menu = settingFactory("graphlocatetographMenu", true, STORAGE_SETTINGS, null as TSK);
@@ -634,6 +637,12 @@ export const piecesmenu = settingFactory("piecesmenu", false, STORAGE_Prog_SETTI
 // 弹的菜单）默认关，超出「右键清爽」拍板字面口径；拆独立门默认开（意图型入口不构成
 // 右键不清爽），管块图标菜单的渐进两项：跳到分片或回到原文 / 渐进阅读摘抄模式。
 export const blockIconMenu = settingFactory("blockIconMenu", true, STORAGE_Prog_SETTINGS, null as TSK);
+// 可见性期4 □4 B②：右键菜单四项各自开关（默认全开=拍板 A 不 breaking）。digestmenu
+// 存量键默认 false 不动（旧语义兼容）；替代通道——整篇摘抄=快捷键+命令面板，
+// 重访调度/复访节奏=浮条 ✧ + 期3 复习计划面板。
+export const wholeDigestMenu = settingFactory("wholeDigestMenu", true, STORAGE_Prog_SETTINGS, null as TSK);
+export const reviewSchedMenu = settingFactory("reviewSchedMenu", true, STORAGE_Prog_SETTINGS, null as TSK);
+export const revisitRhythmMenu = settingFactory("revisitRhythmMenu", true, STORAGE_Prog_SETTINGS, null as TSK);
 // v5 □7 设置砍半：words2dailycard/finishPieceCreateAt/PieceSummaryBoxmenu/merg2newBookEnable/
 // getAllPieceNotesEnable/multilineMarkEnable/send2* 六件/makeCard* 两件/summary2dailynote/
 // PieceMoving*/ProgressiveViewAllMenu 共 18 个显隐与计划流 store 退役（旧持久化值留着无害）。

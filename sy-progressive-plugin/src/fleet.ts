@@ -9,7 +9,7 @@ import FleetFlame from "./FleetFlame.svelte";
 import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
 import { rollerDebtSummary, type DebtSummary } from "./roller";
-import { PdigestReviewKey, dueReviewSQLFor } from "./reviewQueue";
+import { PdigestReviewKey, ReviewKey, dueReviewSQLFor } from "./reviewQueue";
 import { onFleetChanged } from "./fleetNotify";
 import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
 import { icon, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
@@ -36,6 +36,8 @@ export interface FleetActions {
     /** v5 □12：书卡 ✧ 徽章点开=该书重访到期待办列表（完成/推迟/移除，见 reviewMenu.ts）；
      *  期2 bookID 缺省=全局清单（free 源复访的唯一入口） */
     openDueList(ev: { clientX: number; clientY: number }, bookID?: string): any;
+    /** 可见性期3 □3：复习计划面板（独立 Dialog，常驻入口不依赖 due>0） */
+    openReviewPlan(): any;
 }
 
 export const FLEET_DOCK_TYPE = "prog-fleet-dock";
@@ -55,13 +57,16 @@ let notifySubStop: (() => void) | null = null;
 
 export async function refreshFlame() {
     try {
-        // 期2：顺带取 pdigest 复访到期数（一条 attributes 查询，dueReviewSQLFor 只回到期行）
-        const [debt, dueRows] = await Promise.all([
+        // 期2 □2 B 盲区双源化：到期摘抄数=pdigest 文档级 + think 块级（两类键行不重叠，计数直加；
+        // dueReviewSQLFor 只回到期行，done/垃圾值被 q#/s# 前缀自然排除）
+        const now = Date.now();
+        const [debt, dueRows, thinkRows] = await Promise.all([
             rollerDebtSummary(),
-            siyuan.sql(dueReviewSQLFor(PdigestReviewKey, Date.now())) as Promise<any[]>,
+            siyuan.sql(dueReviewSQLFor(PdigestReviewKey, now)) as Promise<any[]>,
+            siyuan.sql(dueReviewSQLFor(ReviewKey, now)) as Promise<any[]>,
         ]);
         flameState.set(debt);
-        digestDueState.set((dueRows ?? []).length);
+        digestDueState.set((dueRows ?? []).length + (thinkRows ?? []).length);
     } catch (e) {
         console.error("fleet refreshFlame failed", e);
     }

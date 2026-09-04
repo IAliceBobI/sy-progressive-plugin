@@ -15,6 +15,7 @@
         graphAddTopbarIcon,
         graphBoxCheckbox,
         graphDefaultExpandLevel,
+        graphDefaultLayout,
         graphHideStructEdges,
         graphMaxAllBlocks,
         graphMaxPBlocks,
@@ -178,6 +179,17 @@
                 <option value="all">{tomatoI18n.全部展开}</option>
             </select>
             {tomatoI18n.默认展开层级}
+        </div>
+        <div>
+            <!-- graphbox 期7：默认布局形态（文档无 custom-graph-layout 时用，顶栏循环钮优先）；
+                 竖排=节点文字竖排，窄 dock 纵向叠多层子节点 -->
+            <select class="b3-select" bind:value={$graphDefaultLayout}>
+                <option value="lr">{tomatoI18n.形态横排向右}</option>
+                <option value="tb">{tomatoI18n.形态横排向下}</option>
+                <option value="vlr">{tomatoI18n.形态竖排向右}</option>
+                <option value="vtb">{tomatoI18n.形态竖排向下}</option>
+            </select>
+            {tomatoI18n.默认布局形态}
         </div>
         <div>
             <input type="checkbox" class="b3-switch" bind:checked={$graphHideStructEdges} />

@@ -6,7 +6,6 @@ import { prog } from "./Progressive";
 import { isMultiLineElement, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { progStorage } from "./ProgressiveStorage";
-import { splitBySentencePeriod } from "./splitEn";
 
 export class SplitSentence {
     private asList: AsList;
@@ -105,15 +104,10 @@ export class SplitSentence {
     }
 }
 
-export function splitLines(ps: string[]) {
-    for (const s of "\n。！？；：") ps = splitBy(ps, s);
-    ps = splitBy(ps, "……");
-    ps = splitBy(ps, "! ");
-    ps = splitBy(ps, "? ");
-    ps = splitBy(ps, "; ");
-    ps = splitBySentencePeriod(ps);
-    return ps;
-}
+// □14 断句管线（splitLines/splitBy）迁出至 splitPipeline.ts（纯函数文件保单测直测，
+// 含公式跨度保护）；import+re-export 保既有 import 路径（seller splitBy / digestUtils splitLines）。
+import { splitLines, splitBy } from "./splitPipeline";
+export { splitLines, splitBy };
 
 function getAttrLine(ref: string, idx: string) {
     return `{: ${RefIDKey}="${ref}" ${PARAGRAPH_INDEX}="${idx}" ${PROG_ORIGIN_TEXT}="1"}`;
@@ -129,65 +123,6 @@ export function dontSplit(markdown: string) {
     if (markdown.indexOf("://") > 0) return true;
     if ([...markdown.matchAll(/!\[.*?\]\(.*?\)/g)].length > 0) return true;
     return false;
-}
-
-function shouldMove(s: string) {
-    return s.startsWith("”")
-        || s.startsWith("’")
-        || s.startsWith("\"")
-        || s.startsWith("'")
-        || s.startsWith("】")
-        || s.startsWith("]")
-        || s.startsWith("}")
-        || s.startsWith(")")
-        || s.startsWith("）")
-        || s.startsWith("』") //『』
-        || s.startsWith("」") //「」
-        || s.startsWith("!")
-        || s.startsWith("！")
-        || s.startsWith("。")
-        || s.startsWith(". ")
-        || s.startsWith("?")
-        || s.startsWith("？")
-        || s.startsWith(";")
-        || s.startsWith("；")
-        || s.startsWith(":")
-        || s.startsWith("：")
-        || s.startsWith(">")
-        || s.startsWith("》")
-        || s.startsWith("…");
-}
-
-function movePunctuations(a: string, b: string) {
-    while (shouldMove(b)) {
-        a += b[0];
-        b = b.slice(1);
-    }
-    return [a, b];
-}
-
-export function splitBy(content: string[], s: string) {
-    const sentences: string[] = [];
-    for (const c of content.filter(i => i.length > 0)) {
-        const parts = c.split(s);
-        for (let i = 0; i < parts.length; i++) {
-            if (i < parts.length - 1) {
-                parts[i] += s;
-            }
-            let j = i;
-            while (j > 0) {
-                const [a, b] = movePunctuations(parts[j - 1], parts[j]);
-                parts[j - 1] = a;
-                parts[j] = b;
-                j--;
-            }
-        }
-        sentences.push(...parts.map(i => i.trim())
-            .map(i => i.trim().replace(/\*+$/g, ""))
-            .filter(i => i.length > 0)
-            .filter(i => i != "*"));
-    }
-    return sentences;
 }
 
 function getIDFromIAL(ial: string) {

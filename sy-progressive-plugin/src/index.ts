@@ -16,18 +16,19 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import SettingsSvelte from "./Settings.svelte"
+import ReviewPlanDialog from "./ReviewPlanDialog.svelte"
 import { resetKey, verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { neighborCode } from "../../sy-tomato-plugin/src/libs/neighbor";
 import { applyProgSkins, refreshProgGate } from "./theme";
 import { newID } from "stonev5-utils";
 import { ProgressivePluginConfig, ProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gconst";
 import { setGlobal } from "stonev5-utils";
-import { mount } from "svelte";
+import { mount, unmount } from "svelte";
 import { progStorage } from "./ProgressiveStorage";
 import { siyuan, timeUtil } from "../../sy-tomato-plugin/src/libs/utils";
 import { initProgFloatBtns, toggleFloatBarSystem, toggleFreeFloat } from "./ProgressiveBtn";
@@ -52,6 +53,9 @@ function loadStore(plugin: BaseTomatoPlugin) {
     piecesmenu.load(plugin);
     ProgressiveStart2learn.load(plugin);
     digestmenu.load(plugin);
+    wholeDigestMenu.load(plugin);
+    reviewSchedMenu.load(plugin);
+    revisitRhythmMenu.load(plugin);
     blockIconMenu.load(plugin);
     // 期1 □2 摘抄落点迁移：digestLanding 无存量值时，老开关 digest2dailycard=true → "daily"
     // （保持原行为），否则默认 "central"；.set 只写内存——即便未持久化，每次启动重跑也幂等
@@ -214,6 +218,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             },
             isReciteInstalled: () => prog.isReciteInstalled(),
             openDueList: (ev, bookID) => openDueReviewList(ev, bookID),
+            openReviewPlan: () => this.openReviewPlanDialog(),
         };
         initFleet(this, fleetActions);
     }
@@ -268,6 +273,30 @@ export default class ThePlugin extends BaseTomatoPlugin {
         });
         dm.add("1", () => { dialog.destroy() })
         dm.add("2", () => { d.destroy() })
+    }
+
+    // 可见性期3 □3 复习计划面板：独立 Dialog 去重重开（settings 同款 DestroyManager 范式；
+    // 入口常驻=Dock 顶部钮 + 浮条 ✧ 菜单，不依赖 due>0——✧ 徽章条件渲染教训）
+    private reviewPlanDm: DestroyManager | null = null;
+
+    openReviewPlanDialog() {
+        const dm = new DestroyManager();
+        this.reviewPlanDm?.destroyBy();
+        this.reviewPlanDm = dm;
+        const id = newID();
+        const dialog = new Dialog({
+            title: tomatoI18n.复习计划,
+            content: `<div id="${id}"></div>`,
+            width: events.isMobile ? "92vw" : "min(760px, 92vw)",
+            height: events.isMobile ? "120svw" : "640px",
+            destroyCallback: () => dm.destroyBy("1"),
+        });
+        const app = mount(ReviewPlanDialog, {
+            target: dialog.element.querySelector("#" + id),
+            props: { plugin: this },
+        });
+        dm.add("1", () => { dialog.destroy() });
+        dm.add("2", () => { unmount(app); });
     }
 
     onload() {

@@ -87,6 +87,9 @@ type TomatoSettings = {
     blockIconMenu: boolean,
     ProgressiveStart2learn: boolean,
     digestmenu: boolean,
+    wholeDigestMenu: boolean,
+    reviewSchedMenu: boolean,
+    revisitRhythmMenu: boolean,
     toolbarlocatedoc: boolean,
     toolbarrefreshVr: boolean,
     toolbarspacerepeat: boolean,
@@ -138,6 +141,7 @@ type TomatoSettings = {
     graphMaxPBlocks: string,
     // graphbox 期2：默认展开层级（按标题层级 h1=1；"all"=全部展开，段落链折叠独立于档位）
     graphDefaultExpandLevel: string,
+    graphDefaultLayout: string,
     graphBoxCheckbox: string,
     userToken: string,
     userID: string,
@@ -406,6 +410,7 @@ type AttrType = {
     "custom-bkMenDocCount"?: string,
     "custom-bkRefDocCount"?: string,
     "custom-graph-isVertical"?: string,
+    "custom-graph-layout"?: string,
     "custom-graph-node-positions"?: string,
     "custom-graph-collapsed"?: string,
     "custom-super-list"?: string,
@@ -513,10 +518,17 @@ interface GraphDockData<T> {
     fitView?: (opts?: { padding?: number; duration?: number }) => void;
     /** graphbox 期2：展开目标节点的折叠祖先链（定位不静默）；返回是否有折叠变更 */
     expandTo?: (id: string) => Promise<boolean>;
-    /** graphbox 期4：图当前通道态/文档/块上限（locateNode 的 toast 分支文案依据） */
-    getGraphState?: () => { mode: "full" | "skeleton"; docID: string; maxBlocks: number };
-    /** graphbox 期3：当前布局方向（横 LR=false 纵 TB=true）——zoom 过小提示切纵向的判定依据 */
+    /** graphbox 期4：图当前通道态/文档/块上限（locateNode 的 toast 分支文案依据）；
+     *  二期 □2 增 blockCount（precheck 真实块数，「超上限」文案只留给 cnt > maxBlocks 的真超限） */
+    getGraphState?: () => { mode: "full" | "skeleton"; docID: string; maxBlocks: number; blockCount?: number };
+    /** graphbox 二期 □2：图内全块 id 集（locateNode 定位兜底上爬祖先的「图内」判定） */
+    graphIDsOf?: () => Set<string>;
+    /** graphbox 期3：当前布局方向（横 LR=false 纵 TB=true）——zoom 过小提示切纵向的判定依据（期7 起随 isVertical 退役，改 layoutForm） */
     isVertical?: boolean;
+    /** graphbox 期7：当前布局形态四态（lr/tb/vlr/vtb）——fitView toast 已竖排态不提示的判定依据 */
+    layoutForm?: string;
+    /** graphbox 期7：¶ 链中段定位重定向（目标块并进 ¶ 大节点 → 图上节点=链头） */
+    paraRedirectOf?: (id: string) => string;
     /** graphbox 期3：xyflow 内部 store 借道（官方更新通道；bind store 在 runes 组件不可靠） */
     graphStore?: { nodes: any; edges: any };
 }

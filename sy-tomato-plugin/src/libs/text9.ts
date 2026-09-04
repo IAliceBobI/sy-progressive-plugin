@@ -792,25 +792,7 @@ export abstract class TomatoI18nABC9 extends TomatoI18nABC10 {
                 return "Insert references mutually below - Create";
         }
     }
-    public get 切换横向与纵向() {
-        switch (this.lang) {
-            case "zh_CN":
-                return "切换横向与纵向";
-            case "es_ES":
-                return "Cambiar entre horizontal y vertical";
-            case "fr_FR":
-                return "Basculer entre horizontal et vertical";
-            case "ja_JP":
-                return "横向と縦向を切り替える";
-            case "zh_CHT":
-                return "切換橫向與縱向";
-            case "it_IT":
-                return "Cambia tra orizzontale e verticale";
-
-            default:
-                return "Switch between horizontal and vertical";
-        }
-    }
+    // 「切换横向与纵向」随期7 四态形态循环钮退役删除（新文案=切换布局形态，tomatoI18n）
     public get 删除所选段落() {
         switch (this.lang) {
             case "zh_CN":

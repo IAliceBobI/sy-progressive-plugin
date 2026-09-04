@@ -452,12 +452,15 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
 }
 .protyle-wysiwyg div:has(> .prog-digest-mark) {
   position: relative;
+  // 可见性期1 □1 A：常显徽章 13px 后 absolute span 会压块首字，让位一栏
+  // （竖条 3 + 隙 2 + 羽毛笔 13 + 余量 4）；纯 CSS 表现层不落盘
+  padding-left: 22px;
 }
 .prog-digest-mark {
   position: absolute;
   left: 2px;
   top: 12px;
-  width: 15px;
+  width: 18px; // 热区随徽章加宽（竖条 3px + 间隙 + 羽毛笔 13px），点击不再只认竖条
   height: 16px;
   cursor: pointer;
   color: var(--prog-accent);
@@ -474,26 +477,32 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   transition: width 0.12s ease-out, background-color 0.12s ease-out;
 }
 .prog-digest-mark::after {
-  // U+2197 须带 U+FE0E 文本变体选择符：裸 ↗ 在 macOS 被 Apple Color Emoji 接管，
-  // color 对 emoji 字形无效、渲染成彩色方块（vision 复审 P1-3，2026-08-30）
-  content: "↗︎";
+  // 可见性期1（2026-09-04 □1 A）：徽章常显——iconProgQuill 羽毛笔 13px mask（静态试板
+  // 三候选定案：箭头 ↗︎ 常态 0.55 太淡且与浮条 origin「跳转」语义混淆，退役；旧字符
+  // 箭头须 U+FE0E 防 emoji 接管的坑随 mask 方案消解——mask 走 alpha 通道，色随
+  // --prog-accent 变量）。0.55 常态不抢正文，hover 强化加亮+微放大。
+  content: "";
   position: absolute;
-  left: 4px;
+  left: 5px;
   top: 50%;
-  transform: translateY(-50%) scale(0.7);
-  opacity: 0;
-  font-size: 10px;
-  line-height: 1;
+  width: 13px;
+  height: 13px;
+  transform: translateY(-50%);
+  background-color: var(--prog-accent);
+  opacity: 0.55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E") no-repeat center / contain;
   pointer-events: none;
-  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out, background-color 0.12s ease-out;
 }
 .prog-digest-mark:hover::before {
   width: 4px;
   background: var(--prog-accent-strong);
 }
 .prog-digest-mark:hover::after {
-  opacity: 0.9;
-  transform: translateY(-50%) scale(1);
+  opacity: 1;
+  background-color: var(--prog-accent-strong);
+  transform: translateY(-50%) scale(1.12);
 }
 
 // ============================================================
@@ -585,6 +594,25 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   font-weight: 600;
   color: var(--prog-sub);
   flex: 1;
+}
+/* 可见性期3 □3：复习计划常驻钮（同 recite 钮形态，色随子色） */
+.prog-fleet-plan {
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  color: var(--prog-accent);
+  transition: opacity 0.12s ease-out, background-color 0.12s ease-out;
+}
+.prog-fleet-plan:hover {
+  background: var(--prog-accent-soft);
+}
+.prog-fleet-plan svg {
+  width: 16px;
+  height: 16px;
 }
 .prog-fleet-recite {
   display: flex;
