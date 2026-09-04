@@ -57,6 +57,14 @@
                 {#if p.debt.debt > 0}
                     <span class="debt-pill" data-state={state}>{tomatoI18n.欠N片(p.debt.debt)}</span>
                 {/if}
+                {#if p.dueTotal > 0}
+                    <!-- 期2 全局 ✧ 待办胶囊：think+pdigest 双源（含 free 源）——点击开全局清单 -->
+                    <button
+                        class="due-pill"
+                        aria-label={tomatoI18n.重访到期待办}
+                        onclick={(e) => actions.openDueList(e)}
+                    >✧ {p.dueTotal}</button>
+                {/if}
             </div>
             <div class="prog-fleet-dots">
                 {#each Array(quota) as _, i}
@@ -129,6 +137,7 @@
                         <button
                             class="prog-fleet-card"
                             class:finished={book.finished}
+                            class:manual={book.manual}
                             onclick={() => actions.continueReading(book.bookID)}
                         >
                             <div class="row">
@@ -136,6 +145,8 @@
                                 <span class="num"
                                     >{book.finished
                                         ? tomatoI18n.已读完
+                                        : book.manual
+                                        ? `✎ ${tomatoI18n.手动分片}`
                                         : book.total > 0
                                         ? `${book.point}/${book.total}`
                                         : tomatoI18n.未分片}</span

@@ -3,7 +3,7 @@ import * as constants from "./constants";
 import { Plugin } from "siyuan";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalNoteBox, getDocIalReadLog, getDocIalWords } from "./progData";
+import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalDigestHub, getDocIalFreeDigestDir, getDocIalNoteBox, getDocIalReadLog, getDocIalWords } from "./progData";
 import { MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import type { ReadingOrder } from "./roller";
 import { osFs } from "../../sy-tomato-plugin/src/libs/globals";
@@ -133,6 +133,7 @@ export class ProgressiveStorage {
             autoSplitSentenceI: false,
             autoSplitSentenceT: false,
             addIndex2paragraph: false,
+            manualMode: false,
         }
     }
 
@@ -184,6 +185,7 @@ export class ProgressiveStorage {
 
         const info = await this.booksInfo(docID);
         if (typeof opt.addIndex2paragraph === "boolean") info.addIndex2paragraph = opt.addIndex2paragraph;
+        if (typeof opt.manualMode === "boolean") info.manualMode = opt.manualMode;
         if (typeof opt.ignored === "boolean") info.ignored = opt.ignored;
         if (typeof opt.showLastBlock === "boolean") info.showLastBlock = opt.showLastBlock;
         if (typeof opt.autoSplitSentenceP === "boolean") info.autoSplitSentenceP = opt.autoSplitSentenceP;
@@ -272,24 +274,46 @@ export class ProgressiveStorage {
         });
     }
 
-    /** prog-data 根下建子文档夹（实时取根的 box+hpath 做落点，ID 锚定与位置无关） */
-    private async createChildUnderRoot(name: string, ialValue: string): Promise<string> {
-        const rootID = await this.ensureProgDataRoot();
-        if (!rootID) return "";
-        // 首次建根后立即取 box：SQL 索引未进会查空导致整链静默失败，走 getBlockInfo 文件树直查
-        const info = await siyuan.getBlockInfo(rootID);
+    /** 任意父文档下建子文档夹（实时取父的 box+hpath 做落点，ID 锚定与位置无关） */
+    private async createChildUnder(parentID: string, name: string, ialValue: string): Promise<string> {
+        // 首次建父后立即取 box：SQL 索引未进会查空导致整链静默失败，走 getBlockInfo 文件树直查
+        const info = await siyuan.getBlockInfo(parentID);
         if (!info?.box) return "";
-        const hpath = await siyuan.getHPathByID(rootID, info.box);
+        const hpath = await siyuan.getHPathByID(parentID, info.box);
         if (!hpath) return "";
         return siyuan.createDocWithMd(info.box, `${hpath}/${name}`, "", "", { [MarkKey]: ialValue });
     }
 
-    /** digest-书名 夹：书名只是初始皮，之后认 IAL（书改名不追改夹名） */
-    async ensureDigestDir(bookID: string): Promise<string> {
+    /** prog-data 根下建子文档夹 */
+    private async createChildUnderRoot(name: string, ialValue: string): Promise<string> {
+        const rootID = await this.ensureProgDataRoot();
+        if (!rootID) return "";
+        return this.createChildUnder(rootID, name, ialValue);
+    }
+
+    /** digest-书名 夹：书名只是初始皮，之后认 IAL（书改名不追改夹名）。
+     *  underBook（源文档下方档）= 新建时挂源书下（老版行为回归）；默认集中档=挂摘抄总夹下。
+     *  已存在的夹按 IAL 原位认回（位置无关），档位只决定「新建」落点 */
+    async ensureDigestDir(bookID: string, underBook = false): Promise<string> {
         return ensureAnchoredDoc(getDocIalDigestDir(bookID), {
             findByIal: () => findDocByIal(getDocIalDigestDir(bookID)),
             checkBlockExist: (_id) => Promise.resolve(false),
-            create: async () => this.createChildUnderRoot(`digest-${await this.bookName(bookID)}`, getDocIalDigestDir(bookID)),
+            create: async () => {
+                const name = `digest-${await this.bookName(bookID)}`;
+                return underBook
+                    ? this.createChildUnder(bookID, name, getDocIalDigestDir(bookID))
+                    : this.createChildUnder(await this.ensureDigestHub(), name, getDocIalDigestDir(bookID));
+            },
+            onResolved: async () => { },
+        });
+    }
+
+    /** 摘抄总夹（期1 □2）：prog-data 根下名「摘抄」，集中归档档所有 digest-书名 夹的父 */
+    async ensureDigestHub(): Promise<string> {
+        return ensureAnchoredDoc(getDocIalDigestHub(), {
+            findByIal: () => findDocByIal(getDocIalDigestHub()),
+            checkBlockExist: (_id) => Promise.resolve(false),
+            create: () => this.createChildUnderRoot("摘抄", getDocIalDigestHub()),
             onResolved: async () => { },
         });
     }
@@ -315,6 +339,16 @@ export class ProgressiveStorage {
             findByIal: () => findDocByIal(getDocIalNoteBox()),
             checkBlockExist: (_id) => Promise.resolve(false),
             create: () => this.createChildUnderRoot("札记匣", getDocIalNoteBox()),
+            onResolved: async () => { },
+        });
+    }
+
+    /** 源文档下方档的非书摘抄夹：digest-源文档名 挂源文档下（按源文档 IAL 锚定，位置无关） */
+    async ensureFreeDigestDir(sourceDocID: string): Promise<string> {
+        return ensureAnchoredDoc(getDocIalFreeDigestDir(sourceDocID), {
+            findByIal: () => findDocByIal(getDocIalFreeDigestDir(sourceDocID)),
+            checkBlockExist: (_id) => Promise.resolve(false),
+            create: async () => this.createChildUnder(sourceDocID, `digest-${await this.bookName(sourceDocID)}`, getDocIalFreeDigestDir(sourceDocID)),
             onResolved: async () => { },
         });
     }
@@ -378,6 +412,15 @@ export class ProgressiveStorage {
                 lastServed: ro.lastServed === bookID ? "" : ro.lastServed,
             });
         }
+        return this.plugin.removeData(bookID);
+    }
+
+    /** 期3 手动分片书：索引恒空。自动书转手动时清旧索引（petal 文件+内存缓存）；
+     *  全新书 removeData 落空无害——loadBookIndexIfNeeded 对无文件恒返回 []，
+     *  isFinished(point,0) 恒真=滚筒/火苗自动不推（零改动语义锚） */
+    async clearBookIndex(bookID: string) {
+        delete this.plugin.data[bookCacheKey(bookID)];
+        delete this.booksInfos()[bookCacheKey(bookID)]; // 历史污染键顺手清（removeIndex 同款）
         return this.plugin.removeData(bookID);
     }
 

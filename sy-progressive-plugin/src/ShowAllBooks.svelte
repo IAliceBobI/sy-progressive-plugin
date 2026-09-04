@@ -15,7 +15,7 @@
     import { createAllPieces } from "./helper";
     import { objOverrideNull } from "stonev5-utils";
     import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
-    import { notifyFleetChanged } from "./fleet";
+    import { notifyFleetChanged } from "./fleetNotify";
 
     interface Props {
         dm: DestroyManager;
@@ -270,6 +270,8 @@
                             <span class="num"
                                 >{totalOf(b) > 0
                                     ? `${b.bookInfo.point ?? 0}/${totalOf(b)} ${tomatoI18n.分片}`
+                                    : b.bookInfo.manualMode
+                                    ? `✎ ${tomatoI18n.手动分片}`
                                     : tomatoI18n.未分片}</span
                             >
                         </div>
@@ -291,7 +293,7 @@
                         <div class="row actions">
                             <button
                                 class="btn primary"
-                                disabled={totalOf(b) === 0}
+                                disabled={totalOf(b) === 0 && !b.bookInfo.manualMode}
                                 aria-label={`${tomatoI18n.阅读}《${b.name}》`}
                                 onclick={() => btnStartToLearn(b.bookID)}
                             >{tomatoI18n.阅读}</button
@@ -321,7 +323,9 @@
                         </div>
                         {#if totalOf(b) === 0}
                             <div class="status-line warn">
-                                {tomatoI18n.未分片请先分片后再阅读}
+                                {b.bookInfo.manualMode
+                                    ? tomatoI18n.手动书说明
+                                    : tomatoI18n.未分片请先分片后再阅读}
                             </div>
                         {/if}
                         <button
@@ -334,6 +338,10 @@
                         >
                         {#if expanded[b.bookID]}
                             <div class="dig">
+                                {#if b.bookInfo.manualMode}
+                                    <!-- 期3 手动分片书：无分片设置可用（空索引+无断句/建片语义），说明行替代 -->
+                                    <div class="dig-row">{tomatoI18n.手动书设置说明}</div>
+                                {:else}
                                 <label class="dig-row">
                                     <input
                                         type="checkbox"
@@ -421,6 +429,7 @@
                                     >🧩 {tomatoI18n.立刻创建所有的分片}</button
                                     >
                                 </div>
+                                {/if}
                             </div>
                         {/if}
                     </article>

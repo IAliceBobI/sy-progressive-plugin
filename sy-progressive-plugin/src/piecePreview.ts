@@ -32,10 +32,10 @@ export function countHeadingLevels(blocks: ReadonlyArray<WordCountType>): Headin
 }
 
 // ---- b 通道缓存（弹窗生命周期 SQL 一次） ----
-/** 查询与 Split2Pieces.HeadingGroup.init 内部 SQL 逐字一致（含 limit 10000），两处必须
+/** 查询与 Split2Pieces.HeadingGroup.init 内部 SQL 逐字一致（含 limit 10000000），两处必须
     同步维护（方案 §10 预留：让 init 复用本函数）。失败抛错，调用方兜底空集。 */
 export async function loadBoldIds(bookID: string): Promise<Set<string>> {
-    const blocks = await siyuan.sql(`select id from blocks where root_id='${bookID}' and markdown like "**%**" limit 10000`);
+    const blocks = await siyuan.sql(`select id from blocks where root_id='${bookID}' and markdown like "**%**" limit 10000000`);
     return new Set(blocks.map(b => b.id));
 }
 

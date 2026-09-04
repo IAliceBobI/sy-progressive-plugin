@@ -6,12 +6,13 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { invalidateDigestMarker, markDigests } from "./digestMarker";
 import { splitLines } from "./SplitSentence";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { digest2dailycard, digestAddReadingpoint, digestGlobalSigle, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { digestLanding, digestAddReadingpoint, digestGlobalSigle, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { getDailyPath } from "./FlashBox";
 import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
 import { progStorage } from "./ProgressiveStorage";
-import { ReviewKey, markQuestion } from "./reviewQueue";
+import { ReviewKey, PdigestReviewKey, markQuestion, nextIntervalDays } from "./reviewQueue";
+import { notifyFleetChanged } from "./fleetNotify";
 import { PIECE_IDX_KEY, buildPieceIdx, piecePointFromMark, resolveDigestOrigin, validDigestMd } from "./originTrace";
 import { bookCommentsFromRows, type BookCommentItem, type BookCommentRow } from "./digestComments";
 
@@ -107,8 +108,16 @@ export class DigestBuilder {
         await siyuan.setBlockAttrs(this.bookID, newAttrs);
     }
 
+    /** 期1 □2 非日记档落点解析：书→digest 夹（源下档新建挂书下/集中档挂总夹下，已有夹 IAL 原位认回）；
+     *  非书→源下档挂源文档下 digest-源文档名 夹/集中档进札记匣 */
+    private async landingDirID(): Promise<string> {
+        const source = digestLanding.get() === "source";
+        if (this.inBook) return progStorage.ensureDigestDir(this.bookID, source);
+        return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureNoteBox();
+    }
+
     private async setDigestCard(digestID: string) {
-        if (digest2dailycard.get()) {
+        if (digestLanding.get() === "daily") {
             addCardSetDueTime(digestID)
         } else {
             if (this.cardMode == "0") {
@@ -116,7 +125,7 @@ export class DigestBuilder {
             } else if (this.cardMode == "1") {
                 // v5：digest 夹位置无关（IAL 锚定），子树旧卡直接按夹 ID 取；
                 // 非书文本没有书夹，按札记匣子树清卡
-                const dirID = this.inBook ? await progStorage.ensureDigestDir(this.bookID) : await progStorage.ensureNoteBox();
+                const dirID = await this.landingDirID();
                 if (dirID) {
                     const cards = await siyuan.getTreeRiffCardsAll(dirID);
                     await siyuan.removeRiffCards(cards.map(card => card.id));
@@ -138,14 +147,14 @@ export class DigestBuilder {
         attr["custom-card-priority"] = this.attrs["custom-card-priority"] ?? "60";
         attr["custom-off-tomatobacklink"] = "1";
         attr["custom-progmark"] = `${TEMP_CONTENT}#${this.bookID},${ct}`;
-        // v5 落点：书摘抄进 prog-data/digest-书名/，非书文本进札记匣（夹均按 IAL 锚定，位置无关；
-        // 日记模式 digest2dailycard 保持用户自选落点不变）
+        // 期1 □2 落点三档：daily=当天日记（原 digest2dailycard）；source=书下/源文档下（老版回归）；
+        // central=书→摘抄总夹/digest-书名，非书→札记匣（夹均按 IAL 锚定，位置无关）
         let boxID = this.boxID;
         let dirPath: string;
-        if (digest2dailycard.get()) {
+        if (digestLanding.get() === "daily") {
             dirPath = getDailyPath().split("/").slice(0, -1).join("/");
         } else {
-            const dirID = this.inBook ? await progStorage.ensureDigestDir(this.bookID) : await progStorage.ensureNoteBox();
+            const dirID = await this.landingDirID();
             if (!dirID) return "";
             // digest 夹可能刚建（首次摘抄），SQL 索引未进查空 box，走 getBlockInfo 文件树直查
             const info = await siyuan.getBlockInfo(dirID);
@@ -171,7 +180,16 @@ export class DigestBuilder {
         await siyuan.setBlockAttrs(first.id, { [ReviewKey]: markQuestion(Date.now()) } as AttrType);
     }
 
-    async digest(split = false, question = false) {
+    /** 期2 复访档：摘抄文档 IAL 打 pdigest-review（文档级滚动复习永不 done，见 reviewQueue.ts）。
+     *  toast 顺带报首访间隔；notifyFleetChanged 即时刷 ✧ 徽章/火苗。 */
+    private async markReviewOn(digestID: string) {
+        if (!digestID) return;
+        await siyuan.setBlockAttrs(digestID, { [PdigestReviewKey]: markQuestion(Date.now()) } as AttrType);
+        await siyuan.pushMsg(tomatoI18n.已加入复访N天后回来(nextIntervalDays(0)));
+        notifyFleetChanged();
+    }
+
+    async digest(split = false, question = false, review = false) {
         const { idx, md } = await getDigestMd(this.settings, this.selected, split, true, false);
         // 过滤空内容：移除空字符串、纯空白字符或仅包含属性行的条目（□16 抽出与整摘共用）
         const validMd = validDigestMd(md);
@@ -181,6 +199,7 @@ export class DigestBuilder {
         }
         const digestID = await this.newDigestDoc(idx, validMd.join("\n"), question);
         if (question) await this.markQuestionOn(digestID);
+        if (review) await this.markReviewOn(digestID);
         // □12：摘抄后立即重打当前文档痕迹（竖条+背景渲染态）；缓存刚被 invalidate 失效，
         // 不必 force。不 await——otab.open 可能替换页签，fire-and-forget 持引用打标无害
         markDigests(this.protyle, this.bookID).catch(() => { });
@@ -255,8 +274,10 @@ function doneCtime(v: string): string | null {
  * 算完整不可达集（环+环上挂块）再统一提升进 roots——逐个提升会与已提升父重复挂载。
  */
 export async function queryDigestTree(bookID: string): Promise<DigestTreeData> {
+    // 外层显式 limit 防内核 64 截尾：内核只看最外层 SELECT 有无 LIMIT（block_query.go
+    // getLimitClause），子查询自带的 limit 1000000 挡不住——摘抄 >64 篇的书整树丢节点
     const rows = await siyuan.sql(`select ial,content,id from blocks where id = "${bookID}" or id in
-        (select block_id from attributes where name="${PDIGEST_CTIME}" and (value like "${bookID}#%" or value like "🔨#${bookID}#%") limit 1000000)`);
+        (select block_id from attributes where name="${PDIGEST_CTIME}" and (value like "${bookID}#%" or value like "🔨#${bookID}#%") limit 1000000) limit 10000000`);
     let bookName = "";
     const nodes: DigestTreeNode[] = [];
     const parentOf = new Map<string, string>();

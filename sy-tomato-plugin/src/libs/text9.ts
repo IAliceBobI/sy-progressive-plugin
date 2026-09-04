@@ -849,25 +849,6 @@ export abstract class TomatoI18nABC9 extends TomatoI18nABC10 {
                 return "Adding reading point";
         }
     }
-    public get 左键点击节点跳转到文档() {
-        switch (this.lang) {
-            case "zh_CN":
-                return "左键点击节点跳转到文档";
-            case "es_ES":
-                return "Haz clic con el botón izquierdo en el nodo para ir al documento";
-            case "fr_FR":
-                return "Cliquez avec le bouton gauche sur le nœud pour accéder au document";
-            case "ja_JP":
-                return "ノードを左クリックしてドキュメントに移動";
-            case "zh_CHT":
-                return "左鍵點擊節點跳轉到文件";
-            case "it_IT":
-                return "Fai clic sinistro sul nodo per accedere al documento";
-
-            default:
-                return "Left-click the node to navigate to the document";
-        }
-    }
     public get 极简无序列表样式() {
         switch (this.lang) {
             case "zh_CN":

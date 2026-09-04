@@ -14,7 +14,7 @@ import AddBookSvelte from "./AddBook.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
-import { notifyFleetChanged } from "./fleet";
+import { notifyFleetChanged } from "./fleetNotify";
 import { HtmlCBType } from "./constants";
 import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
@@ -394,6 +394,12 @@ class Progressive {
             const idx = await progStorage.loadBookIndexIfNeeded(bookID);
             if (idx?.length <= 0) {
                 // not a book
+                // 期3 手动分片书：注册书+空索引，原提示「请先将此文档加入渐进学习列表」
+                // 不对症——放行为手动语义提示（片由摘抄产生，⇧⌥W/块菜单/浮条 📄 三通道共用）
+                if (progStorage.isRegisteredBook(bookID) && progStorage.peekBookInfo(bookID)?.manualMode) {
+                    await siyuan.pushMsg(tomatoI18n.手动分片书请直接摘抄);
+                    return;
+                }
                 for (const div of document.querySelectorAll(`div[${DATA_NODE_ID}="${blockID}"]`)) {
                     const refID = utils.getAttribute(div as any, RefIDKey)
                     if (refID) {
@@ -509,6 +515,10 @@ class Progressive {
             const blocked = [...statuses.values()].find(s => s.status !== "ok");
             if (blocked) {
                 await this.handleUnreadableBook("", blocked);
+            } else if (Object.values(progStorage.booksInfos()).some(i => i?.manualMode && !i.ignored && !i.archived)) {
+                // 期3 手动分片书：书架可读书只剩手动书（空索引恒 finished 被滚筒排除），
+                // 给手动书对症指引，不再误报「您还没添加任何文档」
+                await siyuan.pushMsg(tomatoI18n.手动书不参与推送请点击书卡打开);
             } else {
                 siyuan.pushMsg(tomatoI18n.您还没添加任何文档);
             }
@@ -524,6 +534,13 @@ class Progressive {
             return;
         }
         const bookInfo = await progStorage.booksInfo(bookID);
+        // 期3 手动分片书：无自动片，统一拦截（Dock 书卡/管理页/浮条 ▶ 全入口）——开原书
+        //  +「摘抄即片」提示。无参滚筒路径不会选中手动书（空索引恒 finished），无需再判
+        if (bookInfo.manualMode) {
+            await siyuan.pushMsg(tomatoI18n.手动分片书请直接摘抄);
+            await this.openOriginBook(bookID);
+            return;
+        }
         const bookIndex = await progStorage.loadBookIndexIfNeeded(bookInfo.bookID);
         let point = (await progStorage.booksInfo(bookInfo.bookID)).point;
         if (isRand) point = utils.getRandInt0tox(bookIndex.length); // 随机创建书籍的某个分片，适用于单词集合。

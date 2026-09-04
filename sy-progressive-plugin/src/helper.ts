@@ -1,4 +1,5 @@
 import { BlockNodeEnum, CONTENT_EDITABLE, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey, PARAGRAPH_INDEX, PROG_ORIGIN_TEXT, PROG_PIECE_PREVIOUS, RefIDKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
+import { pieceFilterSQL } from "./originTrace";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
@@ -122,7 +123,7 @@ export async function cleanNote(noteID: string) {
             ial like '%${PROG_PIECE_PREVIOUS}%' 
             or ial like '%${PROG_ORIGIN_TEXT}%' 
             or (markdown='' and content='')
-        ) limit 10000`)) {
+        ) limit 10000000`)) {
         const ial: string = row?.ial ?? "";
         const markdown: string = row?.markdown ?? "";
         if (ial.includes(TEMP_CONTENT) || ial.includes(PROG_PIECE_PREVIOUS)) {
@@ -140,17 +141,21 @@ export async function findPieceDoc(bookID: string, point: number) {
     return doFindDoc(bookID, getDocIalPieces, point);
 }
 
+/** 片文档过滤 SQL：originTrace 纯函数实现（digest 误删防线，TDD 见 tests/unit/pieceCleanupSQL.test.ts） */
+export { pieceFilterSQL } from "./originTrace";
+
 /** 重划分前删除本书全部旧片（2026-08-31 用户实测报回的根因）：旧片 IAL 标记与新方案
  *  同名（TEMP#bookID,point），findPieceDoc/createPiece 命中即复用旧边界内容的片——
  *  书→片副本 miss（轮询 10 轮报「请选择段落块」）、片→原文按旧边界错位。分片=一次性
  *  餐具（读完即删同语义），重划分=按新设置整批重建，旧片删进 history 可恢复。删除走
- *  like 前缀 custom-progmark="TEMP#bookID,——keysDoc（keysDoc#…前缀）/cards/words 等
+ *  pieceFilterSQL（mark 前缀+ctime 排除）——keysDoc（keysDoc#…前缀）/cards/words 等
  *  辅助文档不同前缀不会误伤；单片失败不阻断（残留片回 bug 态，重走重划分可自愈）。
  *  已知边界：片 IAL 是 createDocWithMd→setBlockAttrs 两步后补，巨书上入索引可滞后
  *  24s+——加书后极短窗内重划分会漏删刚建的片（此时片内容与新索引同源，实害有限）。 */
 export async function deleteAllPieces(bookID: string) {
+    // 显式 limit 防内核 64 截尾：片 >64 篇的书重分片会漏删尾部片（片残留=幽灵分片）
     const rows = await siyuan.sql(
-        `select id from blocks where type='d' and ial like '%${MarkKey}="${TEMP_CONTENT}#${bookID},%'`);
+        `select id from blocks where ${pieceFilterSQL(bookID)} limit 10000000`);
     const ids = (rows ?? []).map(r => r?.id).filter(Boolean);
     for (const id of ids) {
         try {
@@ -162,11 +167,11 @@ export async function deleteAllPieces(bookID: string) {
     return ids.length;
 }
 
-/** 本书是否存在片文档（同款 LIKE 前缀）：删记录（removeIndex）后重加书路径的知情
+/** 本书是否存在片文档（同款过滤）：删记录（removeIndex）后重加书路径的知情
  *  警告用——此时书未注册但旧片还在，process() 会照删，须先警告（review P1-1）。 */
 export async function hasPieces(bookID: string) {
     const row = await siyuan.sqlOne(
-        `select count(*) as n from blocks where type='d' and ial like '%${MarkKey}="${TEMP_CONTENT}#${bookID},%'`);
+        `select count(*) as n from blocks where ${pieceFilterSQL(bookID)}`);
     return Number((row as any)?.n ?? 0) > 0;
 }
 

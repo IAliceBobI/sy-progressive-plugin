@@ -63,7 +63,7 @@ export class HeadingGroup {
             arrayRemove(this.headings, "b");
             this.headings.push("7");
 
-            const blocks = await siyuan.sql(`select id from blocks where root_id='${this.bookID}' and markdown like "**%**" limit 10000`);
+            const blocks = await siyuan.sql(`select id from blocks where root_id='${this.bookID}' and markdown like "**%**" limit 10000000`);
             const s = new Set(blocks.map(b => b.id));
             this.wordCount.forEach(e => {
                 if (s.has(e.id)) {

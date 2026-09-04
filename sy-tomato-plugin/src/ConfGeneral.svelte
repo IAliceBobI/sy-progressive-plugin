@@ -11,7 +11,7 @@
     import { addFoldCmd折叠, addFoldCmd展开 } from "./fold";
     import { SPACE } from "./libs/gconst";
     import { onDestroy } from "svelte";
-    import { MENU_MANAGE_GROUPS, type ManagedMenuItem } from "./libs/menuItemRegistry";
+    import { MENU_MANAGE_GROUPS, EXPORT_CARD_MENU_ITEMS, type ManagedMenuItem } from "./libs/menuItemRegistry";
     import { menuKeyHidden, menuHiddenKeys } from "./libs/menuManager";
     import {
         exportBlackList,
@@ -227,6 +227,24 @@
                     {/each}
                 </div>
             {/if}
+
+            <!-- 白/黑名单右键菜单入口（2026-09-03 归位：自右键菜单管理卡迁入，语义严格属于导出
+                 工作空间且运行时注册本就受本卡总开关门控，开关行随 {#if} 卡体隐藏两边一致）。
+                 文档树右键命令的显隐开关，行式沿杂项卡「添加右键菜单:」前缀防读成名单过滤功能开关；
+                 无独立 store 走 hiddenMenuItems 隐藏集，{#key} 同管理卡防 toggle 后 checkbox 不刷新 -->
+            {#key menuManageTick}
+                {#each EXPORT_CARD_MENU_ITEMS as item (item.key)}
+                    <div>
+                        <input
+                            type="checkbox"
+                            class="b3-switch"
+                            checked={menuItemSelected(item)}
+                            onchange={(ev) => toggleMenuItem(item, ev)}
+                        />
+                        {tomatoI18n.menu添加右键菜单}: {item.label()}
+                    </div>
+                {/each}
+            {/key}
 
             <!-- ② 导出目录（placeholder 修正：Windows 显示 Windows 风格示例、其他平台显示 POSIX 风格示例；
                  旧代码两分支互换且 Windows 误挂 $exportPath，见 spec §3.2 行为修正） -->

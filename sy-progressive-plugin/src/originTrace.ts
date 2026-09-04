@@ -5,10 +5,18 @@
 // 删了可按大索引重切同样的片，2026-08-29 浮条 UX 重设计 □9 解锁退役「片=只读原料」）；
 // digest=衍生物持久层；书=静态源永远在（ctime 含 bookID）。
 
-import { TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
+import { MarkKey, PDIGEST_CTIME, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
 
 /** digest 文档 IAL：片序号键（parent-id 锚片 ID 删后悬空，序号才可再生） */
 export const PIECE_IDX_KEY = "custom-pdigest-piece-idx";
+
+/** 片文档过滤 SQL 片段（deleteAllPieces/hasPieces 共用，TDD 见 tests/unit/pieceCleanupSQL.test.ts）。
+ *  digest 摘抄文档的 mark 与片同构（TEMP#bookID,时间戳 vs TEMP#bookID,point，SQL LIKE 区分不了
+ *  数字段语义），2026-09-04 期3 e2e 实锤重分片把它当片误删——靠 ctime 属性存在性一刀切：
+ *  digest 摘抄文档必有 custom-pdigest-ctime（digestUtils 建档同笔写入），片必无。 */
+export function pieceFilterSQL(bookID: string) {
+    return `type='d' and ial like '%${MarkKey}="${TEMP_CONTENT}#${bookID},%' and ial not like '%${PDIGEST_CTIME}="%'`;
+}
 
 export function buildPieceIdx(bookID: string, point: number): string {
     return `${bookID}#${point}`;

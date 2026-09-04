@@ -15,6 +15,7 @@
         bookID,
         blockID,
         point,
+        freeDoc = false,
         onJumpDoc,
         onJumpPiece,
         onShowAll,
@@ -25,6 +26,9 @@
         /** □29 片态直供分片真值（浮条出场时从 mark 解析的 $point）——有值时优先，
          *  免扫索引也免「选中笔记块/嵌套块反查落空」误报（reasoning P1-1） */
         point?: number;
+        /** free 态复用（群反馈 650189）：普通文档无书，清单文案「本书摘抄」→「关联摘抄」；
+         *  bookID 由浮条层传 $noteID（free 摘抄 ctime 自指 docID，queryDigestTree 直查） */
+        freeDoc?: boolean;
         onJumpDoc: (id: string) => void;
         onJumpPiece: (point: number) => void;
         /** □29 清单超 PREVIEW_N 条时的升级入口（开大 Dialog） */
@@ -36,6 +40,8 @@
     let piecePoint = $state<number | null>(null);
     let preview = $derived(flat.slice(0, PREVIEW_N));
     const showLocator = $derived(point != null || !!blockID);
+    const listLabel = $derived(freeDoc ? tomatoI18n.本文档的关联摘抄 : tomatoI18n.本书摘抄清单);
+    const emptyHint = $derived(freeDoc ? tomatoI18n.本文档还没有摘抄 : tomatoI18n.本书还没有摘抄);
 
     onMount(async () => {
         try {
@@ -83,7 +89,7 @@
         {/if}
     {/if}
 
-    <div class="prog-popover-group">{tomatoI18n.本书摘抄清单}</div>
+    <div class="prog-popover-group">{listLabel}</div>
     {#if flat.length > 0}
         <div class="prog-popover-list">
             {#each preview as n (n.id)}
@@ -100,6 +106,6 @@
             </div>
         {/if}
     {:else}
-        <div class="prog-popover-hint">{tomatoI18n.本书还没有摘抄}</div>
+        <div class="prog-popover-hint">{emptyHint}</div>
     {/if}
 {/if}

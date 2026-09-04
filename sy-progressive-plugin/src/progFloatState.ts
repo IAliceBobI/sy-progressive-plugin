@@ -56,6 +56,16 @@ export function expandAtAppear(pref: boolean | null, kind: FloatDocKind): boolea
     return pref ?? kind === "piece";
 }
 
+/**
+ * 附属卡到期刷新守卫：digest 态出场载荷 bookID 可能是非书摘抄的源文档 ID（札记匣/
+ * 源下夹摘抄），其「digest-源名」夹子树永远无卡——ensure 只会建 100% 空夹污染总夹
+ * （期1 □2 Task 6 dev e2e 实锤）。到期数只对注册书刷新。
+ */
+export function shouldRefreshDue(bookID: string, isRegisteredBook: (id: string) => boolean): boolean {
+    if (!bookID) return false;
+    return isRegisteredBook(bookID);
+}
+
 export type FloatBtnKind = "common" | "primary" | "normal" | "ghost";
 
 export interface FloatButtonSpec {
@@ -84,6 +94,7 @@ const SCENE: Record<FloatDocKind, FloatButtonSpec[]> = {
     ],
     digest: [
         { id: "recite", icon: "iconProgSend", kind: "primary", group: "scene" },       // ✍送仿写（未装不显示）
+        { id: "revisit", icon: "iconProgSched", kind: "normal", group: "scene" },      // ✧复访动作组（□7：两态菜单+到期红点；id 不用 review——子排 review 是创建语境）
         { id: "origin", icon: "iconProgBook", kind: "normal", group: "scene" },        // 📖回原书（定位原文块）
         { id: "tree", icon: "iconProgTree", kind: "normal", group: "scene" },          // 🌳路线图浮层（□11）
         { id: "summary", icon: "iconProgQuill", kind: "ghost", group: "scene" },       // ✒摘抄汇总
@@ -223,7 +234,8 @@ export const PIECE_ALL_MAIN_IDS = new Set(PIECE_ALL_MAIN.map(b => b.id));
 /**
  * □10 平铺区低频段动作清单（id 对接旧 HtmlCBType 通道 + □11 浮层族）：
  * 片=未勾池钮 + 目录/重插/清理原文/删片退/忽略本书/路线指引；
- * 书=目录/原文侧追溯/忽略本书/路线指引；摘抄=路线指引；自由态=路线指引。
+ * 书=目录/原文侧追溯/忽略本书/路线指引；摘抄=路线指引；自由态=目录/关联摘抄/路线指引
+ * （群反馈 650189 补齐，无 ignore）。
  * contents（□11 起改弹目录浮层）、map（🗺 路线指引）、traceUp（原文侧追溯）走浮层族，
  * 不再产维护型文档。
  * opts.mainIds（片态）：全量池中未进首行的落平铺区首段（排在固有低频动作前）——
@@ -244,7 +256,10 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[] }
     }
     if (kind === "book") return ["contents", "traceUp", "ignore", "map"];
     if (kind === "digest") return ["map"];
-    return ["map"];
+    // free（群反馈 650189）：书态基础入口——contents/traceUp 复用书态浮层（free 摘抄
+    // ctime 自指 docID，清单浮层按 noteID 即查）；期2 ignore=不再推送（该源文档全部
+    // 复访批量移除，与书忽略正交；free 不参与片推送调度，ignoreBook 语义不适用）
+    return ["contents", "traceUp", "map", "ignore"];
 }
 
 /** 附属卡到期胶囊文案：无到期零占位（不渲染）、>99 截断 */
@@ -258,7 +273,7 @@ export function formatDueCount(n: number): string {
  * Record<DigSubrankId, ...> 精确匹配——任一侧增删 id 都是编译错（make check 拦），
  * 防两源漂移（漂移的失效模式是 icon undefined 渲染期 TypeError，不是温和降级）。
  */
-export type DigSubrankId = "inbox" | "think" | "card" | "word" | "wordai" | "write" | "sched" | "whole";
+export type DigSubrankId = "inbox" | "think" | "card" | "review" | "word" | "wordai" | "write" | "sched" | "whole";
 
 /**
  * 摘抄子排 id 清单（□3 起单一事实源，渲染序）：digest 态不渲染子排（摘抄文档再摘抄
@@ -268,6 +283,6 @@ export type DigSubrankId = "inbox" | "think" | "card" | "word" | "wordai" | "wri
  */
 export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
     if (kind === "digest") return [];
-    const base: DigSubrankId[] = ["inbox", "think", "card", "word", "wordai", "write", "sched"];
+    const base: DigSubrankId[] = ["inbox", "think", "card", "review", "word", "wordai", "write", "sched"];
     return kind === "book" ? base : [...base, "whole"];
 }

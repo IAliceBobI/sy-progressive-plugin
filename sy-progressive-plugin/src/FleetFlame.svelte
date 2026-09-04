@@ -8,15 +8,17 @@
     import type { DebtSummary } from "./roller";
     import type { Writable } from "svelte/store";
     import { PROG_FLAMES, DEFAULT_FLAME_SLUG, FLAME_CORE_D, progFlameSkin, progPaid, PROG_GATE_OPEN } from "./theme";
+    import { digestDueState } from "./fleet";
 
     let { flame, onStart }: { flame: Writable<DebtSummary | null>; onStart: () => any } = $props();
 
     const state = $derived($flame?.state ?? "ok");
     const debt = $derived($flame?.debt ?? 0);
+    // 期2 复访通道：火苗 tooltip 尾行非阻塞提示（不占 quota 不进欠债），无到期不占行
     const tooltip = $derived(
         $flame == null
-            ? tomatoI18n.今日阅读
-            : tomatoI18n.火苗提示($flame.readToday, $flame.quotaToday, $flame.debt),
+            ? tomatoI18n.今日阅读 + ($digestDueState > 0 ? `\n${tomatoI18n.今日还有N条到期摘抄($digestDueState)}` : "")
+            : tomatoI18n.火苗提示($flame.readToday, $flame.quotaToday, $flame.debt, $digestDueState),
     );
     const skin = $derived(
         PROG_FLAMES.find(s => s.slug === $progFlameSkin)

@@ -146,12 +146,14 @@ export async function loadBookStatuses(force = false): Promise<Map<string, BookS
         return cache.m;
     }
 
-    // 一次批量 SQL 查所有书档存在性（type='d' 才算文档还在）
+    // 一次批量 SQL 查所有书档存在性（type='d' 才算文档还在）。
+    // 显式 limit 防内核 64 截尾：一批 100 本全活会被截到 64，尾部书误走 missing→
+    // 移动端无 fs 兜底时误判 lost「书丢了」（桌面端 ownHit 兜底也白扫一次盘）
     const sqlIDs = new Set<string>();
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
     const rows = (await Promise.all(chunks.map(c =>
-        siyuan.sql(`select id from blocks where type='d' and id in (${c.map(x => `'${x}'`).join(",")})`)
+        siyuan.sql(`select id from blocks where type='d' and id in (${c.map(x => `'${x}'`).join(",")}) limit 10000000`)
     ))).flat() as any[] ?? [];
     for (const r of rows) sqlIDs.add(r.id);
 

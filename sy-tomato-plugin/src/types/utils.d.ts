@@ -112,6 +112,7 @@ type TomatoSettings = {
     imgBoxShowMenu: boolean,
     aiBoxMenuShow: boolean,
     digest2dailycard: boolean,
+    digestLanding: string,
     card2dailycard: boolean,
     mobileTopBar: boolean,
     cardAppendTime: boolean,
@@ -132,10 +133,11 @@ type TomatoSettings = {
     flashcardMultipleLnks: boolean,
     flashcardAddRefs: boolean,
     //------------------
-    graphClick2Locate: boolean,
     graphHideStructEdges: boolean,
     graphMaxAllBlocks: string,
     graphMaxPBlocks: string,
+    // graphbox 期2：默认展开层级（按标题层级 h1=1；"all"=全部展开，段落链折叠独立于档位）
+    graphDefaultExpandLevel: string,
     graphBoxCheckbox: string,
     userToken: string,
     userID: string,
@@ -144,6 +146,8 @@ type TomatoSettings = {
     cssListBackgound: boolean,
     cssNattyList: boolean,
     cssRefStyle: string,
+    // 引用效果五档（2026-09-03 多档化）；旧 cssRefStyle/cssRefSquareBrackets 布尔仅迁移期读取
+    cssRefEffect: "none" | "brackets" | "icon" | "shadow" | "highlight",
     keepLazyLoadStore: string,
     awaysExitFocusStore: string,
     cssRefAsTags: string,
@@ -403,6 +407,7 @@ type AttrType = {
     "custom-bkRefDocCount"?: string,
     "custom-graph-isVertical"?: string,
     "custom-graph-node-positions"?: string,
+    "custom-graph-collapsed"?: string,
     "custom-super-list"?: string,
     "custom-tomato-reflink"?: string,
     "custom-sync-block-id"?: string,
@@ -498,16 +503,22 @@ type WindowOpenStyle = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "nop" | "front"
 interface GraphDockData<T> {
     svelte: T;
     setCanvasSize: () => void;
-    locateID: (id: string) => Promise<void>;
-    changeDoc: (p: IProtyle) => Promise<void>;
-}
-
-interface NodeMenu<T> {
-    node?: T;
-    x?: number;
-    y?: number;
-    canvasHeight?: number;
-    canvasWidth?: number;
+    /** 期4：true=已居中脉冲；false=目标不在图（调用方 toast 找不到的原因） */
+    locateID: (id: string) => Promise<boolean>;
+    /** refreshOnly=true=同文档内容刷新：relayout 不 fitView（保用户/定位视图；期4 P1 竞态修复） */
+    changeDoc: (p: IProtyle, refreshOnly?: boolean) => Promise<void>;
+    /** 期4：定位脉冲窗口内抑制自动刷新（expandTo 写属性→ws 回流→relayout 重建打断脉冲/打回 setCenter） */
+    suppressAutoRefreshUntil?: number;
+    /** graphbox 期1：Provider 内 useSvelteFlow 借道（relayout 末尾首屏视口适配） */
+    fitView?: (opts?: { padding?: number; duration?: number }) => void;
+    /** graphbox 期2：展开目标节点的折叠祖先链（定位不静默）；返回是否有折叠变更 */
+    expandTo?: (id: string) => Promise<boolean>;
+    /** graphbox 期4：图当前通道态/文档/块上限（locateNode 的 toast 分支文案依据） */
+    getGraphState?: () => { mode: "full" | "skeleton"; docID: string; maxBlocks: number };
+    /** graphbox 期3：当前布局方向（横 LR=false 纵 TB=true）——zoom 过小提示切纵向的判定依据 */
+    isVertical?: boolean;
+    /** graphbox 期3：xyflow 内部 store 借道（官方更新通道；bind store 在 runes 组件不可靠） */
+    graphStore?: { nodes: any; edges: any };
 }
 
 interface WsMain {

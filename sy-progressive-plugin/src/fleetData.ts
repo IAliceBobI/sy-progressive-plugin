@@ -4,7 +4,7 @@
 // 徽章归属链：✒=摘抄文档自身 PDIGEST_CTIME 行（值含 bookID）；✱✧=think 块的
 // root_id（摘抄文档）经 ctime 映射反查书；札记匣等无书归属不进任何书卡。
 
-import { ReviewKey, isDue, parseReview } from "./reviewQueue";
+import { ReviewKey, PdigestReviewKey, isDue, parseReview } from "./reviewQueue";
 import { mergeMissingBooks, summarizeDebt, DebtSummary } from "./roller";
 import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 import { parseBookIDFromCtime } from "./progData";
@@ -31,6 +31,8 @@ export interface FleetBook {
     badges: FleetBadges;
     /** total>0 且 point>=total（读完待归档） */
     finished: boolean;
+    /** 期3 手动分片书：索引恒空，片=摘抄（✒ 即片数），点卡=开原书 */
+    manual: boolean;
 }
 
 /** 热力格（近 N 天横条，右端=今天） */
@@ -41,6 +43,8 @@ export interface FleetSummary {
     debt: DebtSummary;
     heat: HeatCell[];
     quota: number;
+    /** ✧ 全局到期待办数（think+pdigest 双源，含 free 源；Dock 待办胶囊） */
+    dueTotal: number;
 }
 
 /** PDIGEST_CTIME 行是否结构合法（值 = bookID#ct，至少一个 # 分隔） */
@@ -90,6 +94,30 @@ export function badgesFromReview(
     return m;
 }
 
+/** ✧ 双源合并（期2 复访通道）：think 块级 + pdigest 文档级到期数相加；note（心得）只来自 think */
+export function combineBadges(
+    a: Map<string, { note: number; due: number }>,
+    b: Map<string, { note: number; due: number }>,
+): Map<string, { note: number; due: number }> {
+    const m = new Map(a);
+    for (const [k, v] of b) {
+        const cur = m.get(k) ?? { note: 0, due: 0 };
+        m.set(k, { note: cur.note + v.note, due: cur.due + v.due });
+    }
+    return m;
+}
+
+/** 全局到期计数（期2 Dock ✧ 待办胶囊）：不问归属——free 源（札记匣等无书）也计入，
+ *  与书卡 ✧ 徽章（按书过滤）互补，是 free 来源到期待办的唯一可视入口 */
+export function dueCountOf(rows: { value: string }[], now: number): number {
+    let n = 0;
+    for (const r of rows) {
+        const s = parseReview(r.value);
+        if (s && isDue(s, now)) n++;
+    }
+    return n;
+}
+
 /** 热力五档：没读=0；比例 1/3、2/3 分档；读满=4；q 缺失有读（防御）=2 */
 export function heatLevel(read: number, q: number): 0 | 1 | 2 | 3 | 4 {
     if (read <= 0) return 0;
@@ -121,7 +149,7 @@ export function buildHeat(days: { date: string; q: number; read: number }[], tod
 /** 书卡聚合：滚筒序输出，过滤忽略/归档；order 外的书按 books.json 序兜底排尾。
  *  status 缺省全 ok（与管理页同 rank：⚠ lost 次之、⏸ closed 沉底）。 */
 export function buildFleetBooks(args: {
-    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string } };
+    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean } };
     order: string[];
     todayReads: { [bookID: string]: number };
     indexLens: { [bookID: string]: number };
@@ -151,6 +179,7 @@ export function buildFleetBooks(args: {
                 note: think?.note ?? 0,
                 due: think?.due ?? 0,
             },
+            manual: !!info.manualMode,
             finished: total > 0 && point >= total,
         });
     }
@@ -179,9 +208,12 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
     const infos = progStorage.booksInfos();
     const ids = Object.keys(infos);
 
-    const [ctimeRows, thinkRows, allDays, ro, todayReads] = await Promise.all([
-        siyuan.sql(`select block_id, value from attributes where name='${PDIGEST_CTIME}'`) as Promise<any[]> ?? [],
-        siyuan.sql(`select root_id, value from attributes where name='${ReviewKey}'`) as Promise<any[]> ?? [],
+    // attributes 反查显式 limit：内核对外层无 LIMIT 的 SELECT 套 Search.Limit（默认 64）
+    // 静默截尾——✒ctime/✱think/✧review 三源 >64 篇即漏徽章（getDocRowsByName 同款防线）
+    const [ctimeRows, thinkRows, pdigestRows, allDays, ro, todayReads] = await Promise.all([
+        siyuan.sql(`select block_id, value from attributes where name='${PDIGEST_CTIME}' limit 10000000`) as Promise<any[]> ?? [],
+        siyuan.sql(`select root_id, value from attributes where name='${ReviewKey}' limit 10000000`) as Promise<any[]> ?? [],
+        siyuan.sql(`select root_id, value from attributes where name='${PdigestReviewKey}' limit 10000000`) as Promise<any[]> ?? [],
         rollerAllDays(),
         progStorage.loadReadingOrder(),
         rollerTodayReads(),
@@ -192,7 +224,7 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
     const missing = ids.filter(id => !infos[id]?.bookName);
     if (missing.length) {
         const rows = await siyuan.sql(
-            `select id, content from blocks where type='d' and id in (${missing.map(id => `'${id}'`).join(",")})`) as any[] ?? [];
+            `select id, content from blocks where type='d' and id in (${missing.map(id => `'${id}'`).join(",")}) limit 10000000`) as any[] ?? [];
         for (const r of rows) names[r.id] = r.content;
     }
     for (const id of ids) names[id] = names[id] || infos[id]?.bookName || id;
@@ -214,7 +246,11 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
         names,
         statuses: statusesObj,
         digestCounts: digestCountsFrom(ctimeRows ?? []),
-        thinkBadges: badgesFromReview(thinkRows ?? [], bookOfDocFrom(ctimeRows ?? []), now),
+        // 期2 ✧ 双源：think 块级 + pdigest 文档级（spec 定稿节 3——书卡到期数含复访）
+        thinkBadges: combineBadges(
+            badgesFromReview(thinkRows ?? [], bookOfDocFrom(ctimeRows ?? []), now),
+            badgesFromReview(pdigestRows ?? [], bookOfDocFrom(ctimeRows ?? []), now),
+        ),
     });
 
     const quota = quotaNum();
@@ -223,5 +259,6 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
         debt: summarizeDebt(allDays, todayLocalStr(), quota),
         heat: buildHeat(allDays, todayLocalStr(), spanDays),
         quota,
+        dueTotal: dueCountOf(thinkRows ?? [], now) + dueCountOf(pdigestRows ?? [], now),
     };
 }

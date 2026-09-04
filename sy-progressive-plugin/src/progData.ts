@@ -11,6 +11,16 @@ export function getDocIalDigestDir(bookID: string): string {
     return `digestdir#${TEMP_CONTENT}#${bookID}`;
 }
 
+/** 摘抄总夹（期1 □2）：prog-data 根下收所有 digest-书名 夹的总文件夹，初始名「摘抄」 */
+export function getDocIalDigestHub(): string {
+    return `digesthub#${TEMP_CONTENT}`;
+}
+
+/** 源文档下方档的非书摘抄夹（digest-源文档名，挂源文档下；按源文档锚定） */
+export function getDocIalFreeDigestDir(docID: string): string {
+    return `digestdirfree#${TEMP_CONTENT}#${docID}`;
+}
+
 export function getDocIalNoteBox(): string {
     return `notebox#${TEMP_CONTENT}`;
 }
@@ -100,13 +110,14 @@ export interface ConsolidatePlan {
     skippedForeign: number;
 }
 
-export function planConsolidation(digests: DigestDocInfo[], progDataID: string): ConsolidatePlan {
+export function planConsolidation(digests: DigestDocInfo[], progDataID: string, hubID: string): ConsolidatePlan {
     const plan: ConsolidatePlan = { dirsToMove: [], skippedInPlace: 0, skippedForeign: 0 };
     const seen = new Set<string>();
     for (const d of digests) {
-        // 已归拢：digest 夹的父（或摘抄本身直接挂）已在 prog-data 下——正常形态摘抄的父是 digest 夹、
-        // 夹的父才是 prog-data，判错层会导致幂等失效（e2e 实测：重跑重复搬）
-        if (d.dirParentID === progDataID || d.parentID === progDataID) {
+        // 已归拢（期1 起归拢终点=摘抄总夹）：夹已在总夹下；摘抄无夹直挂 prog-data/总夹的
+        // （搬迁机制只动夹）也视为已就位。夹在 prog-data 根下（v3 期形态）不再算已归拢——
+        // 它正是「归拢进总夹」的搬运对象
+        if (d.dirParentID === hubID || d.parentID === hubID || d.parentID === progDataID) {
             plan.skippedInPlace++;
             continue;
         }
@@ -122,9 +133,10 @@ export function planConsolidation(digests: DigestDocInfo[], progDataID: string):
 }
 
 export interface ConsolidateDeps {
-    progDataID: string;
+    /** 归拢目标=摘抄总夹 ID（同名冲突探测/整搬终点/幂等判定都以它为家） */
+    hubID: string;
     listChildDocs(docID: string): Promise<{ id: string; name: string }[]>;
-    /** 整夹移动进 prog-data（moveDocs），成功与否由返回值表达 */
+    /** 整夹移动进总夹（moveDocs），成功与否由返回值表达 */
     moveDirWhole(dirID: string): Promise<boolean>;
     /** 把单个文档移动并入目标夹（同名冲突时的逐子并入） */
     moveDocInto(docID: string, targetDirID: string): Promise<boolean>;
@@ -140,9 +152,9 @@ export interface ConsolidateResult {
 /** 执行归拢计划：同名逐子并入删壳、否则整搬；搬完打 IAL 锚定；单夹失败不阻断（可重跑）。 */
 export async function executeConsolidation(plan: ConsolidatePlan, deps: ConsolidateDeps): Promise<ConsolidateResult> {
     const r: ConsolidateResult = { moved: 0, failed: 0 };
-    const progDataChildren = await deps.listChildDocs(deps.progDataID);
+    const hubChildren = await deps.listChildDocs(deps.hubID);
     for (const dir of plan.dirsToMove) {
-        const target = progDataChildren.find(c => c.name === dir.dirName);
+        const target = hubChildren.find(c => c.name === dir.dirName);
         try {
             if (target) {
                 const children = await deps.listChildDocs(dir.dirID);
@@ -189,13 +201,15 @@ export function parentIDFromDocPath(path: string): string {
     return parts[parts.length - 2];
 }
 
-/** 列文档夹的直接子文档（id+name）——文档父子在 path 层（parent_id 恒空），按父 path 去掉 .sy 的目录前缀匹配一层 */
+/** 列文档夹的直接子文档（id+name）——文档父子在 path 层（parent_id 恒空），按父 path 去掉 .sy 的目录前缀匹配一层。
+ *  显式 limit 防内核 64 截尾：归拢同名并入分支（executeConsolidation）老夹子文档 >64 时
+ *  只搬前 64 个而 allMoved 仍真 → removeDoc 整树删=壳内尾部摘抄静默丢失（review P1-3）。 */
 export async function listChildDocs(docID: string): Promise<{ id: string; name: string }[]> {
     const row = await siyuan.sqlOne(`select path from blocks where type='d' and id='${docID}'`);
     if (!row?.path) return [];
     const prefix = row.path.endsWith(".sy") ? row.path.slice(0, -3) : row.path;
     const rows = await siyuan.sql(
-        `select id, content from blocks where type='d' and path like '${prefix}/%' and path not like '${prefix}/%/%'`);
+        `select id, content from blocks where type='d' and path like '${prefix}/%' and path not like '${prefix}/%/%' limit 10000000`);
     return (rows ?? []).map(r => ({ id: r.id, name: r.content }));
 }
 
@@ -224,17 +238,20 @@ export interface ConsolidateSummary {
  * 按摘抄 IAL 全库反查老 digest- 夹（位置无关、跨笔记本）→ 搬进 prog-data →
  * 顺手清理已空的 pieces- 夹层。幂等可重跑，单夹失败不阻断。
  */
-export async function consolidateDigests(progDataID: string): Promise<ConsolidateSummary> {
-    // 文档行 parent_id 恒空（父子在 path 层）：先拿摘抄 path，TS 侧推父 ID，再批量查父名
+export async function consolidateDigests(progDataID: string, hubID = progDataID): Promise<ConsolidateSummary> {
+    // 文档行 parent_id 恒空（父子在 path 层）：先拿摘抄 path，TS 侧推父 ID，再批量查父名。
+    // 显式 limit 防内核 64 截尾（用户650189 实锤：64 篇日记摘抄=截断值非真实数，
+    // 排在 64 行后的 digest- 夹整组漏归拢、skippedForeign 同漏计）
     const rows = await siyuan.sql(`
         select a.block_id as docID, b.path as path, a.value as ctime
         from attributes a
         join blocks b on b.id = a.block_id and b.type='d'
         where a.name='${PDIGEST_CTIME}'
+        limit 10000000
     `) ?? [];
     const parentIDs = [...new Set((rows as any[]).map(r => parentIDFromDocPath(r.path)).filter(Boolean))];
     const nameRows = parentIDs.length
-        ? await siyuan.sql(`select id, content from blocks where type='d' and id in (${parentIDs.map(id => `'${id}'`).join(",")})`) ?? []
+        ? await siyuan.sql(`select id, content from blocks where type='d' and id in (${parentIDs.map(id => `'${id}'`).join(",")}) limit 10000000`) ?? []
         : [];
     const nameMap = new Map((nameRows as any[]).map(r => [r.id, r.content]));
     const digests: DigestDocInfo[] = (rows as any[]).map(r => {
@@ -250,23 +267,24 @@ export async function consolidateDigests(progDataID: string): Promise<Consolidat
             bookID: parseBookIDFromCtime(r.ctime ?? ""),
         };
     });
-    const plan = planConsolidation(digests, progDataID);
+    const plan = planConsolidation(digests, progDataID, hubID);
     const result = await executeConsolidation(plan, {
-        progDataID,
+        hubID,
         listChildDocs,
-        moveDirWhole: (dirID) => moveDocIntoParent(dirID, progDataID),
+        moveDirWhole: (dirID) => moveDocIntoParent(dirID, hubID),
         moveDocInto: (docID, targetDirID) => moveDocIntoParent(docID, targetDirID),
         removeDoc: (id) => siyuan.removeDocByIDSiyuan(id),
         setIal: (id, ial) => siyuan.setBlockAttrs(id, { [MarkKey]: ial } as any),
     });
     // 空 pieces- 夹层清理（分片读完即删自然消亡后留下的空壳）；
-    // 子文档判定同样走 path 前缀（父 path 去 .sy 后即子目录前缀）
+    // 子文档判定同样走 path 前缀（父 path 去 .sy 后即子目录前缀）；limit 同防 64 截尾
     const emptyPieceDirs = await siyuan.sql(`
         select c.id from blocks c where c.type='d' and c.content like 'pieces-%'
         and not exists (
             select 1 from blocks k
             where k.type='d' and k.path like substr(c.path, 1, length(c.path) - 3) || '/%'
         )
+        limit 10000000
     `) ?? [];
     for (const row of emptyPieceDirs) await siyuan.removeDocByIDSiyuan(row.id);
     return { plan, result, cleanedEmptyPieceDirs: emptyPieceDirs.length };

@@ -21,6 +21,8 @@ type BookInfo = {
     autoSplitSentenceI?: boolean,
     autoSplitSentenceT?: boolean,
     addIndex2paragraph?: boolean,
+    /** 期3 手动分片书：注册书身份+索引恒空，片由摘抄产生（ctime 聚合 ✒） */
+    manualMode?: boolean,
     finishDays?: number,
     finishTimeSecs?: number,
     finishPieceID?: string,

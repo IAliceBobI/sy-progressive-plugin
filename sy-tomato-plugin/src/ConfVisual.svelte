@@ -14,7 +14,7 @@
         mindWireWordWire,
         graphAddTopbarIcon,
         graphBoxCheckbox,
-        graphClick2Locate,
+        graphDefaultExpandLevel,
         graphHideStructEdges,
         graphMaxAllBlocks,
         graphMaxPBlocks,
@@ -160,16 +160,6 @@
             <input type="checkbox" class="b3-switch" bind:checked={$graphAddTopbarIcon} />
             {tomatoI18n.添加顶栏图标}
         </div>
-        <div class:codeNotValid>
-            <input
-                disabled={codeNotValid}
-                type="checkbox"
-                class="b3-switch"
-                bind:checked={$graphClick2Locate}
-            />
-            {tomatoI18n.左键点击节点跳转到文档}<TomatoVIP {codeValid}></TomatoVIP>
-        </div>
-
         <div>
             <input class="b3-text-field" bind:value={$graphMaxPBlocks} />
             {tomatoI18n.最大连续段落块数量}
@@ -178,6 +168,16 @@
         <div>
             <input class="b3-text-field" bind:value={$graphMaxAllBlocks} />
             {tomatoI18n.最大节点数量}
+        </div>
+        <div>
+            <!-- graphbox 期2：折叠机制默认展开层级（无持久化折叠态的文档首次打开按此推导；toggle 过的文档以 custom-graph-collapsed 为准） -->
+            <select class="b3-select" bind:value={$graphDefaultExpandLevel}>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="all">{tomatoI18n.全部展开}</option>
+            </select>
+            {tomatoI18n.默认展开层级}
         </div>
         <div>
             <input type="checkbox" class="b3-switch" bind:checked={$graphHideStructEdges} />

@@ -10,10 +10,13 @@
     let {
         dm,
         bookID,
+        freeDoc = false,
         onJumpDoc,
     }: {
         dm: DestroyManager;
         bookID: string;
+        /** free 态复用（群反馈 650189）：空态文案「本书还没有摘抄」→「本文档还没有摘抄」 */
+        freeDoc?: boolean;
         onJumpDoc: (id: string) => void;
     } = $props();
 
@@ -62,7 +65,7 @@
     {#if loading}
         <div class="da-hint">{tomatoI18n.加载中}</div>
     {:else if list.length === 0}
-        <div class="da-hint">{flat.length === 0 ? tomatoI18n.本书还没有摘抄 : tomatoI18n.没有匹配的摘抄}</div>
+        <div class="da-hint">{flat.length === 0 ? (freeDoc ? tomatoI18n.本文档还没有摘抄 : tomatoI18n.本书还没有摘抄) : tomatoI18n.没有匹配的摘抄}</div>
     {:else}
         <div class="da-list">
             {#each list as n (n.id)}

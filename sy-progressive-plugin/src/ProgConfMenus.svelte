@@ -1,0 +1,80 @@
+<script lang="ts">
+    // 渐进设置页域组件（2026-09-03 双栏改造）：自 Settings.svelte 整块搬运，卡片内部一行不动；
+    // 本组件=「菜单入口」域的卡片
+    import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+    import HotkeyCap from "../../sy-tomato-plugin/src/HotkeyCap.svelte";
+    import {
+        piecesmenu,
+        digestmenu,
+        blockIconMenu,
+        ProgressiveStart2learn,
+        ProgressiveJumpMenu,
+    } from "../../sy-tomato-plugin/src/libs/stores";
+    import { digest渐进阅读摘抄模式 } from "./DigestProgressiveBox";
+    import {
+        Progressive添加当前文档到渐进阅读分片模式,
+        Progressive跳到分片或回到原文,
+        Progressive开始学习,
+    } from "./Progressive";
+</script>
+
+<!-- 菜单入口（v5 □7：右键显隐开关 20→4——制卡/收集/提取族收进浮条 [+] 高级功能，随开关退役。
+     □11 标题宽化：区内还有块图标菜单（左键点块前小圆点）与移动端菜单，非全是右键，各条目自说明入口类型） -->
+<div class="settingBox">
+    <div class="section-title">{tomatoI18n.菜单入口}</div>
+    <div>{tomatoI18n.menu不显示菜单不影响快捷键的使用}</div>
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$piecesmenu}
+        />
+        {tomatoI18n.menu添加右键菜单}:
+        {Progressive添加当前文档到渐进阅读分片模式.langText()}<HotkeyCap hk={Progressive添加当前文档到渐进阅读分片模式} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$digestmenu}
+        />
+        {tomatoI18n.menu添加右键菜单}:
+        {digest渐进阅读摘抄模式.langText()}<HotkeyCap hk={digest渐进阅读摘抄模式} pluginName="sy-progressive-plugin"></HotkeyCap>
+        <!-- digestmenu 一拖二（□3 review P2-2）：同门还有「整篇摘抄」右键项，开回即一并恢复 -->
+        （+{tomatoI18n.整篇摘抄}）
+    </div>
+
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$ProgressiveJumpMenu}
+        />
+        {tomatoI18n.menu添加右键菜单}:
+        {Progressive跳到分片或回到原文.icon}
+        {Progressive跳到分片或回到原文.langText()}
+        <HotkeyCap hk={Progressive跳到分片或回到原文} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+
+    <!-- □7：块图标菜单（点块前小圆点）独立开关——右键默认关不再连带，键帽见上两行 -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$blockIconMenu}
+        />
+        {tomatoI18n.块图标菜单入口}:
+        {Progressive跳到分片或回到原文.langText()} + {digest渐进阅读摘抄模式.langText()}
+    </div>
+
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$ProgressiveStart2learn}
+        />
+        {tomatoI18n.移动端菜单显示开始学习}:
+        {Progressive开始学习.langText()}
+        <HotkeyCap hk={Progressive开始学习} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+</div>

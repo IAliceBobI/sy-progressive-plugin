@@ -257,6 +257,20 @@ body.prog-unpaid .prog-fb-pro:hover {
   box-shadow: var(--prog-shadow);
 }
 
+/* □7 复访钮到期红点（digest 态 revisit 钮角）：单点不带数字——语义是「该复习了」而非计数
+   （计数在 ✧ 待办/Dock）；无到期不渲染（UI 层 {#if}），动作后 onApplied 复查消散 */
+.prog-fb .prog-fb-revisitdot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--b3-theme-error);
+  box-shadow: 0 0 0 1.5px var(--b3-theme-surface); // 与按钮底色描边断开，任何底色上都读得出
+  pointer-events: none;
+}
+
 /* 二级芯片排（✂ 摘抄子排）：方案 A 芯片化同语（2026-08-31 拍板，□5）——弃连续色带容器
    +hairline 的「外挂」视觉，子排钮与主排同为独立散点芯片，仅以底色深浅+尺寸分层级：
    主排芯片 accent-soft（亮 12%/暗 14%）30px > 子排芯片 8% 26px > 平铺区 5% 26px；
@@ -642,6 +656,20 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   color: var(--prog-status-over);
   font-weight: 700;
 }
+/* 期2 全局 ✧ 待办胶囊：与书卡 ✧ 徽章同色系（warn）；无欠债 pill 时独自靠右 */
+.due-pill {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--prog-status-warn);
+  background: color-mix(in srgb, var(--prog-status-warn) 12%, transparent);
+  cursor: pointer;
+}
+.debt-pill + .due-pill {
+  margin-left: 8px;
+}
 
 /* 点行（全局今日点 + 书卡今日点共用） */
 .prog-fleet-dots {
@@ -735,6 +763,10 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
 }
 .prog-fleet-card.finished {
   opacity: 0.65;
+}
+/* 期3 手动分片书：无进度语义（片=摘抄），隐藏进度轨道；✒✱✧ 徽章行照常 */
+.prog-fleet-card.manual .track {
+  display: none;
 }
 // ⏸/⚠ 状态卡（bookStatus 判定链）：与管理页 ShowAllBooks 同视觉语言
 .prog-fleet-card.closed {

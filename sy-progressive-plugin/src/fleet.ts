@@ -1,7 +1,7 @@
 // v5 □6 状态栏火苗 + 左 Dock 舰队总览（视觉方案 docs/prog-v5-visual-design.md §2/§3）。
 // 挂载编排 + 刷新调度：动作经 FleetActions 注入（不 import Progressive，防循环依赖——
-// Progressive.ts 反向 import 本模块的 notifyFleetChanged 在记账后触发刷新）。
-// 刷新时机：30s 定时 + notifyFleetChanged（读片/摘抄等数据变化点）+ 面板手动 ♻。
+// 数据侧反向只 import fleetNotify 发信号，本模块 initFleet 订阅后刷新，□7 拆信号与装载）。
+// 刷新时机：30s 定时 + fleetNotify 信号（读片/摘抄等数据变化点）+ 面板手动 ♻。
 
 import { mount, unmount } from "svelte";
 import { writable } from "svelte/store";
@@ -9,8 +9,10 @@ import FleetFlame from "./FleetFlame.svelte";
 import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
 import { rollerDebtSummary, type DebtSummary } from "./roller";
+import { PdigestReviewKey, dueReviewSQLFor } from "./reviewQueue";
+import { onFleetChanged } from "./fleetNotify";
 import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
-import { icon } from "../../sy-tomato-plugin/src/libs/utils";
+import { icon, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { newID } from "stonev5-utils";
 
@@ -31,14 +33,17 @@ export interface FleetActions {
     reciteAction(): any;
     /** recite 是否已安装（导流图标亮/灰态） */
     isReciteInstalled(): boolean;
-    /** v5 □12：书卡 ✧ 徽章点开=该书重访到期待办列表（完成/推迟/移除，见 reviewMenu.ts） */
-    openDueList(ev: { clientX: number; clientY: number }, bookID: string): any;
+    /** v5 □12：书卡 ✧ 徽章点开=该书重访到期待办列表（完成/推迟/移除，见 reviewMenu.ts）；
+     *  期2 bookID 缺省=全局清单（free 源复访的唯一入口） */
+    openDueList(ev: { clientX: number; clientY: number }, bookID?: string): any;
 }
 
 export const FLEET_DOCK_TYPE = "prog-fleet-dock";
 
 /** 火苗数据（状态栏消费，轻查询） */
 export const flameState = writable<DebtSummary | null>(null);
+/** 到期摘抄数（火苗 tooltip 尾行消费，期2；非阻塞提示，不占 quota 不进欠债） */
+export const digestDueState = writable(0);
 /** 面板数据（Dock 消费，重查询） */
 export const panelState = writable<FleetSummary | null>(null);
 
@@ -46,10 +51,17 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let refreshing = false;
 let flameApp: any = null;
 let quotaSubStop: (() => void) | null = null;
+let notifySubStop: (() => void) | null = null;
 
 export async function refreshFlame() {
     try {
-        flameState.set(await rollerDebtSummary());
+        // 期2：顺带取 pdigest 复访到期数（一条 attributes 查询，dueReviewSQLFor 只回到期行）
+        const [debt, dueRows] = await Promise.all([
+            rollerDebtSummary(),
+            siyuan.sql(dueReviewSQLFor(PdigestReviewKey, Date.now())) as Promise<any[]>,
+        ]);
+        flameState.set(debt);
+        digestDueState.set((dueRows ?? []).length);
     } catch (e) {
         console.error("fleet refreshFlame failed", e);
     }
@@ -69,11 +81,6 @@ export async function refreshPanel() {
 
 export async function refreshFleet() {
     await Promise.all([refreshFlame(), refreshPanel()]);
-}
-
-/** 数据变化点入口：Progressive.markReadSafe 记账成功后调用（火苗/面板即时联动） */
-export function notifyFleetChanged() {
-    refreshFleet();
 }
 
 /** 档位切换（Dock 今日状态区胶囊）：落盘 + 立即重刷（今天的 q 以实时档位覆盖） */
@@ -132,7 +139,9 @@ export function initFleet(plugin: any, actions: FleetActions) {
         },
     } as any);
 
-    // ---- 刷新调度：30s 全量 + 档位变化联动 ----
+    // ---- 刷新调度：30s 全量 + 档位变化联动 + 数据侧信号（□7 拆 fleetNotify，
+    //      notifyFleetChanged 等信号在 initFleet 前到达=无订阅者丢弃，等价旧空刷） ----
+    notifySubStop = onFleetChanged(() => refreshFleet());
     refreshFleet();
     refreshTimer = setInterval(refreshFleet, 30 * 1000);
     quotaSubStop = dailyQuota.subscribe(() => refreshFlame());
@@ -143,6 +152,8 @@ export function onunloadFleet() {
         clearInterval(refreshTimer);
         refreshTimer = null;
     }
+    notifySubStop?.();
+    notifySubStop = null;
     quotaSubStop?.();
     quotaSubStop = null;
     if (flameApp) {

@@ -17,7 +17,7 @@
     import { createAllPieces, deleteAllPieces, hasPieces } from "./helper";
     import * as constants from "./constants";
     import { progStorage, ProgressiveStorage } from "./ProgressiveStorage";
-    import { notifyFleetChanged } from "./fleet";
+    import { notifyFleetChanged } from "./fleetNotify";
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 
     interface Props {
@@ -39,6 +39,8 @@
     let createPiecesNow = $state(false);
     let addIndex = $state(false);
     let splitType: AsList = $state("no" as any);
+    // 期3 手动分片书：勾上后走 addManualBook 独立注册分支（切分配置整体置灰失效）
+    let manualSplit = $state(false);
     let disabled = $state(true);
     let contentBlocks: WordCountType[] = $state([]);
     let contentBlockLen = $derived(
@@ -178,6 +180,11 @@
     // 且此后不变（doCount 单发 / loadBold 单发），刻意在 setTimeout 回调内读取使其
     // 不进本 effect 依赖（boldIds 后到不重算——它只影响 B chip 渲染与下次 calcGroups）。
     $effect(() => {
+        // 期3 手动分片：切分参数整体失效，预览不重算（省无效计算；旧预览值随置灰隐藏）
+        if (manualSplit) {
+            recalcing = false;
+            return;
+        }
         const levels = [...selectedLevels];
         const wordNum = SPLIT_TIERS[splitIdx];
         recalcing = true;
@@ -200,6 +207,11 @@
         // 空文档兜底拦截：空索引书（books.json 有键、索引文件空）不在 heal 自愈范围
         if (contentBlocks.length === 0) {
             siyuan.pushMsg(tomatoI18n.加书失败请重试);
+            return;
+        }
+        // 期3 手动分片书：独立注册分支（身份照注册、索引恒空、片由摘抄产生）
+        if (manualSplit) {
+            await addManualBook();
             return;
         }
         // 正式分片与预览同一计算口（方案 §2.2）：同参数必同结果，不另写一条逻辑
@@ -256,6 +268,48 @@
         } catch (e) {
             // 注册段失败=弹窗还在可原样重点；注册后失败=书已在管理页可见可重试
             console.error("AddBook process failed", e);
+            siyuan.pushMsg(tomatoI18n.加书失败请重试);
+        }
+    }
+
+    /** 期3 手动分片书：照常注册书身份（IAL+books.json）但索引恒空——片由摘抄产生
+     *  （DigestBuilder 书态兜底：ctime=bookID#ct 聚合书卡 ✒、落点 digest-书名 夹，
+     *  digestUtils 零改动）。转书场景（自动→手动）清旧索引+旧片；手动→自动=重开
+     *  本弹窗走 process 原路径。无片可开：加完直接打开原书 */
+    async function addManualBook() {
+        {
+            const attrs = {} as AttrType;
+            attrs["custom-sy-readonly"] = "true";
+            attrs["custom-progmark"] = MarkBookKey;
+            await siyuan.setBlockAttrs(bookID, attrs);
+        }
+        try {
+            // 自动书转手动：旧索引文件+内存缓存清空（全新书 removeData 落空无害）
+            await progStorage.clearBookIndex(bookID);
+
+            const block = await siyuan.getRowByID(bookID);
+            const info = ProgressiveStorage.defaultBookInfo();
+            info.time = await siyuan.currentTimeMs();
+            info.boxID = block?.box ?? "";
+            info.bookID = bookID;
+            info.manualMode = true;
+            info.bookName = bookName;
+            await progStorage.resetBookInfo(bookID, info);
+
+            // 注册落定才关弹窗（与 process 同款：此前失败弹窗保留可重点）
+            destroy();
+            notifyFleetChanged(); // Dock 即时见新书手动态
+
+            // 旧片清理：与阅读链共用 StartToLearnLock 排队串行（process 同款防复用窗口）
+            if (await hasPieces(bookID)) {
+                await siyuan.pushMsg(tomatoI18n.正在清理旧分片);
+                await navigator.locks.request(constants.StartToLearnLock, async () => {
+                    await deleteAllPieces(bookID);
+                });
+            }
+            await prog.openOriginBook(bookID);
+        } catch (e) {
+            console.error("AddBook addManualBook failed", e);
             siyuan.pushMsg(tomatoI18n.加书失败请重试);
         }
     }
@@ -319,9 +373,9 @@
                 </div>
             </div>
             <!-- 分片结果条：即时预览（□4）。按钮退役，片数+三数+sparkline 随参数防抖更新 -->
-            <div class="prog-piece-bar" class:prog-recalcing={recalcing}>
+            <div class="prog-piece-bar" class:prog-recalcing={recalcing} class:prog-manual-dim={manualSplit}>
                 <div class="prog-piece-row">
-                    <span class="prog-piece-value">{preview?.count ?? 1}</span>
+                    <span class="prog-piece-value">{manualSplit ? "–" : preview?.count ?? 1}</span>
                     <span class="prog-piece-label">{tomatoI18n.分片数量}</span>
                     <span class="prog-piece-stats">
                         <span class="prog-piece-stat">
@@ -364,8 +418,9 @@
         </section>
 
         <!-- 卡2 切分设置：标题级 chips + 字数滑块（即时预览的参数面，□4）。
-             □1 引导文案：总纲立「级=在哪切、字数=切多碎」分工，hint/tooltip 分层释义 -->
-        <section class="prog-card">
+             □1 引导文案：总纲立「级=在哪切、字数=切多碎」分工，hint/tooltip 分层释义；
+             期3 手动分片勾上后整卡置灰失效 -->
+        <section class="prog-card" class:prog-manual-dim={manualSplit}>
             <div class="prog-card-title">{tomatoI18n.切分设置}</div>
             <div class="prog-field-hint prog-card-lede">{tomatoI18n.切分总纲}</div>
 
@@ -443,61 +498,71 @@
         <!-- 卡3 分片选项 -->
         <section class="prog-card">
             <div class="prog-card-title">{tomatoI18n.分片选项}</div>
+            <!-- 期3 手动分片：勾上后下方切分/断句配置全部无效（置灰），注册走 addManualBook -->
             <label class="prog-switch-row">
-                <input type="checkbox" class="b3-switch" bind:checked={createPiecesNow} />
-                <span>{tomatoI18n.立刻创建所有的分片}</span>
+                <input type="checkbox" class="b3-switch" bind:checked={manualSplit} />
+                <span>{tomatoI18n.手动分片不自动切}</span>
             </label>
-            <label class="prog-switch-row">
-                <input type="checkbox" class="b3-switch" bind:checked={showLastBlock} />
-                <span>{tomatoI18n.显示上一个分片的最后一个块}</span>
-            </label>
-            <label class="prog-switch-row">
-                <input type="checkbox" class="b3-switch" bind:checked={addIndex} />
-                <span>{tomatoI18n.新建分片时给段落标上序号}</span>
-            </label>
+            <div class="prog-field-hint">
+                {manualSplit ? tomatoI18n.手动分片模式说明 : tomatoI18n.手动分片说明}
+            </div>
+            <div class="prog-manual-slave" class:prog-manual-dim={manualSplit}>
+                <label class="prog-switch-row">
+                    <input type="checkbox" class="b3-switch" bind:checked={createPiecesNow} />
+                    <span>{tomatoI18n.立刻创建所有的分片}</span>
+                </label>
+                <label class="prog-switch-row">
+                    <input type="checkbox" class="b3-switch" bind:checked={showLastBlock} />
+                    <span>{tomatoI18n.显示上一个分片的最后一个块}</span>
+                </label>
+                <label class="prog-switch-row">
+                    <input type="checkbox" class="b3-switch" bind:checked={addIndex} />
+                    <span>{tomatoI18n.新建分片时给段落标上序号}</span>
+                </label>
 
-            <div class="prog-radio-label">{tomatoI18n.断句方式}</div>
-            <div class="prog-radio-grid" role="radiogroup" aria-label={tomatoI18n.断句方式}>
-                {#each ["p", "t", "i", "no"] as t}
-                    <!-- □14 断句整体 Pro：未激活 p/t/i 可见但锁死（prog-locked + 🔒 +
-                         点击 pushMsg 引导，不静默不藏），no 免费恒可选。锁 chip 不用原生
-                         disabled（键盘 Tab 不可达=键盘用户触发不了引导，vision review P1）：
-                         radio 保持可聚焦，click preventDefault 硬拦选中（鼠标点 label 转发
-                         与键盘回车同一入口），aria-disabled 承担语义；执行侧 splitAndInsert
-                         另有同门禁兜底 -->
-                    {@const name = t == "p"
-                        ? tomatoI18n.断句为段落块
-                        : t == "t"
-                            ? tomatoI18n.断句为任务块
-                            : t == "i"
-                                ? tomatoI18n.断句为无序表
-                                : tomatoI18n.不断句}
-                    {@const locked = !paid && t !== "no"}
-                    <label
-                        class="prog-radio-chip b3-tooltips b3-tooltips__n"
-                        class:prog-locked={locked}
-                        aria-disabled={locked ? "true" : undefined}
-                        aria-label={locked ? `${name}（Pro）` : name}
-                    >
-                        <input
-                            type="radio"
-                            name="scoops"
-                            value={t}
-                            bind:group={splitType}
+                <div class="prog-radio-label">{tomatoI18n.断句方式}</div>
+                <div class="prog-radio-grid" role="radiogroup" aria-label={tomatoI18n.断句方式}>
+                    {#each ["p", "t", "i", "no"] as t}
+                        <!-- □14 断句整体 Pro：未激活 p/t/i 可见但锁死（prog-locked + 🔒 +
+                             点击 pushMsg 引导，不静默不藏），no 免费恒可选。锁 chip 不用原生
+                             disabled（键盘 Tab 不可达=键盘用户触发不了引导，vision review P1）：
+                             radio 保持可聚焦，click preventDefault 硬拦选中（鼠标点 label 转发
+                             与键盘回车同一入口），aria-disabled 承担语义；执行侧 splitAndInsert
+                             另有同门禁兜底 -->
+                        {@const name = t == "p"
+                            ? tomatoI18n.断句为段落块
+                            : t == "t"
+                                ? tomatoI18n.断句为任务块
+                                : t == "i"
+                                    ? tomatoI18n.断句为无序表
+                                    : tomatoI18n.不断句}
+                        {@const locked = !paid && t !== "no"}
+                        <label
+                            class="prog-radio-chip b3-tooltips b3-tooltips__n"
+                            class:prog-locked={locked}
                             aria-disabled={locked ? "true" : undefined}
-                            onclick={locked ? onLockedSplitClick : undefined}
-                            onchange={locked ? onLockedSplitChange : undefined}
-                        />
-                        <span>
-                            {t == "no" ? tomatoI18n.不断句 : ""}
-                            {t == "p" ? tomatoI18n.断句为段落块 : ""}
-                            {t == "t" ? tomatoI18n.断句为任务块 : ""}
-                            {t == "i" ? tomatoI18n.断句为无序表 : ""}
-                        </span>
-                        <!-- □30 🔒 emoji 换思源 sprite 小锁（iconLock，用户 emoji 装饰土口径收口） -->
-                        {#if locked}<svg class="prog-radio-tag" aria-hidden="true"><use xlink:href="#iconLock"></use></svg>{/if}
-                    </label>
-                {/each}
+                            aria-label={locked ? `${name}（Pro）` : name}
+                        >
+                            <input
+                                type="radio"
+                                name="scoops"
+                                value={t}
+                                bind:group={splitType}
+                                aria-disabled={locked ? "true" : undefined}
+                                onclick={locked ? onLockedSplitClick : undefined}
+                                onchange={locked ? onLockedSplitChange : undefined}
+                            />
+                            <span>
+                                {t == "no" ? tomatoI18n.不断句 : ""}
+                                {t == "p" ? tomatoI18n.断句为段落块 : ""}
+                                {t == "t" ? tomatoI18n.断句为任务块 : ""}
+                                {t == "i" ? tomatoI18n.断句为无序表 : ""}
+                            </span>
+                            <!-- □30 🔒 emoji 换思源 sprite 小锁（iconLock，用户 emoji 装饰土口径收口） -->
+                            {#if locked}<svg class="prog-radio-tag" aria-hidden="true"><use xlink:href="#iconLock"></use></svg>{/if}
+                        </label>
+                    {/each}
+                </div>
             </div>
         </section>
 
@@ -804,6 +869,17 @@
         line-height: 1.5;
         color: var(--b3-theme-on-surface);
         opacity: 0.64;
+    }
+    /* 期3 手动分片：勾上后切分/断句配置整体失效——置灰+禁交互（prog-locked 先例配方，
+       静态 class 可被 scoped CSS 命中） */
+    .prog-manual-dim {
+        opacity: 0.45;
+        pointer-events: none;
+    }
+    .prog-manual-slave {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
     /* □1 切分总纲（卡2 导语）：hint 字阶提一档浓度，与下方两行操作性 hint 分层 */
     .prog-field-hint.prog-card-lede {

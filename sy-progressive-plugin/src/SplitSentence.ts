@@ -1,4 +1,5 @@
-import { PARAGRAPH_INDEX, PROG_ORIGIN_TEXT, RefIDKey, SPACE } from "../../sy-tomato-plugin/src/libs/gconst";
+import { PARAGRAPH_INDEX, PROG_ORIGIN_TEXT, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
+import { escapeLead, mergeMathLead } from "./escapeLead";
 import { NewNodeID, get_siyuan_lnk_md, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { Plugin } from "siyuan";
 import { prog } from "./Progressive";
@@ -78,11 +79,12 @@ export class SplitSentence {
                 // □1 重插失真（2026-09-01）：三档原各有一次尾部裸 IAL 行 push——Lute 把它解析成
                 // 带属性的空段落块（实测 p 档重插产物尾部凭空多空块），断句产物从此零空块
                 if (this.asList == "p") {
+                    ps = mergeMathLead(ps); // $$ 前导片段回粘上一句（□13 review P1-1，escapeLead.ts 头注）
                     blocks = ps.map(i => i.trim())
                         .filter(i => i.length > 0)
                         .map(i => {
                             const { newID, attrLine } = getAttrLineWithID(ref, idx);
-                            return { text: SPACE.repeat(2) + i + ` ${get_siyuan_lnk_md(ref, "  *  ", prog.settings.pieceNoBacktraceLink)}\n${attrLine}\n`, id: newID };
+                            return { text: escapeLead(i) + ` ${get_siyuan_lnk_md(ref, "  *  ", prog.settings.pieceNoBacktraceLink)}\n${attrLine}\n`, id: newID };
                         });
                 } else if (this.asList == "t") {
                     blocks = ps.map(i => {

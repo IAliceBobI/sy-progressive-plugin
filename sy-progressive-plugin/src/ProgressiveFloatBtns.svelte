@@ -4,7 +4,7 @@
     import FloatBall from "./FloatBall.svelte";
     import type { Writable } from "svelte/store";
     import { get } from "svelte/store";
-    import { getFrontend, getAllEditor, type IProtyle } from "siyuan";
+    import { confirm, getFrontend, getAllEditor, type IProtyle } from "siyuan";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { getProgressivePluginConfig, icon, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { events } from "../../sy-tomato-plugin/src/libs/Events";
@@ -40,7 +40,8 @@
         WC去除笔记颜色, WC恢复笔记颜色, WC合并所有分片到新文件,
     } from "./WritingCompareBox";
     import { isProtylePiece } from "./helper";
-    import { openReviewSchedMenu } from "./reviewMenu";
+    import { openReviewSchedMenu, openDigestReviewMenu, removeRevisitBySource } from "./reviewMenu";
+    import { PdigestReviewKey, parseReview, isDue } from "./reviewQueue";
     import { openRefillMenu } from "./refillMenu";
 
     // v5 □5 浮条三态（docs/prog-v5-floatbar-design.md）：球（收起）↔ 浮条（展开）同屏只显示一个；
@@ -191,6 +192,8 @@
         summary: () => tip3(tomatoI18n.摘抄汇总, tomatoI18n.tip摘抄汇总),
         archive: () => tip3(tomatoI18n.归档本书, tomatoI18n.tip归档本书),
         recite: () => tip3(tomatoI18n.送进仿写, tomatoI18n.tip送进仿写),
+        // □7 ✧复访动作组（digest 态）：无键=加入复访（□8 后补入口），有键=完成一轮/改节奏/退出
+        revisit: () => tip3(tomatoI18n.复访, tomatoI18n.tip复访管理),
         // □11：tree=路线图浮层（digest 态）；addBook=📥 加书（□18 起 free/book/piece 三态常驻）
         tree: () => tip3(tomatoI18n.路线图, tomatoI18n.tip路线图),
         addBook: () => tip3(tomatoI18n.加书, tomatoI18n.tip加书, Progressive添加当前文档到渐进阅读分片模式.w()),
@@ -212,10 +215,12 @@
         delBack: () => tip3(tomatoI18n.上片删, tomatoI18n.tip上片删),
         delExit: () => tip3(tomatoI18n.删片退出, tomatoI18n.tip删片退出),
         quit: () => tip3(tomatoI18n.关闭分片, tomatoI18n.tip关闭分片),
-        ignore: () => tip3(tomatoI18n.不再推送, tomatoI18n.tip不再推送),
-        // □11 浮层族：map=路线指引浮层、traceUp=原文侧追溯（书态）
+        ignore: () => tip3(tomatoI18n.不再推送,
+            $kind === "free" ? tomatoI18n.tip不再推送复访 : tomatoI18n.tip不再推送),
+        // □11 浮层族：map=路线指引浮层、traceUp=原文侧追溯（书态；free 态 650189=关联摘抄，跨态异义）
         map: () => tip3(tomatoI18n.路线指引, tomatoI18n.tip路线指引),
-        traceUp: () => tip3(tomatoI18n.本书摘抄, tomatoI18n.tip本书摘抄),
+        traceUp: () => tip3($kind === "free" ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
+            $kind === "free" ? tomatoI18n.tip关联摘抄 : tomatoI18n.tip本书摘抄),
         // □27 仿写本片（片态副本练习）；recite 在 digest 态是「把摘抄送进仿写」（文案在 TIPS，跨态同 id 异义）
         recite: () => tip3(tomatoI18n.仿写本片, tomatoI18n.tip仿写本片),
     };
@@ -258,7 +263,7 @@
         delExit: () => tomatoI18n.删片退出,
         ignore: () => tomatoI18n.不再推送,
         map: () => tomatoI18n.路线指引,
-        traceUp: () => tomatoI18n.本书摘抄,
+        traceUp: () => $kind === "free" ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
         recite: () => tomatoI18n.仿写本片,
     };
     // □11 三行制：子排名沿用单字短名，用法句补齐（card 与高级组同 id 不同义，各自 getter；
@@ -268,6 +273,7 @@
         inbox: () => tip3(tomatoI18n.留档, tomatoI18n.tip留档),
         think: () => tip3(tomatoI18n.思考, tomatoI18n.tip思考),
         card: () => tip3(tomatoI18n.背诵, tomatoI18n.tip背诵),
+        review: () => tip3(tomatoI18n.复访, tomatoI18n.tip复访),
         word: () => tip3(tomatoI18n.单词, tomatoI18n.tip单词),
         wordai: () => tip3(tomatoI18n.生词AI, tomatoI18n.tip生词AI),
         write: () => tip3(tomatoI18n.仿写, tomatoI18n.tip仿写),
@@ -278,6 +284,7 @@
         inbox: "iconProgInbox",
         think: "iconProgThink",
         card: "iconProgRecite",
+        review: "iconHistory", // 期2 复访档：内核内置历史图标（滚动复习语义）
         word: "iconProgWord",
         wordai: "iconProgWordAI",
         write: "iconProgWrite",
@@ -310,12 +317,14 @@
 
     /** □11 目录浮层（contents 钮改道）：书大纲标题列表。□1（2026-09-01）按态分语义：
      *  片态=跳原文标题位置（openOriginBook 定位原标题块；回程靠原文上的书态浮条
-     *  「跳到分片」）+ 高亮当前位置；书态=跳对应分片（现状不动，readThisPiece）。 */
+     *  「跳到分片」）+ 高亮当前位置；书态=跳对应分片（现状不动，readThisPiece）；
+     *  free 态（650189）=跳本文档标题位置（自指 $noteID，同片态 openOriginBook 链路）。 */
     function openContentsPopover(ev?: MouseEvent) {
         // 态/书/片号同一时刻快照（review P2-2：onJump 闭包不混「打开时快照+点击时活读」，
         // 浮层开着时键盘切页签换态，旧浮层点击仍按打开时的语义走，自洽不串台）
         const isPiece = $kind === "piece";
-        const bid = $bookID;
+        const isFree = $kind === "free"; // free 无书：大纲直查本文档，bid 自指
+        const bid = isFree ? $noteID : $bookID;
         const pt = isPiece ? $point : null;
         openFloatPopover({
             title: tomatoI18n.打开目录,
@@ -326,7 +335,7 @@
                 point: pt,
                 onJump: (blockID: string) => {
                     closeFloatPopover();
-                    if (isPiece) void prog.openOriginBook(bid, blockID);
+                    if (isPiece || isFree) void prog.openOriginBook(bid, blockID);
                     else void prog.readThisPiece(blockID);
                 },
             },
@@ -403,14 +412,16 @@
         }
     }
 
-    /** □29 摘抄清单大界面：浮层超量（>30 条）升级——搜索+全量，ShowAllBooks 同款 showDialog 挂载 */
-    function openDigestAllDialog() {
+    /** □29 摘抄清单大界面：浮层超量（>30 条）升级——搜索+全量，ShowAllBooks 同款 showDialog 挂载。
+     *  freeDoc（群反馈 650189）：free 态传 $noteID 查本文档关联摘抄，标题/空态换「本文档」口径 */
+    function openDigestAllDialog(freeDoc = false) {
         showDialog((target, dm) => {
             return mount(DigestAllDialog, {
                 target,
                 props: {
                     dm,
-                    bookID: $bookID,
+                    bookID: freeDoc ? $noteID : $bookID,
+                    freeDoc,
                     onJumpDoc: (id: string) => {
                         dm.destroyBy();
                         void prog.jumpTo(id);
@@ -418,7 +429,7 @@
                 },
             });
         }, {
-            title: tomatoI18n.本书摘抄清单,
+            title: freeDoc ? tomatoI18n.本文档摘抄清单 : tomatoI18n.本书摘抄清单,
             width: events.isMobile ? "90vw" : undefined,
             // min() 钳矮视口：固定 700px 在 <700px 窗口把标题栏/关闭钮裁出屏（vision P1-3；
             // ShowAllBooks 同病属既有缺陷不扩修，新组件不继承）
@@ -426,24 +437,28 @@
         });
     }
 
-    /** □11 原文侧追溯浮层（书态 traceUp 钮；□29 片态复用）：本文档摘抄清单+当前块所属分片 */
+    /** □11 原文侧追溯浮层（书态 traceUp 钮；□29 片态复用；free 态 650189）：本文档摘抄清单+当前块所属分片 */
     function openOriginDigestPopover(ev?: MouseEvent) {
         const s = events.selectedDivsSync(events.protyle?.protyle);
         // □29 片态定位直供浮条出场时解析的 $point（前端内存 ial 无属性窗口，选中笔记块/
         // 嵌套块/搬家块通吃——reasoning P1-1：按块反查会误报「不在分片索引中」）；
-        // 书态选中块=书原文块，块 id 本身即索引键
+        // 书态选中块=书原文块，块 id 本身即索引键。free 无分片概念，locator 段传空不渲染
         const isPiece = $kind === "piece";
+        // free 复用清单浮层：摘抄 ctime 自指 docID（resolveDigestOrigin self 支路），
+        // bookID 传 $noteID 即查本文档关联摘抄（含摘抄上再摘抄的支路树）
+        const isFree = $kind === "free";
         openFloatPopover({
-            title: tomatoI18n.本书摘抄,
+            title: isFree ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
             x: anchorXY(ev).x, y: anchorXY(ev).y,
             component: OriginDigestPopover,
             props: {
-                bookID: $bookID,
-                blockID: isPiece ? "" : (s?.ids?.at(0) ?? ""),
+                bookID: isFree ? $noteID : $bookID,
+                blockID: isPiece || isFree ? "" : (s?.ids?.at(0) ?? ""),
                 point: isPiece ? $point : undefined,
+                freeDoc: isFree,
                 onShowAll: () => {
                     closeFloatPopover();
-                    openDigestAllDialog();
+                    openDigestAllDialog(isFree);
                 },
                 onJumpDoc: (id: string) => {
                     closeFloatPopover();
@@ -540,6 +555,9 @@
                     await prog.sendToRecite();
                 }
                 break;
+            case "revisit": // □7 ✧ 复访动作组（digest 态）：两态菜单；动作落盘后复查红点
+                await openDigestReviewMenu($noteID, ev ?? { clientX: 0, clientY: 0 }, () => probeRevisitDue());
+                break;
             case "nextPure": // 托盘动作勾上首行后走首行入口，同平铺区低频通道
             case "delBack":
             case "quit":
@@ -585,6 +603,25 @@
         }).catch(() => { }); // API 异常静默——胶囊是装饰层不报错打扰（review P2）
     });
 
+    // ---- □7 复访到期红点（digest 态 revisit 钮角）：读文档 IAL 解析 due。不走出场链
+    //      attrs 快照——□8 后补入口刚打的键巨书实测 24s+ 才反映进快照，直查内核真值
+    //      （单文档 getBlockAttrs 轻查询）；菜单动作后 onApplied 复查，完成/推迟/移除即灭点 ----
+    let revisitDue = $state(false);
+    function probeRevisitDue(id = $noteID) {
+        if (!id) return;
+        void siyuan.getBlockAttrs(id).then(attrs => {
+            if (get(noteID) !== id) return; // 竞态守卫：翻页后不回写旧值（crumbs 同款）
+            const s = parseReview(attrs?.[PdigestReviewKey]);
+            revisitDue = !!s && isDue(s, Date.now());
+        }).catch(() => { }); // 装饰层不报错打扰
+    }
+    $effect(() => {
+        const id = $noteID;
+        void $kind;            // 态换代重求值
+        revisitDue = false;
+        if ($kind === "digest" && id) probeRevisitDue(id);
+    });
+
     /** 平铺区低频段旧动作（HtmlCBType 单入口）+ □11 浮层族改道 */
     async function onLowFreq(id: string, ev?: MouseEvent) {
         switch (id) {
@@ -617,7 +654,16 @@
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.quit, $point);
                 break;
             case "ignore":
-                await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.ignoreBook, $point);
+                if ($kind === "free") {
+                    // 期2「不再推送」：该源文档全部摘抄的复访批量移除（confirm 后执行；
+                    // 书忽略与复访正交——free 态不走 ignoreBook）
+                    confirm("", tomatoI18n.不再推送复访确认, async () => {
+                        const n = await removeRevisitBySource($noteID);
+                        await siyuan.pushMsg(n > 0 ? tomatoI18n.已移除N条复访(n) : tomatoI18n.暂无复访摘抄);
+                    });
+                } else {
+                    await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.ignoreBook, $point);
+                }
                 break;
         }
     }
@@ -757,7 +803,7 @@
             ?? null;
     }
 
-    async function runDigest(split = false, question = false, cardMode?: string) {
+    async function runDigest(split = false, question = false, cardMode?: string, review = false) {
         const protyle = resolveSubrankProtyle();
         if (!protyle) {
             await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪);
@@ -770,7 +816,7 @@
         }
         const di = await initDi(s, protyle, digestProgressiveBox.settings);
         if (cardMode) di.cardMode = cardMode; // 去向级覆盖，不 saveCardMode 不改书全局
-        await di.digest(split, question);
+        await di.digest(split, question, review);
     }
 
     async function runWord(ai = false) {
@@ -807,6 +853,9 @@
                 break;
             case "card":
                 await runDigest(false, false, CARD_RECITE); // 每个摘抄都加入闪卡（cardMode 档位，与「执行摘抄(背诵)」命令同源）
+                break;
+            case "review": // 期2 复访档：摘抄+文档级滚动复习入队（cardMode 跟随书设置，不覆盖）
+                await runDigest(false, false, undefined, true);
                 break;
             case "word":
                 await runWord();
@@ -942,6 +991,7 @@
             >
                 {@html icon(b.icon, 16)}
                 {#if b.id === "cards" && $dueText}<span class="prog-fb-cardbadge">{$dueText}</span>{/if}
+                {#if b.id === "revisit" && revisitDue}<span class="prog-fb-revisitdot"></span>{/if}
             </button>
         {/each}
         {#if dropIndex === buttons.length}<span class="prog-fb-dropmark"></span>{/if}

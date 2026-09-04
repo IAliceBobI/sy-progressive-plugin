@@ -1,6 +1,6 @@
 import { IEventBusMap, IProtyle, Lute, Plugin } from "siyuan";
 import { NewLute, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
-import { ReviewKey, parseReview } from "./reviewQueue";
+import { ReviewKey, PdigestReviewKey, parseReview } from "./reviewQueue";
 import { applyReviewAction, schedSubmenuItems } from "./reviewMenu";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
@@ -144,6 +144,18 @@ class DigestProgressiveBox {
                 icon: "iconProgSched",
                 submenu: schedSubmenuItems(ids, s, raw),
             });
+            // 期2 复访节奏：摘抄文档级 pdigest-review（custom IAL 渲染在 wysiwyg 容器属性上，
+            // DigestBuilder.init 读 PDIGEST_CTIME 同款通道）——右键改 q 曲线/s 日程/移除；
+            // 同步读 DOM 零 await（emitToPlugins 同步收集，await addItem 迟到不进菜单）
+            const docReview = detail.protyle?.wysiwyg?.element?.getAttribute(PdigestReviewKey);
+            if (docReview != null) {
+                const docID = detail.protyle?.block?.rootID;
+                menu.addItem({
+                    label: tomatoI18n.复访节奏,
+                    icon: "iconHistory",
+                    submenu: schedSubmenuItems([docID], parseReview(docReview), docReview, PdigestReviewKey),
+                });
+            }
         });
 
         this.plugin.addCommand({

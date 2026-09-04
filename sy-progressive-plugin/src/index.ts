@@ -16,7 +16,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -33,7 +33,8 @@ import { siyuan, timeUtil } from "../../sy-tomato-plugin/src/libs/utils";
 import { initProgFloatBtns, toggleFloatBarSystem, toggleFreeFloat } from "./ProgressiveBtn";
 import { PROG_FLOAT_ICONS } from "./progIcons";
 import { initDigestMarker } from "./digestMarker";
-import { initFleet, notifyFleetChanged, onunloadFleet, type FleetActions } from "./fleet";
+import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
+import { notifyFleetChanged } from "./fleetNotify";
 import { closeFloatPopover } from "./overlays";
 import { openDueReviewList } from "./reviewMenu";
 import { buildContentBlocks, computePieceIndex, runSplit } from "./Split2Pieces";
@@ -52,7 +53,14 @@ function loadStore(plugin: BaseTomatoPlugin) {
     ProgressiveStart2learn.load(plugin);
     digestmenu.load(plugin);
     blockIconMenu.load(plugin);
+    // 期1 □2 摘抄落点迁移：digestLanding 无存量值时，老开关 digest2dailycard=true → "daily"
+    // （保持原行为），否则默认 "central"；.set 只写内存——即便未持久化，每次启动重跑也幂等
+    const hasLanding = (plugin.settingCfg as any)?.digestLanding != null;
     digest2dailycard.load(plugin);
+    digestLanding.load(plugin);
+    if (!hasLanding && digest2dailycard.get() === true) {
+        digestLanding.set("daily");
+    }
     card2dailycard.load(plugin);
     flashcardAddRefs.load(plugin);
     flashcardMultipleLnks.load(plugin);
@@ -243,7 +251,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             version: "v" + this.pluginSpec?.version + "p",
             pro: lastVerifyResult() === true,
             onHelp: (e) => openHelpMenu(e, {
-                usage: () => openHelpDialog("https://awx9773btw.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink", helpDocs),
+                usage: () => openHelpDialog("https://my.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink", helpDocs),
                 changelog: () => openChangelogDialog(changelog),
             }),
             onClose: () => dialog.destroy(),

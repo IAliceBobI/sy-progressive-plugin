@@ -8,8 +8,8 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
-import { digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
-import { FloatDocKind, detectFloatDoc, expandAtAppear } from "./progFloatState";
+import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests } from "./digestMarker";
@@ -133,7 +133,7 @@ async function refreshDue(dirKey: string) {
     if (dirKey === lastDueKey) return;
     lastDueKey = dirKey;
     try {
-        const dirID = await progStorage.ensureDigestDir(dirKey);
+        const dirID = await progStorage.ensureDigestDir(dirKey, digestLanding.get() === "source");
         if (!dirID || lastDueKey !== dirKey) return;
         const ret = await siyuan.getTreeRiffDueCards(dirID);
         if (lastDueKey !== dirKey) return;
@@ -235,7 +235,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // 展开态同款持久化（2026-09-02）：expandAtAppear 偏好优先——书/摘抄态出场不再
         // 无条件收球，跟随用户最后一次显式意志；无意志维持出厂默认（片/free 展开）
         expanded.set(expandAtAppear(floatbarExpandPref.get(), nextKind));
-        if (nextBookID) refreshDue(nextBookID);
+        if (nextBookID && shouldRefreshDue(nextBookID, isBook)) refreshDue(nextBookID);
     }
     // 摘抄痕迹：片态（块 custom-progref 命中）与书态原文（块 ID 即 ref 值）双侧打标。
     // □15 移出 docChanged：出场链由五种事件驱动（含 loaded_protyle_dynamic），protyle

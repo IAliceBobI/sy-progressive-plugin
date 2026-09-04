@@ -232,11 +232,12 @@ function makeRollerDeps(): RollerDeps {
             return row?.content ?? bookID;
         },
         loadAllDays: async () => {
+            // 显式 limit 防内核 64 截尾：日志块 >64 天（约两个月重度使用）热力图/欠债即漏
             const rows = await siyuan.sql(`
                 select a.value as data, b.value as date
                 from attributes a
                 join attributes b on a.block_id = b.block_id and b.name = '${constants.PLOG_DATE}'
-                where a.name = '${constants.PLOG_DATA}'`) ?? [];
+                where a.name = '${constants.PLOG_DATA}' limit 10000000`) ?? [];
             return (rows as any[]).map(r => {
                 const d = parseDayLogData(r.data);
                 return { date: r.date, q: d.q, read: Object.values(d.b).reduce((s, n) => s + n, 0) };
