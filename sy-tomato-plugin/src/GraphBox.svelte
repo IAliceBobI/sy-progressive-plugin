@@ -72,6 +72,9 @@
     let canvasHeight: number = $state();
     let canvasWidth: number = $state();
     let lastDocID = "";
+    // □2 闪烁治理指纹：同文档且 updated 未变 = 图数据必然未变，changeDoc 整次短路
+    // （「打开所在文档」新页签/重复 loaded 事件/轮询必刷的白跑全被挡在构建前，零闪烁零成本）
+    let lastFingerprint = "";
     let currentDocName = ""; // 完整加载时 getData 需要文档名（根节点 label）
     let stop = false;
     // 布局形态四态（期7）：lr/tb=横排文字，vlr/vtb=竖排文字（writing-mode）；
@@ -227,6 +230,14 @@
             colorMode = "dark";
         }
         const docID = protyle.block.rootID;
+        // □2 指纹短路：毫秒级 updated SQL 远贱于 getBlockDOM（巨书 25~39s），同文档未编辑
+        // 直接跳过整次重建——节点 DOM 原样保留（引用不变=视觉零闪烁），折叠/视图态不受扰
+        const updatedRow = await siyuan.sqlOne(`SELECT updated FROM blocks WHERE id = "${docID}" AND type = "d"`);
+        const fingerprint = `${docID}|${updatedRow?.updated ?? ""}`;
+        if (fingerprint === lastFingerprint) {
+            gbLog("graph.short_circuit", `doc=${docID.slice(0, 8)} unchanged`);
+            return;
+        }
         currentDocName = docName;
         const taskLayoutForm = getLayoutForm(docID);
 
@@ -266,6 +277,7 @@
         if (isNewDoc) {
             lastDocID = docID;
         }
+        lastFingerprint = fingerprint; // 构建真正落地才落指纹（中途丢弃/异常不落）
         await relayout(!refreshOnly);
         if (isNewDoc && data()?.locateID) {
             data()?.locateID($nodes.at(0)?.id);
@@ -503,6 +515,7 @@
     async function onManualRefresh() {
         gbLog("graph.manual_refresh", `doc=${(lastDocID || "").slice(0, 8)}`);
         if (!lastDocID) return;
+        lastFingerprint = ""; // 手动刷新=强制重建语义，绕过指纹短路
         await changeDoc({
             title: { editElement: { textContent: currentDocName || lastDocID } },
             block: { rootID: lastDocID },

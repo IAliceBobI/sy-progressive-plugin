@@ -595,34 +595,40 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   color: var(--prog-sub);
   flex: 1;
 }
-/* 可见性期3 □3：复习计划常驻钮（同 recite 钮形态，色随子色） */
+/* 可见性期3 □3：复习计划常驻钮。图文胶囊款（用户反馈 16px 图标钮太小）：规格对齐
+   .prog-fleet-foot .ghost（管理书目参照系），色保留 accent=常驻主入口的提示性 */
 .prog-fleet-plan {
   display: flex;
   align-items: center;
-  padding: 4px;
+  gap: 4px;
+  padding: 4px 8px;
   border: none;
   border-radius: 6px;
   background: none;
   cursor: pointer;
+  font-size: 12px;
   color: var(--prog-accent);
+  box-shadow: inset 0 0 0 1px var(--prog-card-border);
   transition: opacity 0.12s ease-out, background-color 0.12s ease-out;
 }
 .prog-fleet-plan:hover {
   background: var(--prog-accent-soft);
 }
 .prog-fleet-plan svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 .prog-fleet-recite {
   display: flex;
   align-items: center;
-  padding: 4px;
+  padding: 4px 6px;
   border: none;
   border-radius: 6px;
   background: none;
   cursor: pointer;
   color: var(--prog-yours);
+  box-shadow: inset 0 0 0 1px var(--prog-card-border);
   transition: opacity 0.12s ease-out, background-color 0.12s ease-out;
 }
 .prog-fleet-recite:hover {
@@ -633,8 +639,9 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   color: var(--b3-theme-on-surface);
 }
 .prog-fleet-recite svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
 /* 今日状态区 */
@@ -763,6 +770,53 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
 }
 
 /* 书卡列表 */
+/* 舰队管理 □1：书卡搜索框（b3-text-field 底 + prog 变量覆盖）。核心帧线是 outline
+   不是 border（思源 _text-field.scss），静息色须改写 outline；焦点规则核心侧为
+   .b3-text-field:not(.b3-text-field--text):focus (0,3,0)，覆盖须平级特异性（设置页
+   prog-search-input 靠 .tomato-settings-dialog 前缀同机理取胜，舰队版无对话框祖先故平拼类名） */
+.prog-fleet-search {
+  flex: none;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: var(--prog-card-bg);
+  outline: 1px solid var(--prog-card-border);
+  outline-offset: -1px;
+  color: var(--prog-title);
+  box-shadow: none;
+}
+.prog-fleet-search.b3-text-field:hover:not(:focus) {
+  box-shadow: none; /* 核心自带中性 hover 阴影，与 prog 皮肤打架 */
+}
+.prog-fleet-search.b3-text-field:focus {
+  outline-color: var(--prog-accent);
+  box-shadow: 0 0 0 2px var(--prog-accent-soft);
+}
+.prog-fleet-search::placeholder {
+  color: var(--prog-muted);
+}
+/* type=search 原生清除钮：颜色收编进 prog 体系（否则 Chromium 默认色不可控） */
+.prog-fleet-search::-webkit-search-cancel-button {
+  color: var(--prog-muted);
+}
+
+/* 舰队管理 □2：置顶标识（name 行内前缀） */
+.prog-fleet-card .pin {
+  font-size: 11px;
+  margin-right: 2px;
+}
+
+/* 搜索无匹配空态（区别于全书架空的插画态；清关键字即恢复） */
+.prog-fleet-nomatch {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--prog-muted);
+}
+
 .prog-fleet-books {
   display: flex;
   flex-direction: column;
@@ -781,6 +835,10 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   background: var(--prog-card-bg);
   box-shadow: var(--prog-shadow);
   cursor: pointer;
+  /* □2 长按开菜单：禁文本选择与 iOS 系统长按 callout（否则 pointercancel 清计时器，菜单开不出） */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   text-align: left;
   color: var(--prog-title);
   transition: transform 0.12s ease-out, border-color 0.12s ease-out;
@@ -1562,4 +1620,34 @@ button.prog-popover-item:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* progpolish □4：摘抄文档身份徽章（title 区，出场链 DOM 注入零落盘） */
+.prog-digest-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  vertical-align: middle;
+  color: var(--b3-theme-primary);
+  background: var(--b3-theme-primary-lightest);
+  box-shadow: inset 0 0 0 1px var(--b3-theme-primary);
+  cursor: pointer;
+  user-select: none;
+}
+.prog-digest-tag:hover {
+  filter: brightness(1.05);
+}
+.prog-digest-tag svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+html[data-theme-mode="dark"] .prog-digest-tag {
+  color: var(--b3-theme-primary-light);
+  background: transparent;
 }

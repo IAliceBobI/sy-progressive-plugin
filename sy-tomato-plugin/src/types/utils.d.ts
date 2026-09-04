@@ -43,6 +43,7 @@ type TomatoSettings = {
     floatingballEnable: boolean,
     floatingballDocList: FloatingDocItem[],
     floatingballKeyboardList: FloatingKeyboardItem[],
+    floatingballBallList: BallItem[],
     exportWhiteList: string[],
     exportBlackList: string[],
     hiddenMenuItems: string[],
@@ -687,6 +688,27 @@ type FloatingKeyboardItem = {
     altKey?: boolean;
     shiftKey?: boolean;
     ctrlKey?: boolean;
+}
+
+// 悬浮球统一模型（期1 翻新地基）：位置进数据本体（anchor 九宫格+偏移，几何见
+// libs/ballGeometry.ts），废 config 顶层 TomatoFloatingBtnDMKey_* 动态散键；
+// id=newID() 稳定身份；type 走 actions/ 注册表分派。size/opacity/label 为期4 外观字段预留。
+type BallType = "doc" | "shortcut" | "url" | "plugincmd";
+
+type BallItem = {
+    id: string;
+    type: BallType;
+    action?: any;
+    icon?: string;
+    label?: string;
+    size?: number;
+    opacity?: number;
+    showLabel?: boolean;
+    anchor?: number;
+    offsetX?: number;
+    offsetY?: number;
+    enable?: boolean;
+    enableMobile?: boolean;
 }
 
 type ArticlesPrefix = { id: string; docName: string; prefix: string }

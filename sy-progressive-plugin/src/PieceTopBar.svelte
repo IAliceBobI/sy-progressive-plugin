@@ -38,12 +38,15 @@
         ro.observe(rootEl);
         // 主排勾满时按钮超宽横滚且滚动条隐藏——右缘渐隐提示还有更多；滚到底/无溢出摘除，
         // 避免常态盖住最后一个按钮。横滚在 snippet 的 .prog-fb-row 上（容器已改纵排）
+        // □5①：滚离起点后左缘同样挂渐隐（往回滚的内容同样有硬裁碎屑感；滚到底保留——
+        // 三态=scroll-x 右缘（未到底）/scroll-l 左缘（已滚出）/双类同挂=两缘）
         const rowEl = btnsEl?.querySelector(".prog-fb-row");
         function syncScrollHint() {
             if (!rowEl) return;
             const overflow = rowEl.scrollWidth > rowEl.clientWidth + 1;
             const atEnd = rowEl.scrollLeft + rowEl.clientWidth >= rowEl.scrollWidth - 2;
             rowEl.classList.toggle("prog-topbar-scroll-x", overflow && !atEnd);
+            rowEl.classList.toggle("prog-topbar-scroll-l", overflow && rowEl.scrollLeft > 2);
         }
         rowEl?.addEventListener("scroll", syncScrollHint, { passive: true });
         syncScrollHint();
@@ -112,12 +115,40 @@
     .prog-topbar-btns :global(.prog-fb-row)::-webkit-scrollbar {
         display: none;
     }
-    /* 横滚提示（onMount 按溢出/滚位动态挂摘到主排行上）：右缘 16px 渐隐示意「还有更多」；
-       内核 Chromium 114 认前缀写法，标准属性随行兜新内核。row 是 snippet 元素且类为
-       JS 运行时挂，须 :global 组合选择器——裸类名会被 Svelte 当 unused 剪掉 */
-    .prog-topbar-btns :global(.prog-fb-row.prog-topbar-scroll-x) {
-        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
-        mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+    /* 横滚提示（onMount 按溢出/滚位动态挂摘到主排行上）：两缘 16px 表面色渐变示意
+       「还有更多/前面还有」。row 是 snippet 元素且类为 JS 运行时挂，须 :global 组合
+       选择器——裸类名会被 Svelte 当 unused 剪掉。
+       □5②：渐隐从容器 mask 换表面色覆盖层（::before/::after）——mask 会连 sticky
+       折叠钮一起糊掉，覆盖层则可被高 z-index 的折叠钮露出；顶栏背景恒实色
+       （--b3-theme-surface），覆盖层与 mask 视觉等价 */
+    .prog-topbar-btns :global(.prog-fb-row) {
+        position: relative;
+    }
+    .prog-topbar-btns :global(.prog-fb-row.prog-topbar-scroll-x)::after,
+    .prog-topbar-btns :global(.prog-fb-row.prog-topbar-scroll-l)::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 16px;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .prog-topbar-btns :global(.prog-fb-row.prog-topbar-scroll-x)::after {
+        right: 0;
+        background: linear-gradient(to right, transparent, var(--b3-theme-surface));
+    }
+    .prog-topbar-btns :global(.prog-fb-row.prog-topbar-scroll-l)::before {
+        left: 0;
+        background: linear-gradient(to left, transparent, var(--b3-theme-surface));
+    }
+    /* □5②：折叠钮 sticky 钉右缘——溢出初始态它不再被滚出视口（唯一找回工具区的
+       入口，须可预知）；z-index 高于渐隐覆盖层，恒完整可见。实底已有（:global(button)
+       color-mix），叠滚动钮上方不透底。仅顶栏生效（桌面浮条折叠钮照旧流内） */
+    .prog-topbar-btns :global(.prog-fb-fold) {
+        position: sticky;
+        right: 0;
+        z-index: 2;
     }
     /* snippet 里的按钮（ProgressiveFloatBtns 编译 scope 外）：缩小热区 + 实底。
        b3-button--outline 透明底、--b3-list-hover 也是半透明 rgba（两主题实测）——

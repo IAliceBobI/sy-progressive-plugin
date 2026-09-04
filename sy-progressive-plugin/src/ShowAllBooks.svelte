@@ -158,6 +158,15 @@
         b.bookInfo.ignored = v;
         progStorage.setIgnoreBook(b.bookID, v);
     }
+    /** 舰队管理 □2：取消隐匿（管理页=隐匿书唯一找回出口；舰队面板同步刷新） */
+    async function btnUnhide(b: TaskType) {
+        b.bookInfo.hidden = false;
+        await progStorage.setHiddenBook(b.bookID, false);
+        await siyuan.pushMsg(tomatoI18n.已在总览显示);
+        invalidateBookStatusCache();
+        notifyFleetChanged();
+        load(true);
+    }
     function toggleDeep(
         b: TaskType,
         field: "addIndex2paragraph" | "showLastBlock",
@@ -263,10 +272,11 @@
                         </div>
                     </article>
                 {:else}
-                    <!-- 活书卡：书名行 / 进度条 / 动作行 / 折叠分片设置 -->
-                    <article class="card">
+                    <!-- 活书卡：书名行 / 进度条 / 动作行 / 折叠分片设置；□2 隐匿书灰态行（舰队不显示但管理页可见=找回出口） -->
+                    <article class="card" class:hidden={!!b.bookInfo.hidden}>
                         <div class="row top">
-                            <span class="name">{b.name}</span>
+                            <span class="name">{#if b.bookInfo.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{b.name}</span>
+                            {#if b.bookInfo.hidden}<span class="chip chip-hidden">{tomatoI18n.已隐匿此书}</span>{/if}
                             <span class="num"
                                 >{totalOf(b) > 0
                                     ? `${b.bookInfo.point ?? 0}/${totalOf(b)} ${tomatoI18n.分片}`
@@ -314,6 +324,14 @@
                                 onclick={() => toggleIgnore(b)}
                             >{tomatoI18n.忽略}</button
                             >
+                            {#if b.bookInfo.hidden}
+                                <button
+                                    class="btn ghost"
+                                    aria-label={`${tomatoI18n.取消隐匿}《${b.name}》`}
+                                    onclick={() => btnUnhide(b)}
+                                >{tomatoI18n.取消隐匿}</button
+                                >
+                            {/if}
                             <span class="spacer"></span>
                             <button
                                 class="icon-btn danger b3-tooltips b3-tooltips__n"
@@ -653,6 +671,18 @@
     .chip-closed {
         color: var(--prog-muted);
         box-shadow: inset 0 0 0 1px var(--b3-border-color);
+    }
+    /* □2 隐匿书：muted 灰调（与 ⏸ 区分——隐匿是用户主动视觉操作，非异常态） */
+    .chip-hidden {
+        color: var(--prog-sub);
+        background: color-mix(in srgb, var(--prog-muted) 16%, transparent);
+    }
+    .card.hidden {
+        opacity: 0.62;
+    }
+    .name .pin {
+        font-size: 11px;
+        margin-right: 2px;
     }
     .chip-lost {
         color: var(--prog-status-warn);

@@ -33,6 +33,8 @@ export interface FleetBook {
     finished: boolean;
     /** 期3 手动分片书：索引恒空，片=摘抄（✒ 即片数），点卡=开原书 */
     manual: boolean;
+    /** 舰队管理 □2：置顶书（置顶组最优先，组内保滚筒序） */
+    pinned: boolean;
 }
 
 /** 热力格（近 N 天横条，右端=今天） */
@@ -146,10 +148,11 @@ export function buildHeat(days: { date: string; q: number; read: number }[], tod
     return cells;
 }
 
-/** 书卡聚合：滚筒序输出，过滤忽略/归档；order 外的书按 books.json 序兜底排尾。
+/** 书卡聚合：滚筒序输出，过滤忽略/归档/隐匿（□2 hidden 纯视觉：调度链不含 hidden）；
+ *  order 外的书按 books.json 序兜底排尾。
  *  status 缺省全 ok（与管理页同 rank：⚠ lost 次之、⏸ closed 沉底）。 */
 export function buildFleetBooks(args: {
-    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean } };
+    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean; pinned?: boolean; hidden?: boolean } };
     order: string[];
     todayReads: { [bookID: string]: number };
     indexLens: { [bookID: string]: number };
@@ -163,7 +166,7 @@ export function buildFleetBooks(args: {
     const books: FleetBook[] = [];
     for (const bookID of merged.order) {
         const info = args.infos[bookID];
-        if (!info || info.ignored || info.archived) continue;
+        if (!info || info.ignored || info.archived || info.hidden) continue;
         const total = args.indexLens[bookID] ?? 0;
         const point = info.point ?? 0;
         const think = args.thinkBadges.get(bookID);
@@ -180,11 +183,26 @@ export function buildFleetBooks(args: {
                 due: think?.due ?? 0,
             },
             manual: !!info.manualMode,
+            pinned: !!info.pinned,
             finished: total > 0 && point >= total,
         });
     }
-    books.sort((a, b) => rank(a.status) - rank(b.status));
+    // □2 置顶组最优先（组内保滚筒序=不按 status 分层）；其余维持现状 rank（ok→lost→closed）。
+    // JS sort 稳定：组内比较返回 0 即保输入（滚筒）序
+    books.sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        if (a.pinned && b.pinned) return 0;
+        return rank(a.status) - rank(b.status);
+    });
     return books;
+}
+
+/** 书卡关键字过滤（舰队管理 □1 搜索框）：书名大小写不敏感包含匹配，
+ *  纯视觉过滤不动滚筒序/沉底序；空/纯空白关键字原样返回 */
+export function filterFleetBooks(books: FleetBook[], kw: string): FleetBook[] {
+    const k = (kw ?? "").trim().toLowerCase();
+    if (!k) return books;
+    return books.filter(b => b.name.toLowerCase().includes(k));
 }
 
 // ============ 生产侧（真实 siyuan/storage） ============

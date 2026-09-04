@@ -219,6 +219,21 @@ export default class ThePlugin extends BaseTomatoPlugin {
             isReciteInstalled: () => prog.isReciteInstalled(),
             openDueList: (ev, bookID) => openDueReviewList(ev, bookID),
             openReviewPlan: () => this.openReviewPlanDialog(),
+            // 舰队管理 □2：书卡菜单动作（数据侧动作后 notifyFleetChanged 驱动面板即时刷新；
+            // 归档走 confirm 确认链，书摘出调度后由 30s 刷新兜底，不抢 confirm 时序）
+            togglePinBook: async (bookID, v) => {
+                await progStorage.setPinnedBook(bookID, v);
+                notifyFleetChanged();
+            },
+            toggleHideBook: async (bookID, v) => {
+                await progStorage.setHiddenBook(bookID, v);
+                notifyFleetChanged();
+            },
+            ignoreBook: async (bookID) => {
+                await progStorage.setIgnoreBook(bookID, true);
+                notifyFleetChanged();
+            },
+            archiveBook: (bookID) => prog.archiveBookWithConfirm(bookID),
         };
         initFleet(this, fleetActions);
     }

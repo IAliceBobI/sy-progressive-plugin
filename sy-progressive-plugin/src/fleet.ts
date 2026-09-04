@@ -38,6 +38,11 @@ export interface FleetActions {
     openDueList(ev: { clientX: number; clientY: number }, bookID?: string): any;
     /** 可见性期3 □3：复习计划面板（独立 Dialog，常驻入口不依赖 due>0） */
     openReviewPlan(): any;
+    /** 舰队管理 □2：书卡右键菜单四动作（置顶/隐匿=存储纯视觉；忽略/归档复用现成链） */
+    togglePinBook(bookID: string, v: boolean): any;
+    toggleHideBook(bookID: string, v: boolean): any;
+    ignoreBook(bookID: string): any;
+    archiveBook(bookID: string): any;
 }
 
 export const FLEET_DOCK_TYPE = "prog-fleet-dock";

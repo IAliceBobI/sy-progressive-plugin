@@ -17,6 +17,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { findDocByIal, getDocIalDigestDir } from "./progData";
 import { buildDigestMenuItems, digestJumpOf, groupDigestRows, mergeRefRows, DigestRow } from "./digestList";
 import { digestStateOf, digestStateIcon } from "./digestState";
+import { openDigestReviewMenu } from "./reviewMenu";
 
 const MARK_CLASS = "prog-digest-mark";
 const CACHE_TTL_MS = 60_000;
@@ -166,4 +167,36 @@ async function openDigestListMenu(ev: MouseEvent, ids: string[], bookID = "") {
         x: ev.clientX > 0 ? ev.clientX : innerWidth / 2,
         y: ev.clientY > 0 ? ev.clientY : innerHeight / 2,
     }), 0);
+}
+
+/**
+ * 摘抄文档标题区身份徽章（progpolish □4）：摘抄文档出场时在 .protyle-title 注入
+ * 「✒ 摘抄」胶囊，点击弹复访节奏菜单（openDigestReviewMenu 直查 IAL 自动组配两态：
+ * 未设复访=首设直列，已设=复访中+改档），顺带治未设 review 的摘抄文档零入口。
+ * 纯 DOM 注入零落盘；出场链五事件反复调用，幂等清旧重挂（markDigests 同哲学），
+ * title 重渲染丢注入由下次出场事件补挂。
+ * 安全性：本函数只动 title 区（.protyle-title__input 的兄弟节点），不碰 wysiwyg
+ * 内容块——「span 永不加 textContent」硬约束防的是带文本 span 被编辑卷入 .sy
+ * （见文件头 □15），title 区不受此限，徽章带文字安全。
+ */
+export function markDigestTag(protyle: any) {
+    const root: HTMLElement = protyle?.element;
+    if (!root) return;
+    // 清旧紧贴判定（阴性也清）：切到普通文档/片态时清掉残留旧徽章防串文档
+    root.querySelectorAll(".prog-digest-tag").forEach(t => t.remove());
+    if (!protyle?.wysiwyg?.element?.getAttribute(PDIGEST_CTIME)) return;
+    const title = root.querySelector<HTMLElement>(".protyle-title");
+    if (!title) return; // 无标题布局（移动端等），静默降级
+    const tag = document.createElement("span");
+    tag.className = "prog-digest-tag";
+    tag.setAttribute("contenteditable", "false");
+    tag.innerHTML = `<svg><use xlink:href="#iconProgQuill"></use></svg>${tomatoI18n.摘抄}`;
+    tag.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        openDigestReviewMenu(protyle?.block?.rootID ?? "", ev);
+    });
+    const input = title.querySelector(".protyle-title__input");
+    if (input) title.insertBefore(tag, input.nextSibling);
+    else title.append(tag);
 }

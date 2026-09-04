@@ -12,7 +12,7 @@ import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard,
 import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
-import { markDigests } from "./digestMarker";
+import { markDigests, markDigestTag } from "./digestMarker";
 
 const Prog_BUTTON = "custom-prog-button";
 const Prog_BUTTON_NoteID = "custom-prog-button-noteID";
@@ -243,6 +243,11 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     // refMap 60s 缓存兜底开销。
     if (nextKind === "piece" || nextKind === "book") {
         markDigests(protyle, nextBookID).catch(() => { });
+    }
+    // 摘抄文档身份徽章（progpolish □4）：title 区注入「✒ 摘抄」胶囊（零落盘），
+    // 同出场链反复调用，markDigestTag 幂等清旧重挂；title 重渲染丢注入由下次事件补挂
+    if (nextKind === "digest") {
+        markDigestTag(protyle);
     }
 }
 

@@ -29,6 +29,10 @@ type BookInfo = {
     finishIgnore?: boolean,
     finishShowInput?: boolean,
     archived?: string,
+    /** 舰队管理 □2：置顶（舰队面板置顶组最优先，组内保滚筒序；纯视觉不影响调度） */
+    pinned?: boolean,
+    /** 舰队管理 □2：从总览隐匿（纯视觉：舰队面板不显示，滚筒照常推送照常计数） */
+    hidden?: boolean,
 };
 
 type BookInfos = { [key: string]: BookInfo };

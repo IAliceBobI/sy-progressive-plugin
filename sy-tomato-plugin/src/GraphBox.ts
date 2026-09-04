@@ -82,10 +82,13 @@ class GraphBox {
                 || eventType == EventType.loaded_protyle_dynamic
                 || eventType == EventType.switch_protyle
             ) {
-                // 切换文档：直接刷新图（内容完全不同，无需时间戳比对）
+                // 切换文档：直接刷新图（内容完全不同，无需时间戳比对）。
+                // □2 闪烁治理：不再重置 lastRefreshedUpdated——重置会让下个 3s 轮询
+                // 时间戳比对必不等→第二次重建（「打开所在文档」闪两下的第二闪）；
+                // 同文档重复事件由 svelte 侧指纹短路挡住，切文档后轮询即便白跑一次
+                // 也被短路（视觉零伤害）
                 const newDocID = detail?.protyle?.block?.rootID;
                 if (newDocID) {
-                    this.lastRefreshedUpdated = ""; // 重置时间戳，下次轮询/编辑时会重新获取
                     this.getData()?.changeDoc(detail?.protyle);
                 }
             }
@@ -188,11 +191,16 @@ class GraphBox {
     locateNodeMenu(detail: TomatoMenu) {
         const menu = detail.menu;
         if (!events.isMobile) {
+            // 菜单打开时预取目标块（定位光标化）：菜单项被点击时全局 selection 已被
+            // 点菜单动作破坏（focusNode 落到菜单 DOM），实时取光标块必空——只有块
+            // 选中态 CSS 类通道幸存，这就是「必须选中块才能定位」的根因。事件触发
+            // 此刻光标仍在块内，闭包捕获（划词工具条同款纪律）。
+            const presetID = events.selectedDivsSync(detail.protyle).ids?.[0];
             addIfVisible(menu, GraphBox定位到图中的节点.langKey, {
                 label: GraphBox定位到图中的节点.langText(),
                 icon: "iconGraphBox",
                 accelerator: GraphBox定位到图中的节点.m,
-                click: () => this.locateNode(detail.protyle),
+                click: () => this.locateNode(detail.protyle, presetID),
             }, graph定位到图中的节点Menu.get());
             addIfVisible(menu, GraphBox打开块关系图.langKey, {
                 label: GraphBox打开块关系图.langText(),
@@ -205,10 +213,11 @@ class GraphBox {
 
     // 期4 块→图定位完整链路：开 dock→图上非该文档自动切换→expandTo→居中脉冲→
     // 找不到 toast 原因（骨架态/超上限），永不静默（现状病灶=dock 未开/文档不同/折叠/截断全静默）
-    private async locateNode(protyle?: IProtyle) {
+    // presetID=菜单打开时预取的目标块（光标在块内即可定位）；命令通道无预取走实时取块
+    private async locateNode(protyle?: IProtyle, presetID?: string) {
         const { ids, docID, docName } = await events.selectedDivs(protyle);
-        const id = ids?.[0] || events.lastBlockID;
-        gbLog("graph.locate_req", `id=${(id || "").slice(0, 8)} doc=${(docID || "").slice(0, 8)}`);
+        const id = presetID || ids?.[0] || events.lastBlockID;
+        gbLog("graph.locate_req", `id=${(id || "").slice(0, 8)} doc=${(docID || "").slice(0, 8)}${presetID ? " src=menu-preset" : ""}`);
         if (!id) {
             siyuan.pushMsg(tomatoI18n.定位需先选中块, 3000);
             return;

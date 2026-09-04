@@ -69,6 +69,18 @@ export class ProgressiveStorage {
         }
     }
 
+    /** 舰队管理 □2：置顶/取消置顶（纯视觉排序，调度零改动） */
+    async setPinnedBook(bookID: string, v: boolean) {
+        await this.updateBookInfo(bookID, { pinned: v } as any);
+        await siyuan.pushMsg(v ? tomatoI18n.已置顶本书 : tomatoI18n.已取消置顶本书);
+    }
+
+    /** 舰队管理 □2：从总览隐匿/取消隐匿（纯视觉，滚筒照推；不 toast——面板/管理页
+     *  即时变化即反馈，取消隐匿侧由调用方给「已在总览显示」提示） */
+    async setHiddenBook(bookID: string, v: boolean) {
+        await this.updateBookInfo(bookID, { hidden: v } as any);
+    }
+
     async setShowLastBlock(bookID: string, v: boolean) {
         await this.updateBookInfo(bookID, { showLastBlock: v } as any);
         if (v) {
@@ -191,6 +203,8 @@ export class ProgressiveStorage {
         if (typeof opt.autoSplitSentenceP === "boolean") info.autoSplitSentenceP = opt.autoSplitSentenceP;
         if (typeof opt.autoSplitSentenceT === "boolean") info.autoSplitSentenceT = opt.autoSplitSentenceT;
         if (typeof opt.autoSplitSentenceI === "boolean") info.autoSplitSentenceI = opt.autoSplitSentenceI;
+        if (typeof opt.pinned === "boolean") info.pinned = opt.pinned;
+        if (typeof opt.hidden === "boolean") info.hidden = opt.hidden;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
 
         info.time = await siyuan.currentTimeMs();

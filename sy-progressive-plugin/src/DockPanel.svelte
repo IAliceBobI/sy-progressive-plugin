@@ -3,7 +3,8 @@
     // 档位胶囊=□3 归 □6 的档位设置 UI）+ 近14天热力横条 + 书卡列表（进度/今日点/三徽章，
     // 点击断点续读）+ 主按钮 + 底部副操作。空状态诚实：热力全空淡格、主按钮变加书。
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-    import type { FleetSummary, FleetBook } from "./fleetData";
+    import { filterFleetBooks, type FleetSummary, type FleetBook } from "./fleetData";
+    import { openBookMenu } from "./bookMenu";
     import type { FleetActions } from "./fleet";
     import type { Writable } from "svelte/store";
 
@@ -24,24 +25,83 @@
     const p = $derived($panel);
     const empty = $derived(p != null && p.books.length === 0);
     const quota = $derived(p?.quota ?? 3);
-    const state = $derived(p?.debt.state ?? "ok");
+    // （debtState 勿改名 state：$state rune 会把同名变量解析成 store 订阅）
+    const debtState = $derived(p?.debt.state ?? "ok");
+    // 舰队管理 □1：书卡关键字搜索（纯视觉过滤，滚筒/调度零改动；空关键字=全量）
+    let searchKw = $state("");
+    const filteredBooks = $derived(filterFleetBooks(p?.books ?? [], searchKw));
 
     function bookPercent(b: FleetBook): number {
         if (b.total <= 0) return 0;
         return Math.min(100, Math.round((b.point / b.total) * 100));
     }
+
+    // 舰队管理 □2：移动端长按开菜单（pointerType=mouse 走 contextmenu 不走此通道）。
+    // review P1-1 修法：到点只亮旗不开菜单，开菜单挂到松手 click 里——independent 菜单
+    // 构造时即注册 window capture click 监听（内核 plugin/Menu.ts closeEvent），任何与
+    // 松手 click 的交叠都会闪现即逝或空转；click 是长按序列最后一个事件，此后构造零竞态。
+    // 亮旗同时抑制书卡续读（长按后松手的 click 被吞掉改开菜单）。
+    let lpTimer: ReturnType<typeof setTimeout> | undefined;
+    let lpClickFallback: ReturnType<typeof setTimeout> | undefined;
+    let lpArmed = false;
+    let lpX = 0;
+    let lpY = 0;
+
+    function lpStart(e: PointerEvent) {
+        lpArmed = false; // 先重置再早退：混合设备下 mouse 按下也须清旗，防残留吞掉鼠标点击
+        if (e.pointerType === "mouse") return;
+        lpCancel();
+        lpX = e.clientX;
+        lpY = e.clientY;
+        lpTimer = setTimeout(() => {
+            lpArmed = true;
+        }, 500);
+    }
+    function lpCancel() {
+        if (lpTimer) {
+            clearTimeout(lpTimer);
+            lpTimer = undefined;
+        }
+        if (lpClickFallback) {
+            clearTimeout(lpClickFallback);
+            lpClickFallback = undefined;
+        }
+        lpArmed = false;
+    }
+    /** click 派发完毕后构造菜单（零竞态点） */
+    function lpOpen(book: FleetBook) {
+        lpArmed = false;
+        openBookMenu({ clientX: lpX, clientY: lpY }, book, actions);
+    }
+    /** 长按到点后的松手：click 若来（onclick 消费 lpArmed），否则 300ms 兜底开菜单 */
+    function lpUp(book: FleetBook) {
+        if (lpArmed && !lpClickFallback) {
+            lpClickFallback = setTimeout(() => {
+                lpClickFallback = undefined;
+                lpOpen(book);
+            }, 300);
+        }
+    }
+    /** 书卡 click 统一闸：长按旗亮=吞掉续读就地开菜单；否则正常续读 */
+    function cardClick(e: MouseEvent, book: FleetBook) {
+        if (lpArmed) {
+            e.preventDefault();
+            e.stopPropagation();
+            lpOpen(book);
+            return;
+        }
+        actions.continueReading(book.bookID);
+    }
 </script>
 
-<div class="prog-fleet" data-state={state}>
+<div class="prog-fleet" data-state={debtState}>
     <!-- 顶栏：标题 + 复习计划常驻钮（期3 □3：不依赖 due>0——✧ 徽章条件渲染教训） + recite 导流 -->
     <div class="prog-fleet-top">
         <span class="prog-fleet-title">{tomatoI18n.今日阅读}</span>
-        <button
-            class="prog-fleet-plan b3-tooltips b3-tooltips__w"
-            aria-label={tomatoI18n.复习计划}
-            onclick={() => actions.openReviewPlan()}
-        >
+        <!-- 图文胶囊（用户反馈 16px 图标钮太小）：文字常驻后 tooltip/aria-label 冗余，移除 -->
+        <button class="prog-fleet-plan" onclick={() => actions.openReviewPlan()}>
             <svg><use xlink:href="#iconProgSched"></use></svg>
+            <span>{tomatoI18n.复习计划}</span>
         </button>
         <button
             class="prog-fleet-recite b3-tooltips b3-tooltips__w"
@@ -62,7 +122,7 @@
                 <span class="big">{p.debt.readToday}</span>
                 <span class="total">/ {quota}</span>
                 {#if p.debt.debt > 0}
-                    <span class="debt-pill" data-state={state}>{tomatoI18n.欠N片(p.debt.debt)}</span>
+                    <span class="debt-pill" data-state={debtState}>{tomatoI18n.欠N片(p.debt.debt)}</span>
                 {/if}
                 {#if p.dueTotal > 0}
                     <!-- 期2 全局 ✧ 待办胶囊：think+pdigest 双源（含 free 源）——点击开全局清单 -->
@@ -118,18 +178,35 @@
                 <div class="empty-sub">{tomatoI18n.书架空空说明}</div>
             </div>
         {:else}
-            <div class="prog-fleet-books">
-                {#each p.books as book (book.bookID)}
+            <!-- 舰队管理 □1 搜索框：书名包含匹配即过滤；空架子（empty 插画态）不出搜索框 -->
+            <input
+                class="prog-fleet-search b3-text-field"
+                type="search"
+                placeholder={tomatoI18n.搜索书名}
+                aria-label={tomatoI18n.搜索书名}
+                bind:value={searchKw}
+            />
+            {#if filteredBooks.length === 0}
+                <!-- 搜索无匹配（区别于全书架空态；清空关键字即恢复全量） -->
+                <div class="prog-fleet-nomatch">{tomatoI18n.无匹配书目}</div>
+            {:else}
+                <div class="prog-fleet-books">
+                    {#each filteredBooks as book (book.bookID)}
                     {#if book.status === "closed" || book.status === "lost"}
                         <!-- ⏸/⚠ 状态卡（bookStatus 判定链）：灰化/warn 沉底；点击仍走续读，由 startToLearn 拦截给对症提示（lost 直接弹清理 confirm） -->
                         <button
                             class="prog-fleet-card"
                             class:closed={book.status === "closed"}
                             class:lost={book.status === "lost"}
-                            onclick={() => actions.continueReading(book.bookID)}
+                            onclick={(e) => cardClick(e, book)}
+                            oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); openBookMenu(e, book, actions); }}
+                            onpointerdown={(e) => lpStart(e)}
+                            onpointerup={() => lpUp(book)}
+                            onpointercancel={lpCancel}
+                            onpointerleave={lpCancel}
                         >
                             <div class="row">
-                                <span class="name">{book.name}</span>
+                                <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.name}</span>
                                 <span class="st-chip" data-st={book.status}
                                     >{book.status === "closed" ? `⏸ ${tomatoI18n.笔记本已关闭}` : `⚠ ${tomatoI18n.疑似失效}`}</span
                                 >
@@ -145,10 +222,15 @@
                             class="prog-fleet-card"
                             class:finished={book.finished}
                             class:manual={book.manual}
-                            onclick={() => actions.continueReading(book.bookID)}
+                            onclick={(e) => cardClick(e, book)}
+                            oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); openBookMenu(e, book, actions); }}
+                            onpointerdown={(e) => lpStart(e)}
+                            onpointerup={() => lpUp(book)}
+                            onpointercancel={lpCancel}
+                            onpointerleave={lpCancel}
                         >
                             <div class="row">
-                                <span class="name">{book.name}</span>
+                                <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.name}</span>
                                 <span class="num"
                                     >{book.finished
                                         ? tomatoI18n.已读完
@@ -186,9 +268,10 @@
                     {/if}
                 {/each}
             </div>
+            {/if}
         {/if}
 
-        <!-- 主按钮：有书=滚筒开读；空态=把当前文档加为第一本书 -->
+        <!-- 主按钮：有书=滚筒开读；空态=把当前文档加为第一本书（empty=全书架空，不受搜索过滤影响） -->
         <button class="prog-fleet-start" onclick={() => (empty ? actions.addFirstBook() : actions.startReading())}>
             {#if empty}＋ {tomatoI18n.加入第一本书}{:else}▶ {tomatoI18n.开始今日阅读}{/if}
         </button>

@@ -3166,6 +3166,42 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    public get 已定位到原文块() {
+        switch (this.lang) {
+            case "zh_CN": return "已定位到原文块";
+            case "zh_CHT": return "已定位到原文塊";
+            case "en_US":
+            default: return "Located the source block in the book";
+        }
+    }
+
+    public get 已回到分片() {
+        switch (this.lang) {
+            case "zh_CN": return "已回到分片";
+            case "zh_CHT": return "已回到分片";
+            case "en_US":
+            default: return "Back to the piece";
+        }
+    }
+
+    public get 已回到原书() {
+        switch (this.lang) {
+            case "zh_CN": return "已回到原书";
+            case "zh_CHT": return "已回到原書";
+            case "en_US":
+            default: return "Back to the book";
+        }
+    }
+
+    public get 已回到发起文档() {
+        switch (this.lang) {
+            case "zh_CN": return "已回到发起文档";
+            case "zh_CHT": return "已回到發起文檔";
+            case "en_US":
+            default: return "Back to the source doc";
+        }
+    }
+
     public get 暂无到期重访() {
         switch (this.lang) {
             case "zh_CN": return "暂无到期重访";
@@ -4006,6 +4042,116 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    public get 搜索书名() {
+        switch (this.lang) {
+            case "zh_CN": return "搜索书名…";
+            case "zh_CHT": return "搜尋書名…";
+            case "en_US":
+            default: return "Search books…";
+        }
+    }
+
+    public get 无匹配书目() {
+        switch (this.lang) {
+            case "zh_CN": return "无匹配书目";
+            case "zh_CHT": return "無匹配書目";
+            case "en_US":
+            default: return "No matching books";
+        }
+    }
+
+    // ===== 舰队管理 □2：书卡右键菜单+置顶/隐匿（label 自带三档语义短注——Menu item 无 tooltip 字段，
+    //  文案风格对齐「路线书归档」说明族：忽略=退出推送/归档=彻底退场/隐匿=照推不显示） =====
+    public get 置顶本书() {
+        switch (this.lang) {
+            case "zh_CN": return "置顶本书";
+            case "zh_CHT": return "置頂本書";
+            case "en_US":
+            default: return "Pin this book";
+        }
+    }
+
+    public get 取消置顶() {
+        switch (this.lang) {
+            case "zh_CN": return "取消置顶";
+            case "zh_CHT": return "取消置頂";
+            case "en_US":
+            default: return "Unpin";
+        }
+    }
+
+    public get 从总览隐匿() {
+        switch (this.lang) {
+            case "zh_CN": return "从总览隐匿（仍推送）";
+            case "zh_CHT": return "從總覽隱匿（仍推送）";
+            case "en_US":
+            default: return "Hide from fleet (still scheduled)";
+        }
+    }
+
+    public get 忽略本书菜单() {
+        switch (this.lang) {
+            case "zh_CN": return "忽略（不再推送）";
+            case "zh_CHT": return "忽略（不再推送）";
+            case "en_US":
+            default: return "Ignore (stop scheduling)";
+        }
+    }
+
+    public get 归档本书菜单() {
+        switch (this.lang) {
+            case "zh_CN": return "归档（彻底退场，摘抄留存）";
+            case "zh_CHT": return "歸檔（徹底退場，摘抄留存）";
+            case "en_US":
+            default: return "Archive (done, digests stay)";
+        }
+    }
+
+    public get 已置顶本书() {
+        switch (this.lang) {
+            case "zh_CN": return "已置顶本书";
+            case "zh_CHT": return "已置頂本書";
+            case "en_US":
+            default: return "Pinned";
+        }
+    }
+
+    public get 已取消置顶本书() {
+        switch (this.lang) {
+            case "zh_CN": return "已取消置顶";
+            case "zh_CHT": return "已取消置頂";
+            case "en_US":
+            default: return "Unpinned";
+        }
+    }
+
+    public get 已在总览显示() {
+        switch (this.lang) {
+            case "zh_CN": return "已在总览显示";
+            case "zh_CHT": return "已在總覽顯示";
+            case "en_US":
+            default: return "Shown in fleet again";
+        }
+    }
+
+    public get 已隐匿此书() {
+        switch (this.lang) {
+            case "zh_CN": return "已隐匿（总览不显示，仍推送）";
+            case "zh_CHT": return "已隱匿（總覽不顯示，仍推送）";
+            case "en_US":
+            default: return "Hidden (not in fleet, still scheduled)";
+        }
+    }
+
+    public get 取消隐匿() {
+        switch (this.lang) {
+            case "zh_CN": return "取消隐匿";
+            case "zh_CHT": return "取消隱匿";
+            case "en_US":
+            default: return "Unhide";
+        }
+    }
+
     public get 导流仿写已装() {
         switch (this.lang) {
             case "zh_CN": return "仿写练习（recite）";
@@ -4799,10 +4945,10 @@ export class TomatoI18n extends TomatoI18nABC {
 
     public get tip本书附属卡() {
         switch (this.lang) {
-            case "zh_CN": return "打开本书附属闪卡复习，胶囊为今日到期数";
-            case "zh_CHT": return "打開本書附屬閃卡複習，膠囊為今日到期數";
+            case "zh_CN": return "打开本书摘抄闪卡复习（卡来自 ✂ 摘抄，非分片），胶囊为今日到期数";
+            case "zh_CHT": return "打開本書摘抄閃卡複習（卡來自 ✂ 摘抄，非分片），膠囊為今日到期數";
             case "en_US":
-            default: return "Review this book's flashcards; badge counts those due today";
+            default: return "Review this book's digest flashcards (from ✂ digests, not fragments); badge counts those due today";
         }
     }
 

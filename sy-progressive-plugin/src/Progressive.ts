@@ -846,7 +846,16 @@ class Progressive {
             await OpenSyFile2(this.plugin, target.bookID);
             return;
         }
-        if (target.action !== "none") await OpenSyFile2(this.plugin, target.id);
+        if (target.action !== "none") {
+            // 去向反馈（progpolish □2）：一级命中书内原文块时用户感知「一点就回原书」预期落空，
+            // 四态 toast 只报实际去向，不动四级链判定本身
+            const tip = target.action === "ref" ? tomatoI18n.已定位到原文块
+                : target.action === "piece" ? tomatoI18n.已回到分片
+                : target.action === "book" ? tomatoI18n.已回到原书
+                : tomatoI18n.已回到发起文档;
+            await siyuan.pushMsg(tip);
+            await OpenSyFile2(this.plugin, target.id);
+        }
     }
 
     /** recite 安装检测（app.plugins，送仿写按钮显隐；□6 Dock 导流图标复用） */

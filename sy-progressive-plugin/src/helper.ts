@@ -393,7 +393,13 @@ export async function fastCopyBlock(point: number, info: BookInfo, id: string, m
     }
     attrs["custom-progref"] = id;
     if (markdown.startsWith("<div>")) {
-        return markdown;
+        // □4 progref 债（2026-09-04）：html 块（SQL markdown 列形态 `<div>...</div>`）此前
+        // 裸 return 丢 IAL——custom-progref/origin-text/in-book-index 全落空，副本查询
+        // （getPiecesByRefID 的 root_id 限定 SQL）永远查空=跳转失灵。IAL 行须**空行隔开**：
+        // kramdown 对 HTML 块的终结以空行为界，紧贴的 `{: }` 被吞进 HTML 块内容成字面文本
+        // （6808 双变体实测：紧贴=ial 列无/块 md 残留；空行=正确入 IAL 并进 attributes 表）。
+        // 其他块类型（p/c/t 单 \n）实测解析正常不动。存量片不迁移，重分片即恢复。
+        return `${markdown}\n\n${utils.ial2str(attrs)}`;
     } else if (isMultiLineElement(markdown)) {
         markdown = utils.replaceRef2Lnk(markdown)
         return `${markdown}\n${utils.ial2str(attrs)}`;
