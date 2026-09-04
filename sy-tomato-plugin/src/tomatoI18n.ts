@@ -5052,10 +5052,10 @@ export class TomatoI18n extends TomatoI18nABC {
 
     public get tip制卡() {
         switch (this.lang) {
-            case "zh_CN": return "选中块制卡；未选中用光标块，拖蓝文字做填空";
-            case "zh_CHT": return "選中塊製卡；未選中用游標塊，拖藍文字做填空";
+            case "zh_CN": return "选中块制卡；未选中用光标块，拖蓝文字做填空。闪卡每天占用复习时间，只放真正要背的";
+            case "zh_CHT": return "選中塊製卡；未選中用游標塊，拖藍文字做填空。閃卡每天佔用複習時間，只放真正要背的";
             case "en_US":
-            default: return "Card selected blocks, or the cursor block; a text selection becomes a cloze";
+            default: return "Cards from selected/cursor blocks; cloze from selection. Review costs time daily — add sparingly";
         }
     }
 
@@ -5543,20 +5543,53 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "You are on a piece";
         }
     }
+    // routemap □2 片态意图分组组头（读完这片/留点什么/去别处）
+    public get 路线组读完这片() {
+        switch (this.lang) {
+            case "zh_CN": return "读完这片";
+            case "zh_CHT": return "讀完這片";
+            case "en_US":
+            default: return "Finish this piece";
+        }
+    }
     public get 路线片下一片() {
         switch (this.lang) {
-            case "zh_CN": return "下一片：读完删片前进（片是一次性餐具）";
-            case "zh_CHT": return "下一片：讀完刪片前進（片是一次性餐具）";
+            case "zh_CN": return "下一片：删片前进，计入今日阅读（片是一次性餐具）";
+            case "zh_CHT": return "下一片：刪片前進，計入今日閱讀（片是一次性餐具）";
             case "en_US":
-            default: return "Next: read done, delete this piece and move on";
+            default: return "Next: delete this piece and move on, counts as read";
+        }
+    }
+    public get 路线片下一片纯() {
+        switch (this.lang) {
+            case "zh_CN": return "下一个分片：翻页不删，片留作草稿，同样计数";
+            case "zh_CHT": return "下一個分片：翻頁不刪，片留作草稿，同樣計數";
+            case "en_US":
+            default: return "Page on: keep this piece as draft, also counts";
+        }
+    }
+    public get 路线组留点什么() {
+        switch (this.lang) {
+            case "zh_CN": return "留点什么";
+            case "zh_CHT": return "留點什麼";
+            case "en_US":
+            default: return "Keep something";
         }
     }
     public get 路线片回看() {
         switch (this.lang) {
-            case "zh_CN": return "回看：回上一片，不删";
-            case "zh_CHT": return "回看：回上一片，不刪";
+            case "zh_CN": return "回看：回上一片，不删也不计数";
+            case "zh_CHT": return "回看：回上一片，不刪也不計數";
             case "en_US":
-            default: return "Back: previous piece, kept intact";
+            default: return "Back: previous piece, kept, not counted";
+        }
+    }
+    public get 路线组去别处() {
+        switch (this.lang) {
+            case "zh_CN": return "去别处";
+            case "zh_CHT": return "去別處";
+            case "en_US":
+            default: return "Go elsewhere";
         }
     }
     public get 路线片摘抄() {
@@ -5577,10 +5610,10 @@ export class TomatoI18n extends TomatoI18nABC {
     }
     public get 路线片制卡() {
         switch (this.lang) {
-            case "zh_CN": return "制卡：制卡四钮，选中/光标块做闪卡";
-            case "zh_CHT": return "製卡：製卡四鈕，選中/游標塊做閃卡";
+            case "zh_CN": return "制卡：做闪卡进复习队列，每天占用复习时间";
+            case "zh_CHT": return "製卡：做閃卡進複習隊列，每天佔用複習時間";
             case "en_US":
-            default: return "Cards: make flashcards from selected/cursor blocks";
+            default: return "Cards: flashcards enter review queue, costing daily time";
         }
     }
     public get 路线片收集提取() {

@@ -630,6 +630,9 @@ class Progressive {
                 break;
             case HtmlCBType.next:
                 await progStorage.gotoBlock(bookID, point + 1);
+                // routemap □1 计数解耦：读到新片即前进——翻页不删片与下片删同权计数
+                // （片可留作草稿，point+1 为去重锚判新高的新 point）
+                await this.markReadSafe(bookID, point + 1);
                 await this.startToLearnWithLock(bookID);
                 this.closePeices(bookID);
                 showCardAnswer();
@@ -658,7 +661,8 @@ class Progressive {
                 // v5「读完即删」：分片是一次性餐具（原文档还在、误删可重分片），主循环高频动作不再 confirm
                 await siyuan.removeRiffCards([noteID]);
                 await progStorage.gotoBlock(bookID, point + 1);
-                await this.markReadSafe(bookID); // 已读=删片前进那一刻（火苗/热力图唯一数据源）
+                // routemap □1：已读=读到新片那一刻（翻页/删片同权；锚防回看后再删重复计）
+                await this.markReadSafe(bookID, point + 1);
                 await this.startToLearnWithLock(bookID);
                 siyuan.removeDocByID(noteID);
                 this.closePeices(bookID);
@@ -725,10 +729,11 @@ class Progressive {
         });
     }
 
-    /** 已读记账；附属动作失败只降级不阻断开片 */
-    private async markReadSafe(bookID: string) {
+    /** 已读记账；附属动作失败只降级不阻断开片。routemap □1：point=前进后的新 point，
+     * 传给 roller 当日去重锚（回看后再前进到旧高度不重复计） */
+    private async markReadSafe(bookID: string, point?: number) {
         try {
-            await rollerMarkRead(bookID);
+            await rollerMarkRead(bookID, point);
             notifyFleetChanged(); // □6 火苗/面板即时联动（fleet.ts 不 import 本类，单向无环）
         } catch (e) {
             console.error("roller markRead failed", e);

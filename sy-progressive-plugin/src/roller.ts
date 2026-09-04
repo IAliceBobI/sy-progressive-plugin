@@ -1,7 +1,8 @@
 // v5 核心循环引擎（□3）：滚筒轮转 / 已读记账 / 欠债汇总 / 归档打标。
 // 纯逻辑 + deps 注入（progData.ts 同款模式），行为全可单测，不依赖 UI 与活实例。
-// 设计共识：出片即轮转（order+lastServed）；已读=删片且 point 前进；欠债滚动累积
-// （每日记档位+已读，读满封顶不增债、无抵扣）；计划流退役（时间驱动 push 与 pull 定位冲突）。
+// 设计共识：出片即轮转（order+lastServed）；已读=读到新片（routemap □1 计数解耦：翻页
+// 留片与下片删同权，point 前进即计；当日去重锚 p 防回看-前进循环刷账，跨天重置=重读
+// 也算读）；欠债滚动累积（每日记档位+已读，读满封顶不增债、无抵扣）；计划流退役。
 
 /** reading-order.json 内容（plugin storage 独立键，books.json 不动结构） */
 export interface ReadingOrder {
@@ -17,6 +18,9 @@ export interface DayLogData {
     q: number;
     /** bookID -> 当日已读片数（Dock 书卡「今日已读点」的数据需求） */
     b: { [bookID: string]: number };
+    /** bookID -> 上次记账时的 point（routemap □1 当日去重锚：新 point 创新高才计，
+        防回看-前进循环刷账；跨天新块自然无锚=重读也算读） */
+    p?: { [bookID: string]: number };
 }
 
 export interface DebtSummary {
@@ -77,8 +81,11 @@ export function pickNextBook(ro: ReadingOrder, readable: Set<string>): string | 
     return null;
 }
 
-export function incrementDay(data: DayLogData, bookID: string, quota: number): DayLogData {
-    return { q: quota, b: { ...data.b, [bookID]: (data.b[bookID] ?? 0) + 1 } };
+export function incrementDay(data: DayLogData, bookID: string, quota: number, point?: number): DayLogData {
+    const next: DayLogData = { q: quota, b: { ...data.b, [bookID]: (data.b[bookID] ?? 0) + 1 } };
+    if (point != null) next.p = { ...data.p, [bookID]: point };
+    else if (data.p) next.p = { ...data.p };
+    return next;
 }
 
 export function summarizeDebt(
@@ -124,12 +131,15 @@ export async function nextBook(deps: RollerDeps): Promise<string | null> {
     return pick;
 }
 
-export async function markRead(deps: RollerDeps, bookID: string): Promise<void> {
+/** routemap □1：point=本次记账对应的新 point（gotoBlock 前进后的值）。传入时按当日
+ * 去重锚判重——未创新高（回看后再前进到旧高度）整笔 no-op；不传=旧行为（无锚必计）。 */
+export async function markRead(deps: RollerDeps, bookID: string, point?: number): Promise<void> {
     const date = deps.getTodayStr();
     const quota = deps.getQuota();
     const blockID = await deps.findDayBlock(date);
     const data = blockID ? await deps.readDayBlockData(blockID) : { q: quota, b: {} };
-    const next = incrementDay(data, bookID, quota);
+    if (point != null && data.p && point <= (data.p[bookID] ?? -1)) return;
+    const next = incrementDay(data, bookID, quota, point);
     const summary = formatDaySummary(next, { [bookID]: await deps.getBookName(bookID) });
     if (blockID) {
         await deps.updateDayBlock(blockID, date, next, summary);
@@ -144,7 +154,6 @@ export async function archiveBook(deps: RollerDeps, bookID: string): Promise<voi
 
 // ============ 生产侧实现（真实 siyuan/storage，□3 接线） ============
 
-import { newID } from "stonev5-utils";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
 import { progStorage } from "./ProgressiveStorage";
@@ -208,9 +217,12 @@ function makeRollerDeps(): RollerDeps {
         createDayBlock: async (date, data, summary) => {
             const docID = await progStorage.ensureReadLog();
             if (!docID) return "";
-            // 预置块 id（kramdown IAL）两步落属性：id 无转义问题，data 走 setBlockAttrs（JSON 不进 markdown）
-            const id = newID();
-            await siyuan.insertBlockAsChildOf(`${summary} {: id="${id}"}`, docID);
+            // 内核 markdown 通道不解析 kramdown IAL（`{: id=}` 落字面文本，2026-09-04 e2e 实锤：
+            // 预置 id 打空→setBlockAttrs 静默失败→date/data 永远缺失→findDayBlock 恒 miss 每次
+            // 新建块）——真实块 id 改从 insert 响应 doOperations[0].id 取
+            const r = await siyuan.insertBlockAsChildOf(summary, docID);
+            const id = ((r as any[])?.[0])?.doOperations?.[0]?.id ?? "";
+            if (!id) return "";
             await siyuan.setBlockAttrs(id, {
                 [constants.PLOG_DATE]: date,
                 [constants.PLOG_DATA]: JSON.stringify(data),
@@ -218,8 +230,9 @@ function makeRollerDeps(): RollerDeps {
             return id;
         },
         updateDayBlock: async (blockID, date, data, summary) => {
-            // 内容是投影可随时重写；IAL 双键全量重设（data 是真源，date 锚随更新补回）
-            await siyuan.updateBlock(blockID, `${summary} {: id="${blockID}"}`);
+            // 内容是投影可随时重写（markdown 通道不解析 IAL，只写纯 summary 勿带 {: id=}）；
+            // IAL 双键全量重设（data 是真源，date 锚随更新补回）
+            await siyuan.updateBlock(blockID, summary);
             await siyuan.setBlockAttrs(blockID, {
                 [constants.PLOG_DATE]: date,
                 [constants.PLOG_DATA]: JSON.stringify(data),
@@ -258,8 +271,8 @@ export async function rollerNextBook(): Promise<string> {
     return (await nextBook(makeRollerDeps())) ?? "";
 }
 
-export async function rollerMarkRead(bookID: string): Promise<void> {
-    await markRead(makeRollerDeps(), bookID);
+export async function rollerMarkRead(bookID: string, point?: number): Promise<void> {
+    await markRead(makeRollerDeps(), bookID, point);
 }
 
 export async function rollerArchiveBook(bookID: string): Promise<void> {

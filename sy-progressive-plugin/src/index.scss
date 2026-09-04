@@ -1482,6 +1482,17 @@ button.prog-popover-item:hover {
   padding: 8px 10px 4px;
   opacity: 0.8;
 }
+// routemap □2 片态意图子组头（读完这片/留点什么/去别处）：顶部留隔+细分隔线与主标题
+// 分层；首组紧跟主标题（组件层 gi===0 加 --first 免上边线）
+.prog-route-sub {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--b3-border-color);
+}
+.prog-route-sub-first {
+  margin-top: 0;
+  border-top: none;
+}
 .prog-route-item {
   cursor: default;
 }
