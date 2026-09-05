@@ -67,16 +67,29 @@ export function shouldRefreshDue(bookID: string, isRegisteredBook: (id: string) 
 }
 
 /**
- * 出场摘抄痕迹求值（群反馈 650189 修复，2026-09-05）：返回 markDigests 的 bookID
- * 实参（空串=不打标）。片/书/digest 态用出场载荷 bookID（片=所属书、书=自身、
- * digest=原书——digest 文档内拷贝块 progref 与再摘支路都按原书 refMap 命中）；
- * free 态载荷 bookID 恒空（detectFloatDoc 对普通文档返回 null），按 docID 自指查
- * refMap——free 摘抄 ctime=`docID#ct`（resolveDigestOrigin 三链落空自指同源）。
- * 原实现出场只对 piece/book 打标，free 文档摘抄小条重进文档永不补挂。
+ * 出场摘抄痕迹求值（群反馈 650189 根治，2026-09-05 深夜）：返回 markDigests 的 bookID
+ * 实参（空串=不打标）。片/书态用出场载荷 bookID（片=所属书、书=自身）；free 态载荷
+ * bookID 恒空（detectFloatDoc 对普通文档返回 null），按 docID 自指查 refMap——free
+ * 摘抄 ctime=`docID#ct`（resolveDigestOrigin 三链落空自指同源）。digest 态恒空串：
+ * 卡片拷贝块自带 progref 指向原块，按源 refMap 查询全命中会满挂卡片（用户报障
+ * 「摘抄后整篇变色」根因，v3.4.1 出场链使它从概率性一次变每次出场幂等重打）——
+ * 痕迹只挂源文档，卡片零痕迹（出场残留清理见 clearDigestMarks）。
  */
 export function digestMarkBookID(kind: FloatDocKind, bookID: string, docID: string): string {
+    if (kind === "digest") return "";
     if (kind === "free") return docID;
     return bookID;
+}
+
+/**
+ * 摘抄动作链挂载 gate（群反馈 650189 根治）：宿主文档是 digest 卡片时不当场挂痕——
+ * 卡片里再摘/整摘时当前 protyle=卡片，拷贝块 progref 指向原块全命中源 refMap 会满挂
+ * 卡片（v3.4.0 时代「偶发大片」即此链）。摘抄数据照常落库（ctime+progref），源文档
+ * （书/free 态）出场自然挂出。ctime=宿主 wysiwyg 的 custom-pdigest-ctime
+ * （DigestBuilder.init 直读，同 markDigestTag 判据）。
+ */
+export function isDigestHostDoc(ctime: string | null | undefined): boolean {
+    return !!ctime;
 }
 
 export type FloatBtnKind = "common" | "primary" | "normal" | "ghost";

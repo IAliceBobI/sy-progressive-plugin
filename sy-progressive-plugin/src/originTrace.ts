@@ -22,6 +22,16 @@ export function buildPieceIdx(bookID: string, point: number): string {
     return `${bookID}#${point}`;
 }
 
+/** 摘抄序号清洗（群反馈 650189 同场小修，2026-09-05）：getDigestMd 读块的
+ *  custom-in-book-index / data-node-index 作卡片标题 `[序号]` 前缀。历史 bug：
+ *  `cloned.setAttribute(IN_BOOK_INDEX, null)` 被 DOM 转字符串落 "null" 字面量进
+ *  拷贝块 IAL，digest 卡片块从此带真值 "null"，再摘时拼出标题「[null]」。清洗后
+ *  恒非空：脏值与缺失一律兜底 "0"（「[0]」既有正常形态），写侧 setAttribute 也
+ *  永不再落 "null"。 */
+export function validDigestIdx(v: string | null | undefined): string {
+    return v && v !== "null" && v !== "undefined" ? v : "0";
+}
+
 export function parsePieceIdx(value: string | undefined | null): { bookID: string; point: number } | null {
     if (!value) return null;
     const i = value.lastIndexOf("#");

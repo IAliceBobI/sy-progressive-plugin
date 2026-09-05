@@ -13,7 +13,8 @@ import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
 import { progStorage } from "./ProgressiveStorage";
 import { ReviewKey, PdigestReviewKey, markQuestion, nextIntervalDays } from "./reviewQueue";
 import { notifyFleetChanged } from "./fleetNotify";
-import { PIECE_IDX_KEY, buildPieceIdx, piecePointFromMark, resolveDigestOrigin, validDigestMd } from "./originTrace";
+import { PIECE_IDX_KEY, buildPieceIdx, piecePointFromMark, resolveDigestOrigin, validDigestMd, validDigestIdx } from "./originTrace";
+import { isDigestHostDoc } from "./progFloatState";
 import { bookCommentsFromRows, type BookCommentItem, type BookCommentRow } from "./digestComments";
 
 // □12 摘抄标记零触碰统一（2026-08-30）：+ 链接（addPlusLnk）与写 style 背景（changeBG）
@@ -202,8 +203,11 @@ export class DigestBuilder {
         if (question) await this.markQuestionOn(digestID);
         if (review) await this.markReviewOn(digestID);
         // □12：摘抄后立即重打当前文档痕迹（竖条+背景渲染态）；缓存刚被 invalidate 失效，
-        // 不必 force。不 await——otab.open 可能替换页签，fire-and-forget 持引用打标无害
-        markDigests(this.protyle, this.bookID).catch(() => { });
+        // 不必 force。不 await——otab.open 可能替换页签，fire-and-forget 持引用打标无害。
+        // 卡片宿主 gate（群反馈 650189 根治）：在卡片里再摘时当前 protyle=卡片，拷贝块
+        // progref 全命中源 refMap 会满挂卡片（「整篇变色」根因链）——数据照常落库，
+        // 源文档出场自然挂出，卡片零痕迹。
+        if (!isDigestHostDoc(this.ctime)) markDigests(this.protyle, this.bookID).catch(() => { });
         await this.otab.open(digestID, windowOpenStyle.get() as any, this.ids.at(0));
         await this.setDigestCard(digestID);
         if (digestAddReadingpoint.get()) {
@@ -236,8 +240,9 @@ export class DigestBuilder {
             siyuan.pushMsg(tomatoI18n.摘抄目录未就绪请重试);
             return "";
         }
-        // 整摘同享 invalidate 缓存失效，与 digest() 对称即时重打（review P2#4）
-        markDigests(this.protyle, this.bookID).catch(() => { });
+        // 整摘同享 invalidate 缓存失效，与 digest() 对称即时重打（review P2#4）；
+        // 卡片宿主 gate 同 digest()（isDigestHostDoc，群反馈 650189 根治）
+        if (!isDigestHostDoc(this.ctime)) markDigests(this.protyle, this.bookID).catch(() => { });
         await this.otab.open(digestID, (forRecite ? "front" : windowOpenStyle.get()) as any, this.ids.at(0));
         await this.setDigestCard(digestID);
         return digestID;
@@ -358,8 +363,10 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
     let idx: string;
     let i = 0;
     for (const div of selected) {
-        let inBookIdx = div.getAttribute(IN_BOOK_INDEX);
-        if (!inBookIdx) inBookIdx = div.getAttribute(DATA_NODE_INDEX);
+        // 序号清洗（[null] 标题根治，群反馈 650189 同场）：历史 setAttribute(key, null)
+        // 落 "null" 字面量进块 IAL，真值脏值曾被当序号拼标题——validDigestIdx 兜底 "0"，
+        // 且恒非空使下方 setAttribute(IN_BOOK_INDEX) 永不再产新脏值
+        const inBookIdx = validDigestIdx(div.getAttribute(IN_BOOK_INDEX) ?? div.getAttribute(DATA_NODE_INDEX));
 
         let originID = div.getAttribute(RefIDKey);
         if (!originID) originID = div.getAttribute(DATA_NODE_ID);

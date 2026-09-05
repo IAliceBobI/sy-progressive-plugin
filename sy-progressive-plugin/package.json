@@ -1,6 +1,6 @@
 {
   "name": "sy-progressive-plugin",
-  "version": "3.4.1",
+  "version": "3.4.2",
   "description": "思源笔记渐进学习插件：摘抄/分片渐进、闪卡、多行挖空",
   "private": true,
   "type": "module",

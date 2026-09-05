@@ -12,7 +12,7 @@ import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard,
 import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue, digestMarkBookID } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
-import { markDigests, markDigestTag } from "./digestMarker";
+import { markDigests, markDigestTag, clearDigestMarks } from "./digestMarker";
 
 const Prog_BUTTON = "custom-prog-button";
 const Prog_BUTTON_NoteID = "custom-prog-button-noteID";
@@ -216,6 +216,13 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
 
     // □11 自由态：普通文档（非三态）在自由态上岗时以 free 态出场（✂📥 两键）
     if (docID == null || (nextKind == null && !freeSession)) {
+        // 痕迹只挂源文档（群反馈 650189 根治）：普通文档出场补挂摘抄痕迹——markDigests
+        // 自指 docID（free 摘抄 ctime=docID#ct 命中 refMap），不看自由态是否上岗（用户
+        // 日常打开/复习流打开同权补挂）；digestMarker 空结果负缓存防高频 SQL。浮条
+        // 语义不变：普通文档不出场（show=false 原样）。
+        if (docID != null && nextKind == null) {
+            markDigests(protyle, docID).catch(() => { });
+        }
         show.set(false);
         return;
     }
@@ -238,15 +245,19 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         if (nextBookID && shouldRefreshDue(nextBookID, isBook)) refreshDue(nextBookID);
     }
     // 摘抄痕迹：四态出场求值（digestMarkBookID）——片态（块 custom-progref 命中）与
-    // 书态原文（块 ID 即 ref 值）双侧打标；free 态自指 docID、digest 态原书 bookID
-    // （群反馈 650189：free 文档摘抄小条重进不补挂——原只 piece/book 打标，free 摘抄
-    // 只在动作那一刻打一次，重进文档出场链永不补挂）。
+    // 书态原文（块 ID 即 ref 值）双侧打标；free 态自指 docID；digest 态恒不打（卡片
+    // 零痕迹，群反馈 650189 根治：拷贝块 progref 全命中源 refMap=满挂「整篇变色」
+    // 根因，痕迹只挂源文档——v3.4.1 出场链使满挂从概率性一次变每次出场幂等重打）。
     // □15 移出 docChanged：出场链由五种事件驱动（含 loaded_protyle_dynamic），protyle
     // 懒加载双向窗口（向下滚出新块 + 顶部折叠重展开）都会丢标须重打；幂等清旧重打，
-    // refMap 60s 缓存兜底开销。
+    // refMap 60s 缓存+空结果负缓存兜底开销。
     const markBookID = digestMarkBookID(nextKind, nextBookID, docID ?? "");
     if (markBookID) {
         markDigests(protyle, markBookID).catch(() => { });
+    } else if (nextKind === "digest") {
+        // 卡片只清不打：剥掉修复前版本满挂的残留 span（纯 DOM 零落盘，但插件热升级
+        // reload 不重建已开文档 DOM，须出场主动清；零 SQL）
+        clearDigestMarks(protyle);
     }
     // 摘抄文档身份徽章（progpolish □4）：title 区注入「✒ 摘抄」胶囊（零落盘），
     // 同出场链反复调用，markDigestTag 幂等清旧重挂；title 重渲染丢注入由下次事件补挂

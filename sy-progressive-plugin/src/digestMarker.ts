@@ -18,6 +18,7 @@ import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progDa
 import { PIECE_IDX_KEY, digestTagKind } from "./originTrace";
 import { progStorage } from "./ProgressiveStorage";
 import { showFloatTip, hideFloatTip } from "./floatTip";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { buildDigestMenuItems, digestJumpOf, groupDigestRows, mergeRefRows, DigestRow } from "./digestList";
 import { digestStateOf, digestStateIcon } from "./digestState";
 import { openDigestReviewMenu } from "./reviewMenu";
@@ -35,8 +36,16 @@ export function initDigestMarker(plugin: any) {
 // refMap 缓存：新摘抄后 invalidateDigestMarker 失效，下次出场重查
 const cache = new Map<string, { map: Map<string, string[]>; ts: number }>();
 
+// 空结果负缓存（群反馈 650189 根治配套）：refMap 首查为空的 bookID 记会话级 Set，
+// 后续出场跳过 SQL——普通文档出场补挂后高频触发（切页签/出场链五事件反复调），
+// 空结果靠 60s TTL 过期后每轮重发两条 SQL 浪费。invalidateDigestMarker 同步解除
+// （newDigestDoc 落库必调）：该 bookID 下新建摘抄即恢复重查。只增不清+插件 reload
+// 清零，同 ProgressiveBtn.verifiedNormalDoc 模式。
+const emptyRefBooks = new Set<string>();
+
 export function invalidateDigestMarker(bookID: string) {
     cache.delete(bookID);
+    emptyRefBooks.delete(bookID);
 }
 
 /** ref值 → 摘抄块 ID 数组（升序=时间序；同原文块多次摘抄全部收集，□15 前只留最新） */
@@ -45,19 +54,36 @@ async function buildRefMap(bookID: string): Promise<Map<string, string[]>> {
         `select block_id from attributes where name="${PDIGEST_CTIME}" and value like "${bookID}#%" limit 1000000`,
     );
     const docIDs = docRows.map((r: any) => r.block_id);
-    if (docIDs.length === 0) return new Map();
+    if (docIDs.length === 0) {
+        debugLog("digestmark", `buildRefMap bookID=${bookID} 摘抄文档0（负缓存候选）`, "progressive");
+        return new Map();
+    }
     const rows = await siyuan.sqlAttr(
         `select block_id, value from attributes where name="${RefIDKey}" and root_id in (${docIDs.map((id: string) => `"${id}"`).join(",")}) limit 1000000`,
     );
-    return mergeRefRows(rows);
+    const map = mergeRefRows(rows);
+    debugLog("digestmark", `buildRefMap bookID=${bookID} 文档${docIDs.length} ref${map.size}`, "progressive");
+    return map;
 }
 
 async function refMapOf(bookID: string, force = false): Promise<Map<string, string[]>> {
     const hit = cache.get(bookID);
     if (!force && hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.map;
+    // 负缓存只拦非 force：force=调用方明确要重查（如摘抄刚落库），须穿透
+    if (!force && emptyRefBooks.has(bookID)) return new Map();
     const map = await buildRefMap(bookID);
-    cache.set(bookID, { map, ts: Date.now() });
+    if (map.size === 0) emptyRefBooks.add(bookID);
+    else cache.set(bookID, { map, ts: Date.now() });
     return map;
+}
+
+/**
+ * 只清不打：digest 卡片出场用（digestMarkBookID digest 态返回空串）——卡片零痕迹。
+ * 清残留的必要性：修复前版本满挂的 span 是纯 DOM 注入零落盘（reload 即消），但插件
+ * 热升级/集市更新 reload 不重建已开文档的 DOM，须出场主动剥一遍。零 SQL。
+ */
+export function clearDigestMarks(protyle: any) {
+    protyle?.wysiwyg?.element?.querySelectorAll(`.${MARK_CLASS}`).forEach(m => m.remove());
 }
 
 /**
