@@ -1,6 +1,7 @@
 import { Dialog, Setting } from "siyuan";
 import { openChangelogDialog } from "../../sy-tomato-plugin/src/libs/changelogDialog";
-import changelog from "./changelog.json";
+import changelog2025 from "./changelog/2025.json";
+import changelog2026 from "./changelog/2026.json";
 import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
 import helpDocs from "./help.json";
 import { openHelpMenu } from "../../sy-tomato-plugin/src/libs/helpMenu";
@@ -35,12 +36,16 @@ import { initProgFloatBtns, toggleFloatBarSystem, toggleFreeFloat } from "./Prog
 import { PROG_FLOAT_ICONS } from "./progIcons";
 import { initDigestMarker } from "./digestMarker";
 import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
+import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
 import { notifyFleetChanged } from "./fleetNotify";
 import { closeFloatPopover } from "./overlays";
 import { openDueReviewList } from "./reviewMenu";
 import { buildContentBlocks, computePieceIndex, runSplit } from "./Split2Pieces";
 import { createPiece, deleteAllPieces, fullfilContent } from "./helper";
 import { invalidateBookStatusCache } from "./bookStatus";
+
+// 更新日志按年拆分存储（src/changelog/<年>.json，当年文件追加、往年冻结），此处组装倒序全集
+const changelog = [...changelog2026, ...changelog2025];
 
 function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
@@ -165,6 +170,8 @@ export default class ThePlugin extends BaseTomatoPlugin {
     }
 
     async onLayoutReady() {
+        // □5 时序统一：Box 注册已前移 async onload（框架保序 onload 完成后才
+        // onLayoutReady）；此处再 await 一次为零成本防御，保住本簇的配置前提
         await this.taskCfg;
 
         // 思源登录态异步就绪轮询：启动时未登录/换账号的门禁在登录后补验刷新（照 recite
@@ -189,53 +196,12 @@ export default class ThePlugin extends BaseTomatoPlugin {
         // 制卡核心流免费。老 VIP（included 标记不变）自然通过验证自动过门零操作。
         refreshProgGate(lastVerifyResult() === true);
 
-        // v5 □8：三维皮肤 + 参数微调按存储恢复（theme.ts 注册表与 index.scss slug 对齐）
+        // applyProgSkins 留 auth 簇后（保持现状顺序）：皮肤属性与 Pro 门禁 class 独立挂
+        // body，但「verify 后恢复视觉」防未激活用户 Pro 皮肤闪现（v5 □8 三维皮肤恢复）
         applyProgSkins(this.settingCfg);
 
-        await flashBox.onload(this, this.settingCfg);
-        await pieceMovingBox.onload(this, this.settingCfg);
-        await pieceSummaryBox.onload(this, this.settingCfg);
-        await writingCompareBox.onload(this, this.settingCfg);
-        await digestProgressiveBox.onload(this, this.settingCfg);
-        await progStorage.onLayoutReady(this);
-        await prog.onload(this, this.settingCfg);
+        // 浮条 DOM 直挂 document.body（tomato loadFloatingBall 先例：自挂 DOM 不进 onload 链）
         initProgFloatBtns();
-
-        // v5 □6：状态栏火苗 + 左 Dock 舰队总览（动作注入防循环依赖，见 fleet.ts 头注）
-        const fleetActions: FleetActions = {
-            startReading: () => prog.startToLearnWithLock(),
-            freeDigest: () => toggleFreeFloat(),
-            addFirstBook: () => prog.addProgressiveReadingWithLock(),
-            continueReading: (bookID) => prog.startToLearnWithLock(bookID),
-            manageBooks: () => prog.viewAllProgressiveBooks(),
-            openSettings: () => this.openSettings(),
-            reciteAction: async () => {
-                if (prog.isReciteInstalled()) {
-                    await prog.sendToRecite();
-                } else {
-                    await siyuan.pushMsg(tomatoI18n.导流仿写未装, 2500);
-                }
-            },
-            isReciteInstalled: () => prog.isReciteInstalled(),
-            openDueList: (ev, bookID) => openDueReviewList(ev, bookID),
-            openReviewPlan: () => this.openReviewPlanDialog(),
-            // 舰队管理 □2：书卡菜单动作（数据侧动作后 notifyFleetChanged 驱动面板即时刷新；
-            // 归档走 confirm 确认链，书摘出调度后由 30s 刷新兜底，不抢 confirm 时序）
-            togglePinBook: async (bookID, v) => {
-                await progStorage.setPinnedBook(bookID, v);
-                notifyFleetChanged();
-            },
-            toggleHideBook: async (bookID, v) => {
-                await progStorage.setHiddenBook(bookID, v);
-                notifyFleetChanged();
-            },
-            ignoreBook: async (bookID) => {
-                await progStorage.setIgnoreBook(bookID, true);
-                notifyFleetChanged();
-            },
-            archiveBook: (bookID) => prog.archiveBookWithConfirm(bookID),
-        };
-        initFleet(this, fleetActions);
     }
 
     onunload(): void {
@@ -287,7 +253,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             }
         });
         dm.add("1", () => { dialog.destroy() })
-        dm.add("2", () => { d.destroy() })
+        dm.add("2", () => { unmount(d) })
     }
 
     // 可见性期3 □3 复习计划面板：独立 Dialog 去重重开（settings 同款 DestroyManager 范式；
@@ -314,7 +280,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         dm.add("2", () => { unmount(app); });
     }
 
-    onload() {
+    async onload() {
         this.addIcons(ICONS);
         this.addIcons(PROG_FLOAT_ICONS);
         initDigestMarker(this);
@@ -331,9 +297,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
         });
 
         this.setting = new Setting({
-            confirmCallback: () => {
-                this.saveData(STORAGE_Prog_SETTINGS, this.settingCfg);
-                window.location.reload();
+            confirmCallback: async () => {
+                // await 落盘再触发重载：saveData 异步写被抢跑会掐断，文件保持旧值
+                await this.saveData(STORAGE_Prog_SETTINGS, this.settingCfg);
+                await reloadSelfPlugin("sy-progressive-plugin");
             }
         });
         // v5 □7：原生 Setting 面板不再放条目（与自绘设置面板两套并存易不一致，统一走顶栏齿轮 openSettings）
@@ -376,5 +343,55 @@ export default class ThePlugin extends BaseTomatoPlugin {
         // 桌面顶栏菜单退役（2026-08-31 用户拍板）：加书/跳转在桌面走右键块菜单+浮条+命令
         // 面板；移动端保留顶栏——移动端无浮条 hover 生态，这里是唯一常驻入口
         if (events.isMobile) prog.addTopbar(this, "left");
+
+        // □5 时序统一（照 tomato □4 模式）：官方框架 await plugin.onload()（2023 年起两代
+        // 内核均如此，事实源 docs/siyuan-plugin-lifecycle-async-loading.md）——配置就绪收进
+        // onload，Box 注册集中于此后顺序执行；onLayoutReady 只剩 auth 簇+视觉恢复+浮条
+        // DOM 直挂。各 Box 内的 verifyKeyProgressive 验签保留（懒缓存整链只真跑一次，
+        // 阻塞的仅命令注册——tomato onload 605 批先例）。progStorage 是 loadData 数据加载
+        // （与 taskCfg 同性质，非 verify 类无谓穿插），必须先于 initFleet——fleet 首刷
+        // refreshFleet 读 booksInfos，顺序反转=e2e 实锤 undefined.data TypeError。
+        await this.taskCfg;
+        await flashBox.onload(this, this.settingCfg);
+        await pieceMovingBox.onload(this, this.settingCfg);
+        await pieceSummaryBox.onload(this, this.settingCfg);
+        await writingCompareBox.onload(this, this.settingCfg);
+        await digestProgressiveBox.onload(this, this.settingCfg);
+        await progStorage.onLayoutReady(this);
+        await prog.onload(this, this.settingCfg);
+        const fleetActions: FleetActions = {
+            startReading: () => prog.startToLearnWithLock(),
+            freeDigest: () => toggleFreeFloat(),
+            addFirstBook: () => prog.addProgressiveReadingWithLock(),
+            continueReading: (bookID) => prog.startToLearnWithLock(bookID),
+            manageBooks: () => prog.viewAllProgressiveBooks(),
+            openSettings: () => this.openSettings(),
+            reciteAction: async () => {
+                if (prog.isReciteInstalled()) {
+                    await prog.sendToRecite();
+                } else {
+                    await siyuan.pushMsg(tomatoI18n.导流仿写未装, 2500);
+                }
+            },
+            isReciteInstalled: () => prog.isReciteInstalled(),
+            openDueList: (ev, bookID) => openDueReviewList(ev, bookID),
+            openReviewPlan: () => this.openReviewPlanDialog(),
+            // 舰队管理 □2：书卡菜单动作（数据侧动作后 notifyFleetChanged 驱动面板即时刷新；
+            // 归档走 confirm 确认链，书摘出调度后由 30s 刷新兜底，不抢 confirm 时序）
+            togglePinBook: async (bookID, v) => {
+                await progStorage.setPinnedBook(bookID, v);
+                notifyFleetChanged();
+            },
+            toggleHideBook: async (bookID, v) => {
+                await progStorage.setHiddenBook(bookID, v);
+                notifyFleetChanged();
+            },
+            ignoreBook: async (bookID) => {
+                await progStorage.setIgnoreBook(bookID, true);
+                notifyFleetChanged();
+            },
+            archiveBook: (bookID) => prog.archiveBookWithConfirm(bookID),
+        };
+        initFleet(this, fleetActions);
     }
 }

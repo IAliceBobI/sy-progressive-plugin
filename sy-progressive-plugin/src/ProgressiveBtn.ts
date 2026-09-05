@@ -9,7 +9,7 @@ import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
 import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
-import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue } from "./progFloatState";
+import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue, digestMarkBookID } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests, markDigestTag } from "./digestMarker";
@@ -237,12 +237,16 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         expanded.set(expandAtAppear(floatbarExpandPref.get(), nextKind));
         if (nextBookID && shouldRefreshDue(nextBookID, isBook)) refreshDue(nextBookID);
     }
-    // 摘抄痕迹：片态（块 custom-progref 命中）与书态原文（块 ID 即 ref 值）双侧打标。
+    // 摘抄痕迹：四态出场求值（digestMarkBookID）——片态（块 custom-progref 命中）与
+    // 书态原文（块 ID 即 ref 值）双侧打标；free 态自指 docID、digest 态原书 bookID
+    // （群反馈 650189：free 文档摘抄小条重进不补挂——原只 piece/book 打标，free 摘抄
+    // 只在动作那一刻打一次，重进文档出场链永不补挂）。
     // □15 移出 docChanged：出场链由五种事件驱动（含 loaded_protyle_dynamic），protyle
     // 懒加载双向窗口（向下滚出新块 + 顶部折叠重展开）都会丢标须重打；幂等清旧重打，
     // refMap 60s 缓存兜底开销。
-    if (nextKind === "piece" || nextKind === "book") {
-        markDigests(protyle, nextBookID).catch(() => { });
+    const markBookID = digestMarkBookID(nextKind, nextBookID, docID ?? "");
+    if (markBookID) {
+        markDigests(protyle, markBookID).catch(() => { });
     }
     // 摘抄文档身份徽章（progpolish □4）：title 区注入「✒ 摘抄」胶囊（零落盘），
     // 同出场链反复调用，markDigestTag 幂等清旧重挂；title 重渲染丢注入由下次事件补挂

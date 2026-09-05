@@ -3,7 +3,7 @@ import * as constants from "./constants";
 import { Plugin } from "siyuan";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalDigestHub, getDocIalFreeDigestDir, getDocIalNoteBox, getDocIalReadLog, getDocIalWords } from "./progData";
+import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalDigestHub, getDocIalFreeDigestDir, getDocIalNoteBox, getDocIalNoteDir, getDocIalReadLog, getDocIalWords } from "./progData";
 import { MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import type { ReadingOrder } from "./roller";
 import { osFs } from "../../sy-tomato-plugin/src/libs/globals";
@@ -262,7 +262,8 @@ export class ProgressiveStorage {
 
     // ============ v5 prog-data 锚定链 ============
     // 根目录：storage ID + IAL 双锚（换设备/清存储靠 IAL 认回）；
-    // digest 夹/札记匣：只走 IAL 认回（全局唯一，不缓存——少一个 stale 源）。
+    // digest 夹/札记匣：无 storage ID，认回=IAL 全库搜 + 刚建缓存（□1：索引延迟窗口
+    // 防重复建，命中经 checkBlockExist 校验活死，见 progData.ts ensureAnchoredDoc）。
 
     private async saveProgDataID(id: string) {
         this.plugin.data[constants.STORAGE_PROGDATA] = id;
@@ -311,7 +312,7 @@ export class ProgressiveStorage {
     async ensureDigestDir(bookID: string, underBook = false): Promise<string> {
         return ensureAnchoredDoc(getDocIalDigestDir(bookID), {
             findByIal: () => findDocByIal(getDocIalDigestDir(bookID)),
-            checkBlockExist: (_id) => Promise.resolve(false),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
             create: async () => {
                 const name = `digest-${await this.bookName(bookID)}`;
                 return underBook
@@ -326,7 +327,7 @@ export class ProgressiveStorage {
     async ensureDigestHub(): Promise<string> {
         return ensureAnchoredDoc(getDocIalDigestHub(), {
             findByIal: () => findDocByIal(getDocIalDigestHub()),
-            checkBlockExist: (_id) => Promise.resolve(false),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
             create: () => this.createChildUnderRoot("摘抄", getDocIalDigestHub()),
             onResolved: async () => { },
         });
@@ -336,7 +337,7 @@ export class ProgressiveStorage {
     async ensureWordsDoc(bookID: string): Promise<string> {
         return ensureAnchoredDoc(getDocIalWords(bookID), {
             findByIal: () => findDocByIal(getDocIalWords(bookID)),
-            checkBlockExist: (_id) => Promise.resolve(false),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
             create: async () => this.createChildUnderRoot(`words-${await this.bookName(bookID)}`, getDocIalWords(bookID)),
             onResolved: async () => { },
         });
@@ -351,8 +352,26 @@ export class ProgressiveStorage {
     async ensureNoteBox(): Promise<string> {
         return ensureAnchoredDoc(getDocIalNoteBox(), {
             findByIal: () => findDocByIal(getDocIalNoteBox()),
-            checkBlockExist: (_id) => Promise.resolve(false),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
             create: () => this.createChildUnderRoot("札记匣", getDocIalNoteBox()),
+            onResolved: async () => { },
+        });
+    }
+
+    /** 札记匣内源文档夹（□3 分组）：central+非书档的摘抄按源文档归集进
+     *  札记匣/digest-源文档名/ 三层；夹名初始皮=源文档名（走 getBlockInfo 实时通道，
+     *  bookName 的 SQL content 列对刚建文档有索引延迟会落 id 形态丑名），认 IAL 位置无关 */
+    async ensureNoteDir(sourceDocID: string): Promise<string> {
+        return ensureAnchoredDoc(getDocIalNoteDir(sourceDocID), {
+            findByIal: () => findDocByIal(getDocIalNoteDir(sourceDocID)),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
+            create: async () => {
+                const info = await siyuan.getBlockInfo(sourceDocID);
+                const name = info?.rootTitle ? `digest-${info.rootTitle}` : `digest-${sourceDocID}`;
+                const box = await this.ensureNoteBox();
+                if (!box) return "";
+                return this.createChildUnder(box, name, getDocIalNoteDir(sourceDocID));
+            },
             onResolved: async () => { },
         });
     }
@@ -361,7 +380,7 @@ export class ProgressiveStorage {
     async ensureFreeDigestDir(sourceDocID: string): Promise<string> {
         return ensureAnchoredDoc(getDocIalFreeDigestDir(sourceDocID), {
             findByIal: () => findDocByIal(getDocIalFreeDigestDir(sourceDocID)),
-            checkBlockExist: (_id) => Promise.resolve(false),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
             create: async () => this.createChildUnder(sourceDocID, `digest-${await this.bookName(sourceDocID)}`, getDocIalFreeDigestDir(sourceDocID)),
             onResolved: async () => { },
         });
@@ -371,7 +390,7 @@ export class ProgressiveStorage {
     async ensureReadLog(): Promise<string> {
         return ensureAnchoredDoc(getDocIalReadLog(), {
             findByIal: () => findDocByIal(getDocIalReadLog()),
-            checkBlockExist: (_id) => Promise.resolve(false),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
             create: () => this.createChildUnderRoot("阅读日志", getDocIalReadLog()),
             onResolved: async () => { },
         });

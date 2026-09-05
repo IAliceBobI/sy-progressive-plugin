@@ -66,6 +66,19 @@ export function shouldRefreshDue(bookID: string, isRegisteredBook: (id: string) 
     return isRegisteredBook(bookID);
 }
 
+/**
+ * 出场摘抄痕迹求值（群反馈 650189 修复，2026-09-05）：返回 markDigests 的 bookID
+ * 实参（空串=不打标）。片/书/digest 态用出场载荷 bookID（片=所属书、书=自身、
+ * digest=原书——digest 文档内拷贝块 progref 与再摘支路都按原书 refMap 命中）；
+ * free 态载荷 bookID 恒空（detectFloatDoc 对普通文档返回 null），按 docID 自指查
+ * refMap——free 摘抄 ctime=`docID#ct`（resolveDigestOrigin 三链落空自指同源）。
+ * 原实现出场只对 piece/book 打标，free 文档摘抄小条重进文档永不补挂。
+ */
+export function digestMarkBookID(kind: FloatDocKind, bookID: string, docID: string): string {
+    if (kind === "free") return docID;
+    return bookID;
+}
+
 export type FloatBtnKind = "common" | "primary" | "normal" | "ghost";
 
 export interface FloatButtonSpec {

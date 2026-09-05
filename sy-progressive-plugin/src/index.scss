@@ -169,7 +169,7 @@ html[data-theme-mode="dark"] {
 // ============================================================
 // 浮条 tooltip 自建单例（floatTip.ts）：复用思源 .tooltip 类观感，但纯提示勿拦指针
 // （原生 #tooltip 因同步悬浮要点链接而刻意可拦——会与按钮 hover 几何互扰，见
-// debugging.md「平铺区按钮 tooltip 裁切」□1 增量）。规则挂 id 常驻，show 里
+// debugging/e2e/floatbar.md「平铺区按钮 tooltip 会被行容器裁切」□1 增量）。规则挂 id 常驻，show 里
 // removeAttribute("style") 清定位不误伤。
 #prog-float-tip {
   pointer-events: none;
@@ -520,6 +520,9 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   gap: 3px;
   padding: 0 4px;
   height: 100%;
+  /* ok 态兜底：warn/over 由 [data-state] 注入覆盖（特异性 0,2,0 > 0,1,0）。
+     此前注释宣称「:root 的 flame-core 兜底」但从未定义，var() 失败芯焰/数字回退黑 */
+  --prog-flame-core: var(--prog-status-ok);
   border: none;
   background: none;
   cursor: pointer;
@@ -540,6 +543,14 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
 .prog-flame-core {
   fill: var(--prog-flame-core);
   opacity: 0.85;
+}
+.prog-flame-label {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--b3-theme-on-surface);
+  /* vision 评审 P1：0.55 在亮底 2.5:1/暗底 1.6:1 低于 WCAG；0.75 双主题 ≥4.5:1 */
+  opacity: 0.75;
 }
 .prog-flame-num {
   font-size: 12px;

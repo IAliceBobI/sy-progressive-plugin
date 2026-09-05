@@ -942,7 +942,7 @@
         accent-color: var(--b3-theme-primary);
     }
     /* □14 锁态（未激活 p/t/i）：运行时挂的类须 :global 组合选择器，否则 scoped CSS
-       当 unused 剪掉（debugging.md 先例）。弱化下沉到文字 span（vision 复评 P2：容器
+       当 unused 剪掉（debugging/e2e/input.md「浏览器模拟思源移动端」先例）。弱化下沉到文字 span（vision 复评 P2：容器
        opacity 会连带压暗 b3-tooltips 伪元素=Pro 引导气泡只剩 60% 浓度）+ 虚线边框
        强化「不可选区」语义；🔒 保持全浓（暗底金锁=强信号） */
     .prog-radio-chip:global(.prog-locked) {

@@ -135,5 +135,21 @@ export function validDigestMd(md: string[]): string[] {
     });
 }
 
+/** 展示侧摘抄类型（□2 标题胶囊字标）：piece=片发起 / book=书态 / free=札记（非书）。
+ *  与 resolveDigestOrigin 分工：发起侧管「这次摘抄落哪个匣」（输入来自选中态），
+ *  展示侧管「这篇已存在的摘抄文档是什么身份」——数据源全是摘抄文档 IAL（稳定，
+ *  title 用户可改不作依据）。问题/整摘不进此分类（title 的 ❓/[整] 前缀已自表达）。 */
+export type DigestTagKind = "piece" | "book" | "free";
+
+export function digestTagKind(
+    pieceIdx: string | undefined | null,
+    ctimeBookID: string,
+    isRegistered: (id: string) => boolean,
+): DigestTagKind {
+    if (pieceIdx) return "piece";
+    if (ctimeBookID && isRegistered(ctimeBookID)) return "book";
+    return "free";
+}
+
 /** TEMP_CONTENT re-export（消费方拼片 IAL 用，防各处裸抄魔法串） */
 export { TEMP_CONTENT };

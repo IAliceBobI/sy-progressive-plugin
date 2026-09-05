@@ -8,6 +8,7 @@
     // 改造；2026-09-03 双栏改造复刻番茄终态架构：左导航 7 域+右侧单域渲染+搜索聚合视图）
     import "../../sy-tomato-plugin/src/IndexConf.css";
     import { floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
+    import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import UpgradeBar from "../../sy-tomato-plugin/src/UpgradeBar.svelte";
     import { saveRestorePagePosition } from "../../sy-tomato-plugin/src/libs/utils";
@@ -145,7 +146,7 @@
             floatbarMainBtns.set([...pieceMainBtns]);
         }
         await plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg);
-        window.location.reload();
+        await reloadSelfPlugin("sy-progressive-plugin");
     }
 </script>
 

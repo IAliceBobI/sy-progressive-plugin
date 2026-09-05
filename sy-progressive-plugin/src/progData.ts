@@ -25,6 +25,11 @@ export function getDocIalNoteBox(): string {
     return `notebox#${TEMP_CONTENT}`;
 }
 
+/** 札记匣内按源文档归集的夹（□3：digest-源文档名 挂札记匣下；按源文档锚定，位置无关） */
+export function getDocIalNoteDir(docID: string): string {
+    return `notedir#${TEMP_CONTENT}#${docID}`;
+}
+
 /** words 单词文档（v5 □4 起进 prog-data；值格式沿用历史 `words#t#bookID`，旧书下文档按 IAL 原位认回） */
 export function getDocIalWords(bookID: string): string {
     return `words#${TEMP_CONTENT}#${bookID}`;
@@ -47,12 +52,22 @@ export interface AnchorDeps {
     onResolved(id: string, fresh: boolean): Promise<void>;
 }
 
-// 同 IAL 的进行中 ensure 去重：建匣/建夹后 attributes 索引有秒级延迟，窗口期内第二次
-// findByIal 查空会重复建（e2e 实测首摘抄双札记匣）；只去重 in-flight 不缓存结果——
-// 文档被删后下一次 ensure 仍走完整认回链，不会拿到死 ID。
+// 同 IAL 的进行中 ensure 去重；跨调用（非并发）的重复建由 freshCreatedIds 设防（□1）。
 const inFlightEnsure = new Map<string, Promise<string>>();
 
-/** 统一锚定链：storage ID → checkBlockExist → IAL 全库搜 → 惰性新建。 */
+// 本进程内新建过的锚定 ID（□1 双札记匣修复）：建匣/建夹后 attributes 索引有秒级延迟，
+// in-flight 的去重只护并发、finally 即清 key——窗口期内跨调用的第二次 findByIal 仍查空
+// 会重复建（用户主实例实锤双札记匣）。常驻内存认回 + 命中时 checkBlockExist 校验活死：
+// checkBlockExist 走内核 HTTP 直查不受 SQL 索引延迟影响（annoDraft 删向 ~6s 残留识破实证），
+// 文档被删 → 校验失败清缓存走完整链重建，「下一次 ensure 不拿死 ID」语义不丢。
+const freshCreatedIds = new Map<string, string>();
+
+/** 单测隔离用：清空刚建 ID 缓存 */
+export function resetAnchoredCacheForTest() {
+    freshCreatedIds.clear();
+}
+
+/** 统一锚定链：storage ID → checkBlockExist → IAL 全库搜 →（刚建缓存校验）→ 惰性新建。 */
 export async function ensureAnchoredDoc(ialValue: string, deps: AnchorDeps): Promise<string> {
     const running = inFlightEnsure.get(ialValue);
     if (running) return running;
@@ -65,8 +80,18 @@ export async function ensureAnchoredDoc(ialValue: string, deps: AnchorDeps): Pro
             await deps.onResolved(found, false);
             return found;
         }
+        // 索引延迟窗口守卫：本进程刚建过同 IAL 文档而 SQL 仍查空——校验活着就认回，勿重复建
+        const fresh = freshCreatedIds.get(ialValue);
+        if (fresh) {
+            if (await deps.checkBlockExist(fresh)) {
+                await deps.onResolved(fresh, false);
+                return fresh;
+            }
+            freshCreatedIds.delete(ialValue);
+        }
         const created = await deps.create();
         if (!created) return "";
+        freshCreatedIds.set(ialValue, created);
         await deps.onResolved(created, true);
         return created;
     })().finally(() => inFlightEnsure.delete(ialValue));

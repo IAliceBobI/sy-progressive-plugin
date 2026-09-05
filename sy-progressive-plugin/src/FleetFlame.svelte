@@ -42,5 +42,6 @@
         <!-- 芯焰：状态色渲染区（绿/黄/红） -->
         <path class="prog-flame-core" d={coreD} />
     </svg>
+    <span class="prog-flame-label">{tomatoI18n.火苗欠债标签}</span>
     <span class="prog-flame-num">{$flame == null ? "–" : debt}</span>
 </button>

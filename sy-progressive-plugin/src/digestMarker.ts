@@ -14,7 +14,10 @@ import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { PDIGEST_CTIME, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import { PdigestReviewKey, ReviewKey } from "./reviewQueue";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { findDocByIal, getDocIalDigestDir } from "./progData";
+import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
+import { PIECE_IDX_KEY, digestTagKind } from "./originTrace";
+import { progStorage } from "./ProgressiveStorage";
+import { showFloatTip, hideFloatTip } from "./floatTip";
 import { buildDigestMenuItems, digestJumpOf, groupDigestRows, mergeRefRows, DigestRow } from "./digestList";
 import { digestStateOf, digestStateIcon } from "./digestState";
 import { openDigestReviewMenu } from "./reviewMenu";
@@ -184,13 +187,32 @@ export function markDigestTag(protyle: any) {
     if (!root) return;
     // 清旧紧贴判定（阴性也清）：切到普通文档/片态时清掉残留旧徽章防串文档
     root.querySelectorAll(".prog-digest-tag").forEach(t => t.remove());
-    if (!protyle?.wysiwyg?.element?.getAttribute(PDIGEST_CTIME)) return;
+    const wys = protyle?.wysiwyg?.element;
+    if (!wys?.getAttribute(PDIGEST_CTIME)) return;
     const title = root.querySelector<HTMLElement>(".protyle-title");
     if (!title) return; // 无标题布局（移动端等），静默降级
+    // □2 类型字标：片摘（片序号键）> 书摘（ctime 归属注册书）> 札记（非书）——
+    // 全类型统一「摘抄」被用户点名无信息量；问题/整摘靠 title 的 ❓/[整] 前缀自表达
+    const kind = digestTagKind(
+        wys.getAttribute(PIECE_IDX_KEY),
+        parseBookIDFromCtime(wys.getAttribute(PDIGEST_CTIME) ?? ""),
+        (id) => progStorage.isRegisteredBook(id),
+    );
+    const label = kind === "piece" ? tomatoI18n.片摘 : kind === "book" ? tomatoI18n.书摘 : tomatoI18n.札记徽章;
     const tag = document.createElement("span");
     tag.className = "prog-digest-tag";
     tag.setAttribute("contenteditable", "false");
-    tag.innerHTML = `<svg><use xlink:href="#iconProgQuill"></use></svg>${tomatoI18n.摘抄}`;
+    tag.innerHTML = `<svg><use xlink:href="#iconProgQuill"></use></svg>${label}`;
+    // hover 来源提示：aria-label 驱动 #prog-float-tip 单例（自建元素对思源 tip 生态隐身，
+    // □10/□1 坑）；来源名异步补，未就绪时 hover 无 tip 功能不受损（floatTip 语义）
+    const parentID = wys.getAttribute("custom-pdigest-parent-id");
+    if (parentID) {
+        siyuan.getBlockInfo(parentID).then((info: any) => {
+            if (info?.rootTitle) tag.setAttribute("aria-label", `${label}\n${tomatoI18n.摘抄来源提示(info.rootTitle)}`);
+        }).catch(() => { });
+        tag.addEventListener("mouseenter", () => showFloatTip(tag));
+        tag.addEventListener("mouseleave", hideFloatTip);
+    }
     tag.addEventListener("click", (ev) => {
         ev.stopPropagation();
         ev.preventDefault();

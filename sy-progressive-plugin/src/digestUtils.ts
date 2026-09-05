@@ -109,11 +109,12 @@ export class DigestBuilder {
     }
 
     /** 期1 □2 非日记档落点解析：书→digest 夹（源下档新建挂书下/集中档挂总夹下，已有夹 IAL 原位认回）；
-     *  非书→源下档挂源文档下 digest-源文档名 夹/集中档进札记匣 */
+     *  非书→源下档挂源文档下 digest-源文档名 夹/集中档进札记匣（□3 起匣内按源文档建夹归集，
+     *  同 source 档命名法：札记匣/digest-源文档名/摘抄文档 三层） */
     private async landingDirID(): Promise<string> {
         const source = digestLanding.get() === "source";
         if (this.inBook) return progStorage.ensureDigestDir(this.bookID, source);
-        return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureNoteBox();
+        return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureNoteDir(this.docID);
     }
 
     private async setDigestCard(digestID: string) {
