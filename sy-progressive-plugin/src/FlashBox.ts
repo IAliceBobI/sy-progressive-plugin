@@ -7,7 +7,7 @@ import { getCardsDoc, getHPathByDocID } from "./helper";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { domNewLine, DomSuperBlockBuilder, getSpans } from "../../sy-tomato-plugin/src/libs/sydom";
 import { getDocTracer, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { card2dailycard, flashcardAddRefs, flashcardNotebook, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { card2dailycard, cardContextMenu, flashcardAddRefs, flashcardNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -39,8 +39,9 @@ function getBlockDOM(dom: HTMLElement): { dom: HTMLElement, blockID: string } {
 
 export const flashBox制卡 = winHotkey("⌥E", "制卡", "iconProgCardAdd", () => tomatoI18n.制卡)
 export const flashBox原地制卡 = winHotkey("⌥`", "原地制卡", "iconProgCardHere", () => tomatoI18n.原地制卡)
-export const flashBox制卡并发到dailycard = winHotkey("⌘`", "制卡并发到dailycard", "iconProgCardDaily", () => tomatoI18n.制卡并发到dailycard)
-export const flashBox制卡并发到dailycard无引用 = winHotkey("⌥S", "制卡并发到dailycard无引用", "iconProgCardDailyN", () => tomatoI18n.制卡并发到dailycard无引用) // □14 拍板免费（制卡=核心复习流，不设门）
+// □2 制卡入口清理（2026-09-07 bear 拍板）：「制日卡」（⌘｀，card2dailycard 默认开后与「制卡」落点
+// 完全等价）退役，⌘｀ 空出不复用；langKey 沿用旧名保 keymap.custom 用户改键存量，展示名改「制卡无引用」
+export const flashBox制卡并发到dailycard无引用 = winHotkey("⌥S", "制卡并发到dailycard无引用", "iconProgCardDailyN", () => tomatoI18n.制卡无引用) // □14 拍板免费（制卡=核心复习流，不设门）
 export const flashBox多行标记 = winHotkey("shift+alt+enter", "多行标记", "iconProgMulti", () => tomatoI18n.多行标记)
 
 class FlashBox {
@@ -69,21 +70,11 @@ class FlashBox {
             },
         });
         this.plugin.addCommand({
-            langKey: flashBox制卡并发到dailycard.langKey,
-            langText: flashBox制卡并发到dailycard.langText(),
-            hotkey: flashBox制卡并发到dailycard.m,
-            callback: () => {
-                this.makeCard(events.protyle?.protyle, CardType.None, getDailyPath());
-            },
-        });
-        this.plugin.addCommand({
             langKey: flashBox制卡并发到dailycard无引用.langKey,
             langText: flashBox制卡并发到dailycard无引用.langText(),
             hotkey: flashBox制卡并发到dailycard无引用.m,
             callback: () => {
-                if (flashBox制卡并发到dailycard无引用.cmd()) {
-                    this.makeCard(events.protyle?.protyle, CardType.None, getDailyPath(), true);
-                }
+                this.makeCard(events.protyle?.protyle, CardType.None, undefined, true);
             },
         });
         this.plugin.addCommand({
@@ -92,6 +83,38 @@ class FlashBox {
             hotkey: flashBox多行标记.m,
             editorCallback: (p) => this.multilineMark(p),
         });
+
+        // □3 右键制卡开关（2026-09-07 bear 拍板，默认关）：任意文档右键块/选块可制卡——
+        // 快捷键通道本就全局注册，此入口补齐「右键直接用」。目标块取法沿 DigestProgressiveBox
+        // 重访调度右键的既有结论（emitToPlugins 同步收集菜单项，全程零 await）：
+        // blockElements 是 click-blockicon 专属，open-menu-content 走 --select/element 同步取
+        this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
+            if (!cardContextMenu.get()) return;
+            let els: HTMLElement[] = Object.values((detail as any).blockElements ?? {});
+            if (els.length === 0) {
+                els = [...(detail.protyle?.wysiwyg?.element?.querySelectorAll<HTMLElement>(".protyle-wysiwyg--select") ?? [])];
+                if (els.length === 0 && (detail as any).element) els = [(detail as any).element];
+            }
+            if (els.length === 0) return;
+            (detail.menu as any).addItem({
+                label: flashBox制卡.langText(),
+                icon: flashBox制卡.icon,
+                accelerator: flashBox制卡.w(),
+                click: () => { this.makeCardFromBlocks(detail.protyle, els); },
+            });
+        });
+    }
+
+    /** 右键菜单制卡入口：右键目标块（或选中的多块）整块制卡，落点跟随设置 */
+    async makeCardFromBlocks(protyle: IProtyle, blocks: HTMLElement[], t: CardType = CardType.None) {
+        const divs: HTMLElement[] = [];
+        const ids: string[] = [];
+        for (const b of blocks) {
+            const { id, div } = await this.cloneDiv(b as HTMLDivElement, true);
+            ids.push(id);
+            divs.push(div);
+        }
+        if (ids.length > 0) await this.insertCard(protyle, divs, t, ids[ids.length - 1]);
     }
 
     async multilineMark(protyle: IProtyle) {
@@ -294,7 +317,6 @@ class FlashBox {
             setRef,//ori
             this.settings.flashcardMultipleLnks,
             setPath,//ctx
-            flashcardUseLink.get(),
         );
     }
 

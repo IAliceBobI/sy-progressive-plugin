@@ -10,7 +10,6 @@
         digestNoBacktraceLink,
         flashcardAddRefs,
         flashcardMultipleLnks,
-        flashcardUseLink,
         hideBtnsInFlashCard,
         markOriginTextBG,
         openCardsOnOpenPiece,
@@ -31,15 +30,6 @@
             bind:checked={$flashcardAddRefs}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置相关概念}>{tomatoI18n.卡片最上面添加相关概念}</span>
-    </div>
-
-    <div>
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$flashcardUseLink}
-        />
-        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置回溯链接}>{tomatoI18n.闪卡的回溯使用链接}</span>
     </div>
 
     <div>

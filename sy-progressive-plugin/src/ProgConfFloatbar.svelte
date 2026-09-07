@@ -43,8 +43,7 @@
         // 高级 14（□14c 起可勾上首行；label 沿 □10 短标签）
         card: () => tomatoI18n.制卡,
         cardHere: () => tomatoI18n.原地制卡短,
-        cardDaily: () => tomatoI18n.制日卡,
-        cardDailyN: () => tomatoI18n.制日卡无引,
+        cardDailyN: () => tomatoI18n.制卡无引用,
         multi: () => tomatoI18n.多行,
         collect: () => tomatoI18n.收集,
         movePrev: () => tomatoI18n.移上一片,
@@ -79,8 +78,7 @@
         traceUp: () => tomatoI18n.tip本书摘抄, // □29 片态复用（原书态浮层，选中块定位当前片）
         card: () => tomatoI18n.tip制卡,
         cardHere: () => tomatoI18n.tip原地制卡,
-        cardDaily: () => tomatoI18n.tip制日卡,
-        cardDailyN: () => tomatoI18n.tip制日卡无引,
+        cardDailyN: () => tomatoI18n.tip制卡无引用,
         multi: () => tomatoI18n.tip多行,
         collect: () => tomatoI18n.tip收集,
         movePrev: () => tomatoI18n.tip移上一片,

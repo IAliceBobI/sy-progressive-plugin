@@ -38,7 +38,7 @@ export const PROG_FLOAT_ICONS = `
      （+/入卡下箭头/日历+加号/日历+ban 角标），ban 角标沿用 delBack/delExit 的 r5.5 圆底家族 -->
 <symbol id="iconProgCardAdd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/><path d="M18 2.8v4.4"/><path d="M15.8 5h4.4"/></symbol>
 <symbol id="iconProgCardHere" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/><path d="M14.5 11v7"/><path d="m12 15.5 2.5 2.5 2.5-2.5"/></symbol>
-<symbol id="iconProgCardDaily" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M3 10h18"/><path d="M16.5 13.5v5"/><path d="M14 16h5"/></symbol>
+
 <symbol id="iconProgCardDailyN" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5.2"/><path d="M6.5 2v4"/><path d="M12.5 2v4"/><path d="M3 9h13"/><circle cx="17" cy="17" r="5.5"/><path d="m13.3 13.3 7.4 7.4"/></symbol>
 <!-- 移动族：上下双槽线（目标/当前位置）+ 中间单向箭头，成对镜像 -->
 <symbol id="iconProgMoveUp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14"/><path d="M5 21h14"/><path d="M12 17V8"/><path d="m8 12 4-4 4 4"/></symbol>

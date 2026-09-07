@@ -6,7 +6,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { invalidateDigestMarker, markDigests } from "./digestMarker";
 import { splitLines } from "./SplitSentence";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { digestLanding, digestAddReadingpoint, digestGlobalSigle, flashcardUseLink, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { digestLanding, digestAddReadingpoint, digestGlobalSigle, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { getDailyPath } from "./FlashBox";
 import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
@@ -382,7 +382,6 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
             !digestProgressiveBox.settings.digestNoBacktraceLink, // ori
             settings.flashcardMultipleLnks, // more
             true, // ctx
-            flashcardUseLink.get(), // lnk
         );
         cloned.setAttribute(RefIDKey, originID);
         cloned.setAttribute(IN_BOOK_INDEX, inBookIdx);

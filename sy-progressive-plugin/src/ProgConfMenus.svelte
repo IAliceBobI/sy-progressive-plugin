@@ -6,6 +6,7 @@
     import {
         piecesmenu,
         digestmenu,
+        cardContextMenu,
         blockIconMenu,
         wholeDigestMenu,
         reviewSchedMenu,
@@ -14,6 +15,7 @@
         ProgressiveJumpMenu,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { digest渐进阅读摘抄模式 } from "./DigestProgressiveBox";
+    import { flashBox制卡 } from "./FlashBox";
     import {
         Progressive添加当前文档到渐进阅读分片模式,
         Progressive跳到分片或回到原文,
@@ -43,6 +45,16 @@
         />
         {tomatoI18n.menu添加右键菜单}:
         {digest渐进阅读摘抄模式.langText()}<HotkeyCap hk={digest渐进阅读摘抄模式} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <!-- □3 右键制卡（2026-09-07 bear 拍板，默认关）：任意文档右键块可制卡，快捷键通道本就全局 -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$cardContextMenu}
+        />
+        {tomatoI18n.menu添加右键菜单}:
+        {flashBox制卡.langText()}<HotkeyCap hk={flashBox制卡} pluginName="sy-progressive-plugin"></HotkeyCap>
     </div>
 
     <!-- 可见性期4 □4 B②：右键菜单四项各自开关（整篇摘抄从 digestmenu 一拖二拆出） -->

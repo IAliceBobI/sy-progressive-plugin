@@ -18,10 +18,12 @@ export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "iconProg
 export const digest执行摘抄并断句 = winHotkey("⇧⌥X", "执行摘抄并断句", "iconSplitTB", () => tomatoI18n.执行摘抄并断句)
 // 2026-09-02 用户反馈：留档/背诵此前只是浮条子排两按钮，快捷键通道唯一且行为跟 cardMode 设置
 // 漂移；补两命令各带独立默认键，用户可在插件设置/思源键位设置里分别改。
-// 键位按 winHotkey 规范化后形态比对过全仓（ctrl+alt+X 写法会归一成 ⌘⌥X）：⇧⌥P/⌘⌥Z 均无冲突
-// （⌘⌥P 曾人选，与 recite reciteCopyPrompt=alt+ctrl+p 规范化后撞键，dev 实例 console 实锤）
-export const digest执行摘抄留档 = winHotkey("⇧⌥P", "执行摘抄留档", "iconProgArchive", () => tomatoI18n.执行摘抄留档)
-export const digest执行摘抄背诵 = winHotkey("⌘⌥Z", "执行摘抄背诵", "iconProgRecite", () => tomatoI18n.执行摘抄背诵)
+// 2026-09-06 撞键清理换键：留档原 ⇧⌥P 撞官方 commandPanel、背诵原 ⌘⌥Z 撞 tomato GraphBox
+// dock——当时定键只比对了全仓插件，官方 keymap 对照是静态注释态看不见（winHotkey 同款盲区）。
+// 留档终键 ⌥⇧⌘P=原键同字母加 ⌘：⌥⇧ 字母段真满员（⌥⇧S 被 tomato AIBox「人工智能」占，
+// 且 AIBox 开关关着的 keymap 扫描看不见——须靠 winHotkey globalThis 注册表告警兜底）
+export const digest执行摘抄留档 = winHotkey("⌥⇧⌘P", "执行摘抄留档", "iconProgArchive", () => tomatoI18n.执行摘抄留档)
+export const digest执行摘抄背诵 = winHotkey("⌥⌘8", "执行摘抄背诵", "iconProgRecite", () => tomatoI18n.执行摘抄背诵)
 
 /**
  * □11 入口统一（设计共识 2）：⌥Z/右键/块图标「渐进阅读摘抄模式」全收——三态（含自由态）

@@ -200,7 +200,7 @@ export const PIECE_LOW_POOL = ["contents", "refill", "clean", "delExit", "ignore
  * □14c 高级四组 14 项 id（设置面板池复用；顺序 = 制卡|收集|移动|提取整理 组语义序）。
  */
 export const ADV_POOL = [
-    "card", "cardHere", "cardDaily", "cardDailyN", "multi",
+    "card", "cardHere", "cardDailyN", "multi",
     "collect",
     "movePrev", "moveNext",
     "extractAll", "extractEnd", "extract", "noColor", "reColor", "merge",
@@ -227,7 +227,6 @@ const EXTRA_MAIN: FloatButtonSpec[] = [
     // 高级 14（组语义序同 ADV_POOL）
     { id: "card", icon: "iconProgCardAdd", kind: "normal", group: "scene" },
     { id: "cardHere", icon: "iconProgCardHere", kind: "normal", group: "scene" },
-    { id: "cardDaily", icon: "iconProgCardDaily", kind: "normal", group: "scene" },
     { id: "cardDailyN", icon: "iconProgCardDailyN", kind: "normal", group: "scene" },
     { id: "multi", icon: "iconProgMulti", kind: "normal", group: "scene" },
     { id: "collect", icon: "iconProgInbox", kind: "normal", group: "scene" },

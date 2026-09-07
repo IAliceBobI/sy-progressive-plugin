@@ -6,6 +6,7 @@ import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
 import helpDocs from "./help.json";
 import { openHelpMenu } from "../../sy-tomato-plugin/src/libs/helpMenu";
 import { buildSettingsHeader } from "../../sy-tomato-plugin/src/libs/settingsHeader";
+import { migrateLegacyHotkeys } from "../../sy-tomato-plugin/src/libs/hotkeyCap";
 import { ICONS } from "./icons";
 import { prog, progSettingsOpenHK } from "./Progressive";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
@@ -17,7 +18,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, flashcardUseLink, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -59,6 +60,7 @@ function loadStore(plugin: BaseTomatoPlugin) {
     ProgressiveStart2learn.load(plugin);
     digestmenu.load(plugin);
     wholeDigestMenu.load(plugin);
+    cardContextMenu.load(plugin);
     reviewSchedMenu.load(plugin);
     revisitRhythmMenu.load(plugin);
     blockIconMenu.load(plugin);
@@ -75,7 +77,6 @@ function loadStore(plugin: BaseTomatoPlugin) {
     flashcardMultipleLnks.load(plugin);
     windowOpenStyle.load(plugin);
     flashcardNotebook.load(plugin);
-    flashcardUseLink.load(plugin);
     digestNoBacktraceLink.load(plugin);
     pieceNoBacktraceLink.load(plugin);
     markOriginTextBG.load(plugin);
@@ -195,6 +196,16 @@ export default class ThePlugin extends BaseTomatoPlugin {
         // □14 收费门恢复（2026-08-30）：皮肤+断句+生词 AI+收集/写作对比族 Pro，摘抄/挪片/
         // 制卡核心流免费。老 VIP（included 标记不变）自然通过验证自动过门零操作。
         refreshProgGate(lastVerifyResult() === true);
+
+        // 2026-09-06 撞键清理迁移：custom 仍是旧默认（用户从未改键）才写新默认，改过/删过的
+        // 不动（幂等）；命令已在 onload 注册（框架保序晚于此），keymap 条目就绪可查。
+        // 末条= v5 □7 挪键的存量尾巴：default 已 ⌥⌘F7，但当时未迁移——custom 残留 ⌥⌘F6
+        // 的老用户仍与「恢复笔记颜色」双绑（dev/主实例实锤）
+        await migrateLegacyHotkeys("sy-progressive-plugin", [
+            ["执行摘抄留档", "⌥⇧P", "⌥⇧⌘P"],
+            ["执行摘抄背诵", "⌥⌘Z", "⌥⌘8"],
+            ["合并所有分片到新文件", "⌥⌘F6", "⌥⌘F7"],
+        ]);
 
         // applyProgSkins 留 auth 簇后（保持现状顺序）：皮肤属性与 Pro 门禁 class 独立挂
         // body，但「verify 后恢复视觉」防未激活用户 Pro 皮肤闪现（v5 □8 三维皮肤恢复）

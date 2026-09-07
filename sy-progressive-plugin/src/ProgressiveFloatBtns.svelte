@@ -30,8 +30,8 @@
     import DigestAllDialog from "./DigestAllDialog.svelte";
     import { WordBuilder } from "./wordsUtils";
     import {
-        flashBox, flashBox制卡, flashBox原地制卡, flashBox制卡并发到dailycard,
-        flashBox制卡并发到dailycard无引用, flashBox多行标记, CardType, getDailyPath,
+        flashBox, flashBox制卡, flashBox原地制卡,
+        flashBox制卡并发到dailycard无引用, flashBox多行标记, CardType,
     } from "./FlashBox";
     import { pieceMovingBox, PieceMovingBox移动到上一分片内, PieceMovingBox移动到下一分片内 } from "./PieceMovingBox";
     import { pieceSummaryBox, PieceSummaryBox收集内容到文件 } from "./PieceSummaryBox";
@@ -714,8 +714,7 @@
     const ADV_USAGE: Record<string, () => string> = {
         card: () => tomatoI18n.tip制卡,
         cardHere: () => tomatoI18n.tip原地制卡,
-        cardDaily: () => tomatoI18n.tip制日卡,
-        cardDailyN: () => tomatoI18n.tip制日卡无引,
+        cardDailyN: () => tomatoI18n.tip制卡无引用,
         multi: () => tomatoI18n.tip多行,
         collect: () => tomatoI18n.tip收集,
         movePrev: () => tomatoI18n.tip移上一片,
@@ -731,8 +730,7 @@
         [
             { id: "card", icon: "iconProgCardAdd", label: () => tomatoI18n.制卡, spec: flashBox制卡, run: p => flashBox.makeCard(p, CardType.None) },
             { id: "cardHere", icon: "iconProgCardHere", label: () => tomatoI18n.原地制卡短, spec: flashBox原地制卡, run: p => flashBox.makeCard(p, CardType.Here) },
-            { id: "cardDaily", icon: "iconProgCardDaily", label: () => tomatoI18n.制日卡, spec: flashBox制卡并发到dailycard, run: p => flashBox.makeCard(p, CardType.None, getDailyPath()) },
-            { id: "cardDailyN", icon: "iconProgCardDailyN", label: () => tomatoI18n.制日卡无引, spec: flashBox制卡并发到dailycard无引用, run: p => flashBox.makeCard(p, CardType.None, getDailyPath(), true) },
+            { id: "cardDailyN", icon: "iconProgCardDailyN", label: () => tomatoI18n.制卡无引用, spec: flashBox制卡并发到dailycard无引用, run: p => flashBox.makeCard(p, CardType.None, undefined, true) },
             { id: "multi", icon: "iconProgMulti", label: () => tomatoI18n.多行, spec: flashBox多行标记, run: p => flashBox.multilineMark(p) },
         ],
         [
