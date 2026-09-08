@@ -5,6 +5,7 @@
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { filterFleetBooks, type FleetSummary, type FleetBook } from "./fleetData";
     import { openBookMenu } from "./bookMenu";
+    import { showFloatTip, hideFloatTip } from "./floatTip";
     import type { FleetActions } from "./fleet";
     import type { Writable } from "svelte/store";
 
@@ -34,6 +35,12 @@
     function bookPercent(b: FleetBook): number {
         if (b.total <= 0) return 0;
         return Math.min(100, Math.round((b.point / b.total) * 100));
+    }
+
+    // 手动书体验补课 □2：手动书 hover 书卡给行为说明（点击开原书、片=摘抄）。
+    // 复用浮条自建 tip 单例（aria-label 驱动，非手动书无 label 自动无 tip）
+    function onCardEnter(ev: MouseEvent) {
+        showFloatTip(ev.currentTarget as HTMLElement);
     }
 
     // 舰队管理 □2：移动端长按开菜单（pointerType=mouse 走 contextmenu 不走此通道）。
@@ -222,6 +229,9 @@
                             class="prog-fleet-card"
                             class:finished={book.finished}
                             class:manual={book.manual}
+                            aria-label={book.manual ? tomatoI18n.手动书说明 : undefined}
+                            onmouseenter={onCardEnter}
+                            onmouseleave={hideFloatTip}
                             onclick={(e) => cardClick(e, book)}
                             oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); openBookMenu(e, book, actions); }}
                             onpointerdown={(e) => lpStart(e)}
@@ -234,11 +244,13 @@
                                 <span class="num"
                                     >{book.finished
                                         ? tomatoI18n.已读完
+                                        : book.writing
+                                        ? `✍ ${book.point}/${book.total}`
                                         : book.manual
-                                        ? `✎ ${tomatoI18n.手动分片}`
-                                        : book.total > 0
-                                        ? `${book.point}/${book.total}`
-                                        : tomatoI18n.未分片}</span
+                                            ? `✎ ${tomatoI18n.手动分片}`
+                                            : book.total > 0
+                                                ? `${book.point}/${book.total}`
+                                                : tomatoI18n.未分片}</span
                                 >
                             </div>
                             <div class="track"><div class="fill" style="width:{bookPercent(book)}%"></div></div>
@@ -275,12 +287,19 @@
         <button class="prog-fleet-start" onclick={() => (empty ? actions.addFirstBook() : actions.startReading())}>
             {#if empty}＋ {tomatoI18n.加入第一本书}{:else}▶ {tomatoI18n.开始今日阅读}{/if}
         </button>
+        <!-- writebook-next □2：写作书入口升格全宽行（bear 反馈 footer ghost icon 小钮易看不见；
+             与主按钮构成「读/写」双门——读写闭环的门面叙事。西语等长 label 在 274px footer
+             行放不下，全宽行七语种皆容纳；文字常驻故不挂 tooltip） -->
+        <button class="prog-fleet-write" onclick={() => actions.addWritingBook()}>
+            <svg><use xlink:href="#iconProgWriteAdd"></use></svg>
+            <span>{tomatoI18n.新建写作书}</span>
+        </button>
 
         <div class="prog-fleet-foot">
             <button class="ghost" onclick={() => actions.manageBooks()}>{tomatoI18n.管理书目}</button>
             <span class="fn__flex-1"></span>
             <button class="ghost icon b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.刷新}
-                onclick={() => onRefresh()}>♻</button
+                onclick={() => onRefresh()}><svg><use xlink:href="#iconProgRefresh"></use></svg></button
             >
             <button class="ghost" onclick={() => actions.openSettings()}>{tomatoI18n.设置}</button>
         </div>

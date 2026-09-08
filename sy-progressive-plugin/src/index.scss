@@ -98,6 +98,9 @@ body.prog-topbar-on #editor {
   --prog-card-border: color-mix(in srgb, var(--prog-accent) 24%, var(--b3-border-color));
   --prog-shadow: 0 2px 8px rgba(43, 77, 88, 0.10);
   --prog-yours: #b06e1e;
+  // 顶栏设置火苗家族色（topbar-gear 战役）：亮档比 yours 加深——#b06e1e 在浅底实测 3.77:1，
+  // 顶栏 14px 小图标三色拉平需 4.74:1；暗档同 yours。yours 本体是画布情绪锚不为顶栏改
+  --prog-topbar: #9c5f12;
 
   /* 文字层级 */
   --prog-title: color-mix(in srgb, var(--b3-theme-on-surface) 90%, transparent);
@@ -137,6 +140,7 @@ html[data-theme-mode="dark"] {
   --prog-card-border: color-mix(in srgb, var(--prog-accent) 28%, var(--b3-border-color));
   --prog-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
   --prog-yours: #d4a960;
+  --prog-topbar: #d4a960;
 
   --prog-title: color-mix(in srgb, var(--b3-theme-on-surface) 90%, transparent);
   --prog-sub: color-mix(in srgb, var(--b3-theme-on-surface) 62%, transparent);
@@ -161,6 +165,13 @@ html[data-theme-mode="dark"] {
 
   --prog-panel-bg: var(--b3-theme-surface);
   --prog-panel-border: var(--b3-border-color);
+}
+
+// 顶栏设置火苗家族色（topbar-logo 战役 2026-09-08）：三插件顶栏各自挂主题色
+// （番茄齿轮红/渐进火苗琥珀/仿写双页青绿，均 24vb/1.7u 细线稿对齐官方生态），机制同 recite 的
+// .recite-topbar-gear——线稿 stroke:currentColor 随 color，类改 color 即改图标色，特异性 (0,2,0) 压过 .toolbar__item
+.toolbar__item.prog-topbar-settings {
+  color: var(--prog-topbar);
 }
 
 // ============================================================
@@ -505,6 +516,58 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   transform: translateY(-50%) scale(1.12);
 }
 
+// 期5 素材徽标（materialMarker 注入 span，写作书片内素材块）：与摘抄痕迹同族
+// 形态（竖条+mask 徽章），图标=素材语义（下箭头入托盘，iconProgMaterial 同形）；
+// 素材块不挂 progref（期3 materialize 剥离）故与 .prog-digest-mark 永不同块。
+.protyle-wysiwyg div:has(> .prog-material-mark) {
+  position: relative;
+  padding-left: 22px;
+}
+.prog-material-mark {
+  position: absolute;
+  left: 2px;
+  top: 12px;
+  width: 18px;
+  height: 16px;
+  cursor: pointer;
+  color: var(--prog-accent);
+}
+.prog-material-mark::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--prog-accent);
+  transition: width 0.12s ease-out, background-color 0.12s ease-out;
+}
+.prog-material-mark::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  transform: translateY(-50%);
+  background-color: var(--prog-accent);
+  opacity: 0.55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v10'/%3E%3Cpath d='m8 9 4 4 4-4'/%3E%3Cpath d='M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v10'/%3E%3Cpath d='m8 9 4 4 4-4'/%3E%3Cpath d='M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'/%3E%3C/svg%3E") no-repeat center / contain;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out, background-color 0.12s ease-out;
+}
+.prog-material-mark:hover::before {
+  width: 4px;
+  background: var(--prog-accent-strong);
+}
+.prog-material-mark:hover::after {
+  opacity: 1;
+  background-color: var(--prog-accent-strong);
+  transform: translateY(-50%) scale(1.12);
+}
+
 // ============================================================
 // v5 □6 状态栏火苗（docs/prog-v5-visual-design.md §2）：恒暖壳+可变芯光。
 // 三态 = data-state 注入 --prog-flame-core/glow + 形态冗余（黄瘦/红宽呼吸），
@@ -594,6 +657,17 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   overflow: hidden;
 }
 
+/* writebook-next □7：dock 挂载高度链收缩——dock.element（block，高=面板尺寸）下的
+   中间层须 height:100% 落到真实可用高 + 子级 min-height:0 放行收缩（flex 子项默认
+   min-height:auto 会被书卡列表内容顶开，面板溢出挂载点、footer 沉入 dock 滚动区） */
+.prog-fleet-dock {
+  height: 100%;
+  min-height: 0;
+}
+.prog-fleet-dock > .fn__flex-1 {
+  min-height: 0;
+}
+
 /* 顶栏 */
 .prog-fleet-top {
   display: flex;
@@ -629,6 +703,34 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   width: 14px;
   height: 14px;
   flex: none;
+}
+/* writebook-next □2：新建写作书全宽行（bear 反馈 ✍ ghost icon 小钮易看不见）。与主按钮
+   构成读写双门：主按钮实心填充=阅读主路径，此行 ghost 描边+accent=写作入口，主次分明 */
+.prog-fleet-write {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  flex: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--prog-accent);
+  box-shadow: inset 0 0 0 1px var(--prog-card-border);
+  transition: background-color 0.12s ease-out;
+}
+.prog-fleet-write:hover {
+  background: var(--prog-accent-soft);
+}
+.prog-fleet-write svg {
+  width: 16px; /* 家族标准渲染档：加号角标 14px 下缩成点（vision P2-1），16px 可读 */
+  height: 16px;
+  flex: none;
+}
+.prog-fleet-write span {
+  white-space: nowrap;
 }
 .prog-fleet-recite {
   display: flex;
@@ -1017,6 +1119,10 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
 .prog-fleet-foot .ghost.icon {
   padding: 4px 6px;
   box-shadow: none;
+}
+.prog-fleet-foot .ghost.icon svg {
+  width: 14px;
+  height: 14px;
 }
 .prog-fleet-loading {
   display: flex;

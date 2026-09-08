@@ -1,5 +1,5 @@
 import { IProtyle } from "siyuan";
-import { siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { siyuan, getNotebookFirstOne } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import * as gconst from "../../sy-tomato-plugin/src/libs/gconst";
@@ -7,7 +7,7 @@ import { getCardsDoc, getHPathByDocID } from "./helper";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { domNewLine, DomSuperBlockBuilder, getSpans } from "../../sy-tomato-plugin/src/libs/sydom";
 import { getDocTracer, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { card2dailycard, cardContextMenu, flashcardAddRefs, flashcardNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { cardLanding, cardContextMenu, flashcardAddRefs, flashcardNotebook, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -16,6 +16,10 @@ import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 export enum CardType {
     Here = "Here", None = "None"
 }
+
+/** 制卡落点三档（cardLanding store 同枚举，2026-09-07 三档化）：dailycard=当日
+ *  daily card 文档（默认）/ dailynote=当天日记尾插 / cards=书下或源下 cards 夹 */
+export type CardLanding = "dailycard" | "dailynote" | "cards";
 
 export function getDailyPath() {
     const today = utils.timeUtil.dateFormat(new Date()).split(" ")[0];
@@ -75,6 +79,31 @@ class FlashBox {
             hotkey: flashBox制卡并发到dailycard无引用.m,
             callback: () => {
                 this.makeCard(events.protyle?.protyle, CardType.None, undefined, true);
+            },
+        });
+        // B③ 制卡落点三直发命令（2026-09-07 bear 三问拍板）：单次覆盖 cardLanding 默认档，
+        // 不带落点后缀的「制卡」仍走默认——同构摘抄侧「留档/背诵 vs 摘抄制卡模式下拉」。
+        // 无默认快捷键（官方 ⌥⌘ 字母键位预算紧，留用户键位设置自绑，anno collect 三直发
+        // 先例），故不走 winHotkey 工厂（m 空会 throw）
+        this.plugin.addCommand({
+            langKey: "制卡到当日卡文档",
+            langText: `${tomatoI18n.制卡} → ${tomatoI18n.落点当日卡文档}`,
+            callback: () => {
+                this.makeCard(events.protyle?.protyle, CardType.None, undefined, false, "dailycard");
+            },
+        });
+        this.plugin.addCommand({
+            langKey: "制卡到当天日记",
+            langText: `${tomatoI18n.制卡} → ${tomatoI18n.落点当天日记}`,
+            callback: () => {
+                this.makeCard(events.protyle?.protyle, CardType.None, undefined, false, "dailynote");
+            },
+        });
+        this.plugin.addCommand({
+            langKey: "制卡到卡片夹",
+            langText: `${tomatoI18n.制卡} → ${tomatoI18n.落点卡片夹}`,
+            callback: () => {
+                this.makeCard(events.protyle?.protyle, CardType.None, undefined, false, "cards");
             },
         });
         this.plugin.addCommand({
@@ -160,29 +189,30 @@ class FlashBox {
     // └───┬─┘            │   ┌──────────────┐ │
     //     └──────────────┴──►│blankSpaceCard│─┘
     //                        └──────────────┘
-    /** v5 □7：制卡入口收进浮条 [+] 高级功能 + 命令面板（右键菜单/块图标菜单退役） */
-    async makeCard(protyle: IProtyle, t: CardType, path?: string, noRef?: boolean) {
+    /** v5 □7：制卡入口收进浮条 [+] 高级功能 + 命令面板（右键菜单/块图标菜单退役）
+     *  @param landing 落点单次覆盖（B③ 三直发命令用）；缺省回落 cardLanding 默认档 */
+    async makeCard(protyle: IProtyle, t: CardType, path?: string, noRef?: boolean, landing?: CardLanding) {
         if (!protyle) return;
         const { ids, divs } = await this.cloneSelectedLineMarkdowns(protyle, noRef);
         if (ids.length > 0) { // multilines
-            await this.insertCard(protyle, divs, t, ids[ids.length - 1], path);
+            await this.insertCard(protyle, divs, t, ids[ids.length - 1], path, landing);
         } else {
             const blockID = events.lastBlockID; // getCursorElement
             const range = document.getSelection()?.getRangeAt(0);
             const blank = range?.cloneContents()?.textContent ?? "";
             if (blockID) {
-                this.blankSpaceCard(blockID, blank, range, protyle, t, path, noRef);
+                this.blankSpaceCard(blockID, blank, range, protyle, t, path, noRef, landing);
             }
         }
     }
 
-    private async insertCard(protyle: IProtyle, divs: HTMLElement[], t: CardType, lastSelectedID: string, path?: string) {
+    private async insertCard(protyle: IProtyle, divs: HTMLElement[], t: CardType, lastSelectedID: string, path?: string, landing?: CardLanding) {
         return navigator.locks.request("prog-FlashBox-insertCard", { mode: "exclusive" }, async (_lock) => {
-            return this.doInsertCard(protyle, divs, t, lastSelectedID, path);
+            return this.doInsertCard(protyle, divs, t, lastSelectedID, path, landing);
         });
     }
 
-    private async doInsertCard(protyle: IProtyle, divs: HTMLElement[], t: CardType, lastSelectedID: string, path?: string) {
+    private async doInsertCard(protyle: IProtyle, divs: HTMLElement[], t: CardType, lastSelectedID: string, path?: string, landing?: CardLanding) {
         const boxID = flashcardNotebook.get(a => {
             if (!a) return protyle.notebookId
             return a;
@@ -199,22 +229,41 @@ class FlashBox {
             ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
         } else if (t == CardType.Here) {
             ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], lastSelectedID))
-        } else if (card2dailycard.get()) {
-            // □3 制卡统一归置（2026-09-01 拍板）：默认制卡并入当日 daily card 文档（与 ⌘｀ 同款
-            // 落点）；设置关闭后回落 cards 夹旧路线（cardUnderPiece 分叉保持原语义）
-            const targetDocID = await getDailyCardDocID(boxID, getDailyPath());
-            ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
         } else {
-            let hpath = "";
-            if (bookID && !this.settings.cardUnderPiece) {
-                hpath = await getHPathByDocID(bookID, "cards");
+            // B③（2026-09-07 bear 三问拍板）：landing=三直发命令的单次覆盖，缺省回落
+            // cardLanding 默认档（⌥E/⌥S/浮条/右键全走默认）；开片同步开卡另读默认档不受影响
+            const land = landing ?? cardLanding.get();
+            if (land === "dailynote") {
+                // 制卡落点 dailynote（三档化 2026-09-07）：当天日记文档尾插——createDailyNote 内核
+                // 幂等（existed 通道当天重复调用返回同一篇），笔记本解析与番茄日记管线同款
+                // （用户选择的 dailynote 笔记本优先，回落首个打开的笔记本）；空日记（当天首张卡）
+                // getDocLastID 得 undefined，previousID 通道失效——转首块插入（parentID 通道）
+                const nb = storeNoteBox_selectedNotebook.getOr() || getNotebookFirstOne()?.id;
+                if (!nb) return;
+                const { id: dailyDocID } = await siyuan.createDailyNote(nb);
+                const lastID = await siyuan.getDocLastID(dailyDocID);
+                if (lastID) {
+                    ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], lastID))
+                } else {
+                    ops.push(...siyuan.transInsertBlocksAsChildOf([domStr, domNewLine().outerHTML], dailyDocID))
+                }
+            } else if (land !== "cards") {
+                // □3 制卡统一归置（2026-09-01 拍板，三档化后默认档 dailycard）：制卡并入当日
+                // daily card 文档；cards 档回落 cards 夹旧路线（cardUnderPiece 分叉保持原语义）
+                const targetDocID = await getDailyCardDocID(boxID, getDailyPath());
+                ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
             } else {
-                hpath = await getHPathByDocID(docID, "cards");
-                bookID = docID;
+                let hpath = "";
+                if (bookID && !this.settings.cardUnderPiece) {
+                    hpath = await getHPathByDocID(bookID, "cards");
+                } else {
+                    hpath = await getHPathByDocID(docID, "cards");
+                    bookID = docID;
+                }
+                if (!hpath) return;
+                const targetDocID = await getCardsDoc(bookID, boxID, hpath);
+                ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
             }
-            if (!hpath) return;
-            const targetDocID = await getCardsDoc(bookID, boxID, hpath);
-            ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
         }
 
         // □12 摘抄标记零触碰统一：markOriginText 退役——制卡后原文不再写 & 链接/背景
@@ -320,7 +369,7 @@ class FlashBox {
         );
     }
 
-    private async blankSpaceCard(blockID: string, selected: string, range: Range, protyle: IProtyle, cardType: CardType, path?: string, noRef?: boolean) {
+    private async blankSpaceCard(blockID: string, selected: string, range: Range, protyle: IProtyle, cardType: CardType, path?: string, noRef?: boolean, landing?: CardLanding) {
         let tmpDiv: HTMLElement;
         const { dom } = getBlockDOM(range.endContainer.parentElement);
         if (!dom) return;
@@ -339,7 +388,7 @@ class FlashBox {
             const { div } = await this.cloneDiv(dom as HTMLDivElement, !noRef);
             tmpDiv = div;
         }
-        await this.insertCard(protyle, [tmpDiv], cardType, blockID, path);
+        await this.insertCard(protyle, [tmpDiv], cardType, blockID, path, landing);
     }
 }
 

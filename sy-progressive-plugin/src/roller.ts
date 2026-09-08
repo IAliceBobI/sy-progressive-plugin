@@ -159,6 +159,7 @@ import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
 import { progStorage } from "./ProgressiveStorage";
 import * as constants from "./constants";
 import { loadBookStatuses } from "./bookStatus";
+import { fetchWritingPieces, isWritingFinished } from "./writeBook";
 
 function todayStr(): string {
     const n = new Date();
@@ -194,6 +195,12 @@ function makeRollerDeps(): RollerDeps {
             const s = new Set<string>();
             for (const [id, info] of Object.entries(progStorage.booksInfos())) {
                 if (info.ignored || info.archived) continue;
+                // 期2 写作书：索引恒空，isFinished(point>=0) 恒 true=误伤（写作书被滚筒
+                // 静默排除）；finished 语义=片列表全定稿（0 槽书不算完，提示建槽）
+                if (info.writing) {
+                    if (isWritingFinished(await fetchWritingPieces(id))) s.add(id);
+                    continue;
+                }
                 const idx = await progStorage.loadBookIndexIfNeeded(id);
                 if (isFinished(info.point ?? 0, idx.length)) s.add(id);
             }

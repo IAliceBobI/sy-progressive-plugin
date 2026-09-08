@@ -10,7 +10,7 @@ import { progStorage } from "./ProgressiveStorage";
 import { isMultiLineElement } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { SplitSentence } from "./SplitSentence";
 import { prog } from "./Progressive";
-import { pieceDocName, pieceAlias, getDocIalWords } from "./progData";
+import { pieceDocName, pieceAlias, getDocIalWords, getDocIalPieces } from "./progData";
 
 // getDocIalWords 定义已挪 progData.ts（v5 words 进 prog-data，ProgressiveStorage 也要用，避免循环 import）
 export { getDocIalWords };
@@ -20,9 +20,8 @@ export function tempContent(content: string, id?: string) { // for btns and spli
     else return content + `\n{: id="${id}" ${MarkKey}="${TEMP_CONTENT}"}`;
 }
 
-export function getDocIalPieces(bookID: string, point: number) {
-    return `${TEMP_CONTENT}#${bookID},${point}`;
-}
+// getDocIalPieces 已搬 progData（期1 写作书纯函数依赖），此处 re-export 保旧路径
+export { getDocIalPieces } from "./progData";
 
 export function getDocIalCards(bookID: string) {
     return `cards#${TEMP_CONTENT}#${bookID}`;

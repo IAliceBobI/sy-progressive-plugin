@@ -1,14 +1,23 @@
 # Progressive Learning
 
-Finally finish what you read: split long documents into daily digestible pieces — a complete loop from reading input to flashcard review, fully open source.
+Finally finish what you read — and what you write: progressive reading digests your input, progressive writing turns it into finished drafts — a complete loop from reading to writing, fully open source.
 
 ## Highlights
 
+- ✍ **Progressive writing** — your material, queued to be written: send selected blocks from any document straight into a writing book, let the roller serve you one piece a day, finalize as you go, then compile the draft. What you read becomes the raw material of what you write
 - 📖 **Two progressive modes** — excerpt-based (pick the essence) and piece-based (slice the whole doc), so long reads get digested day by day
 - ✂️ **Text-splitting toolkit** — sentence splitting, Enter-to-split, block merging, double-tap multi-select on mobile
 - 🎴 **Card-making pipeline** — multi-line cloze, multi-line cards, word flashcards and Daily Card — make cards where you read
 
 ## Features
+
+### ✍ Progressive Writing
+
+- **Writing books** — create one with a name and an outline; each outline line becomes a slot, so you frame the skeleton before you write
+- **Three ways to feed slots** — send selected blocks from any doc, pull from the excerpt pool, or push from the floating bar; material carries a source badge that jumps back to the original text
+- **One roller, two phases** — reading books and writing books share the same scheduler: reading is content written by others queued to read; writing is your own material queued to write
+- **Piece management** — split into new pieces, move material across pieces, finalize when done (reversible)
+- **Compile to draft (Pro)** — turn finalized pieces into a standalone document in one click, from material to finished work; the everyday writing flow is free
 
 ### 📖 Progressive Reading
 
@@ -36,6 +45,7 @@ Finally finish what you read: split long documents into daily digestible pieces 
 1. Open a long document, select the text you want to read, and click "Excerpt" on the floating bar — or run the command "Add current document to piece-based progressive reading" to slice the whole doc
 2. Run "Start today's reading" from the command palette, read today's portion, and page through
 3. To remember the good parts: select and cloze/make cards — review happens in SiYuan's built-in flashcard system
+4. Got something to write? Create a "new writing book" from the fleet panel to set up slots, send great material you come across straight into them, let the roller serve one piece a day, finalize as you go, then "compile to draft" in one click
 
 ## Docs & Community
 

@@ -11,6 +11,19 @@ export function getDocIalDigestDir(bookID: string): string {
     return `digestdir#${TEMP_CONTENT}#${bookID}`;
 }
 
+/** writebook-next □4 双夹并存（bear 拍板逐次可选）：override 方向专用锚。首段独立命名
+ *  （digestdiru/digestdirh）而非 bookID 后加后缀——findDocByIal 是 LIKE 子串匹配，
+ *  `digestdir#…#bookID` 会命中 `digestdir#…#bookID#u`（前缀污染误认回）。与现锚
+ *  （跟全局档的主力夹）三锚并存：under=书下夹、hub=总夹夹；主力夹恰在目标方向时
+ *  ensure 层复用它不重复建（ProgressiveStorage.ensureDigestDirUnder/Hub）。 */
+export function getDocIalDigestDirUnder(bookID: string): string {
+    return `digestdiru#${TEMP_CONTENT}#${bookID}`;
+}
+
+export function getDocIalDigestDirHub(bookID: string): string {
+    return `digestdirh#${TEMP_CONTENT}#${bookID}`;
+}
+
 /** 摘抄总夹（期1 □2）：prog-data 根下收所有 digest-书名 夹的总文件夹，初始名「摘抄」 */
 export function getDocIalDigestHub(): string {
     return `digesthub#${TEMP_CONTENT}`;
@@ -97,6 +110,12 @@ export async function ensureAnchoredDoc(ialValue: string, deps: AnchorDeps): Pro
     })().finally(() => inFlightEnsure.delete(ialValue));
     inFlightEnsure.set(ialValue, p);
     return p;
+}
+
+/** 片文档 IAL 值：TEMP#书ID,片序号（0 起）。自 helper 搬入（期1 写作书纯函数
+ *  依赖它；helper 链拉 .svelte 进不了单测），helper re-export 保旧 import 路径 */
+export function getDocIalPieces(bookID: string, point: number) {
+    return `${TEMP_CONTENT}#${bookID},${point}`;
 }
 
 /** 分片片名：[NNNNN] 五位序号 + 摘要（v5 直挂书下，前缀与用户子文档区分） */

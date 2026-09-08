@@ -9,7 +9,7 @@ import { DigestBuilder } from "./digestUtils";
 import { blockIconMenu, digestmenu, wholeDigestMenu, reviewSchedMenu, revisitRhythmMenu } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
-import { kind, openDigestSubrank, show, toggleFreeFloat } from "./ProgressiveBtn";
+import { kind, openDigestSubrank, show, toggleFreeFloat, digOpen, expanded, collapseFloatBar, freeFloatOff } from "./ProgressiveBtn";
 import { cardModeFor, type DigestIntent } from "./digestCardMode";
 import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 
@@ -37,10 +37,17 @@ class DigestProgressiveBox {
     lute: Lute;
     singleTab: SingleTab;
 
-    /** ⌥Z 命令/右键/块图标三入口共用的改道出口 */
+    /** ⌥Z 命令/右键/块图标三入口共用的改道出口。writebook-next □10（bear 拍板）：toggle 化——
+     *  子排开着按=收起，且与 ✂ 状态栏钮同生命周期矩阵（free 无球=下班消失、三态收成球）；
+     *  球态或子排未开=展开+开子排（打开摘抄模式）。「摘抄模式激活态」锚定 digOpen。 */
     private enterDigestMode() {
         if (show.get() && kind.get()) {
-            openDigestSubrank();
+            if (digOpen.get() && expanded.get()) {
+                if (kind.get() === "free") freeFloatOff();
+                else collapseFloatBar();
+            } else {
+                openDigestSubrank();
+            }
         } else {
             toggleFreeFloat(true);
         }

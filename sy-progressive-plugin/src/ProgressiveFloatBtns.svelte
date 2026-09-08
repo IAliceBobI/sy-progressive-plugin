@@ -4,7 +4,7 @@
     import FloatBall from "./FloatBall.svelte";
     import type { Writable } from "svelte/store";
     import { get } from "svelte/store";
-    import { confirm, getFrontend, getAllEditor, type IProtyle } from "siyuan";
+    import { confirm, getFrontend, getAllEditor, Menu, type IProtyle } from "siyuan";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { getProgressivePluginConfig, icon, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { events } from "../../sy-tomato-plugin/src/libs/Events";
@@ -15,10 +15,15 @@
     import { HtmlCBType } from "./constants";
     import { CARD_RECITE } from "./digestCardMode";
     import { buildFloatButtons, buildFlatCells, digestSubrankIds, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, type FloatDocKind } from "./progFloatState";
+    import { progStorage } from "./ProgressiveStorage";
+    import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, fetchWritingPieces, mergePieceIntoNeighbor } from "./writeBook";
+    import { PROG_DONE_KEY } from "../../sy-tomato-plugin/src/libs/gconst";
+    import { notifyFleetChanged } from "./fleetNotify";
     import { digSubrankOpen, floatbarFlatCollapsed, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { progPaid } from "./theme";
     import { collapseFloatBar, expandFloatBar, floatSwapBook, freeFloatOff } from "./ProgressiveBtn";
     import { digestProgressiveBox, initDi, digestWholeDoc } from "./DigestProgressiveBox";
+    import { queryDigestTree } from "./digestUtils";
     import { openFloatPopover, closeFloatPopover } from "./overlays";
     import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
     import { mount, onMount } from "svelte";
@@ -86,6 +91,13 @@
 
     const buttons = $derived(
         $kind == null ? [] : buildFloatButtons($kind, { reciteInstalled: prog.isReciteInstalled(), mainIds }),
+    );
+
+    // 期3 素材入槽双入口（渲染层条件钮，不进 □14c 配置池——写作书专用动作无跨态配置语义）：
+    // 拉式=写作书片态「插入素材」（开选择器）；推式=摘抄态「入槽」（两级菜单书→槽）。
+    // writing 片判定同步查 booksInfos（出场链已加载完成，无 I/O）
+    const isWritingPiece = $derived(
+        $kind === "piece" && !!$bookID && !!(progStorage.peekBookInfo($bookID)?.writing),
     );
     const flatCells = $derived($kind == null ? [] : buildFlatCells($kind, { mainIds }));
     // □3 子排 id 序收单一事实源（digestSubrankIds）：whole（整摘）限片+自由态，自由态
@@ -179,8 +191,11 @@
         digest: () => tip3(tomatoI18n.摘抄, tomatoI18n.tip摘抄),
         cards: () => tip3(tomatoI18n.附属卡, tomatoI18n.tip本书附属卡), // 名用无占位 getter（本书附属卡带「·到期 {N}」尾巴）
         swap: () => tip3(tomatoI18n.换书, tomatoI18n.tip换书),
-        next: () => tip3(tomatoI18n.下片删, tomatoI18n.tip下片删),
-        prev: () => tip3(tomatoI18n.回看, tomatoI18n.tip回看, Progressive上一页.w()),
+        next: () => tip3($kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
+            $kind === "digest" ? tomatoI18n.tip下一条摘抄 : tomatoI18n.tip下片删),
+        prev: () => tip3($kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
+            $kind === "digest" ? tomatoI18n.tip上一条摘抄 : tomatoI18n.tip回看,
+            $kind === "digest" ? undefined : Progressive上一页.w()),
         // origin 主排只有片/摘抄两态在用：片态=回原书带块级定位（2026-08-31 升级），
         // 摘抄态文案（回原书·定位摘抄原文）在渲染处特判覆盖
         origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书, $kind === "piece" ? Progressive跳到分片或回到原文.w() : undefined), // 摘抄态文案在渲染处特判
@@ -271,6 +286,10 @@
     // P2-1：与 digestSubrankIds 漂移=编译错，防 icon undefined 渲染期崩）
     const DIG_TIPS: Record<DigSubrankId, () => string> = {
         inbox: () => tip3(tomatoI18n.留档, tomatoI18n.tip留档),
+        // □4 落点变体（去向级覆盖，不落盘不改 digestLanding 全局档）：书/片态挂所属书下、
+        // free 态挂源文档下（source 档原生语义）｜总夹/札记匣按是否在书（central 原生语义）
+        tobook: () => tip3(tomatoI18n.摘抄挂书侧, tomatoI18n.tip摘抄挂书侧),
+        tohub: () => tip3(tomatoI18n.摘抄归总夹, tomatoI18n.tip摘抄归总夹),
         think: () => tip3(tomatoI18n.思考, tomatoI18n.tip思考),
         card: () => tip3(tomatoI18n.背诵, tomatoI18n.tip背诵),
         review: () => tip3(tomatoI18n.复访, tomatoI18n.tip复访),
@@ -282,6 +301,8 @@
     };
     const DIG_ICONS: Record<DigSubrankId, string> = {
         inbox: "iconProgInbox",
+        tobook: "iconProgDigestToBook",  // □4 落点变体：书+页内两行（裸 iconProgBook 撞主排 origin，vision P1-1）
+        tohub: "iconProgDigestToHub",    // □4 落点变体：folder 线稿（iconProgContents 撞低频区打开目录）
         think: "iconProgThink",
         card: "iconProgRecite",
         review: "iconHistory", // 期2 复访档：内核内置历史图标（滚动复习语义）
@@ -292,6 +313,174 @@
         whole: "iconProgPiece",
     };
 
+    // ---- 期3 素材入槽双入口动作 ----
+    /** 拉式：写作书片态「插入素材」→ MaterialPicker 选择器 */
+    function openMaterialPickerForPiece() {
+        if ($noteID && $bookID) prog.openMaterialPicker($noteID, $bookID);
+    }
+
+    /** 推式：摘抄态「入槽」→ 两级菜单（书→未定稿槽）；入槽=整条摘抄转实尾插 */
+    async function openSlotMenuForDigest(ev: MouseEvent) {
+        const targets = await listWritingSlotTargets();
+        if (targets.length === 0) {
+            void siyuan.pushMsg(tomatoI18n.还没有可入槽的写作书, 2500);
+            return;
+        }
+        type MenuItemOption = Parameters<Menu["addItem"]>[0];
+        const menu = new (Menu as any)("progMaterialSlotMenu", undefined, true) as Menu;
+        for (const t of targets) {
+            const slotItems: MenuItemOption[] = t.slots.map(s => ({
+                label: s.title,
+                click: async () => {
+                    const n = await insertDigestIntoPiece(s.docID, t.bookID, $noteID);
+                    await siyuan.pushMsg(n > 0
+                        ? tomatoI18n.已入槽本书该槽(n, t.name)
+                        : tomatoI18n.该摘抄无内容块, 2500);
+                },
+            }));
+            menu.addItem({ label: t.name, submenu: slotItems });
+        }
+        menu.open({ x: ev.clientX, y: ev.clientY });
+    }
+
+    /** 直送：任意阅读文档选中块不经摘抄池转实进槽（不建摘抄本体——素材即普通文本
+     *  无卡语义，血缘=源doc#块ID 徽标跳回原文出处）。选中块在开菜单前捕获（菜单/焦点
+     *  转移后选区不可靠——拆分同款）；cursorOnly 光标兜底块算数（对齐摘抄的宽松语义，
+     *  直送可逆宁顺勿拦——与拆分的宁严勿错相反）。身份守卫不吃 events.prototype 兜底
+     *  （块引浮窗同文档劫持窗口，toPiece 注释 P1-1 同源） */
+    async function openDirectSlotMenu(ev: MouseEvent) {
+        const protyle = getAllEditor().find(p => p?.protyle?.block?.rootID === $noteID)?.protyle ?? null;
+        if (!protyle || protyle.block?.rootID !== $noteID) {
+            void siyuan.pushMsg(tomatoI18n.分片编辑器未就绪, 2500);
+            return;
+        }
+        const { ids } = await events.selectedDivs(protyle);
+        if (!ids || ids.length === 0) {
+            void siyuan.pushMsg(tomatoI18n.请先选中要入槽的内容, 2500);
+            return;
+        }
+        const captured = [...ids];
+        const sourceID = $noteID as string;
+        const targets = await listWritingSlotTargets();
+        if (targets.length === 0) {
+            void siyuan.pushMsg(tomatoI18n.还没有可入槽的写作书, 2500);
+            return;
+        }
+        type MenuItemOption = Parameters<Menu["addItem"]>[0];
+        const menu = new (Menu as any)("progDirectSlotMenu", undefined, true) as Menu;
+        for (const t of targets) {
+            const slotItems: MenuItemOption[] = t.slots.map(s => ({
+                label: s.title,
+                click: async () => {
+                    const n = await insertBlocksIntoPiece(s.docID, t.bookID, sourceID, captured);
+                    await siyuan.pushMsg(n > 0
+                        ? tomatoI18n.已入槽本书该槽(n, t.name)
+                        : tomatoI18n.该摘抄无内容块, 2500);
+                },
+            }));
+            menu.addItem({ label: t.name, submenu: slotItems });
+        }
+        menu.open({ x: ev.clientX, y: ev.clientY });
+    }
+
+    // ---- 期4 片管理动作（写作书片态条件钮，与插入素材同区） ----
+    /** 当前片定稿位：出场/翻片时异步拉一次（getBlockAttrs HTTP 直查无索引延迟）；
+     *  翻片竞态守卫：晚到的旧片响应不覆盖新片图标（crumbs/probeRevisitDue 同款 house style） */
+    let pieceDone = $state(false);
+    $effect(() => {
+        const nid = $noteID;
+        void $kind;
+        pieceDone = false;
+        if (nid && $bookID && progStorage.peekBookInfo($bookID)?.writing) {
+            void siyuan.getBlockAttrs(nid)
+                .then(a => { if (get(noteID) === nid) pieceDone = a?.[PROG_DONE_KEY] === "1"; })
+                .catch(() => { /* 拉不到按未定稿渲染，点击时再落 IAL */ });
+        }
+    });
+
+    /** 定稿/解除（可逆）：乐观翻转+失败回滚；进度占比变化即时通知舰队 */
+    async function togglePieceDone() {
+        if (!$noteID || !$bookID) return;
+        const next = !pieceDone;
+        pieceDone = next;
+        try {
+            await setPieceDoneState($noteID, next);
+            notifyFleetChanged();
+            await siyuan.pushMsg(next ? tomatoI18n.已定稿该片 : tomatoI18n.已解除定稿, 2500);
+        } catch (e) {
+            pieceDone = !next;
+            console.error("togglePieceDone failed", e);
+            await siyuan.pushMsg(tomatoI18n.定稿失败请重试, 2500);
+        }
+    }
+
+    /** 拆为新片：选中块在弹窗前捕获（Dialog 聚焦后编辑器选区不可靠）。
+     *  cursorOnly（光标兜底块）不算选中——拆分是搬块重构，宁严勿错；
+     *  不吃 events.protyle 兜底（□3 已知错位窗口，摘错可逆、拆错是重构事故） */
+    function openSplitPieceFromBar() {
+        const protyle = resolveFloatDocProtyle();
+        if (!protyle || protyle.block?.rootID !== $noteID) {
+            void siyuan.pushMsg(tomatoI18n.分片编辑器未就绪, 2500);
+            return;
+        }
+        void (async () => {
+            const { ids, cursorOnly } = await events.selectedDivs(protyle);
+            if (!ids || ids.length === 0 || cursorOnly) {
+                await siyuan.pushMsg(tomatoI18n.请先选中要拆分的块, 2500);
+                return;
+            }
+            prog.openSplitPieceDialog($noteID, $bookID, ids);
+        })();
+    }
+
+    /** 与邻槽合并（slotmerge）：dir=-1 当前槽并入上一槽（视点所在槽被删 → 成功后
+     *  视点跳保留槽）、dir=+1 吸收下一槽内容（视点不动）。无邻槽边界 toast；定稿
+     *  双向拦映射现成移块两键；无 confirm 直接执行+toast（对齐移块/定稿轻交互，
+     *  误删可从思源历史恢复——实机走查若觉风险高再议） */
+    async function mergePieceFromBar(dir: -1 | 1) {
+        if (!$noteID || !$bookID) return;
+        const protyle = resolveFloatDocProtyle();
+        if (!protyle || protyle.block?.rootID !== $noteID) {
+            void siyuan.pushMsg(tomatoI18n.分片编辑器未就绪, 2500);
+            return;
+        }
+        const pieces = await fetchWritingPieces($bookID);
+        const cur = pieces.find(p => p.docID === $noteID);
+        if (!cur) {
+            void siyuan.pushMsg(tomatoI18n.合并失败请重试, 2500);
+            return;
+        }
+        if (!pieces.some(p => p.point === cur.point + dir)) {
+            await siyuan.pushMsg(dir < 0 ? tomatoI18n.没有上一槽 : tomatoI18n.没有下一槽, 2500);
+            return;
+        }
+        try {
+            const r = await mergePieceIntoNeighbor($bookID, $noteID, dir);
+            notifyFleetChanged(); // 片数-1 → 舰队进度分母即时刷新
+            await siyuan.pushMsg(dir < 0 ? tomatoI18n.已合并到上一槽 : tomatoI18n.已合并到下一槽, 2500);
+            // 向上并=视点所在槽被删，跳保留槽（splitPiece 拆完 jumpTo 的对应物）；向下并视点不动
+            if (dir < 0) await prog.jumpTo(r.keptDocID);
+        } catch (e) {
+            console.error("mergePieceFromBar failed", e);
+            const msg = String((e as Error)?.message ?? "");
+            if (msg.includes("kept piece done")) {
+                await siyuan.pushMsg(tomatoI18n.该片已定稿不可移入, 2500);
+            } else if (msg.includes("removed piece done")) {
+                await siyuan.pushMsg(tomatoI18n.该片已定稿不可移出, 2500);
+            } else {
+                await siyuan.pushMsg(tomatoI18n.合并失败请重试, 2500);
+            }
+        }
+    }
+
+    /** 期5 汇编成稿（Pro）：书级入口（管理页同款签名）；Pro 验证+购买引导在 Box 内 */
+    function compileWritingFromBar() {
+        if (!$bookID) return;
+        const box = progStorage.peekBookInfo($bookID)?.boxID;
+        if (!box) return;
+        void writingCompareBox.compileWritingBook($bookID, box);
+    }
+
     // ---- □11 浮层族锚点：dispatch 透传最近一次点击坐标（按钮/浮条内均可作锚） ----
     let lastXY = { x: innerWidth / 2, y: innerHeight / 2 };
     function anchorXY(ev?: MouseEvent) {
@@ -300,6 +489,25 @@
     }
 
     /** □11 路线图浮层（digest 态 tree 钮）：全摘抄树+本书批注 */
+    /** □6 摘抄顺序遍历（digest 态 prev/next，bear 拍板双向纯浏览不删）：同书摘抄
+     *  ctime 序线性走，与「全摘抄树」（tree 钮=跳转）互补=池内逐条走。flat 为
+     *  ctime 降序（flat[0]=最新，startToLearn 同源）：next=更新的相邻 i-1、
+     *  prev=更早的相邻 i+1；边界 toast 不弹跳。跳转同树钮 jumpTo 通道。 */
+    async function jumpDigestNeighbor(step: 1 | -1) {
+        const tree = await queryDigestTree($bookID);
+        const i = tree.flat.findIndex(n => n.id === $noteID);
+        if (i < 0) {
+            await siyuan.pushMsg(tomatoI18n.未找到本条摘抄);
+            return;
+        }
+        const target = tree.flat[i - step];
+        if (!target) {
+            await siyuan.pushMsg(step > 0 ? tomatoI18n.已是最新一条摘抄 : tomatoI18n.已是最早一条摘抄);
+            return;
+        }
+        void prog.jumpTo(target.id);
+    }
+
     function openTreePopover(ev?: MouseEvent) {
         openFloatPopover({
             title: tomatoI18n.路线图,
@@ -486,9 +694,17 @@
                 await floatSwapBook();
                 break;
             case "next":
+                if ($kind === "digest") {
+                    await jumpDigestNeighbor(1);
+                    break;
+                }
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.deleteAndNext, $point);
                 break;
             case "prev":
+                if ($kind === "digest") {
+                    await jumpDigestNeighbor(-1);
+                    break;
+                }
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.previous, $point);
                 break;
             case "origin":
@@ -815,7 +1031,7 @@
             ?? null;
     }
 
-    async function runDigest(split = false, question = false, cardMode?: string, review = false) {
+    async function runDigest(split = false, question = false, cardMode?: string, review = false, landingOverride?: "source" | "central") {
         const protyle = resolveSubrankProtyle();
         if (!protyle) {
             await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪);
@@ -828,6 +1044,7 @@
         }
         const di = await initDi(s, protyle, digestProgressiveBox.settings);
         if (cardMode) di.cardMode = cardMode; // 去向级覆盖，不 saveCardMode 不改书全局
+        if (landingOverride) di.landingOverride = landingOverride; // □4 落点同款覆盖语义
         await di.digest(split, question, review);
     }
 
@@ -859,6 +1076,12 @@
         switch (id) {
             case "inbox":
                 await runDigest();
+                break;
+            case "tobook": // □4 落点变体：显式挂书/源侧（覆盖全局档，一次性）
+                await runDigest(false, false, undefined, false, "source");
+                break;
+            case "tohub": // □4 落点变体：显式归总夹/札记匣（覆盖全局档，一次性）
+                await runDigest(false, false, undefined, false, "central");
                 break;
             case "think":
                 await runDigest(false, true);
@@ -1007,6 +1230,62 @@
             </button>
         {/each}
         {#if dropIndex === buttons.length}<span class="prog-fb-dropmark"></span>{/if}
+        <!-- 期3 素材入槽双入口（条件钮，不进配置池）：拉式=写作书片态 / 推式=摘抄态；
+             期4 写作书片态追加：拆为新片（块级）/ 定稿（片级，动态图标=当前态）；
+             期5 追加：汇编成稿（书级，Pro——灰档视觉+点击引导与高级组同口径）；
+             slotmerge 追加：与上一槽/下一槽合并（片级结构操作，向上并视点跳保留槽） -->
+        {#if isWritingPiece}
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                aria-label={tip3(tomatoI18n.插入素材, tomatoI18n.tip插入素材)}
+                onclick={() => openMaterialPickerForPiece()}
+            >{@html icon("iconProgMaterial", 16)}</button>
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                aria-label={tip3(tomatoI18n.拆为新片, tomatoI18n.tip拆为新片)}
+                onclick={() => openSplitPieceFromBar()}
+            >{@html icon("iconProgSplit", 16)}</button>
+            <!-- slotmerge 合槽两钮（片级结构操作，与拆分同区）：向上=当前槽并上一槽（视点跟随跳转）、
+                 向下=吸收下一槽（视点不动）；快捷键不做（⌃⌥U/I 已被移块占用，用户点名再加） -->
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                aria-label={tip3(tomatoI18n.与上一槽合并, tomatoI18n.tip与上一槽合并)}
+                onclick={() => mergePieceFromBar(-1)}
+            >{@html icon("iconUp", 16)}</button>
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                aria-label={tip3(tomatoI18n.与下一槽合并, tomatoI18n.tip与下一槽合并)}
+                onclick={() => mergePieceFromBar(1)}
+            >{@html icon("iconDown", 16)}</button>
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                aria-label={tip3(pieceDone ? tomatoI18n.解除定稿 : tomatoI18n.定稿,
+                    pieceDone ? tomatoI18n.tip解除定稿 : tomatoI18n.tip定稿)}
+                onclick={() => togglePieceDone()}
+            >{@html icon(pieceDone ? "iconUndo" : "iconCheck", 16)}</button>
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                class:prog-fb-pro={$progPaid === false}
+                aria-label={tip3(tomatoI18n.汇编成稿, tomatoI18n.tip汇编成稿)}
+                onclick={() => compileWritingFromBar()}
+            >{@html icon("iconProgMerge", 16)}</button>
+        {/if}
+        {#if $kind === "digest"}
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                aria-label={tip3(tomatoI18n.入槽, tomatoI18n.tip入槽)}
+                onclick={(e) => openSlotMenuForDigest(e)}
+            >{@html icon("iconProgPiece", 16)}</button>
+        {/if}
+        <!-- 直送：一切阅读态（书/片/自由文档）选中块直接进槽——不经摘抄池不建摘抄本体；
+             写作书片自身排除（片内搬运是移片/拆分领地）；摘抄态排除（已有整摘入槽） -->
+        {#if ($kind === "piece" || $kind === "free" || $kind === "book") && !isWritingPiece}
+            <button
+                class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                aria-label={tip3(tomatoI18n.直接入槽, tomatoI18n.tip直接入槽)}
+                onclick={(e) => openDirectSlotMenu(e)}
+            >{@html icon("iconProgMaterial", 16)}</button>
+        {/if}
         {#if flatCells.length > 0 || advVisible.length > 0}
             <!-- □14b 折叠钮：首行行尾，chevron 指向即动作方向（展开中显示⌃=收起） -->
             <button
@@ -1056,7 +1335,8 @@
     {/if}
     {#if $digOpen && digIds.length > 0}
         <!-- 子排开合（□2 持久记忆）：digOpen 随 digSubrankOpen 跨分片/跨会话记住用户选择，
-             未存过值=开；摘抄态没有 ✂（渲染了就无法收起）故不渲染——摘抄文档再摘抄落札记匣本就低频 -->
+             未存过值=开；□11 起 digest 态也开精简子排（再摘抄/单词族，✂ 钮随 common 组常驻
+             可收起）——旧「摘抄态不渲染子排」退役 -->
         <div class="prog-fb-dig">
             {#each digIds as id (id)}
                 <button

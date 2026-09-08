@@ -3,7 +3,7 @@ import * as constants from "./constants";
 import { Plugin } from "siyuan";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalDigestHub, getDocIalFreeDigestDir, getDocIalNoteBox, getDocIalNoteDir, getDocIalReadLog, getDocIalWords } from "./progData";
+import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalDigestDirUnder, getDocIalDigestDirHub, getDocIalDigestHub, getDocIalFreeDigestDir, getDocIalNoteBox, getDocIalNoteDir, getDocIalReadLog, getDocIalWords } from "./progData";
 import { MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import type { ReadingOrder } from "./roller";
 import { osFs } from "../../sy-tomato-plugin/src/libs/globals";
@@ -73,6 +73,12 @@ export class ProgressiveStorage {
     async setPinnedBook(bookID: string, v: boolean) {
         await this.updateBookInfo(bookID, { pinned: v } as any);
         await siyuan.pushMsg(v ? tomatoI18n.已置顶本书 : tomatoI18n.已取消置顶本书);
+    }
+
+    /** 期2 写作书：续转指针（开片/入槽/拆分时写；轮到优先开它）。静默不 toast——
+     *  高频后台写，用户可见反馈由「打开的片」本身承担 */
+    async setActivePoint(bookID: string, point: number) {
+        await this.updateBookInfo(bookID, { activePoint: point } as any);
     }
 
     /** 舰队管理 □2：从总览隐匿/取消隐匿（纯视觉，滚筒照推；不 toast——面板/管理页
@@ -146,6 +152,8 @@ export class ProgressiveStorage {
             autoSplitSentenceT: false,
             addIndex2paragraph: false,
             manualMode: false,
+            writing: false,
+            activePoint: 0,
         }
     }
 
@@ -198,6 +206,7 @@ export class ProgressiveStorage {
         const info = await this.booksInfo(docID);
         if (typeof opt.addIndex2paragraph === "boolean") info.addIndex2paragraph = opt.addIndex2paragraph;
         if (typeof opt.manualMode === "boolean") info.manualMode = opt.manualMode;
+        if (typeof opt.writing === "boolean") info.writing = opt.writing;
         if (typeof opt.ignored === "boolean") info.ignored = opt.ignored;
         if (typeof opt.showLastBlock === "boolean") info.showLastBlock = opt.showLastBlock;
         if (typeof opt.autoSplitSentenceP === "boolean") info.autoSplitSentenceP = opt.autoSplitSentenceP;
@@ -206,6 +215,7 @@ export class ProgressiveStorage {
         if (typeof opt.pinned === "boolean") info.pinned = opt.pinned;
         if (typeof opt.hidden === "boolean") info.hidden = opt.hidden;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
+        if (utils.isValidNumber(opt.activePoint)) info.activePoint = opt.activePoint;
 
         info.time = await siyuan.currentTimeMs();
         this.booksInfos()[docID] = info;
@@ -321,6 +331,49 @@ export class ProgressiveStorage {
             },
             onResolved: async () => { },
         });
+    }
+
+    /** writebook-next □4 双夹并存（逐次 override 方向专用）：方向锚认回 → 主力夹恰在该
+     *  方向则复用（防同位置双夹）→ 方向锚新建。方向锚见 progData（首段独立防 LIKE 前缀污染） */
+    async ensureDigestDirUnder(bookID: string): Promise<string> {
+        const ial = getDocIalDigestDirUnder(bookID);
+        const byDir = await ensureAnchoredDoc(ial, {
+            findByIal: () => findDocByIal(ial),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
+            create: async () => {
+                // 主力夹（现锚）已在书下：复用它，不再建（幂等——每次 override 都走这条认回）
+                const mainDir = await this.digestDirParentOf(getDocIalDigestDir(bookID), bookID);
+                if (mainDir) return mainDir;
+                return this.createChildUnder(bookID, `digest-${await this.bookName(bookID)}`, ial);
+            },
+            onResolved: async () => { },
+        });
+        return byDir;
+    }
+
+    async ensureDigestDirHub(bookID: string): Promise<string> {
+        const ial = getDocIalDigestDirHub(bookID);
+        return ensureAnchoredDoc(ial, {
+            findByIal: () => findDocByIal(ial),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
+            create: async () => {
+                const mainDir = await this.digestDirParentOf(getDocIalDigestDir(bookID), await this.ensureDigestHub());
+                if (mainDir) return mainDir;
+                return this.createChildUnder(await this.ensureDigestHub(), `digest-${await this.bookName(bookID)}`, ial);
+            },
+            onResolved: async () => { },
+        });
+    }
+
+    /** 锚值找夹并核对其直接父是否恰为 parentID（文档父子在 path 层——blocks 表文档行
+     *  parent_id 恒空，见踩坑）：夹即目标方向时 override 复用主力夹，同位置不建双夹 */
+    private async digestDirParentOf(ialValue: string, parentID: string): Promise<string> {
+        if (!parentID) return "";
+        const dirID = await findDocByIal(ialValue);
+        if (!dirID) return "";
+        const row = await siyuan.sqlOne(`select path from blocks where id='${dirID}'`);
+        const parent = row?.path?.split("/").filter(Boolean).at(-2);
+        return parent === parentID ? dirID : "";
     }
 
     /** 摘抄总夹（期1 □2）：prog-data 根下名「摘抄」，集中归档档所有 digest-书名 夹的父 */

@@ -16,6 +16,8 @@
     import { objOverrideNull } from "stonev5-utils";
     import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
     import { notifyFleetChanged } from "./fleetNotify";
+    import { fetchWritingPieces } from "./writeBook";
+    import { writingCompareBox } from "./WritingCompareBox";
 
     interface Props {
         dm: DestroyManager;
@@ -32,6 +34,10 @@
         bookInfo: BookInfo;
         bookIndex: string[][];
         name: string;
+        /** 期2 写作书：定稿片数（进度换源；非写作书恒 0） */
+        doneOf: number;
+        /** 期2 写作书：片总数（bookIndex 恒空时的 total 源；非写作书恒 0） */
+        pieceLen: number;
     };
 
     let books: TaskType[] = $state([]);
@@ -71,14 +77,24 @@
                 await progStorage.booksInfo(bookID),
                 ProgressiveStorage.defaultBookInfo(),
             );
-            const bookIndex = await progStorage.loadBookIndexIfNeeded(bookID);
+            // 期2 写作书：片列表单发拉取（total=片数、doneOf=定稿数；进度=定稿占比）
+            let doneOf = 0;
+            let pieceLen = 0;
+            let bookIndex: string[][] = [];
+            if (bookInfo.writing) {
+                const pieces = await fetchWritingPieces(bookID);
+                doneOf = pieces.filter(p => p.done).length;
+                pieceLen = pieces.length;
+            } else {
+                bookIndex = await progStorage.loadBookIndexIfNeeded(bookID);
+            }
             const row = siyuan.sqlOne(
                 `select content from blocks where type='d' and id="${bookID}"`,
             );
             // 书名实时兜底：SQL 实查 → books.json bookName 缓存 → bookID
             // （旧版 🚫 前缀退役：文档缺失由 ⚠ 状态卡承载，书名保持干净）
             const name = (await row)?.content || bookInfo.bookName || bookID;
-            list.push({ bookID, bookInfo, bookIndex, name });
+            list.push({ bookID, bookInfo, bookIndex, name, doneOf, pieceLen });
         }
         statuses = st;
         orderIdx = oIdx;
@@ -103,16 +119,17 @@
     });
 
     function totalOf(b: TaskType): number {
+        // 期2 写作书：total=片数（定稿占比的分母）；阅读书=索引长
+        if (b.bookInfo.writing) return b.pieceLen;
         return (b.bookIndex ?? []).length;
     }
-    /** 与 DockPanel/fleetData 同口径：total<=0 → 0，读完 = 100% */
+    /** 与 DockPanel/fleetData 同口径：total<=0 → 0，读完 = 100%。
+     *  期2 写作书：进度=定稿片占比（doneOf/片数）；阅读书=point/total */
     function percentOf(b: TaskType): number {
         const total = totalOf(b);
         if (total <= 0) return 0;
-        return Math.min(
-            100,
-            Math.round(((b.bookInfo.point ?? 0) / total) * 100),
-        );
+        const done = b.bookInfo.writing ? b.doneOf : (b.bookInfo.point ?? 0);
+        return Math.min(100, Math.round((done / total) * 100));
     }
 
     async function btnStartToLearn(bookID: string) {
@@ -220,6 +237,10 @@
             </svg>
             <div class="empty-title">{tomatoI18n.书架空空}</div>
             <div class="empty-sub">{tomatoI18n.书架空空说明}</div>
+            <!-- 期1 写作书：空态也露出入口（写作书=从零建骨架的第一形态）；□2 图标统一线稿家族 -->
+            <button class="btn ghost empty-write" onclick={() => prog.openAddWritingBookDialog()}
+                ><svg><use xlink:href="#iconProgWriteAdd"></use></svg> {tomatoI18n.新建写作书}</button
+            >
         </div>
     {:else}
         <div class="manage-bar">
@@ -227,11 +248,17 @@
                 >{tomatoI18n.共N本书(sortedBooks.length)}</span
             >
             <span class="spacer"></span>
+            <!-- 期1 写作书：管理页常驻入口；□2 图标统一线稿家族；accent=常驻主入口提示性（同 prog-fleet-plan） -->
+            <button
+                class="icon-btn write b3-tooltips b3-tooltips__n"
+                aria-label={tomatoI18n.新建写作书}
+                onclick={() => prog.openAddWritingBookDialog()}
+            ><svg><use xlink:href="#iconProgWriteAdd"></use></svg></button>
             <button
                 class="icon-btn b3-tooltips b3-tooltips__n"
                 aria-label={tomatoI18n.刷新}
                 onclick={() => load(true)}
-            >♻</button>
+            ><svg><use xlink:href="#iconProgRefresh"></use></svg></button>
         </div>
         <div class="manage-list">
             {#each sortedBooks as b (b.bookID)}
@@ -279,7 +306,11 @@
                             {#if b.bookInfo.hidden}<span class="chip chip-hidden">{tomatoI18n.已隐匿此书}</span>{/if}
                             <span class="num"
                                 >{totalOf(b) > 0
-                                    ? `${b.bookInfo.point ?? 0}/${totalOf(b)} ${tomatoI18n.分片}`
+                                    ? b.bookInfo.writing
+                                        ? `✍ ${b.doneOf}/${totalOf(b)} ${tomatoI18n.分片}`
+                                        : `${b.bookInfo.point ?? 0}/${totalOf(b)} ${tomatoI18n.分片}`
+                                    : b.bookInfo.writing
+                                    ? `✍ ${tomatoI18n.写作中}`
                                     : b.bookInfo.manualMode
                                     ? `✎ ${tomatoI18n.手动分片}`
                                     : tomatoI18n.未分片}</span
@@ -303,19 +334,30 @@
                         <div class="row actions">
                             <button
                                 class="btn primary"
-                                disabled={totalOf(b) === 0 && !b.bookInfo.manualMode}
+                                disabled={totalOf(b) === 0 && !b.bookInfo.manualMode && !b.bookInfo.writing}
                                 aria-label={`${tomatoI18n.阅读}《${b.name}》`}
                                 onclick={() => btnStartToLearn(b.bookID)}
                             >{tomatoI18n.阅读}</button
                             >
-                            <button
-                                class="btn ghost"
-                                class:emph={totalOf(b) === 0}
-                                aria-label={`${tomatoI18n.重新分片}《${b.name}》`}
-                                onclick={() =>
-                                    btnAddProgressiveReading(b.bookID)}
-                            >{tomatoI18n.重新分片}</button
-                            >
+                            {#if b.bookInfo.writing}
+                                <!-- 期5 汇编成稿（Pro，书级入口与浮条同款签名）：Pro 验证+购买引导在 Box 内 -->
+                                <button
+                                    class="btn ghost"
+                                    aria-label={`${tomatoI18n.汇编成稿}《${b.name}》`}
+                                    onclick={() =>
+                                        writingCompareBox.compileWritingBook(b.bookID, b.bookInfo.boxID)}
+                                >{tomatoI18n.汇编成稿}</button
+                                >
+                            {:else}
+                                <button
+                                    class="btn ghost"
+                                    class:emph={totalOf(b) === 0}
+                                    aria-label={`${tomatoI18n.重新分片}《${b.name}》`}
+                                    onclick={() =>
+                                        btnAddProgressiveReading(b.bookID)}
+                                >{tomatoI18n.重新分片}</button
+                                >
+                            {/if}
                             <button
                                 class="switch"
                                 role="switch"
@@ -341,7 +383,9 @@
                         </div>
                         {#if totalOf(b) === 0}
                             <div class="status-line warn">
-                                {b.bookInfo.manualMode
+                                {b.bookInfo.writing
+                                    ? tomatoI18n.写作书说明
+                                    : b.bookInfo.manualMode
                                     ? tomatoI18n.手动书说明
                                     : tomatoI18n.未分片请先分片后再阅读}
                             </div>
@@ -359,6 +403,9 @@
                                 {#if b.bookInfo.manualMode}
                                     <!-- 期3 手动分片书：无分片设置可用（空索引+无断句/建片语义），说明行替代 -->
                                     <div class="dig-row">{tomatoI18n.手动书设置说明}</div>
+                                {:else if b.bookInfo.writing}
+                                    <!-- 期1 写作书：无切分语义，说明行替代（调度/入槽后续期接入） -->
+                                    <div class="dig-row">{tomatoI18n.写作书设置说明}</div>
                                 {:else}
                                 <label class="dig-row">
                                     <input
@@ -506,6 +553,19 @@
             font-size: 12px;
             color: var(--prog-muted);
         }
+        /* 期1 写作书空态入口：空态插画整体 opacity 0.55，钮单独回全浓保可点感；
+           □2 线稿图标替换 ✍——svg 尺寸须覆盖容器插画级 .manage-empty svg（40×52） */
+        .empty-write {
+            margin-top: 10px;
+            opacity: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            svg {
+                width: 14px;
+                height: 14px;
+            }
+        }
     }
 
     /* 顶栏（书籍计数 + 刷新）+ 卡片列表 */
@@ -513,7 +573,7 @@
         display: flex;
         flex: none;
         align-items: center;
-        gap: 4px;
+        gap: 8px; /* vision P2-8：✍/♻ 两 icon 钮字形间净距过紧（4px 抬 8px） */
         min-height: 28px;
     }
     .manage-count {
@@ -634,7 +694,22 @@
         background: transparent;
         color: var(--prog-muted);
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         transition: color 0.12s ease-out, box-shadow 0.12s ease-out;
+        /* □2 线稿图标替换 ✍/♻ emoji：svg 需显式尺寸（默认塌成 0）；hover 反馈与
+           ghost 钮语言对齐（vision P2-3，原先仅 .danger 有触发规则） */
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+        &:hover {
+            color: var(--prog-accent);
+        }
+        &.write {
+            color: var(--prog-accent);
+        }
         &.danger:hover {
             color: var(--b3-theme-error);
             box-shadow: inset 0 0 0 1px

@@ -15,6 +15,11 @@
         Progressive下一页,
         progSettingsOpenHK,
     } from "./Progressive";
+    import {
+        flashBox制卡,
+        flashBox原地制卡,
+        flashBox制卡并发到dailycard无引用,
+    } from "./FlashBox";
 </script>
 
 <div class="settingBox">
@@ -44,5 +49,16 @@
     </div>
     <div>
         {digest执行摘抄背诵.langText()}<HotkeyCap hk={digest执行摘抄背诵} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <!-- 制卡三连补全（09-07 制卡入口战役遗留）：摘抄四连与制卡三连同属摘-卡工作流相邻动作，
+         命令翻新时快捷键卡漏带；⌥E 在「菜单」卡右键开关行另有键帽（开关+键帽合行）不冲突 -->
+    <div>
+        {flashBox制卡.langText()}<HotkeyCap hk={flashBox制卡} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {flashBox原地制卡.langText()}<HotkeyCap hk={flashBox原地制卡} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {flashBox制卡并发到dailycard无引用.langText()}<HotkeyCap hk={flashBox制卡并发到dailycard无引用} pluginName="sy-progressive-plugin"></HotkeyCap>
     </div>
 </div>

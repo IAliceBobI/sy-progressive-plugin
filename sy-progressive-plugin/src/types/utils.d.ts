@@ -23,6 +23,11 @@ type BookInfo = {
     addIndex2paragraph?: boolean,
     /** 期3 手动分片书：注册书身份+索引恒空，片由摘抄产生（ctime 聚合 ✒） */
     manualMode?: boolean,
+    /** 期1 写作书：渐进阅读的姊妹形态（素材排列相位）；与 manualMode 分家——
+     *  手动书不进滚筒、写作书进滚筒；索引恒空（运行时按 MarkKey SQL 拉片） */
+    writing?: boolean,
+    /** 期2 写作书：续转指针=最近活跃槽 point（开片/入槽/拆分时写；调度轮到优先开它） */
+    activePoint?: number,
     finishDays?: number,
     finishTimeSecs?: number,
     finishPieceID?: string,

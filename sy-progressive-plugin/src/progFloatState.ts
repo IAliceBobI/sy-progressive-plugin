@@ -121,6 +121,10 @@ const SCENE: Record<FloatDocKind, FloatButtonSpec[]> = {
     digest: [
         { id: "recite", icon: "iconProgSend", kind: "primary", group: "scene" },       // ✍送仿写（未装不显示）
         { id: "revisit", icon: "iconProgSched", kind: "normal", group: "scene" },      // ✧复访动作组（□7：两态菜单+到期红点；id 不用 review——子排 review 是创建语境）
+        // □6 摘抄顺序遍历（bear 拍板双向纯浏览不删）：iconProgNext=删后走专属形（右上箭头
+        // +×角标）不适用，纯走位走 prev/nextPure 双向对家族（iconProgPrev/iconProgFFast）
+        { id: "prev", icon: "iconProgPrev", kind: "normal", group: "scene" },          // ⬅上一条摘抄
+        { id: "next", icon: "iconProgFFast", kind: "normal", group: "scene" },         // ➡下一条摘抄
         { id: "origin", icon: "iconProgBook", kind: "normal", group: "scene" },        // 📖回原书（定位原文块）
         { id: "tree", icon: "iconProgTree", kind: "normal", group: "scene" },          // 🌳路线图浮层（□11）
         { id: "summary", icon: "iconProgQuill", kind: "ghost", group: "scene" },       // ✒摘抄汇总
@@ -164,6 +168,9 @@ export function buildFloatButtons(
         // cards 插在 digest 之后（视觉顺序：✂ 🗂 🔄）
         common.splice(1, 0, { id: "cards", icon: "iconProgCard", kind: "common", group: "common" });
     } else if (kind === "digest") {
+        // □11 digest 态开子排（bear「浮条应与分片差不多」）：✂ 钮=子排开合+收起通道
+        //（与 book/piece 公共组同款），视觉顺序 ✂ 🗂
+        common.push({ id: "digest", icon: "iconProgScissors", kind: "common", group: "common" });
         common.push({ id: "cards", icon: "iconProgCard", kind: "common", group: "common" });
     }
     // 拷贝再改（review P2：直接改 SCENE 常量对象是不可逆突变——recite 装上后双 primary）
@@ -298,7 +305,7 @@ export function formatDueCount(n: number): string {
  * Record<DigSubrankId, ...> 精确匹配——任一侧增删 id 都是编译错（make check 拦），
  * 防两源漂移（漂移的失效模式是 icon undefined 渲染期 TypeError，不是温和降级）。
  */
-export type DigSubrankId = "inbox" | "think" | "card" | "review" | "word" | "wordai" | "write" | "sched" | "whole";
+export type DigSubrankId = "inbox" | "tobook" | "tohub" | "think" | "card" | "review" | "word" | "wordai" | "write" | "sched" | "whole";
 
 /**
  * 摘抄子排 id 清单（□3 起单一事实源，渲染序）：digest 态不渲染子排（摘抄文档再摘抄
@@ -307,7 +314,12 @@ export type DigSubrankId = "inbox" | "think" | "card" | "review" | "word" | "wor
  * （ProgressiveFloatBtns 的 DIG_ICONS/DIG_TIPS），此处只管 id 序与按态过滤。
  */
 export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
-    if (kind === "digest") return [];
-    const base: DigSubrankId[] = ["inbox", "think", "card", "review", "word", "wordai", "write", "sched"];
+    // □4 tobook/tohub=落点变体（挂书侧/归总夹，去向级覆盖不落盘）紧跟主摘抄钮——
+    // bear 试用拍板「落点都能选」：全局档（digestLanding）一刀切之外逐次指定。
+    // □11 digest 态开精简子排（bear「与分片差不多」）：再摘抄三档落点+问题+强制卡+
+    // 单词两钮；review/sched 与首行 ✧ 复访组重复、write 与首行送仿写重复、whole 对卡片
+    // 无意义（整摘复制）——不收。再摘抄走非书链路（落源文档下/札记匣）。
+    if (kind === "digest") return ["inbox", "tobook", "tohub", "think", "card", "word", "wordai"];
+    const base: DigSubrankId[] = ["inbox", "tobook", "tohub", "think", "card", "review", "word", "wordai", "write", "sched"];
     return kind === "book" ? base : [...base, "whole"];
 }

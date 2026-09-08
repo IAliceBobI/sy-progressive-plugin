@@ -19,7 +19,7 @@ import { newID } from "stonev5-utils";
 export interface FleetActions {
     /** ▶ 开始今日阅读（滚筒下一片） */
     startReading(): any;
-    /** □11 自由态上岗（状态栏 ✂ 钮：普通文档浮条到场；三态文档=聚焦浮条开子排） */
+    /** □11 自由态上岗（状态栏 ✂ 钮：普通文档浮条到场；在场=生命周期 toggle，见 toggleFreeFloat □3） */
     freeDigest(): any;
     /** 空态主按钮=把当前文档加入渐进阅读 */
     addFirstBook(): any;
@@ -27,6 +27,8 @@ export interface FleetActions {
     continueReading(bookID: string): any;
     /** 管理书目（旧「查看所有渐进学习文档」表格，□7 收编进面板） */
     manageBooks(): any;
+    /** 期1 写作书：新建写作书弹窗（书名+落点笔记本+可选大纲） */
+    addWritingBook(): any;
     /** 打开设置 */
     openSettings(): any;
     /** recite 导流：装了=触发仿写练习，未装=提示 */
@@ -100,7 +102,7 @@ export async function setQuota(n: number) {
 }
 
 export function initFleet(plugin: any, actions: FleetActions) {
-    // ---- □11 状态栏 ✂ 钮（火苗旁，不复用火苗）：自由态上岗/聚焦浮条 ----
+    // ---- □11 状态栏 ✂ 钮（火苗旁，不复用火苗）：上岗/浮条生命周期 toggle（□3 二击=收缩/消失） ----
     // 两钮均 position:"left"（afterbegin 插头部，后注册者更靠左）→ 火苗须后注册才在最左端
     const freeHost = document.createElement("div");
     freeHost.className = "prog-freebtn-host";
@@ -135,7 +137,10 @@ export function initFleet(plugin: any, actions: FleetActions) {
         },
         init: (dock: any) => {
             const eleID = newID();
-            dock.element.innerHTML = `<div class="fn__flex-1 fn__flex-column prog-fleet-dock"><div id="${eleID}" class="fn__flex-1"></div></div>`;
+            // □7 高度链修复：须挂 fn__flex（display:flex）——dock.element 是 block（高=面板
+            // 尺寸），中间层缺 flex 时 height:auto 被书卡内容撑开溢出挂载点、footer/主按钮
+            // 沉入 dock 滚动区；配套 .prog-fleet-dock 样式（height:100%+子级 min-height:0）
+            dock.element.innerHTML = `<div class="fn__flex fn__flex-column fn__flex-1 prog-fleet-dock"><div id="${eleID}" class="fn__flex-1"></div></div>`;
             panel = mount(DockPanel, {
                 target: dock.element.querySelector("#" + eleID),
                 props: { panel: panelState, actions, onQuota: setQuota, onRefresh: refreshFleet },

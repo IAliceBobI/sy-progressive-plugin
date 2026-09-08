@@ -1,7 +1,7 @@
 import { Menu, Plugin, openTab, confirm, IProtyle, IEventBusMap, Protyle } from "siyuan";
 import "./index.scss";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
-import { closeTabByTitle, getActiveDocID, getActiveProtyle, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { closeTabByTitle, getActiveDocID, getActiveProtyle, getNotebookFirstOne, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import * as help from "./helper";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
@@ -11,6 +11,9 @@ import {
     PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_PARENT_ID, PROG_PIECE_PREVIOUS, RefIDKey
 } from "../../sy-tomato-plugin/src/libs/gconst";
 import AddBookSvelte from "./AddBook.svelte";
+import AddWritingBookSvelte from "./AddWritingBook.svelte";
+import MaterialPickerSvelte from "./MaterialPicker.svelte";
+import SplitPieceDialogSvelte from "./SplitPieceDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
@@ -20,10 +23,12 @@ import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progDa
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { addClickEvent, progressiveBtnFloating } from "./ProgressiveBtn";
-import { blockIconMenu, card2dailycard, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { findPieceByCandidates } from "./contentsJump";
+import { queryDigestTree } from "./digestUtils";
+import { fetchWritingPieces, pickWritingTarget } from "./writeBook";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
 import { mount, } from "svelte";
@@ -339,7 +344,9 @@ class Progressive {
         }, {
             title: bookName,
             width: events.isMobile ? "90vw" : undefined,
-            height: events.isMobile ? "180vw" : undefined,
+            // 矮视口自适应（vision P1，tomato 设置战役同款先例）：桌面默认高 700px 在
+            // <700px 视口下 footer 溢出画面，min() 钳回视口内、弹窗体内部滚动
+            height: events.isMobile ? "180vw" : "min(700px, 92vh)",
         });
     }
 
@@ -534,12 +541,36 @@ class Progressive {
             return;
         }
         const bookInfo = await progStorage.booksInfo(bookID);
-        // 期3 手动分片书：无自动片，统一拦截（Dock 书卡/管理页/浮条 ▶ 全入口）——开原书
-        //  +「摘抄即片」提示。无参滚筒路径不会选中手动书（空索引恒 finished），无需再判
+        // 期3 手动分片书：无自动片，统一拦截（Dock 书卡/管理页/浮条 ▶ 全入口）。manualbook □3
+        //  起：片=摘抄，点击直达最近一片（queryDigestTree.flat 首位=ctime 最新，续读语义）；
+        //  0 片回落原行为（开原书+「请直接摘抄」引导）。无参滚筒路径不会选中手动书（空索引恒
+        //  finished），无需再判
         if (bookInfo.manualMode) {
+            const tree = await queryDigestTree(bookID);
+            if (tree.flat.length > 0) {
+                await OpenSyFile2(this.plugin, tree.flat[0].id);
+                return;
+            }
             await siyuan.pushMsg(tomatoI18n.手动分片书请直接摘抄);
             await this.openOriginBook(bookID);
             return;
+        }
+        // 期2 写作书调度：轮到=开 activePoint 片（续转指针），已定稿/删/越界顺延首个
+        // 未定稿片；无片/全定稿=终态提示（开书给建槽现场）。索引恒空不走 createPiece 链
+        if (bookInfo.writing) {
+            const pieces = await fetchWritingPieces(bookID);
+            const target = pickWritingTarget(pieces, bookInfo.activePoint);
+            if (!target) {
+                await siyuan.pushMsg(tomatoI18n.写作书请从槽位开始, 2500);
+                await this.openOriginBook(bookID);
+                return;
+            }
+            await progStorage.setActivePoint(bookID, target.point);
+            events.setDocID(target.docID);
+            await OpenSyFile2(this.plugin, target.docID);
+            // 计数同权：轮到写作书开片=今日阅读 +1（与阅读书翻片同 quota 池）
+            await this.markReadSafe(bookID);
+            return true;
         }
         const bookIndex = await progStorage.loadBookIndexIfNeeded(bookInfo.bookID);
         let point = (await progStorage.booksInfo(bookInfo.bookID)).point;
@@ -573,9 +604,18 @@ class Progressive {
             return false;
         }
         if (openPiece && this.settings.openCardsOnOpenPiece) {
-            if (card2dailycard.get()) {
+            const landing = cardLanding.get();
+            if (landing === "dailynote") {
+                // 制卡落点跟随（三档化 2026-09-07）：dailynote 档打开当天日记（createDailyNote
+                // 幂等；笔记本解析与制卡侧 FlashBox.doInsertCard 同款）
+                const nb = storeNoteBox_selectedNotebook.getOr() || getNotebookFirstOne()?.id;
+                if (nb) {
+                    const { id: dailyDocID } = await siyuan.createDailyNote(nb);
+                    OpenSyFile2(this.plugin, dailyDocID, windowOpenStyle.get() as any);
+                }
+            } else if (landing !== "cards") {
                 // □3 制卡统一归置：新卡落当日 dailycard 文档，「开片同步开卡」跟随打开它
-                // （语义保持：边读边看新卡汇合；关掉制卡并入开关才回落旧 cards 夹）。
+                // （语义保持：边读边看新卡汇合；cards 档才回落旧 cards 夹）。
                 // boxID 与制卡侧同款分叉：闪卡专用笔记本优先，回落书所在笔记本
                 const boxID = flashcardNotebook.get(a => a || bookInfo.boxID);
                 const targetDocID = await getDailyCardDocID(boxID, getDailyPath());
@@ -932,7 +972,52 @@ class Progressive {
         }, {
             title: tomatoI18n.管理书目,
             width: events.isMobile ? "90vw" : undefined,
-            height: events.isMobile ? "180vw" : "800px",
+            // min() 自适应：定高 800px 在矮视口裁掉顶栏（✍/♻ 入口不可达，vision P1-2）
+            height: events.isMobile ? "180vw" : "min(800px, 92vh)",
+        });
+    }
+
+    /** 期1 写作书：新建弹窗（书名+落点笔记本+可选大纲+工作流程向导），入口=舰队总览/管理页。
+     *  高度随视口自适应（vision P1-2：定高 700px 在矮视口上下裁顶，标题不可见）；
+     *  流程卡入驻后 880px 桌面常规一屏，矮视口仍由 92vh 收口+内容滚动兜底 */
+    openAddWritingBookDialog() {
+        showDialog((target, dm) => {
+            return mount(AddWritingBookSvelte, {
+                target,
+                props: { dm },
+            });
+        }, {
+            title: tomatoI18n.新建写作书,
+            width: events.isMobile ? "90vw" : undefined,
+            height: events.isMobile ? "180vw" : "min(880px, 92vh)",
+        });
+    }
+
+    /** 期3 拉式素材选择器：全库摘抄池按源书分组，点击=整条摘抄转实尾插进当前片 */
+    openMaterialPicker(pieceDocID: string, bookID: string) {
+        showDialog((target, dm) => {
+            return mount(MaterialPickerSvelte, {
+                target,
+                props: { dm, pieceDocID, bookID },
+            });
+        }, {
+            title: tomatoI18n.插入素材,
+            width: events.isMobile ? "90vw" : undefined,
+            height: events.isMobile ? "180vw" : "min(700px, 88vh)",
+        });
+    }
+
+    /** 期4 拆为新片：选中块已在调用前捕获（弹窗聚焦后编辑器选区不可靠） */
+    openSplitPieceDialog(pieceDocID: string, bookID: string, blockIDs: string[]) {
+        showDialog((target, dm) => {
+            return mount(SplitPieceDialogSvelte, {
+                target,
+                props: { dm, pieceDocID, bookID, blockIDs },
+            });
+        }, {
+            title: tomatoI18n.拆为新片,
+            width: events.isMobile ? "90vw" : "460px",
+            height: "auto", // 单字段弹窗内容自适应（showDialog 默认 700px 定高会撑出大片空白）
         });
     }
 }

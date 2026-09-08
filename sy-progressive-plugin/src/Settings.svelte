@@ -5,7 +5,7 @@
     import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
     // 番茄工具箱设置页同款卡片体系+导航双栏壳（IndexConf.css 的 .tomato-settings-nav 作用域），
     // 根节点挂 .tomato-settings-dialog 类启用；样式按该类作用域限定，不会泄漏（2026-08-24 对齐
-    // 改造；2026-09-03 双栏改造复刻番茄终态架构：左导航 7 域+右侧单域渲染+搜索聚合视图）
+    // 改造；2026-09-03 双栏改造复刻番茄终态架构：左导航域列表+右侧单域渲染+搜索聚合视图）
     import "../../sy-tomato-plugin/src/IndexConf.css";
     import { floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
@@ -15,6 +15,7 @@
     import { searchSettings } from "../../sy-tomato-plugin/src/libs/ui";
     import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
     import ProgConfDigest from "./ProgConfDigest.svelte";
+    import ProgConfCard from "./ProgConfCard.svelte";
     import ProgConfFloatbar from "./ProgConfFloatbar.svelte";
     import ProgConfSkins from "./ProgConfSkins.svelte";
     import ProgConfBasic from "./ProgConfBasic.svelte";
@@ -50,11 +51,13 @@
     const SearchKeyItemKey =
         "progressive_settings_SearchKeyItemKey_RfrUm9VLS4GehTzg5ygRrNT";
 
-    // 导航 7 域（2026-09-03 双栏改造：1:1 照搬原单栏 7 段，零迁移零重划；顺序按番茄
-    // 「本体→招牌→通用→入口→兜底」哲学，核心功能摘抄与制卡打头）；label 惰性取值
+    // 导航 8 域（2026-09-03 双栏改造 7 域；2026-09-07 bear 三问 A1 拆域：「摘抄与制卡」13 项
+    // 混排卡拆「摘抄」5 项+「制卡」8 项，导航 7→8）；顺序按番茄「本体→招牌→通用→入口→兜底」
+    // 哲学，核心功能摘抄/制卡打头；label 惰性取值
     // （tomatoI18n 依 window 语言动态切，模板每次渲染现取，勿在模块顶层快照）
     const NAV_DOMAINS: Array<{ id: string; label: () => string }> = [
-        { id: "digest", label: () => tomatoI18n.摘抄与制卡 },
+        { id: "digest", label: () => tomatoI18n.摘抄 },
+        { id: "card", label: () => tomatoI18n.制卡 },
         { id: "floatbar", label: () => tomatoI18n.浮条 },
         { id: "skins", label: () => tomatoI18n.皮肤外观 },
         { id: "basic", label: () => tomatoI18n.基础设置 },
@@ -64,7 +67,7 @@
     ];
     let navActive = $state("digest");
     const NavKeyItemKey = "progressive_settings_NavKeyItemKey_Kw9VtQeXr4TnZb7hLsYdA2g";
-    // 聚合视图：searchKey 非空=全 7 域聚合渲染，navActive 冻结待清空回位；
+    // 聚合视图：searchKey 非空=全域聚合渲染，navActive 冻结待清空回位；
     // navHits=各域是否有命中卡（searchSettings 过滤后从 DOM 回读），驱动导航项高亮
     let navHits: Record<string, boolean> = $state({});
     // 输入沿聚合视图进出跳变跟踪（非响应式：只用于进/出沿触发滚顶，逐键过滤不触发）
@@ -97,7 +100,7 @@
                 updateNavHits();
             }
         }
-        // 导航位置记忆：恢复上次分区（首开无存储落「摘抄与制卡」默认）。单域渲染无长滚动，
+        // 导航位置记忆：恢复上次分区（首开无存储落「摘抄」默认）。单域渲染无长滚动，
         // 纯状态切换即可
         const savedNav = localStorage.getItem(NavKeyItemKey);
         if (savedNav && NAV_DOMAINS.some((d) => d.id === savedNav)) {
@@ -180,7 +183,7 @@
         />
     </div>
 
-    <!-- 双栏：左 7 域导航 + 右内容区（浏览态单域渲染 / 搜索态「全部」聚合视图）。
+    <!-- 双栏：左域导航 + 右内容区（浏览态单域渲染 / 搜索态「全部」聚合视图）。
          data-search= searchSettings 候选跳过（容器 textContent 含全库设置文案，不跳则恒命中
          无意义）；样式挂 .tomato-settings-nav 作用域（IndexConf.css）。搜索态导航命中域
          高亮，点击即清搜索跳该域（复刻番茄终态交互） -->
@@ -196,11 +199,13 @@
             {/each}
         </nav>
         <div class="tomato-nav-content">
-            <!-- 7 域组件渲染抽出 snippet 供浏览/聚合两分支复用；浮条域快照经 bindable
+            <!-- 域组件渲染抽出 snippet 供浏览/聚合两分支复用；浮条域快照经 bindable
                  双向、皮肤域吃 codeValid 激活态，其余域纯 store 绑定零 props -->
             {#snippet domainCards(id: string)}
                 {#if id === "digest"}
                     <ProgConfDigest></ProgConfDigest>
+                {:else if id === "card"}
+                    <ProgConfCard></ProgConfCard>
                 {:else if id === "floatbar"}
                     <ProgConfFloatbar bind:pieceMainBtns bind:pieceMainBtnsDirty></ProgConfFloatbar>
                 {:else if id === "skins"}
@@ -216,7 +221,7 @@
                 {/if}
             {/snippet}
             {#if searchKey}
-                <!-- 聚合视图：全 7 域同屏+域标题行做域界标，data-domain 供 updateNavHits
+                <!-- 聚合视图：全域同屏+域标题行做域界标，data-domain 供 updateNavHits
                      回读命中态；searchSettings 深收按域过滤、空域整节隐藏 -->
                 {#each NAV_DOMAINS as d (d.id)}
                     <section class="conf-group" data-domain={d.id}>
@@ -263,7 +268,7 @@
         max-width: 420px;
     }
     /* 聚合态抑制与 .tomato-agg-title 逐字重复的域组件首标题（vision P1：界标+卡内
-       同名标题上下两行，6/7 域逐字重复）；浏览态无 .tomato-agg-title 节点自然不命中，
+       同名标题上下两行，各域逐字重复）；浏览态无 .tomato-agg-title 节点自然不命中，
        域标题保留。快捷键域首标题是「如有冲突请调整」提示文案非域名，聚合态保留 */
     .container :global(.tomato-agg-title + .settingBox > .section-title:first-child) {
         display: none;

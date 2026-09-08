@@ -18,7 +18,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -36,6 +36,7 @@ import { siyuan, timeUtil } from "../../sy-tomato-plugin/src/libs/utils";
 import { initProgFloatBtns, toggleFloatBarSystem, toggleFreeFloat } from "./ProgressiveBtn";
 import { PROG_FLOAT_ICONS } from "./progIcons";
 import { initDigestMarker } from "./digestMarker";
+import { initMaterialMarker } from "./materialMarker";
 import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
 import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
 import { notifyFleetChanged } from "./fleetNotify";
@@ -73,6 +74,13 @@ function loadStore(plugin: BaseTomatoPlugin) {
         digestLanding.set("daily");
     }
     card2dailycard.load(plugin);
+    // 制卡落点三档迁移（同上款幂等）：cardLanding 无存量时 card2dailycard=false → "cards"
+    // （true 与默认 dailycard 同值无需动）；.set 只写内存，每次启动重跑幂等
+    const hasCardLanding = (plugin.settingCfg as any)?.cardLanding != null;
+    cardLanding.load(plugin);
+    if (!hasCardLanding && card2dailycard.get() === false) {
+        cardLanding.set("cards");
+    }
     flashcardAddRefs.load(plugin);
     flashcardMultipleLnks.load(plugin);
     windowOpenStyle.load(plugin);
@@ -295,6 +303,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         this.addIcons(ICONS);
         this.addIcons(PROG_FLOAT_ICONS);
         initDigestMarker(this);
+        initMaterialMarker(this);
         events.onload(this);
         tomatoI18n.init();
 
@@ -343,6 +352,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
             this.pluginSpec = sp
         });
 
+        // 顶栏设置火苗（topbar-logo 战役返工，与状态栏火苗同源=插件身份标识）：挂类着 --prog-topbar
+        // 家族琥珀色（recite 顶栏 icon 挂 .recite-topbar-gear 同款机制——线稿 stroke:currentColor
+        // 随 color，改 color 即改图标色）
         this.addTopBar({
             icon: "iconSettingsProg",
             title: progSettingsOpenHK.langText() + progSettingsOpenHK.w(),
@@ -350,7 +362,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             callback: () => {
                 this.openSettings();
             },
-        })
+        }).classList.add("prog-topbar-settings")
         // 桌面顶栏菜单退役（2026-08-31 用户拍板）：加书/跳转在桌面走右键块菜单+浮条+命令
         // 面板；移动端保留顶栏——移动端无浮条 hover 生态，这里是唯一常驻入口
         if (events.isMobile) prog.addTopbar(this, "left");
@@ -376,6 +388,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             addFirstBook: () => prog.addProgressiveReadingWithLock(),
             continueReading: (bookID) => prog.startToLearnWithLock(bookID),
             manageBooks: () => prog.viewAllProgressiveBooks(),
+            addWritingBook: () => prog.openAddWritingBookDialog(),
             openSettings: () => this.openSettings(),
             reciteAction: async () => {
                 if (prog.isReciteInstalled()) {

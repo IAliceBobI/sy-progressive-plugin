@@ -43,6 +43,16 @@ export class DigestBuilder {
     piecePoint: number | null = null;
     /** v5：getBookID 结果是否为已注册的书——非书文本（含札记摘抄再摘抄）落札记匣 */
     inBook: boolean;
+    /** writebook-next □4：落点去向级覆盖（"source"=书/源侧夹、"central"=总夹/札记匣）——
+     *  浮条子排「挂书侧/归总夹」两钮逐次指定，不落盘不改 digestLanding 全局档（同
+     *  cardMode 覆盖模式：intent 决定去向，saveCardMode 都不调）；undefined=跟全局档 */
+    landingOverride?: "source" | "central";
+
+    /** 落点档求值唯一入口（□4 收口）：override 优先于全局设置——daily 档下显式点了
+     *  落点变体钮也一样走指定侧（显式意志胜出），故三处读值点全走这里 */
+    private landing(): string {
+        return this.landingOverride ?? digestLanding.get();
+    }
 
     async init() {
         this.allText = getAllText(this.selected);
@@ -113,13 +123,19 @@ export class DigestBuilder {
      *  非书→源下档挂源文档下 digest-源文档名 夹/集中档进札记匣（□3 起匣内按源文档建夹归集，
      *  同 source 档命名法：札记匣/digest-源文档名/摘抄文档 三层） */
     private async landingDirID(): Promise<string> {
-        const source = digestLanding.get() === "source";
-        if (this.inBook) return progStorage.ensureDigestDir(this.bookID, source);
+        const landing = this.landing();
+        const source = landing === "source";
+        if (this.inBook) {
+            // □4 逐次 override：方向锚双夹（主力夹恰在该方向时 ensure 内复用，同位置不建双夹）
+            if (this.landingOverride === "source") return progStorage.ensureDigestDirUnder(this.bookID);
+            if (this.landingOverride === "central") return progStorage.ensureDigestDirHub(this.bookID);
+            return progStorage.ensureDigestDir(this.bookID, source);
+        }
         return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureNoteDir(this.docID);
     }
 
     private async setDigestCard(digestID: string) {
-        if (digestLanding.get() === "daily") {
+        if (this.landing() === "daily") {
             addCardSetDueTime(digestID)
         } else {
             if (this.cardMode == "0") {
@@ -153,7 +169,7 @@ export class DigestBuilder {
         // central=书→摘抄总夹/digest-书名，非书→札记匣（夹均按 IAL 锚定，位置无关）
         let boxID = this.boxID;
         let dirPath: string;
-        if (digestLanding.get() === "daily") {
+        if (this.landing() === "daily") {
             dirPath = getDailyPath().split("/").slice(0, -1).join("/");
         } else {
             const dirID = await this.landingDirID();
@@ -425,4 +441,63 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
     }
     if (!idx) idx = "0";
     return { idx, md };
+}
+// ============ 期3 素材池（MaterialPicker 数据源） ============
+
+export interface MaterialPoolItem {
+    id: string;
+    title: string;
+    /** 剥 🔨 前缀后的毫秒时间串（排序键） */
+    ctime: string;
+    done: boolean;
+}
+
+export interface MaterialPoolGroup {
+    /** 源书/源文档 docID */
+    key: string;
+    name: string;
+    items: MaterialPoolItem[];
+}
+
+/** 全库摘抄池按源书分组（ctime 反查；含自由态——源为普通文档的摘抄）。组内条目
+ *  ctime 倒序，组间=组内最新在前（活跃源书优先）。外层显式 limit 防内核 64 截尾 */
+export async function queryMaterialPool(): Promise<MaterialPoolGroup[]> {
+    const rows = await siyuan.sql(
+        `select a.block_id as id, a.value as ctime, b.content from attributes a` +
+        ` join blocks b on b.id = a.block_id and b.type = 'd'` +
+        ` where a.name = '${PDIGEST_CTIME}' limit 10000000`) as any[] ?? [];
+    const groups = new Map<string, MaterialPoolGroup>();
+    for (const r of rows) {
+        const raw = r.ctime ?? "";
+        const done = raw.startsWith("🔨#");
+        const ct = (done ? raw.slice("🔨#".length) : raw).split("#").pop() ?? "";
+        const key = raw.startsWith("🔨#") ? raw.slice("🔨#".length).split("#")[0] : raw.split("#")[0];
+        if (!key) continue; // 脏值行（无源 ID）静默剔除
+        let g = groups.get(key);
+        if (!g) {
+            g = { key, name: "", items: [] };
+            groups.set(key, g);
+        }
+        g.items.push({ id: r.id, title: r.content ?? "", ctime: ct, done });
+    }
+    for (const g of groups.values()) {
+        g.items.sort((a, b) => Number(b.ctime || 0) - Number(a.ctime || 0));
+    }
+    // 组名：booksInfos bookName 缓存优先，缺失批量 SQL（源可能是普通文档=自由态摘抄）
+    const { progStorage } = await import("./ProgressiveStorage");
+    const missing = [...groups.values()].filter(g => !g.name).map(g => g.key);
+    const nameMap = new Map<string, string>();
+    for (const g of groups.values()) {
+        const cached = progStorage.booksInfos()[g.key]?.bookName;
+        if (cached) nameMap.set(g.key, cached);
+    }
+    const noName = missing.filter(k => !nameMap.has(k));
+    if (noName.length) {
+        const nameRows = await siyuan.sql(
+            `select id, content from blocks where type='d' and id in (${noName.map(k => `'${k}'`).join(",")}) limit 10000000`) as any[] ?? [];
+        for (const r of nameRows) nameMap.set(r.id, r.content ?? "");
+    }
+    const out = [...groups.values()].map(g => ({ ...g, name: nameMap.get(g.key) || g.key }));
+    out.sort((a, b) => Number(b.items[0]?.ctime || 0) - Number(a.items[0]?.ctime || 0));
+    return out;
 }

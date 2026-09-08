@@ -12,6 +12,7 @@ import { progStorage } from "./ProgressiveStorage";
 import { loadBookStatuses } from "./bookStatus";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
+import { fetchWritingPieces } from "./writeBook";
 
 /** 三徽章：✒ 摘抄 / ✱ 心得 / ✧ 到期问题 */
 export interface FleetBadges { digest: number; note: number; due: number; }
@@ -33,6 +34,8 @@ export interface FleetBook {
     finished: boolean;
     /** 期3 手动分片书：索引恒空，片=摘抄（✒ 即片数），点卡=开原书 */
     manual: boolean;
+    /** 期1 写作书：与 manualMode 分家（写作书进滚筒；徽标 ✍ 区分） */
+    writing: boolean;
     /** 舰队管理 □2：置顶书（置顶组最优先，组内保滚筒序） */
     pinned: boolean;
 }
@@ -150,9 +153,10 @@ export function buildHeat(days: { date: string; q: number; read: number }[], tod
 
 /** 书卡聚合：滚筒序输出，过滤忽略/归档/隐匿（□2 hidden 纯视觉：调度链不含 hidden）；
  *  order 外的书按 books.json 序兜底排尾。
- *  status 缺省全 ok（与管理页同 rank：⚠ lost 次之、⏸ closed 沉底）。 */
+ *  status 缺省全 ok（与管理页同 rank：⚠ lost 次之、⏸ closed 沉底）。
+ *  期2 写作书：point/total 语义=定稿片数/片数（doneLens 注入；进度=定稿占比） */
 export function buildFleetBooks(args: {
-    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean; pinned?: boolean; hidden?: boolean } };
+    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean; writing?: boolean; pinned?: boolean; hidden?: boolean } };
     order: string[];
     todayReads: { [bookID: string]: number };
     indexLens: { [bookID: string]: number };
@@ -160,6 +164,8 @@ export function buildFleetBooks(args: {
     digestCounts: Map<string, number>;
     thinkBadges: Map<string, { note: number; due: number }>;
     statuses?: { [bookID: string]: "ok" | "closed" | "lost" };
+    /** 写作书定稿片数（point 换源）；缺省按 0 计 */
+    doneLens?: { [bookID: string]: number };
 }): FleetBook[] {
     const merged = mergeMissingBooks({ order: args.order, lastServed: "" }, Object.keys(args.infos));
     const rank = (s: string) => (s === "ok" ? 0 : s === "lost" ? 1 : 2);
@@ -168,7 +174,7 @@ export function buildFleetBooks(args: {
         const info = args.infos[bookID];
         if (!info || info.ignored || info.archived || info.hidden) continue;
         const total = args.indexLens[bookID] ?? 0;
-        const point = info.point ?? 0;
+        const point = info.writing ? (args.doneLens?.[bookID] ?? 0) : (info.point ?? 0);
         const think = args.thinkBadges.get(bookID);
         books.push({
             bookID,
@@ -183,6 +189,7 @@ export function buildFleetBooks(args: {
                 due: think?.due ?? 0,
             },
             manual: !!info.manualMode,
+            writing: !!info.writing,
             pinned: !!info.pinned,
             finished: total > 0 && point >= total,
         });
@@ -248,7 +255,15 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
     for (const id of ids) names[id] = names[id] || infos[id]?.bookName || id;
 
     const indexLens: { [bookID: string]: number } = {};
+    const doneLens: { [bookID: string]: number } = {};
     for (const id of ids) {
+        // 期2 写作书：total=片数（运行时 MarkKey 拉取）、doneLens=定稿数（进度换源）
+        if (progStorage.booksInfos()[id]?.writing) {
+            const pieces = await fetchWritingPieces(id);
+            indexLens[id] = pieces.length;
+            doneLens[id] = pieces.filter(p => p.done).length;
+            continue;
+        }
         indexLens[id] = (await progStorage.loadBookIndexIfNeeded(id)).length;
     }
 
@@ -261,6 +276,7 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
         order: ro.order,
         todayReads,
         indexLens,
+        doneLens,
         names,
         statuses: statusesObj,
         digestCounts: digestCountsFrom(ctimeRows ?? []),

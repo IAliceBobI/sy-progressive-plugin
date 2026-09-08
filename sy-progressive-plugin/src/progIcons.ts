@@ -22,8 +22,23 @@ export const PROG_FLOAT_ICONS = `
 <!-- □19 生词 AI：A 形左移避让 + 右上四角星角标（CardAdd/AddBook 的角标家族） -->
 <symbol id="iconProgWordAI" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 19 9.5 6l6 13"/><path d="M6 14.5h7"/><path d="M18 2.4 19.3 3.7 20.6 5 19.3 6.3 18 7.6 16.7 6.3 15.4 5 16.7 3.7Z"/></symbol>
 <symbol id="iconProgWrite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
+<!-- writebook-next □2：新建写作书=iconProgWrite 铅笔+左上加号角标（CardAdd/AddBook 的
+     「基础物+加号=新建该物」角标家族；笔尖占右上故角标落左上空白象限） -->
+<symbol id="iconProgWriteAdd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="M5 2.8v4.4"/><path d="M2.8 5h4.4"/></symbol>
+<!-- writebook-next □2 vision P1-1：刷新=标准双弧循环箭头（lucide refresh-cw 线稿化），
+     替换舰队 footer/管理栏 ♻ emoji（交互控件线稿化收尾） -->
+<symbol id="iconProgRefresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></symbol>
+<!-- writebook-next □4 vision P1-1：子排落点变体专属图（裸 iconProgBook 撞主排 origin「回原书」、
+     iconProgContents 撞低频区 contents「打开目录」——同屏一图两义）。toBook=翻开书左页加两行
+     文本（书里进内容）；toHub=folder 线稿（夹/收纳语义，家族此前空白区） -->
+<symbol id="iconProgDigestToBook" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h6a2 2 0 0 1 2 2v13"/><path d="M22 4h-6a2 2 0 0 0-2 2v13"/><path d="M2 4v15a2 2 0 0 0 2 2h16"/><path d="M5 10h3"/><path d="M5 14h3"/></symbol>
+<symbol id="iconProgDigestToHub" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
 <symbol id="iconProgMulti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h.01"/><path d="M8 6h13"/><path d="M3 12h.01"/><path d="M8 12h13"/><path d="M3 18h.01"/><path d="M8 18h13"/></symbol>
 <symbol id="iconProgAI" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.7 5.7 1.9-5.7 1.9L12 18.4l-1.9-5.7-5.7-1.9 5.7-1.9Z"/><path d="M19 15v4"/><path d="M17 17h4"/></symbol>
+<symbol id="iconProgMaterial" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+<!-- 期4 拆为新片：源片两行内容 + 右向流出箭头（内容流向新片；与 TraceUp 的回看钩箭头同族异向；
+     箭头杆起点 15 与源片右缘 14 留 1 单位呼吸位（vision P2-1） -->
+<symbol id="iconProgSplit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="11" height="14" rx="2"/><path d="M6 10h5"/><path d="M6 14h5"/><path d="M15 10h5"/><path d="m18 7 3 3-3 3"/></symbol>
 <symbol id="iconProgFleet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 4 6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 5-7 6-11Z"/><path d="M12 12c.6 1.5 2.2 2.6 2.2 4.3a2.2 2.2 0 0 1-4.4 0c0-1.7 1.6-2.8 2.2-4.3Z"/></symbol>
 <symbol id="iconProgFFast" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 5 7 7-7 7"/><path d="m13 5 7 7-7 7"/></symbol>
 <symbol id="iconProgDelBack" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7H3"/><path d="m7 2-5 5 5 5"/><circle cx="17" cy="17" r="5.5"/><path d="m14.8 14.8 4.4 4.4"/><path d="m19.2 14.8-4.4 4.4"/></symbol>

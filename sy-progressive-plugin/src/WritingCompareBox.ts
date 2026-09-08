@@ -1,6 +1,10 @@
 import { IProtyle, Plugin } from "siyuan";
 import { add_href, attrNewLine, cloneCleanDiv, getAttribute, ial2str, isValidNumber, parseIAL, removeAttribute, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
-import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece } from "./helper";
+import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getDocIalPieces, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece } from "./helper";
+import { fetchWritingPieces } from "./writeBook";
+import { progStorage } from "./ProgressiveStorage";
+import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
+import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { MarkKey, PROG_ORIGIN_TEXT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
@@ -105,6 +109,29 @@ class WritingCompareBox {
                 if (WC恢复笔记颜色.cmd()) await this.noColor(protyle, false);
             },
         });
+        // 期5 汇编成稿（写作书语义入口，Pro；无默认键留自绑——winHotkey m 空 throw
+        // 故直传 langKey，resume doc cards 同款）：当前片属 writing 书才汇编；书骨架
+        // 文档上 mark 解析得 bookID=""（book#TEMP 无逗号尾段），补 isRegisteredBook
+        // 第二刀认回（书文档恰是命令最自然的触发位，静默 no-op 违直觉）
+        this.plugin.addCommand({
+            langKey: "compile writing book",
+            langText: tomatoI18n.汇编成稿,
+            editorCallback: (protyle) => {
+                void getBookIDByBlock(protyle.block?.rootID ?? "").then(async ({ bookID }) => {
+                    const rootID = protyle.block?.rootID ?? "";
+                    if (!bookID && rootID && progStorage.isRegisteredBook(rootID)
+                        && progStorage.peekBookInfo(rootID)?.writing) {
+                        bookID = rootID;
+                    }
+                    if (!bookID) return;
+                    if (!progStorage.peekBookInfo(bookID)?.writing) return;
+                    const box = bookID === rootID
+                        ? (progStorage.peekBookInfo(bookID)?.boxID ?? protyle.notebookId)
+                        : protyle.notebookId;
+                    void this.compileWritingBook(bookID, box);
+                });
+            },
+        });
     }
 
     // v5 □7：提取/整理族入口收进浮条 [+] 高级功能 + 命令面板（右键菜单退役），方法转 public 供浮条调用
@@ -182,9 +209,9 @@ class WritingCompareBox {
         OpenSyFile2(this.plugin, keysDocID, windowOpenStyle.get() as any);
     }
 
-    async extractAsBook(boxID: string, pieceID: string, notebookId: string, markKey: string) {
+    async extractAsBook(boxID: string, pieceID: string, notebookId: string, markKey: string, titleMsg = tomatoI18n.合并所有分片到新文件) {
         if (!pieceID || !notebookId || !markKey) return;
-        siyuan.pushMsg(tomatoI18n.合并所有分片到新文件)
+        siyuan.pushMsg(titleMsg)
 
         const { pieceIDs, bookID } = await getAllPieces(markKey);
         const blocks = await getAllBlocks(pieceIDs, false, true, false);
@@ -204,6 +231,32 @@ class WritingCompareBox {
         await siyuan.clearAll(newBookID);
         await siyuan.insertBlocksAsChildOf([div.outerHTML], newBookID);
         OpenSyFile2(this.plugin, newBookID, windowOpenStyle.get() as any);
+    }
+
+    /** 期5 汇编成稿（Pro，写作书语义入口）：复用 extractAsBook 内核通道（片序数字序
+     *  合并到 merged-书名 落点、幂等重生成、素材 custom-prog-material 血缘随块带入）。
+     *  门禁=运行时 verifyKeyProgressive（入口不隐藏；无 Pro toast+购买引导）。
+     *  markKey 取首片（getAllPieces 只解析 bookID 前缀，与片无关）；书级签名供
+     *  浮条（bookID+box）与管理页（无编辑器）共用。
+     *  navigator.locks ifAvailable 防双击交错（取数段秒级+无钮禁用，A.clear→B.clear→
+     *  A.insert→B.insert 会双份；拿不到锁静默 return=已有一次在跑，StartToLearnLock 同款） */
+    async compileWritingBook(bookID: string, boxID: string) {
+        if (!bookID || !boxID) return;
+        if (!(await verifyKeyProgressive())) {
+            await siyuan.pushMsg(tomatoI18n.Pro功能尾注, 2500);
+            openBuyDialog("progressive", tomatoI18n.购买页, false);
+            return;
+        }
+        return navigator.locks.request("prog-compile-writing", { ifAvailable: true }, async (lock) => {
+            if (!lock) return;
+            const pieces = await fetchWritingPieces(bookID);
+            if (pieces.length === 0) {
+                await siyuan.pushMsg(tomatoI18n.该书还没有分片, 2500);
+                return;
+            }
+            const markKey = getDocIalPieces(bookID, pieces[0].point);
+            await this.extractAsBook(boxID, pieces[0].docID, boxID, markKey, tomatoI18n.汇编成稿);
+        });
     }
 
     async extractNotes(pieceID: string, notebookId: string, markKey: string) {
@@ -292,7 +345,11 @@ async function getAllPieces(markKey: string) {
         .then(rows => {
             rows = rows
                 .map(r => r.attrs = parseIAL(r.ial))
-                .sort((a, b) => a["custom-progmark"].localeCompare(b["custom-progmark"]));
+                // 片序=MarkKey 尾段 point 数字序。期4 修复：原 localeCompare 字典序在
+                // point≥10 时乱序（"10"<"2"）——写作书槽位几十量级必踩，阅读书 10+ 片同中招。
+                // 乱值尾段 NaN 按 0 兜底（旧码 undefined 比较直接 TypeError 崩，新码更稳）
+                .sort((a, b) => (Number(String(a["custom-progmark"]).split(",").pop()) || 0)
+                    - (Number(String(b["custom-progmark"]).split(",").pop()) || 0));
             return rows.map(r => r.id);
         });
     return { pieceIDs, pmPreffix, pieceIdx, bookID }

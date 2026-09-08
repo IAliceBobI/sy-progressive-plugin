@@ -13,6 +13,8 @@ import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue, digestM
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests, markDigestTag, clearDigestMarks } from "./digestMarker";
+import { markMaterials } from "./materialMarker";
+import { findDocByIal, getDocIalDigestDirUnder, getDocIalDigestDirHub } from "./progData";
 
 const Prog_BUTTON = "custom-prog-button";
 const Prog_BUTTON_NoteID = "custom-prog-button-noteID";
@@ -39,8 +41,9 @@ export function progFloatStores() {
     return { show, expanded, kind, title, point, noteID, bookID, zIndexPlus, dueText, digOpen };
 }
 
-// DigestProgressiveBox ⌥z 改道需要读出场态（show+kind=当前文档在三态内）
-export { show, kind };
+// DigestProgressiveBox ⌥z 改道需要读出场态（show+kind=当前文档在三态内；□10 toggle 化
+// 还要 digOpen/expanded 判「激活态」与收缩通道）
+export { show, kind, digOpen, expanded };
 
 /** 展开浮条（球点击 / 命令通道）；显式意志落盘（2026-09-02 起跨会话记忆）。子排不
  *  联动——□2 起开合持久记忆只归 ✂ 与显式命令管，点球展开浮条尊重用户上次的子排状态 */
@@ -76,12 +79,21 @@ let freeSession = false;
 // 只增不清，插件 reload 自然清零；安全性论证见识别段注释。
 const verifiedNormalDoc = new Set<string>();
 
-/** 自由态上岗（状态栏 ✂ 钮 / ⌥Z 在普通文档的改道出口）。三态文档在场=聚焦浮条+
- *  展开子排；普通文档=自由态上岗并立刻出场（withSubrank=⌥Z 通道顺手展开摘抄子排）。
+/** 状态栏 ✂ 钮通道（writebook-next □3 二击语义重分配）：浮条在场=生命周期 toggle
+ *  （free 态二击=下班消失——free 恒展开无球态且 collapse 会错误落盘展开偏好，须走
+ *  freeFloatOff；三态展开=收缩成球；球态=展开，子排开合尊重 digSubrankOpen 持久
+ *  记忆）；不在场=自由态上岗/出场。摘抄子排的显式入口归浮条 ✂ 钮（digOpen.toggle）
+ *  与 ⌥Z「渐进阅读摘抄模式」（DigestProgressiveBox.enterDigestMode 独立出口）。
  *  编辑器解析不出时只置上岗位，下次出场事件（点击编辑器/切页签）自然带出浮条。 */
 export async function toggleFreeFloat(withSubrank = false) {
     if (show.get() && kind.get()) {
-        openDigestSubrank();
+        if (kind.get() === "free") {
+            freeFloatOff();
+        } else if (expanded.get()) {
+            collapseFloatBar();
+        } else {
+            expandFloatBar();
+        }
         return;
     }
     freeSession = true;
@@ -133,11 +145,17 @@ async function refreshDue(dirKey: string) {
     if (dirKey === lastDueKey) return;
     lastDueKey = dirKey;
     try {
-        const dirID = await progStorage.ensureDigestDir(dirKey, digestLanding.get() === "source");
-        if (!dirID || lastDueKey !== dirKey) return;
-        const ret = await siyuan.getTreeRiffDueCards(dirID);
+        const dueOf = async (id: string) => (await siyuan.getTreeRiffDueCards(id))?.unreviewedCount ?? 0;
+        const source = digestLanding.get() === "source";
+        const dirID = await progStorage.ensureDigestDir(dirKey, source);
         if (lastDueKey !== dirKey) return;
-        dueText.set(formatDueCount(ret?.unreviewedCount ?? 0));
+        let due = dirID ? await dueOf(dirID) : 0;
+        // □4 双夹并查：override 摘抄的卡挂在方向夹子树（under/hub），主力档的另一方向
+        // 夹找得到才查（不 ensure 不新建）；主力夹恰在另一方向时它已计入，无重复
+        const other = await findDocByIal(source ? getDocIalDigestDirHub(dirKey) : getDocIalDigestDirUnder(dirKey));
+        if (other && other !== dirID) due += await dueOf(other);
+        if (lastDueKey !== dirKey) return;
+        dueText.set(formatDueCount(due));
     } catch (e) {
         console.error("prog float due refresh failed", e);
     }
@@ -258,6 +276,11 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // 卡片只清不打：剥掉修复前版本满挂的残留 span（纯 DOM 零落盘，但插件热升级
         // reload 不重建已开文档 DOM，须出场主动清；零 SQL）
         clearDigestMarks(protyle);
+    }
+    // 期5 素材徽标：写作书片态打（素材块 custom-prog-material 命中；幂等清旧重挂，
+    // 与 markDigests 同随出场事件反复调用——protyle 懒加载窗口丢标补挂）
+    if (nextKind === "piece" && nextBookID && progStorage.peekBookInfo(nextBookID)?.writing) {
+        markMaterials(protyle);
     }
     // 摘抄文档身份徽章（progpolish □4）：title 区注入「✒ 摘抄」胶囊（零落盘），
     // 同出场链反复调用，markDigestTag 幂等清旧重挂；title 重渲染丢注入由下次事件补挂

@@ -51,6 +51,9 @@
     let paid = $state(false);
     // □18 知情警告文案（onMount 检测填充；空串=全新文档不渲染）
     let warnText = $state("");
+    // slotmerge □1 写作书硬拦：表单照常显示（警示须可见，骨架屏开关 disabled 复用不得）
+    // 但提交钮锁死——与 □18 知情警告（可继续）分层的禁止态
+    let writingBlocked = $state(false);
 
     // ===== □4 统计步骤增强：chips + 字数滑块 + 即时预览（方案=docs/prog-addbook-split-preview.md） =====
     // 切窗离散档：0=「不限」（splitWordNum 0，现有语义保留）。默认 500（2026-08-30 用户
@@ -104,7 +107,13 @@
         // 按本次设置重分片；已是某书的分片 → 加书=脱离母书独立成书。管理页「重新分片」
         // 走同一弹窗，同样获警告。仅提示不拦截（重加书是合法路径，知情即可）
         try {
-            if (progStorage.isRegisteredBook(bookID)) {
+            // slotmerge □1 写作书硬拦置链首（写作书必然已注册，放 isRegisteredBook 之后
+            // 永远走不到）：确认加阅读会按阅读语义重分片摧毁槽结构，属禁止而非知情——
+            // 警示条置顶 + 提交钮禁用。管理页「重新分片」走同一弹窗，同守卫自动覆盖
+            if (progStorage.peekBookInfo(bookID)?.writing) {
+                warnText = tomatoI18n.加书硬拦写作书;
+                writingBlocked = true;
+            } else if (progStorage.isRegisteredBook(bookID)) {
                 warnText = tomatoI18n.加书警告已注册;
             } else {
                 const attrs = await siyuan.getBlockAttrs(bookID);
@@ -204,6 +213,8 @@
     }
 
     async function process() {
+        // slotmerge □1 硬拦兜底：提交钮 disabled 外的第二道防线（状态异常时误触不落盘）
+        if (writingBlocked) return;
         // 空文档兜底拦截：空索引书（books.json 有键、索引文件空）不在 heal 自愈范围
         if (contentBlocks.length === 0) {
             siyuan.pushMsg(tomatoI18n.加书失败请重试);
@@ -335,9 +346,10 @@
             </div>
         </div>
     {:else}
-        <!-- □18 身份知情警告：已注册书/已是分片时置顶提示（不拦截，重加书是合法路径） -->
+        <!-- □18 身份知情警告：已注册书/已是分片时置顶提示（不拦截，重加书是合法路径）；
+             slotmerge □1 写作书硬拦态换 error 红（禁止 ≠ 知情） -->
         {#if warnText}
-            <div class="prog-addbook-warn" role="alert">{warnText}</div>
+            <div class="prog-addbook-warn" class:prog-addbook-blocked={writingBlocked} role="alert">{warnText}</div>
         {/if}
         <!-- 卡1 文档统计 -->
         <section class="prog-card">
@@ -566,9 +578,9 @@
             </div>
         </section>
 
-        <!-- 底部操作栏：主操作实心 primary，sticky 恒在 -->
+        <!-- 底部操作栏：主操作实心 primary，sticky 恒在。slotmerge □1：写作书硬拦锁提交 -->
         <div class="prog-footer">
-            <button class="b3-button prog-primary-btn" onclick={process}
+            <button class="b3-button prog-primary-btn" disabled={writingBlocked} onclick={process}
                 >{tomatoI18n.添加文档到渐进阅读}</button
             >
             <button
@@ -603,6 +615,12 @@
         background-color: color-mix(in srgb, var(--b3-theme-warning, #d25f00) 12%, transparent);
         color: var(--b3-theme-on-surface);
         box-shadow: inset 2px 0 0 var(--b3-theme-warning, #d25f00);
+    }
+    /* slotmerge □1 硬拦态：error 家族与 ⚠ 知情警告分层（禁止强于知情）；
+       --b3-theme-error 同属文档不全变量，带 hex fallback 降级无害 */
+    .prog-addbook-warn.prog-addbook-blocked {
+        background-color: color-mix(in srgb, var(--b3-theme-error, #d23f31) 12%, transparent);
+        box-shadow: inset 2px 0 0 var(--b3-theme-error, #d23f31);
     }
 
     /* ---- 卡片壳（conf-group 配方） ---- */
