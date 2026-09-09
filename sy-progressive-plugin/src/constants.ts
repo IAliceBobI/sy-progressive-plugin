@@ -15,7 +15,12 @@ export const TryAddStarsLock = "TryAddStarsLock";
 export const ProgressiveAddBtnListenersLock = "ProgressiveAddBtnListenersLock";
 export const AddProgressiveReadingLock = "AddProgressiveReadingLock";
 export const StartToLearnLock = "StartToLearnLock";
+export const HtmlBlockReadNextPeiceLock = "htmlBlockReadNextPeiceLock";
 export const IndexTime2Wait = 400;
+// □1 锁治理：持锁操作租约上限（ms）。锁内链路 hang 时 promise 永不落定=锁永久占用
+// （插件 reload 不放、仅整页刷新可救）；race 到点即放锁。180s > 合法最慢链（重试循环
+// 30×(500ms+SQL)≈2min + 巨片构建），详见 lockLease.ts 头注。
+export const LockLeaseMs = 180_000;
 
 export enum HtmlCBType {
     previous = 0,

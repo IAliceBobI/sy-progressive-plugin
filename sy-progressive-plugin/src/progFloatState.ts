@@ -186,6 +186,11 @@ export function buildFloatButtons(
         const map = new Map(PIECE_ALL_MAIN.map(b => [b.id, b]));
         return opts.mainIds.map(id => map.get(id)).filter(b => b != null);
     }
+    if (kind === "free" && opts.mainIds) {
+        // 自由态同机制（650189 拖动排序反馈）：独立清单独立池，与片态互不投影
+        const map = new Map(FREE_ALL_MAIN.map(b => [b.id, b]));
+        return opts.mainIds.map(id => map.get(id)).filter(b => b != null);
+    }
     return [...common, ...scene];
 }
 
@@ -264,6 +269,24 @@ const PIECE_ALL_MAIN: FloatButtonSpec[] = [
 export const PIECE_ALL_MAIN_IDS = new Set(PIECE_ALL_MAIN.map(b => b.id));
 
 /**
+ * 自由态首行全量池（650189 拖动排序反馈，2026-09-09）：6 项 = SCENE.free 两键 + 平铺区
+ * 低频四项。icon 与片态全量池同源同值（digest=✂/addBook=📥/contents/map/traceUp/ignore），
+ * kind 档按 free 语义：✂ 是本态唯一 primary（子排开合锚点），ignore=ghost（弱化语义）。
+ * 片态专属动作（next/prev/origin 等）不入池——free 无片可推进。
+ */
+const FREE_ALL_MAIN: FloatButtonSpec[] = [
+    { id: "digest", icon: "iconProgScissors", kind: "primary", group: "scene" },
+    { id: "addBook", icon: "iconProgAddBook", kind: "normal", group: "scene" },
+    { id: "contents", icon: "iconProgContents", kind: "normal", group: "scene" },
+    { id: "traceUp", icon: "iconProgTraceUp", kind: "normal", group: "scene" },
+    { id: "map", icon: "iconProgMap", kind: "normal", group: "scene" },
+    { id: "ignore", icon: "iconProgIgnore", kind: "ghost", group: "scene" },
+];
+
+/** 自由态全量池 id 集（mainIds 载入/落盘过滤面，同 PIECE_ALL_MAIN_IDS 语义） */
+export const FREE_ALL_MAIN_IDS = new Set(FREE_ALL_MAIN.map(b => b.id));
+
+/**
  * □10 平铺区低频段动作清单（id 对接旧 HtmlCBType 通道 + □11 浮层族）：
  * 片=未勾池钮 + 目录/重插/清理原文/删片退/忽略本书/路线指引；
  * 书=目录/原文侧追溯/忽略本书/路线指引；摘抄=路线指引；自由态=目录/关联摘抄/路线指引
@@ -290,7 +313,13 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[] }
     if (kind === "digest") return ["map"];
     // free（群反馈 650189）：书态基础入口——contents/traceUp 复用书态浮层（free 摘抄
     // ctime 自指 docID，清单浮层按 noteID 即查）；期2 ignore=不再推送（该源文档全部
-    // 复访批量移除，与书忽略正交；free 不参与片推送调度，ignoreBook 语义不适用）
+    // 复访批量移除，与书忽略正交；free 不参与片推送调度，ignoreBook 语义不适用）。
+    // 拖拽排序起 mainIds 生效：池内未进首行的一律落平铺区（digest/addBook 被拖出首行
+    // 也兜底回平铺区，任何按钮不彻底消失——与片态 □14c 同口径）
+    if (opts?.mainIds) {
+        const inMain = new Set(opts.mainIds);
+        return FREE_ALL_MAIN.map(b => b.id).filter(id => !inMain.has(id));
+    }
     return ["contents", "traceUp", "map", "ignore"];
 }
 

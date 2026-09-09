@@ -114,7 +114,7 @@ import { childBlocksToWordCount } from "./childBlocks";
 // 数据源 = getChildBlocks 单发（巨书秒级：45k 块书实测 0.55s；旧 getDocBlocks 通道同书
 // 26~39s + 24MB 主线程 innerHTML 解析）。textLen = sum(count)，口径 ≈ 旧
 // div.textContent.length（剥零宽后 99.5% 逐位一致，2026-08-30 实测拍板）。
-export async function buildContentBlocks(bookID: string): Promise<{ blocks: WordCountType[], textLen: number }> {
+export async function buildContentBlocks(bookID: string): Promise<{ blocks: WordCountType[], textLen: number, rawCount: number }> {
     return childBlocksToWordCount(await siyuan.getChildBlocks(bookID));
 }
 

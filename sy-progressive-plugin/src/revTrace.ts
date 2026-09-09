@@ -9,7 +9,8 @@
 // （摘抄打标/复访键等插件 attr 流零误染）；新块 updated=创建时刻（新块计当日增量自动成立）。
 import { siyuan, timeUtil, getActiveProtyle } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
-import { revTraceEnabled } from "../../sy-tomato-plugin/src/libs/stores";
+import { revTraceScope } from "../../sy-tomato-plugin/src/libs/stores";
+import { BOOK_WRITING, MarkKey, PDIGEST_CTIME, PDIGEST_INDEX, PDIGEST_LAST_ID, PDIGEST_PARENT_ID } from "../../sy-tomato-plugin/src/libs/gconst";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { showFloatTip, hideFloatTip } from "./floatTip";
 import { progStorage } from "./ProgressiveStorage";
@@ -57,6 +58,61 @@ export function shouldColor(updated: string, enrolledAt: string, now: Date): boo
     return tierOf(updated, now) != null && updated > enrolledAt;
 }
 
+// ============ revtrace-scope：渐进文档判定（"prog" 档门控）============
+
+/** 摘抄产物锚键（custom-pdigest-* 家族现役四键，gconst 单一事实源） */
+const PDIGEST_IAL_KEYS = [PDIGEST_CTIME, PDIGEST_LAST_ID, PDIGEST_INDEX, PDIGEST_PARENT_ID];
+
+/**
+ * 「是渐进文档」纯信号判定（挂单测）：命中 progStorage 注册书，或文档 IAL 带渐进锚键
+ * 任一——custom-progmark（书/片/prog-data 锚文档统一挂载键，getDocIal* 家族的值全落此键）
+ * / custom-book-writing（写作书）/ custom-pdigest-*（摘抄产物）。ial 空对象/兜底查询失败
+ * 时仅靠注册书信号（fail-safe 偏保守=跳过不染，漏染由 30s 缓存过期后下次出场修正）。
+ */
+export function isProgDocBySignals(ial: Record<string, string> | null | undefined, isRegistered: boolean): boolean {
+    if (isRegistered) return true;
+    if (!ial) return false;
+    if (ial[MarkKey] || ial[BOOK_WRITING]) return true;
+    return PDIGEST_IAL_KEYS.some((k) => !!ial[k]);
+}
+
+// 30s 短缓存（digestState 同量级）：判定输入=注册书（内存）+文档 IAL（重查询走 HTTP），
+// 出场链五事件高频触发须兜住；加书/删书等导致注册集变化由 TTL 自然过期吸收
+const PROG_DOC_TTL_MS = 30_000;
+const progDocCache = new Map<string, { ok: boolean; ts: number }>();
+
+/** 单测隔离用：清 isProgDoc 缓存 */
+export function resetProgDocCacheForTest() {
+    progDocCache.clear();
+}
+
+/**
+ * 运行时判定（"prog" 档出场门控消费）：IAL 优先读 protyle.background?.ial（内存零请求，
+ * isDailyNoteIal 同款先例），缺则 getBlockAttrs 一次兜底；结果 30s 缓存。
+ * 注册书命中走内存快判不进缓存（isRegisteredBook 零开销，缓存反而陈旧化加书场景）。
+ */
+export async function isProgDoc(protyle: any, docID: string): Promise<boolean> {
+    if (!docID) return false;
+    if (progStorage.isRegisteredBook(docID)) return true;
+    const hit = progDocCache.get(docID);
+    if (hit && Date.now() - hit.ts < PROG_DOC_TTL_MS) return hit.ok;
+    let ial = protyle?.background?.ial as Record<string, string> | null | undefined;
+    if (!ial || Object.keys(ial).length === 0) {
+        ial = await siyuan.getBlockAttrs(docID).catch(() => null);
+    }
+    const ok = isProgDocBySignals(ial, false);
+    progDocCache.set(docID, { ok, ts: Date.now() });
+    return ok;
+}
+
+/** 同步读判定缓存（MutationObserver 回调用）：不看 TTL（peekUpdatedMap 只读哲学——
+ *  条不丢，注册集/IAL 变化由出场全量修正）；注册书内存快判同款先行，缓存 miss=false
+ *  保守跳过本轮补挂 */
+function isProgDocSync(docID: string): boolean {
+    if (progStorage.isRegisteredBook(docID)) return true;
+    return progDocCache.get(docID)?.ok ?? false;
+}
+
 // ============ □2 数据层：updated 快照（TTL 缓存）============
 
 // 10s TTL（digestMarker 60s 模式缩窗——着色要跟手，编辑后数秒内重出场即见新色；
@@ -93,16 +149,27 @@ function peekUpdatedMap(docID: string): Map<string, string> | null {
 
 const MARK_CLASS = "prog-revtrace-mark";
 
-// □4 开关接线：revTraceEnabled store（默认关；设置面板/命令 toggle 同源），出场门控实时读
-// ——设置面板 bind:checked 与命令 .set() 都走订阅 applyRevTraceEnabled 实时清/挂（index.ts）
+// □4 开关接线（revtrace-scope 三档化）：revTraceScope store（默认 off；设置面板三档 select
+// 与命令 toggle 同源），出场门控实时读——设置面板 bind:value 与命令 .set() 都走订阅
+// applyRevTraceEnabled 实时清/挂（index.ts）
 
-/** 开关翻转后的实时生效（index.ts 订阅调）：关=全编辑器清残留（纯 DOM 零落盘）；开=当前
- *  激活编辑器立即补染（其余编辑器随下次出场事件自然染——digest 族同款事件模型） */
-export function applyRevTraceEnabled(on: boolean) {
-    if (!on) {
-        document.querySelectorAll(`.${MARK_CLASS}`).forEach(m => m.remove());
-        return;
-    }
+/** 命令 toggle 的「上次范围档」记忆：任何非 off 档落地即记录（index.ts 订阅写入）；
+ *  从未有非 off 值（新装/老开关本就关未迁移）时空串，toggle 开时回退 "prog" */
+let lastScope = "";
+export function rememberRevTraceScope(scope: string) {
+    if (scope !== "off") lastScope = scope;
+}
+export function lastRevTraceScope(): string {
+    return lastScope || "prog";
+}
+
+/** 档位翻转后的实时生效（index.ts 订阅调）：切档全局清旧档残留（如 all→prog 须撤掉
+ *  非渐进文档的条——纯 DOM 零落盘，reload 即消）；非 off 档=当前激活编辑器按新档立即
+ *  补染（其余编辑器随下次出场事件自然染——digest 族同款事件模型；"prog" 档下激活页
+ *  非渐进文档时 revTraceOnAppear 自会清跳过） */
+export function applyRevTraceEnabled(scope: string) {
+    document.querySelectorAll(`.${MARK_CLASS}`).forEach((m) => m.remove());
+    if (scope === "off") return;
     const p = getActiveProtyle();
     if (p) revTraceOnAppear(p, p?.block?.rootID ?? "").catch(() => { });
 }
@@ -139,7 +206,14 @@ function editingBlockID(welement: HTMLElement): string {
 export async function revTraceOnAppear(protyle: any, docID: string) {
     const welement: HTMLElement = protyle?.wysiwyg?.element;
     if (!welement) return;
-    if (!revTraceEnabled.get() || !docID) {
+    const scope = revTraceScope.get();
+    if (scope === "off" || !docID) {
+        clearRevTrace(welement);
+        return;
+    }
+    // "prog" 档门控：非渐进文档直接跳过（不发 SQL、不扫 DOM、不 enroll 基线）；
+    // 清残留兜住切档（all→prog）后非渐进文档内存中的旧条
+    if (scope === "prog" && !(await isProgDoc(protyle, docID))) {
         clearRevTrace(welement);
         return;
     }
@@ -235,7 +309,11 @@ function ensureReplantObserver(welement: HTMLElement, docID: string, base: strin
     if (replantObservers.has(welement)) return;
     const mo = new MutationObserver((muts) => {
         const st = replantStates.get(welement);
-        if (!st || !revTraceEnabled.get()) return;
+        const scope = revTraceScope.get();
+        // 三档门控（revtrace-scope）：off 不补挂；"prog" 档须文档仍是渐进的（切档
+        // all→prog 后残留 observer 的宿主可能已不在范围内）——同步读判定缓存
+        if (!st || scope === "off") return;
+        if (scope === "prog" && !isProgDocSync(st.docID)) return;
         const divs = new Set<HTMLElement>();
         for (const m of muts) {
             for (const n of m.addedNodes) {

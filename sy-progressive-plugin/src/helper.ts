@@ -256,7 +256,9 @@ export async function createPiece(bookInfo: BookInfo, index: string[][], point: 
 }
 
 export async function fullfilContent(point: number, bookID: string, piecePre: string[], piece: string[], noteID: string, stype: AsList | "no" | null) {
-    progStorage.updateBookInfoTime(bookID);
+    // review P2-2：补 await——重试路径的时间写只剩这里与 startToLearn 成功点两处，
+    // 落盘时序可断言（fire-and-forget 会在 e2e 对账时漂移）
+    await progStorage.updateBookInfoTime(bookID);
     const info = await progStorage.booksInfo(bookID);
 
     const allContent = [];

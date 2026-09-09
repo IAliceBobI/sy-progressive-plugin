@@ -7,7 +7,7 @@
         digestLanding,
         digestNoBacktraceLink,
         markOriginTextBG,
-        revTraceEnabled,
+        revTraceScope,
         digestAddReadingpoint,
         digestGlobalSigle,
     } from "../../sy-tomato-plugin/src/libs/stores";
@@ -64,11 +64,17 @@
     </div>
 
     <div>
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$revTraceEnabled}
-        />
+        <!-- revtrace-scope 生效范围三档（旧 revTraceEnabled 布尔开关退役为迁移读源）：
+             off=关/prog=仅渐进文档（isProgDoc 判定）/all=全部文档（原行为）；迁移见 index.ts
+             loadStore。vision 对齐：与上方两 select 统一 min-width，右侧标签起始对齐 -->
+        <select class="b3-select" style="min-width: 160px" bind:value={$revTraceScope}>
+            <option value="off">{tomatoI18n.修订范围关}</option>
+            <option value="prog">{tomatoI18n.修订范围仅渐进}</option>
+            <option value="all">{tomatoI18n.修订范围全部}</option>
+            {#if !["off", "prog", "all"].includes($revTraceScope)}
+                <option value={$revTraceScope}>{$revTraceScope} {tomatoI18n.已失效请重新选择}</option>
+            {/if}
+        </select>
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置修订痕迹}>{tomatoI18n.修订痕迹色条}</span>
     </div>
 

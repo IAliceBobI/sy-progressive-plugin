@@ -14,6 +14,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { into } from "stonev5-utils";
+import { lockWithLease } from "./lockLease";
 
 type BlockContent = {
     ial?: AttrType, id?: string, markdown?: string, content?: string,
@@ -247,8 +248,7 @@ class WritingCompareBox {
             openBuyDialog("progressive", tomatoI18n.购买页, false);
             return;
         }
-        return navigator.locks.request("prog-compile-writing", { ifAvailable: true }, async (lock) => {
-            if (!lock) return;
+        return lockWithLease("prog-compile-writing", async () => {
             const pieces = await fetchWritingPieces(bookID);
             if (pieces.length === 0) {
                 await siyuan.pushMsg(tomatoI18n.该书还没有分片, 2500);

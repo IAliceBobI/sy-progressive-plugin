@@ -13,6 +13,9 @@ import { getAllContentEditableText } from "../../sy-tomato-plugin/src/libs/domUt
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { hasInlineStyles, isSplittableInPlace, splitInPlaceSentences } from "./splitInPlaceCore";
+import { progStorage } from "./ProgressiveStorage";
+import { invalidateRevTrace } from "./revTrace";
+import { lockWithLease } from "./lockLease";
 
 interface SplitPlan { id: string; sentences: string[] }
 
@@ -22,8 +25,7 @@ export async function splitInPlaceRun(protyle: IProtyle) {
         await siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
         return;
     }
-    return navigator.locks.request("prog.splitInPlace", { ifAvailable: true }, async (lock) => {
-        if (!lock) return;
+    return lockWithLease("prog.splitInPlace", async () => {
         const s = await events.selectedDivs(protyle);
         if (!s || s.ids.length === 0) {
             await siyuan.pushMsg(tomatoI18n.请先选择要断句的块);
@@ -51,6 +53,14 @@ export async function splitInPlaceRun(protyle: IProtyle) {
                 await siyuan.insertBlockAfter(p.sentences.join("\n\n"), p.id, "markdown");
                 await siyuan.deleteBlock(p.id);
                 made += p.sentences.length;
+            }
+            // revtrace「拆装不算修订」：断句=插新句块+删原块，句子块 updated=断句时刻
+            // 会整批误报「刚改」——推基线到操作后（句子块≤基线全无色）+作废 updated
+            // 快照缓存。未纳入文档 bump 自动 no-op（首次 enroll 必晚于此刻，本就无色）
+            const docID = protyle?.block?.rootID ?? "";
+            if (docID) {
+                await progStorage.bumpRevTraceBaseline(docID);
+                invalidateRevTrace(docID);
             }
             await siyuan.pushMsg(tomatoI18n.断句完成N块M句(plans.length, made), 2500);
         };

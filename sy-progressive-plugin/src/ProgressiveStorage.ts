@@ -1,5 +1,6 @@
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import * as constants from "./constants";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { Plugin } from "siyuan";
 import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -489,6 +490,24 @@ export class ProgressiveStorage {
         return m[docID];
     }
 
+    /** 重置基线为当下（revtrace「拆装不算修订」修复，bear 2026-09-09 拍板）：重插/就地
+     *  断句等「删旧插新」操作会把块整体换成新块——内核插块事务 updated=创建时刻，色条
+     *  整片误报「全部刚改」。操作完成后调此=把基线推到操作时刻，新块 updated≤基线全无色，
+     *  之后的真改动从零重新染色；代价=同窗口内的真手改一并无色（测试期数据可接受）。
+     *  区别于 enrollRevTrace 首次幂等语义，此处对已纳入文档无条件覆盖；未纳入文档不动
+     *  （其首次 enroll 必晚于操作时刻，新块本就无色，预写反而留无谓条目）。
+     *  门闩窗口内返回空串（调用方无需重试——下轮出场 enroll 会补上较晚基线，同向安全） */
+    async bumpRevTraceBaseline(docID: string): Promise<string> {
+        if (!this.revTraceEnrolledAt(docID)) return "";
+        if (!this.storageReady) return "";
+        const raw = this.plugin.data[constants.STORAGE_REVTRACE];
+        const m = (raw && typeof raw === "object" ? raw : {}) as Record<string, string>;
+        m[docID] = utils.timeUtil.kernelTimeNow();
+        this.plugin.data[constants.STORAGE_REVTRACE] = m;
+        await this.plugin.saveData(constants.STORAGE_REVTRACE, m);
+        return m[docID];
+    }
+
     /** 剔除 enrollment 条目已退役（□8：查询空≠已删——新建索引未就绪同形态，误删基线
      * 吞编辑；残留条目量级无害见上注，调用点已撤）；保留方法签名注释仅供考古，勿再调 */
 
@@ -506,6 +525,10 @@ export class ProgressiveStorage {
 
     private async saveBookInfos() {
         if (!this.storageReady) return; // □13 门闩：防空对象/未初始化整体落盘覆盖旧书
+        // □1 取证打点：窗口内被门闩丢弃的写只改内存不落盘（2026-09-09 事故：reload 后
+        // 5s 点删片返回，gotoBlock(0) 的 point 落盘被拦=盘上 point 停旧值）。留 Loki 痕迹
+        // 供下次事故对时间线，不改门闩语义（空覆盖防护优先）
+        debugLog("storage", "saveBookInfos dropped by storageReady latch（写仅入内存）", "progressive");
         return this.plugin.saveData(constants.STORAGE_BOOKS, this.booksInfos());
     }
 

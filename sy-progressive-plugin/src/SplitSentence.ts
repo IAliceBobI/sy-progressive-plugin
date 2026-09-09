@@ -6,6 +6,7 @@ import { prog } from "./Progressive";
 import { isMultiLineElement, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { progStorage } from "./ProgressiveStorage";
+import { lockWithLease } from "./lockLease";
 
 export class SplitSentence {
     private asList: AsList;
@@ -22,21 +23,19 @@ export class SplitSentence {
     }
 
     async insert(open = true) {
-        return navigator.locks.request("prog.SplitSentence.insert", { ifAvailable: true }, async (lock) => {
-            if (lock) {
-                let firstID: string;
-                const mdList: string[] = [];
-                for (const b of this.textAreas) {
-                    if (b.blocks.length === 0) continue; // p 档 filter 后理论可空，空 textArea 不产出（防空行粘连）
-                    if (!firstID) {
-                        firstID = b.blocks[0].id;
-                    }
-                    mdList.push(b.blocks.map(i => i.text).join(""));
+        return lockWithLease("prog.SplitSentence.insert", async () => {
+            let firstID: string;
+            const mdList: string[] = [];
+            for (const b of this.textAreas) {
+                if (b.blocks.length === 0) continue; // p 档 filter 后理论可空，空 textArea 不产出（防空行粘连）
+                if (!firstID) {
+                    firstID = b.blocks[0].id;
                 }
-                await siyuan.insertBlockAsChildOf(mdList.join("\n\n"), this.noteID);
-                if (firstID && open) {
-                    OpenSyFile2(this.plugin, firstID);
-                }
+                mdList.push(b.blocks.map(i => i.text).join(""));
+            }
+            await siyuan.insertBlockAsChildOf(mdList.join("\n\n"), this.noteID);
+            if (firstID && open) {
+                OpenSyFile2(this.plugin, firstID);
             }
         });
     }

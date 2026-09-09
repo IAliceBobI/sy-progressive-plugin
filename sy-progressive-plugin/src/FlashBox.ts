@@ -13,6 +13,7 @@ import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
+import { lockWithLease } from "./lockLease";
 
 export enum CardType {
     Here = "Here", None = "None"
@@ -213,9 +214,8 @@ class FlashBox {
     }
 
     private async insertCard(protyle: IProtyle, divs: HTMLElement[], t: CardType, lastSelectedID: string, path?: string, landing?: CardLanding) {
-        return navigator.locks.request("prog-FlashBox-insertCard", { mode: "exclusive" }, async (_lock) => {
-            return this.doInsertCard(protyle, divs, t, lastSelectedID, path, landing);
-        });
+        return lockWithLease("prog-FlashBox-insertCard",
+            () => this.doInsertCard(protyle, divs, t, lastSelectedID, path, landing), { queued: true });
     }
 
     private async doInsertCard(protyle: IProtyle, divs: HTMLElement[], t: CardType, lastSelectedID: string, path?: string, landing?: CardLanding) {

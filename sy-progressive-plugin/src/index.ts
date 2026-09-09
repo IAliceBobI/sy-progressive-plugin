@@ -18,7 +18,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, revTraceEnabled, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarFlatCollapsed, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
@@ -38,7 +38,7 @@ import { initProgFloatBtns, toggleFloatBarSystem, toggleFreeFloat } from "./Prog
 import { PROG_FLOAT_ICONS } from "./progIcons";
 import { initDigestMarker } from "./digestMarker";
 import { initMaterialMarker } from "./materialMarker";
-import { applyRevTraceEnabled } from "./revTrace";
+import { applyRevTraceEnabled, lastRevTraceScope, rememberRevTraceScope } from "./revTrace";
 import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
 import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
 import { syncSettingsFromDisk } from "../../sy-tomato-plugin/src/libs/storageHotReload";
@@ -97,9 +97,21 @@ function loadStore(plugin: BaseTomatoPlugin) {
     // □12 摘抄背景渲染态总开关：body 类即 CSS 总闸（index.scss div:has(> .prog-digest-mark)），
     // 订阅在 load 后挂——subscribe 立即同步一次，之后设置面板改值实时生效
     markOriginTextBG.subscribe(v => document.body.classList.toggle("prog-digest-bg-on", !!v));
-    // revtrace □4 修订痕迹总开关：订阅实时清/挂（命令 toggle 与设置面板同源；初始同步一次无害——开时无编辑器则 no-op，关时清零残留）
+    // revtrace-scope 范围三档迁移（digestLanding 同款幂等）：revTraceScope 无存量值时
+    // 老开关 revTraceEnabled=true → "all"（旧开关开着=全局染，保持原行为），否则默认
+    // "off"；.set 只写内存——即便未持久化，每次启动重跑也幂等。旧键留盘仅作迁移读源
+    const hasRevTraceScope = (plugin.settingCfg as any)?.revTraceScope != null;
     revTraceEnabled.load(plugin);
-    revTraceEnabled.subscribe(v => applyRevTraceEnabled(!!v));
+    revTraceScope.load(plugin);
+    const migratedScope = revTraceScopeFromLegacy(hasRevTraceScope, revTraceEnabled.get() === true);
+    if (migratedScope) revTraceScope.set(migratedScope);
+    // 订阅实时清/挂（命令 toggle 与设置面板同源；初始同步一次无害——非 off 时无编辑器
+    // 则 no-op，off 时清零残留）；非 off 档顺带喂给命令 toggle 的「上次范围档」记忆
+    rememberRevTraceScope(revTraceScope.get());
+    revTraceScope.subscribe((v) => {
+        rememberRevTraceScope(v);
+        applyRevTraceEnabled(v);
+    });
     hideBtnsInFlashCard.load(plugin);
     pieceTailCard.load(plugin);
     openCardsOnOpenPiece.load(plugin);
@@ -108,6 +120,7 @@ function loadStore(plugin: BaseTomatoPlugin) {
     mobileTopBar.load(plugin);
     initProgFloatBtnsDisable.load(plugin);
     floatbarMainBtns.load(plugin);
+    floatbarFreeMainBtns.load(plugin);
     floatbarFlatCollapsed.load(plugin);
     digSubrankOpen.load(plugin);
     floatbarExpandPref.load(plugin);
@@ -357,16 +370,17 @@ export default class ThePlugin extends BaseTomatoPlugin {
             },
         });
 
-        // revtrace □4：修订痕迹开关命令（与设置项 revTraceEnabled 同一状态；无默认键位——
-        // 命令面板可搜，免去 winHotkey 全仓比对；实时生效走 loadStore 里的 store 订阅）
+        // revtrace-scope：修订痕迹开关命令保持二态开/关（与设置项 revTraceScope 同源；
+        // 无默认键位——命令面板可搜，免去 winHotkey 全仓比对；实时生效走 loadStore 订阅）。
+        // 开=回到上次范围档（记忆喂点=loadStore/订阅的非 off 值；从未有过值时开到 "prog"）
         this.addCommand({
             langKey: "revTraceToggle",
             langText: tomatoI18n.修订痕迹开关,
             callback: () => {
-                revTraceEnabled.set(!revTraceEnabled.get());
+                revTraceScope.set(revTraceScope.get() === "off" ? lastRevTraceScope() : "off");
                 // set 只改内存（stores P1-1 教训），命令通道确定落盘紧跟 write——
                 // 否则重启/插件 reload 后开关回旧值，与设置面板通道行为不对称
-                revTraceEnabled.write().catch(() => { });
+                revTraceScope.write().catch(() => { });
             },
         });
 

@@ -14,12 +14,12 @@
     } from "./Progressive";
     import { HtmlCBType } from "./constants";
     import { CARD_RECITE } from "./digestCardMode";
-    import { buildFloatButtons, buildFlatCells, digestSubrankIds, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, type FloatDocKind } from "./progFloatState";
+    import { buildFloatButtons, buildFlatCells, digestSubrankIds, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, type FloatDocKind } from "./progFloatState";
     import { progStorage } from "./ProgressiveStorage";
     import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, fetchWritingPieces, mergePieceIntoNeighbor } from "./writeBook";
     import { PROG_DONE_KEY } from "../../sy-tomato-plugin/src/libs/gconst";
     import { notifyFleetChanged } from "./fleetNotify";
-    import { digSubrankOpen, floatbarFlatCollapsed, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
+    import { digSubrankOpen, floatbarFlatCollapsed, floatbarFreeMainBtns, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { progPaid } from "./theme";
     import { collapseFloatBar, expandFloatBar, floatSwapBook, freeFloatOff } from "./ProgressiveBtn";
     import { digestProgressiveBox, initDi, digestWholeDoc } from "./DigestProgressiveBox";
@@ -82,13 +82,26 @@
     // □14c 片态首行有序清单（全量 28 项任意可入，顺序即渲染序）：组件 $state 镜像 +
     // settingFactory 持久化——拖拽落子即时生效（set+write 落盘），设置面板保存 reload
     // 后重读。未进清单的钮不消失——buildFlatCells/advVisible 落回平铺区固有段位。
-    // 载入即滤未知 id（未来退役动作的存量配置）：显示序≡数据序，拖拽 dropIndex 直插不偏移
-    let mainIds = $state<string[]>([...floatbarMainBtns.get()].filter(id => PIECE_ALL_MAIN_IDS.has(id)));
+    // 载入即滤未知 id（未来退役动作的存量配置）：显示序≡数据序，拖拽 dropIndex 直插不偏移。
+    // free 态同机制接入（650189 拖动排序反馈，2026-09-09）：独立 store 独立池，kind
+    // 切换（⌘数字 切页签）时镜像换源重载——浮条是单例复用，不换源会拿片态清单渲染 free
+    function loadMainIds(kind: FloatDocKind | null): string[] {
+        if (kind === "free") {
+            return [...floatbarFreeMainBtns.get()].filter(id => FREE_ALL_MAIN_IDS.has(id));
+        }
+        return [...floatbarMainBtns.get()].filter(id => PIECE_ALL_MAIN_IDS.has(id));
+    }
+    let mainIds = $state<string[]>(loadMainIds($kind));
     function commitMainIds(next: string[]) {
         mainIds = [...next];
-        floatbarMainBtns.set(mainIds);
-        void floatbarMainBtns.write();
+        const store = $kind === "free" ? floatbarFreeMainBtns : floatbarMainBtns;
+        store.set(mainIds);
+        void store.write();
     }
+    $effect(() => {
+        void $kind;
+        mainIds = loadMainIds($kind);
+    });
 
     const buttons = $derived(
         $kind == null ? [] : buildFloatButtons($kind, { reciteInstalled: prog.isReciteInstalled(), mainIds }),
@@ -114,8 +127,9 @@
         void floatbarFlatCollapsed.write(); // set 先写内存 settingCfg，write 落盘
     }
 
-    // ---- □14c 首行拖拽换位（HTML5 dnd，桌面片态；移动端/书态/摘抄态不挂 draggable）----
-    const canDrag = $derived(!isMobile && $kind === "piece");
+    // ---- □14c 首行拖拽换位（HTML5 dnd，桌面片态+自由态；移动端/书态/摘抄态不挂 draggable。
+    // free 态接入=650189 反馈「自由态无法拖动排序」——书/摘抄态 4 键固定编排无精简空间）----
+    const canDrag = $derived(!isMobile && ($kind === "piece" || $kind === "free"));
     let dragId = $state<string | null>(null);    // 拖拽中的动作 id
     let dropIndex = $state<number | null>(null); // 首行插入位（显示序；null=不在首行上）
 

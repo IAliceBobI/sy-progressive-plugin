@@ -16,6 +16,8 @@
     import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
     import { createAllPieces, deleteAllPieces, hasPieces } from "./helper";
     import * as constants from "./constants";
+    import { lockWithLease } from "./lockLease";
+    import { blockCountDivergent } from "./addBookGuard";
     import { progStorage, ProgressiveStorage } from "./ProgressiveStorage";
     import { notifyFleetChanged } from "./fleetNotify";
     import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
@@ -43,6 +45,9 @@
     let manualSplit = $state(false);
     let disabled = $state(true);
     let contentBlocks: WordCountType[] = $state([]);
+    // □7 滤空块后的滤前行数：□3 守卫对照 SQL 计数须同口径（SQL 含空块），用滤后
+    // blocks.length 会造成系统性差值=空块数，空段占比高的书被永久误拦（review P1-2）
+    let rawBlockCount = $state(0);
     let contentBlockLen = $derived(
         contentBlocks.length === 0 ? 1 : contentBlocks.length,
     );
@@ -146,8 +151,9 @@
             wordCount = c.stat.wordCount;
         }).catch(() => { /* 独立展示通道失败不阻断统计，wordCount 保持 0 */ });
         // 统计走 getChildBlocks 单发（巨书秒级），textLen = sum(content) 随行返回
-        const { blocks, textLen: totalLen } = await buildContentBlocks(bookID);
+        const { blocks, textLen: totalLen, rawCount } = await buildContentBlocks(bookID);
         contentBlocks = blocks;
+        rawBlockCount = rawCount;
         // headCount 是 UI 派生状态，副作用留在组件（不放纯函数里）。
         // 纯标题数用于「各级标题数」展示（vision P1-1：+1 兜底会与 chips 计数同屏矛盾）；
         // 「平均每标题块数」除数另用 +1 兜底（无标题书按 1 组防除零）。
@@ -215,9 +221,14 @@
     async function process() {
         // slotmerge □1 硬拦兜底：提交钮 disabled 外的第二道防线（状态异常时误触不落盘）
         if (writingBlocked) return;
-        // 空文档兜底拦截：空索引书（books.json 有键、索引文件空）不在 heal 自愈范围
+        // 空文档兜底拦截：空索引书（books.json 有键、索引文件空）不在 heal 自愈范围。
+        // □7 滤空块后新增可达形态：全空段落文档（修复前会一路注册出全空片索引=□7 温床）
         if (contentBlocks.length === 0) {
-            siyuan.pushMsg(tomatoI18n.加书失败请重试);
+            if (rawBlockCount > 0) {
+                siyuan.pushMsg(tomatoI18n.该文档没有可分片的内容);
+            } else {
+                siyuan.pushMsg(tomatoI18n.加书失败请重试);
+            }
             return;
         }
         // 期3 手动分片书：独立注册分支（身份照注册、索引恒空、片由摘抄产生）
@@ -228,6 +239,15 @@
         // 正式分片与预览同一计算口（方案 §2.2）：同参数必同结果，不另写一条逻辑
         const groups = await calcGroups(selectedLevels, splitWordNum);
         if (groups.length === 0) return;
+        // □3 块数悬殊警告：树通道（getChildBlocks，分片数据源）与 SQL 计数大幅背离
+        // =书处在编辑/索引窗口，拦下防静默生成坏索引（2026-09-09 事故家族）。
+        // 查询失败（NaN）不拦——fail-open，别让一条对照查询断掉加书
+        const sqlRow = await siyuan.sqlOne(`select count(*) as c from blocks where root_id='${bookID}'`);
+        const sqlCount = Number((sqlRow as { c?: number | string } | null | undefined)?.c ?? NaN);
+        if (!Number.isNaN(sqlCount) && blockCountDivergent(rawBlockCount, sqlCount)) {
+            await siyuan.pushMsg(tomatoI18n.内容还在索引请稍后再分片, 4000);
+            return;
+        }
         {
             const attrs = {} as AttrType;
             attrs["custom-sy-readonly"] = "true";
@@ -261,9 +281,9 @@
             // 点开始学习/跳到分片会复用旧片（原 bug 短窗复发），锁住让它们排队等清理完成。
             if (await hasPieces(bookID)) {
                 await siyuan.pushMsg(tomatoI18n.正在重建分片);
-                await navigator.locks.request(constants.StartToLearnLock, async () => {
-                    await deleteAllPieces(bookID);
-                });
+                // review P1-1：排队锁同样要租约（hang 会永久占住 StartToLearnLock，与
+                // 阅读链共锁=四入口全堵）。清片=巨书残留数百片×每片 2 次 HTTP，租约放宽 600s
+                await lockWithLease(constants.StartToLearnLock, () => deleteAllPieces(bookID), { queued: true, leaseMs: 600_000 });
             }
 
             // 断句
@@ -311,12 +331,11 @@
             destroy();
             notifyFleetChanged(); // Dock 即时见新书手动态
 
-            // 旧片清理：与阅读链共用 StartToLearnLock 排队串行（process 同款防复用窗口）
+            // 旧片清理：与阅读链共用 StartToLearnLock 排队串行（process 同款防复用窗口
+            // + review P1-1 同款租约治理）
             if (await hasPieces(bookID)) {
                 await siyuan.pushMsg(tomatoI18n.正在清理旧分片);
-                await navigator.locks.request(constants.StartToLearnLock, async () => {
-                    await deleteAllPieces(bookID);
-                });
+                await lockWithLease(constants.StartToLearnLock, () => deleteAllPieces(bookID), { queued: true, leaseMs: 600_000 });
             }
             await prog.openOriginBook(bookID);
         } catch (e) {

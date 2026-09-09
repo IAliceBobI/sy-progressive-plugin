@@ -6,7 +6,7 @@ import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import * as help from "./helper";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import * as constants from "./constants";
-import { revTraceOnAppear } from "./revTrace";
+import { invalidateRevTrace, revTraceOnAppear } from "./revTrace";
 import {
     BlockNodeEnum, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey,
     PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_PARENT_ID, PROG_PIECE_PREVIOUS, RefIDKey
@@ -21,6 +21,7 @@ import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
 import { HtmlCBType } from "./constants";
+import { lockWithLease, type LockLeaseResult } from "./lockLease";
 import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
@@ -35,6 +36,7 @@ import { queryDigestTree } from "./digestUtils";
 import { fetchWritingPieces, pickWritingTarget } from "./writeBook";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
+import { pieceRowsNoneInsertable, pieceUnbuildable } from "./pieceEmpty";
 import { mount, } from "svelte";
 import { fullfilContent } from "./helper";
 import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
@@ -173,14 +175,14 @@ class Progressive {
                 // 防满屏，域外无特殊化）；浮条总开关关也不影响（revTraceEnabled 自管）。
                 // 与 ProgressiveBtn 四态挂点幂等并存（那边另覆盖闪卡预览宿主）
                 revTraceOnAppear(detail.protyle, detail.protyle?.block?.rootID ?? "").catch(() => { });
-                navigator.locks.request(constants.TryAddStarsLock, { ifAvailable: true }, async (lock) => {
+                void lockWithLease(constants.TryAddStarsLock, async () => {
                     const protyle: IProtyle = detail.protyle;
                     const welement = protyle?.wysiwyg?.element as HTMLElement;
                     const element = protyle?.element as HTMLElement;
                     if (!protyle || !welement || !element) return;
                     const nextDocID = protyle?.block?.rootID;
                     const { isPiece } = help.isProtylePiece(protyle);
-                    if (lock && nextDocID && isPiece) {
+                    if (nextDocID && isPiece) {
                         if (this.docID != nextDocID || this.welement !== welement) {
                             this.docID = nextDocID;
                             this.welement = welement;
@@ -194,13 +196,13 @@ class Progressive {
                         }
                     }
                 });
-                navigator.locks.request(constants.ProgressiveAddBtnListenersLock, { ifAvailable: true }, async (lock) => {
+                void lockWithLease(constants.ProgressiveAddBtnListenersLock, async () => {
                     const protyle: IProtyle = detail.protyle;
                     if (!protyle) return;
                     const notebookId = protyle.notebookId;
                     const nextDocID = protyle?.block?.rootID;
                     const element = protyle?.wysiwyg?.element as HTMLElement;
-                    if (lock && element && nextDocID && notebookId) {
+                    if (element && nextDocID && notebookId) {
                         addClickEvent(element);
                     }
                 });
@@ -212,13 +214,13 @@ class Progressive {
                 || eventType == EventType.loaded_protyle_dynamic
                 || eventType == EventType.destroy_protyle
                 || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
-                navigator.locks.request("ProgressiveBox 2025-07-16 10:33:20", { ifAvailable: true }, async (lock) => {
+                void lockWithLease("ProgressiveBox 2025-07-16 10:33:20", async () => {
                     const protyle: IProtyle = detail.protyle;
                     if (!protyle) return;
                     const notebookId = protyle.notebookId;
                     const nextDocID = protyle?.block?.rootID;
                     const element = protyle?.wysiwyg?.element as HTMLElement;
-                    if (lock && element && nextDocID && notebookId) {
+                    if (element && nextDocID && notebookId) {
                         await progressiveBtnFloating(protyle, eventType == EventType.destroy_protyle);
                     }
                 });
@@ -249,8 +251,7 @@ class Progressive {
                 || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
                 // 设置关=不再挂钮（destroy 清残留分支不受门控；已挂钮随切文档/reload 退场）
                 if (!mobileSelectBtns.get()) return;
-                navigator.locks.request("prog selml lock", { ifAvailable: true }, async (lock) => {
-                    if (!lock) return;
+                void lockWithLease("prog selml lock", async () => {
                     // destroy 后 debounce 尾巴可能在 detached protyle 上复活实例+挂按钮（□9 P2-3 同款守卫）
                     if (!protyle.element?.isConnected) return;
                     const wysiwyg = protyle.wysiwyg?.element as HTMLElement;
@@ -281,40 +282,38 @@ class Progressive {
     }
 
     private async tryAddRefAttr(elements: HTMLElement[]) {
-        return navigator.locks.request(constants.TryAddStarsLock + "tryAddRefAttr", { mode: "exclusive" }, async (lock) => {
-            if (lock) {
-                elements
-                    .filter(e => e.getAttribute && e.querySelectorAll)
-                    .filter((e: HTMLElement) => !e.getAttribute(RefIDKey))
-                    .filter((e: HTMLElement) => {
-                        const a = e.getAttribute(DATA_TYPE);
-                        return a == BlockNodeEnum.NODE_PARAGRAPH
-                            || a == BlockNodeEnum.NODE_LIST
-                            || a == BlockNodeEnum.NODE_LIST_ITEM
-                            || a == BlockNodeEnum.NODE_HEADING
-                            || a == BlockNodeEnum.NODE_BLOCKQUOTE
-                            || a == BlockNodeEnum.NODE_CODE_BLOCK;
-                    }).forEach(e => {
-                        const { ref, idx, bIdx } = help.findBack(e) || help.findForward(e);
-                        if (ref) {
-                            const attr = {} as AttrType;
-                            attr["custom-progref"] = ref;
-                            if (idx) attr["custom-paragraph-index"] = idx;
-                            if (bIdx) attr["custom-in-book-index"] = bIdx;
-                            setTimeout(() => {
-                                siyuan.setBlockAttrs(e.getAttribute(DATA_NODE_ID), attr);
-                            }, 4000);
+        return lockWithLease(constants.TryAddStarsLock + "tryAddRefAttr", async () => {
+            elements
+                .filter(e => e.getAttribute && e.querySelectorAll)
+                .filter((e: HTMLElement) => !e.getAttribute(RefIDKey))
+                .filter((e: HTMLElement) => {
+                    const a = e.getAttribute(DATA_TYPE);
+                    return a == BlockNodeEnum.NODE_PARAGRAPH
+                        || a == BlockNodeEnum.NODE_LIST
+                        || a == BlockNodeEnum.NODE_LIST_ITEM
+                        || a == BlockNodeEnum.NODE_HEADING
+                        || a == BlockNodeEnum.NODE_BLOCKQUOTE
+                        || a == BlockNodeEnum.NODE_CODE_BLOCK;
+                }).forEach(e => {
+                    const { ref, idx, bIdx } = help.findBack(e) || help.findForward(e);
+                    if (ref) {
+                        const attr = {} as AttrType;
+                        attr["custom-progref"] = ref;
+                        if (idx) attr["custom-paragraph-index"] = idx;
+                        if (bIdx) attr["custom-in-book-index"] = bIdx;
+                        setTimeout(() => {
+                            siyuan.setBlockAttrs(e.getAttribute(DATA_NODE_ID), attr);
+                        }, 4000);
+                        e.setAttribute(RefIDKey, ref);
+                        if (bIdx) e.setAttribute(IN_BOOK_INDEX, bIdx);
+                        if (idx) e.setAttribute(PARAGRAPH_INDEX, idx);
+                        e.querySelectorAll(`div[${DATA_NODE_ID}]`).forEach(e => {
                             e.setAttribute(RefIDKey, ref);
                             if (bIdx) e.setAttribute(IN_BOOK_INDEX, bIdx);
                             if (idx) e.setAttribute(PARAGRAPH_INDEX, idx);
-                            e.querySelectorAll(`div[${DATA_NODE_ID}]`).forEach(e => {
-                                e.setAttribute(RefIDKey, ref);
-                                if (bIdx) e.setAttribute(IN_BOOK_INDEX, bIdx);
-                                if (idx) e.setAttribute(PARAGRAPH_INDEX, idx);
-                            });
-                        }
-                    });
-            }
+                        });
+                    }
+                });
         });
     }
 
@@ -371,14 +370,10 @@ class Progressive {
         menu.fullscreen();
     }
 
-    async addProgressiveReadingWithLock(bookID?: string) {
-        return navigator.locks.request(constants.AddProgressiveReadingLock, { ifAvailable: true }, async (lock) => {
-            if (lock) {
-                await this.addProgressiveReading(bookID);
-                await utils.sleep(constants.IndexTime2Wait);
-            } else {
-                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [1]");
-            }
+    async addProgressiveReadingWithLock(bookID?: string): Promise<void> {
+        await this.withProgLock(constants.AddProgressiveReadingLock, async () => {
+            await this.addProgressiveReading(bookID);
+            await utils.sleep(constants.IndexTime2Wait);
         });
     }
 
@@ -495,11 +490,16 @@ class Progressive {
                 if (hit) {
                     await progStorage.gotoBlock(bookID, hit.point);
                     await this.startToLearnWithLock(bookID);//创建分片
-                    // □3：1200ms 固定时延不等片真就绪（删片重建链索引追赶远超
-                    // 1.2s），改轮询 findPieceDoc 命中后再查副本跳块（不阻塞菜单回调）。
-                    // seq latest-wins（review P2-2）：重入时旧轮询晚命中不得拉走用户
-                    this.jumpToPieceBlockWhenReady(bookID, hit.point, hit.id, ++this.jumpSeq)
-                        .catch(() => siyuan.pushMsg(tomatoI18n.请等待索引建立));
+                    // □7：出片链对空片会跳点前进（books.json point 已≠hit.point）——
+                    // 该片永远不建，60 轮轮询必然空烧后弹误导的「请等待索引建立」，
+                    // point 漂移即跳过轮询（用户已落在跳过后的可读片上）
+                    if ((await progStorage.booksInfo(bookID))?.point === hit.point) {
+                        // □3：1200ms 固定时延不等片真就绪（删片重建链索引追赶远超
+                        // 1.2s），改轮询 findPieceDoc 命中后再查副本跳块（不阻塞菜单回调）。
+                        // seq latest-wins（review P2-2）：重入时旧轮询晚命中不得拉走用户
+                        this.jumpToPieceBlockWhenReady(bookID, hit.point, hit.id, ++this.jumpSeq)
+                            .catch(() => siyuan.pushMsg(tomatoI18n.请等待索引建立));
+                    }
                     return;
                 }
                 await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
@@ -546,24 +546,49 @@ class Progressive {
         return rows.at(0)?.block_id ?? "";
     }
 
-    async startToLearnWithLock(bookID = "", isRand = false) {
-        return navigator.locks.request(constants.StartToLearnLock, { ifAvailable: true }, async (lock) => {
-            if (lock) {
-                await siyuan.pushMsg(tomatoI18n.正在为您打开文档片段);
-                // □3 review P1：false=createPiece 落空（索引追赶窗口，可重试）；undefined=各
-                // 终态（已带对症提示，不重试不叠弹）。重试间隔防连发，烧完仍 false 才弹失效。
-                let ok: boolean | undefined = false;
-                let i = 0;
-                while ((ok = await this.startToLearn(bookID, isRand)) === false) {
-                    if (i++ > 30) break;
-                    await utils.sleep(500);
+    /** □1 锁治理：读片链持锁入口（加书/出片/跳片删片/重插）共用的租约包装。
+     *  unavailable=上一操作持锁中（对齐真实语义的提示，替代旧「请等待索引建立 [n]」）；
+     *  lease-expired=锁内链路 hang 触发租约放锁（操作已弃置，提示可重试）。
+     *  返回结果供内部调用方门控结算动作（review P2-1）；公开入口一律用 void 包装版 */
+    private async withProgLock(name: string, body: () => Promise<unknown>): Promise<LockLeaseResult> {
+        const r = await lockWithLease(name, body);
+        if (r === "unavailable") await siyuan.pushMsg(tomatoI18n.上一操作仍在进行中);
+        else if (r === "lease-expired") await siyuan.pushMsg(tomatoI18n.操作超时未完成);
+        return r;
+    }
+
+    /** 内层结果版：InLock 各分支据此决定关页签/闪卡结算——租约孤儿窗口里内层没跑完
+     *  就不关用户当前页签（review P2-1）。对外签名仍是 void 的 startToLearnWithLock */
+    private async startToLearnLeased(bookID = "", isRand = false): Promise<LockLeaseResult> {
+        return this.withProgLock(constants.StartToLearnLock, async () => {
+            // □2 文案梳理：删「正在为您打开文档片段」——每次出片必弹但结果自可见（片
+            // 页签即开），异常慢路径已由重试首轮的「分片索引建立中」覆盖
+            // □3 review P1：false=createPiece 落空（索引追赶窗口，可重试）；undefined=各
+            // 终态（已带对症提示，不重试不叠弹）。重试间隔防连发，烧完仍 false 才弹失效。
+            // □7："skipped"=空片跳点（point 已前进，下一轮新 point 续建）——自带跳过
+            // 提示、不弹「分片索引建立中」（非索引追赶）、重置计数不烧 30 轮预算（跳点
+            // 每轮推进 point 有限步必然终结，连环空片书也走不完索引长度）。
+            // □1：重试首轮补一次中间反馈（原 ~15s 全静默）；updateBookInfoTime 挪出重试
+            // 路径——成功出片由 startToLearn 成功点/fullfilContent 落 time，失败重试不再
+            // 每 500ms 刷 books.json（触发内核 dataChanges 广播风暴，事故实锤 3 分钟每秒 2 条）
+            let ok: boolean | undefined | "skipped" = false;
+            let i = 0;
+            while ((ok = await this.startToLearn(bookID, isRand)) === false || ok === "skipped") {
+                if (ok === "skipped") {
+                    i = 0;
+                } else if (i === 0) {
+                    await siyuan.pushMsg(tomatoI18n.分片索引建立中);
                 }
-                if (ok === false) await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
-                await utils.sleep(constants.IndexTime2Wait);
-            } else {
-                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [2]");
+                if (i++ > 30) break;
+                await utils.sleep(500);
             }
+            if (ok === false) await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
+            await utils.sleep(constants.IndexTime2Wait);
         });
+    }
+
+    async startToLearnWithLock(bookID = "", isRand = false): Promise<void> {
+        await this.startToLearnLeased(bookID, isRand);
     }
 
     /** ⏸/⚠ 书的统一处理：闭笔记本=提示开箱恢复（书可能只是暂不可见，绝不清理）；
@@ -650,7 +675,9 @@ class Progressive {
         const bookIndex = await progStorage.loadBookIndexIfNeeded(bookInfo.bookID);
         let point = (await progStorage.booksInfo(bookInfo.bookID)).point;
         if (isRand) point = utils.getRandInt0tox(bookIndex.length); // 随机创建书籍的某个分片，适用于单词集合。
-        await progStorage.updateBookInfoTime(bookID);
+        // □1：updateBookInfoTime 原在此处（startToLearn 每次重试都执行——books.json
+        // 写盘风暴+dataChanges 广播）。挪除：成功出片由 fullfilContent 落 time，
+        // 失败重试/终态路径不再记活跃时间
         if (bookIndex.length === 0) {
             // 0 片 ≠ 最后一页（旧文案误导）：未分片的书引导去分片
             await siyuan.pushMsg(tomatoI18n.本书还未分片(st.name));
@@ -673,9 +700,33 @@ class Progressive {
             openPiece = true;
             await OpenSyFile2(this.plugin, noteID)
         } else {
-            // 分片源块失效/索引未就绪（createPiece 返回 ""）——可重试失败：返回 false 交
-            // startToLearnWithLock 重试（□3 review P1：原裸 return 使 while 重试循环死代码，
-            // 索引追赶窗口一次机会都不给；终态提示上抛由 WithLock 统一弹防 30 连发）
+            // □7 空片自愈：片永久不可建（存活块全无内容=空段落占片槽；或全数悬空=
+            // 书阅读中途被编辑、索引残留死 ID，2026-09-09 主实例两形态同症状：重试
+            // 30 轮烧完弹「内容已失效」，point 卡死书砖住）≠ 索引未就绪——跳点前进
+            // （books.json 每轮重读 point，重试循环下一轮自动在新 point 续建）；跳到
+            // 索引尾则下一轮走「已经是最后一页」终态。缺行者用内核实时通道判死活：
+            // SQL 行缺失在索引追赶窗口≠块已删，checkBlockExist 不吃索引延迟（P1-4）。
+            // 随机模式不跳（P1-1）：gotoBlock 会污染顺序断点 + 每轮重掷使跳点无界，
+            // 重试=重新摇号已有界。已知边缘（review P2-6 备案）：deleteAndBack 的
+            // 目标片恰为空片时跳点向前弹回当前片，net=「返回」no-op——无挂死无数据
+            // 损坏，优于修复前的卡死，不为极罕见场景传方向上下文。
+            const pBlocks = bookIndex[point] ?? [];
+            if (!isRand && pBlocks.length > 0) {
+                const rows = await siyuan.getRows(pBlocks, "id,markdown");
+                if (!rows.some(r => r.markdown)) {
+                    const missing = pBlocks.filter(id => !rows.some(r => r.id === id));
+                    const dead = await Promise.all(missing.map(id =>
+                        siyuan.checkBlockExist(id).then(exist => !exist).catch(() => false)));
+                    if (pieceUnbuildable(rows, dead)) {
+                        await siyuan.pushMsg(tomatoI18n.分片无内容已跳过(`[${String(point).padStart(5, "0")}]`));
+                        await progStorage.gotoBlock(bookID, point + 1);
+                        return "skipped";
+                    }
+                }
+            }
+            // 可重试失败：返回 false 交 startToLearnWithLock 重试（□3 review P1：原裸
+            // return 使 while 重试循环死代码，索引追赶窗口一次机会都不给；终态提示上抛
+            // 由 WithLock 统一弹防 30 连发）
             return false;
         }
         if (openPiece && this.settings.openCardsOnOpenPiece) {
@@ -711,17 +762,17 @@ class Progressive {
                 }
             }
         }
+        // □1 P2-2：成功出片记活跃时间（新书复用/滚筒命中已存在片时 createPiece 早退
+        // 不进 fullfilContent，books.json time 断刷会丢 bookStatus 的 2min 新书保护期）。
+        // 成功点单次写：重试失败轮不触发，无风暴回归
+        await progStorage.updateBookInfoTime(bookID);
         return true;
     }
 
-    async htmlBlockReadNextPeice(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
-        return navigator.locks.request("htmlBlockReadNextPeiceLock", { ifAvailable: true }, async (lock) => {
-            if (lock) {
-                await this.htmlBlockReadNextPeiceInLock(bookID, noteID, cbType, point);
-                await utils.sleep(constants.IndexTime2Wait);
-            } else {
-                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [3]");
-            }
+    async htmlBlockReadNextPeice(bookID: string, noteID: string, cbType: HtmlCBType, point: number): Promise<void> {
+        await this.withProgLock(constants.HtmlBlockReadNextPeiceLock, async () => {
+            await this.htmlBlockReadNextPeiceInLock(bookID, noteID, cbType, point);
+            await utils.sleep(constants.IndexTime2Wait);
         });
     }
 
@@ -736,23 +787,29 @@ class Progressive {
 
     private async htmlBlockReadNextPeiceInLock(bookID: string, noteID: string, cbType: HtmlCBType, point: number) {
         switch (cbType) {
-            case HtmlCBType.previous:
+            case HtmlCBType.previous: {
                 await progStorage.gotoBlock(bookID, point - 1);
-                await this.startToLearnWithLock(bookID);
-                this.closePeices(bookID);
-                showCardAnswer();
-                pressSkip()
+                const r = await this.startToLearnLeased(bookID);
+                if (r === "done") {
+                    this.closePeices(bookID);
+                    showCardAnswer();
+                    pressSkip()
+                }
                 break;
-            case HtmlCBType.next:
+            }
+            case HtmlCBType.next: {
                 await progStorage.gotoBlock(bookID, point + 1);
                 // routemap □1 计数解耦：读到新片即前进——翻页不删片与下片删同权计数
                 // （片可留作草稿，point+1 为去重锚判新高的新 point）
                 await this.markReadSafe(bookID, point + 1);
-                await this.startToLearnWithLock(bookID);
-                this.closePeices(bookID);
-                showCardAnswer();
-                pressSkip()
+                const r = await this.startToLearnLeased(bookID);
+                if (r === "done") {
+                    this.closePeices(bookID);
+                    showCardAnswer();
+                    pressSkip()
+                }
                 break;
+            }
             case HtmlCBType.deleteAndExit:
                 confirm("⚠️", "🏃 🗑", async () => {
                     await siyuan.removeRiffCards([noteID]);
@@ -765,11 +822,13 @@ class Progressive {
                 confirm("⚠️", tomatoI18n.删除并返回, async () => {
                     await siyuan.removeRiffCards([noteID]);
                     await progStorage.gotoBlock(bookID, point - 1);
-                    await this.startToLearnWithLock(bookID);
+                    const r = await this.startToLearnLeased(bookID);
                     siyuan.removeDocByID(noteID);
-                    this.closePeices(bookID);
-                    showCardAnswer();
-                    pressSkip()
+                    if (r === "done") {
+                        this.closePeices(bookID);
+                        showCardAnswer();
+                        pressSkip()
+                    }
                 });
                 break;
             case HtmlCBType.deleteAndNext: {
@@ -778,18 +837,23 @@ class Progressive {
                 await progStorage.gotoBlock(bookID, point + 1);
                 // routemap □1：已读=读到新片那一刻（翻页/删片同权；锚防回看后再删重复计）
                 await this.markReadSafe(bookID, point + 1);
-                await this.startToLearnWithLock(bookID);
+                const r = await this.startToLearnLeased(bookID);
                 siyuan.removeDocByID(noteID);
-                this.closePeices(bookID);
-                showCardAnswer();
-                pressSkip()
+                if (r === "done") {
+                    this.closePeices(bookID);
+                    showCardAnswer();
+                    pressSkip()
+                }
                 break;
             }
-            case HtmlCBType.nextBook:
-                await this.startToLearnWithLock();
-                showCardAnswer();
-                pressSkip()
+            case HtmlCBType.nextBook: {
+                const r = await this.startToLearnLeased();
+                if (r === "done") {
+                    showCardAnswer();
+                    pressSkip()
+                }
                 break;
+            }
             case HtmlCBType.quit: {
                 const t = await OpenSyFile2(this.plugin, noteID);
                 await utils.sleep(200);
@@ -817,17 +881,22 @@ class Progressive {
     /** □22 重插翻新：清空片内全部子块（含手写笔记——refillMenu 的 confirm 已警告）后按
      * 所选断句方式重插原文。与 htmlBlockReadNextPeice 共锁防并发；先验源块存活再清空
      * （同 createPiece 口径），防索引悬空时「清了旧内容却插不进新内容」。 */
-    async refillPiece(bookID: string, noteID: string, point: number, stype: AsList | "no" | null) {
-        return navigator.locks.request("htmlBlockReadNextPeiceLock", { ifAvailable: true }, async (lock) => {
-            if (!lock) {
-                await siyuan.pushMsg(tomatoI18n.请等待索引建立 + " [3]");
-                return;
-            }
+    async refillPiece(bookID: string, noteID: string, point: number, stype: AsList | "no" | null): Promise<void> {
+        await this.withProgLock(constants.HtmlBlockReadNextPeiceLock, async () => {
             const index = await progStorage.loadBookIndexIfNeeded(bookID);
             const piecePre = index[point - 1] ?? [];
-            const piece = (await siyuan.getRows(index[point] ?? [], "id")).map(r => r.id);
+            const rows = await siyuan.getRows(index[point] ?? [], "id,markdown");
+            const piece = rows.map(r => r.id);
             if (piece.length === 0) {
                 await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
+                return;
+            }
+            // □7 空片前置拦截（P1-3 口径=存活行无一可插）：混合悬空+空片时上面的
+            // id 守卫过、幸存块全无 markdown——clearAll 后 fullfilContent 滤空插不
+            // 进任何内容，终态=确认过、清空了、片废了（clearAll 不可逆）。fail-closed：
+            // SQL markdown 列延迟最多误拦一次可重试，绝不误放行不可逆操作
+            if (pieceRowsNoneInsertable(rows)) {
+                await siyuan.pushMsg(tomatoI18n.该分片没有可重插的内容);
                 return;
             }
             await siyuan.clearAll(noteID);
@@ -840,6 +909,10 @@ class Progressive {
                 await siyuan.pushMsg(tomatoI18n.重插失败提示, 4000);
                 return;
             }
+            // revtrace「拆装不算修订」：重插=清空重建，新块 updated=插入时刻会整片
+            // 误报「刚改」——推基线到操作后（新块≤基线全无色）+作废 updated 快照缓存
+            await progStorage.bumpRevTraceBaseline(noteID);
+            invalidateRevTrace(noteID);
             await utils.sleep(constants.IndexTime2Wait);
         });
     }
