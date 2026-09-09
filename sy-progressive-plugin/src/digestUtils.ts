@@ -5,6 +5,7 @@ import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { invalidateDigestMarker, markDigests } from "./digestMarker";
 import { splitLines } from "./SplitSentence";
+import { appendTailCard } from "./tailCardAppend";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { digestLanding, digestAddReadingpoint, digestGlobalSigle, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -165,7 +166,11 @@ export class DigestBuilder {
         attr["custom-card-priority"] = this.attrs["custom-card-priority"] ?? "60";
         attr["custom-off-tomatobacklink"] = "1";
         attr["custom-progmark"] = `${TEMP_CONTENT}#${this.bookID},${ct}`;
-        // 期1 □2 落点三档：daily=当天日记（原 digest2dailycard）；source=书下/源文档下（老版回归）；
+        // □2 review P1-2：仿写副本机读标记——retrofit 补插链据此跳过（只防建时不够，
+        // 练习中断重开是高频动作，练习现场不该冒出收束卡）
+        if (forRecite) attr["custom-prog-for-recite"] = "1";
+        // 期1 □2 落点三档：daily=daily card 月目录（原 digest2dailycard；落发起文档所在笔记本，
+        // 不看制卡侧 flashcardNotebook）；source=书下/源文档下（老版回归）；
         // central=书→摘抄总夹/digest-书名，非书→札记匣（夹均按 IAL 锚定，位置无关）
         let boxID = this.boxID;
         let dirPath: string;
@@ -186,6 +191,12 @@ export class DigestBuilder {
         const digestID = await siyuan.createDocWithMd(boxID, `${dirPath}/${title}`, md, "", attr);
         // 新摘抄即失效痕迹缓存：refMap 有 60s TTL，不失效则当前文档 ≤60s 内重出场不打新痕迹
         if (digestID) invalidateDigestMarker(this.bookID);
+        // □2 摘抄文档尾卡：新摘抄建时带卡（拍板；daily/central/source 各落点档统一——落点
+        // 只改位置不改身份，pdigest 属性在=摘抄态动作全可用）。仿写副本（forRecite）不带：
+        // 练习现场有 recite 自己的写位/批注 UI，收束卡动作（送仿写等）在练习语境全是噪音。
+        if (digestID && !forRecite) {
+            await appendTailCard({ v: 1, kind: "digest", bookID: this.bookID, point: 0, docID: digestID });
+        }
         return digestID;
     }
 
@@ -379,6 +390,11 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
     let idx: string;
     let i = 0;
     for (const div of selected) {
+        // □2 review P1-1：片尾收束卡不进摘抄副本——整摘/拖选扫到片尾时圈进来会复制出
+        // 「指向原片的活卡」（点钮误删原片）或 broken 占位。只滤自家（anno-chat/ai-grade
+        // 等他人 custom 块保持现状行为不扩权）
+        if (div.getAttribute?.("data-type") === "NodeCustomBlock"
+            && (div.getAttribute("data-info") ?? "").startsWith("sy-progressive-plugin/tail-card")) continue;
         // 序号清洗（[null] 标题根治，群反馈 650189 同场）：历史 setAttribute(key, null)
         // 落 "null" 字面量进块 IAL，真值脏值曾被当序号拼标题——validDigestIdx 兜底 "0"，
         // 且恒非空使下方 setAttribute(IN_BOOK_INDEX) 永不再产新脏值

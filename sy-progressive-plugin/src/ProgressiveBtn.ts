@@ -8,13 +8,15 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
-import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, pieceTailCard, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
 import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue, digestMarkBookID } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests, markDigestTag, clearDigestMarks } from "./digestMarker";
+import { revTraceOnAppear } from "./revTrace";
 import { markMaterials } from "./materialMarker";
 import { findDocByIal, getDocIalDigestDirUnder, getDocIalDigestDirHub } from "./progData";
+import { ensureDigestTailCard } from "./tailCardAppend";
 
 const Prog_BUTTON = "custom-prog-button";
 const Prog_BUTTON_NoteID = "custom-prog-button-noteID";
@@ -172,6 +174,29 @@ export function toggleFloatBarSystem() {
 // （□11.1「片内双色」.prog-piece-live 挂类/清类逻辑已随 2026-08-30 用户实测反馈退役——
 // 原文灰显+笔记继承属性同色没法分清，回归原文不做色彩修饰的老形态，CSS 与本体同批移除）
 
+// □2 存量摘抄补插负缓存：出场事件高频面（click-editorcontent 等每击必发），识别命中过的
+// docID 记住不再重查；mark/ctime 全仓只随新建文档写入（□12 论证），态不会漂移，插件
+// reload 自然清零。未识别出的文档不缓存（与下方 verifiedNormalDoc 同款谨慎）。
+const tailRetrofitSeen = new Set<string>();
+
+/** □2 存量摘抄打开时幂等补插（挂在出场链但先于浮条总开关——收束卡是文档级常驻产物，
+ *  浮条关不该拦补插）；仅编辑器宿主（块引浮窗/搜索预览/闪卡预览不补）。
+ *  开关关期不进负缓存（review P2-2）：否则关→开同 session 内已打开过的摘抄被锁死不补插。 */
+function retrofitDigestTailCard(protyle: IProtyle): void {
+    try {
+        if (pieceTailCard.get() === false) return;
+        if (!isEditor(protyle)) return;
+        const { attrs, docID } = events.getInfo(protyle);
+        if (!docID || !attrs || tailRetrofitSeen.has(docID)) return;
+        const id = detectFloatDoc(attrs, docID, bid => progStorage.isRegisteredBook(bid));
+        if (!id) return;
+        tailRetrofitSeen.add(docID);
+        if (id.kind === "digest") {
+            void ensureDigestTailCard(docID, id.bookID).catch(() => { });
+        }
+    } catch { /* 装饰层静默不扰主流程 */ }
+}
+
 export async function progressiveBtnFloating(protyle: IProtyle, closed = false) {
     if (closed) {
         // destroy_protyle 只收浮条、不做任何全局态清理：被销毁视图的 DOM 随页签消亡，全局
@@ -186,6 +211,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         }
         return;
     }
+    retrofitDigestTailCard(protyle);
     if (initProgFloatBtnsDisable.get()) {
         show.set(false);
         return;
@@ -277,6 +303,11 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // reload 不重建已开文档 DOM，须出场主动清；零 SQL）
         clearDigestMarks(protyle);
     }
+    // revtrace 修订痕迹（□3）：四态出场全染（book/piece/digest/free，闪卡预览宿主同权
+    // ——digest 痕迹同款无特殊化）；纯视图零档案，enroll 基线+updated 色层实时算。
+    // 普通文档（自由态未上岗）的域外出场不在此链——Progressive.ts 五事件 listener 独立
+    // 挂（□8 修：绑四态链时开新文档/懒加载新块永不染，A5 实锤）；两挂点幂等并存
+    revTraceOnAppear(protyle, docID ?? "").catch(() => { });
     // 期5 素材徽标：写作书片态打（素材块 custom-prog-material 命中；幂等清旧重挂，
     // 与 markDigests 同随出场事件反复调用——protyle 懒加载窗口丢标补挂）
     if (nextKind === "piece" && nextBookID && progStorage.peekBookInfo(nextBookID)?.writing) {

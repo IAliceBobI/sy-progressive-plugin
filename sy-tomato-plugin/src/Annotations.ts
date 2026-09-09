@@ -18,6 +18,7 @@ import { getDoOperations } from "./libs/blockUtils";
 import { isReadonly } from "./libs/navUtils";
 import { DestroyManager } from "./libs/destroyer";
 import {
+    annoAutoArchive,
     commentBoxAddFlashCard,
     commentBoxAnnoBg,
     commentBoxAnnoEditorMode,
@@ -41,6 +42,7 @@ import {
 import { annoIdFromHref, blockSubRanges, hasBlockLevelEntry, type BlockSubRange } from "./libs/annoDom";
 import { stripAllAnnoLinks, stripAnnoLinks } from "./libs/annoKramdown";
 import { newDraftBlock, sweepDraftDoc } from "./libs/annoDraft";
+import { runCollect } from "./libs/annoCollect";
 import { clearChat } from "./libs/annoChat";
 import { annoPop } from "./libs/annoPop";
 import { tomatoI18n } from "./tomatoI18n";
@@ -260,8 +262,8 @@ class Annotations {
             // AI 上下文取数（□2 统一后创建也有问 AI）：宿主块原文+文档标题+前后邻居，openEdit 同款
             // 并行链（跨块只取首块，完整选区由 sel.txt 在 AnnoChat ctx 兜底）；失败/为空不阻塞创建
             const host = selected[0];
+            const hostID = getAttribute(host, "data-node-id") ?? "";
             const fetchSource = async (): Promise<string> => {
-                const hostID = getAttribute(host, "data-node-id") ?? "";
                 if (!hostID) return "";
                 try {
                     const kd = (await siyuan.getBlockKramdown(hostID))?.kramdown ?? "";
@@ -300,6 +302,7 @@ class Annotations {
                 props: {
                     dm,
                     annoId,
+                    hostID,
                     source,
                     selText: isSel ? rangeText : "",
                     initialText: "",
@@ -405,6 +408,8 @@ class Annotations {
         // 5. 软限信号（不拦截）
         if (isOverLimit(text)) siyuan.pushMsg(`${tomatoI18n.批注超过软限} ${ANNO_TEXT_SOFT_LIMIT}`);
         if (markFail) siyuan.pushMsg(tomatoI18n.标记写入失败批注已保存);
+        // 6. 自动归档（annoAutoArchive 开）：落库成功即触发，草稿期/问 AI 流程不经过此处
+        this.fireAutoArchive(ids[0]);
         return true;
     }
 
@@ -452,9 +457,9 @@ class Annotations {
             // 原文与上下文补强并行取数（reasoning P2-1：串行会让「问 AI」到弹窗出现的延迟翻倍）。
             // 原文=宿主块 kramdown 剥 IAL 尾行+全部批注锚点链接（块内标记是 UI 非内容，复评 P2；
             // 失败/为空不阻塞编辑，AI 上下文缺原文时按批注正文讨论）。跨块批注 anchor 只取一-block，
-            // 完整选区由 sel.txt 在 AnnoChat ctx 兜底
+            // 完整选区由 sel.txt 在 AnnoChat ctx 兜底。hostID=沉淀为块插块锚点（□1，同宿主块）
+            const hostID = anchor.closest("[data-node-id]")?.getAttribute("data-node-id") ?? "";
             const fetchSource = async (): Promise<string> => {
-                const hostID = anchor.closest("[data-node-id]")?.getAttribute("data-node-id") ?? "";
                 if (!hostID) return "";
                 try {
                     const kd = (await siyuan.getBlockKramdown(hostID))?.kramdown ?? "";
@@ -489,6 +494,7 @@ class Annotations {
                 props: {
                     dm,
                     annoId: entry.id,
+                    hostID,
                     source,
                     selText: entry.sel?.txt ?? "",
                     initialText: entry.text,
@@ -552,7 +558,8 @@ class Annotations {
         return { docTitle, prev, next };
     }
 
-    /** 编辑保存：所有宿主块同步 updateAnnotation（time 不隐式刷，□2 契约）→ 读回验证 → 刷新 DOM/气泡 */
+    /** 编辑保存：所有宿主块同步 updateAnnotation（time 显式刷新为保存时刻——批注按日期
+     *  归档的搬家依据，同次保存所有副本同值）→ 读回验证 → 刷新 DOM/气泡 */
     private async doEditSave(annoId: string, text: string): Promise<boolean> {
         const ids = await this.holderIdsFor(annoId);
         if (ids.length === 0) {
@@ -567,9 +574,10 @@ class Annotations {
             siyuan.pushMsg(tomatoI18n.批注写入失败);
             return false;
         }
+        const editedAt = Date.now();
         const ops = ids.map((id) => ({
             id,
-            attrs: { [ANNOTATIONS_ATTR]: updateAnnotation(cur![id]?.[ANNOTATIONS_ATTR], annoId, { text }) },
+            attrs: { [ANNOTATIONS_ATTR]: updateAnnotation(cur![id]?.[ANNOTATIONS_ATTR], annoId, { text, time: editedAt }) },
         }));
         try {
             await siyuan.batchSetBlockAttrs(ops);
@@ -595,7 +603,23 @@ class Annotations {
         });
         // 气泡重开由 openEdit 的 onSave 包装层延迟驱动（弹窗销毁期事件防误关）
         if (isOverLimit(text)) siyuan.pushMsg(`${tomatoI18n.批注超过软限} ${ANNO_TEXT_SOFT_LIMIT}`);
+        // 编辑保存同样触发自动归档——time 已刷为保存时刻，全量重算即搬家
+        this.fireAutoArchive(ids[0]);
         return true;
+    }
+
+    /** 自动归档钩子：批注落库成功后 fire-and-forget 全量重算该文档（annoAutoArchive 关=
+     *  零行为）。宿主块 id→root_id 解析放异步体内，不拖保存主链；失败在 runCollect
+     *  内部兜底（toast+debugLog），此 void 不吞上层面异常语义。先等 1.5s——setBlockAttrs
+     *  落 .sy 即时但 attributes 表索引秒级，立查会漏掉刚保存的这条（e2e 实锤 auto 轮
+     *  count 少一）。 */
+    private fireAutoArchive(hostID: string) {
+        if (!annoAutoArchive.get() || !hostID) return;
+        void (async () => {
+            await new Promise((r) => setTimeout(r, 1500));
+            const docID = (await siyuan.sqlOne(`select root_id from blocks where id='${hostID}'`))?.root_id ?? "";
+            if (docID) await runCollect({ scopeDocID: docID, scope: "doc", dest: "daily", auto: true });
+        })();
     }
 
     /** 气泡「删除」→ confirm → doRemove（写链串行化防交叠互洗，reasoning P1-1） */
@@ -692,7 +716,10 @@ class Annotations {
             after![id] == null
             || !parseAnnotations(after![id]?.[ANNOTATIONS_ATTR]).some((e) => e.id === entry.id));
         if (!gone) siyuan.pushMsg(tomatoI18n.批注删除失败);
-        else clearChat(entry.id); // □8 删除成功清 AI 对话缓存（生命周期与批注绑定，拍板）
+        else {
+            clearChat(entry.id); // □8 删除成功清 AI 对话缓存（生命周期与批注绑定，拍板）
+            this.fireAutoArchive(ids[0]); // 删除同样触发归档重算，否则日记节残留已删批注（review P1）
+        }
     }
 
     /** anchor → 所在文档 rootID（.protyle-title 带 data-node-id=块根 id，思源 title.ts:406）；

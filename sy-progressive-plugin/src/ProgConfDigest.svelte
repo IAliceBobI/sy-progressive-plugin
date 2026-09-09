@@ -7,6 +7,7 @@
         digestLanding,
         digestNoBacktraceLink,
         markOriginTextBG,
+        revTraceEnabled,
         digestAddReadingpoint,
         digestGlobalSigle,
     } from "../../sy-tomato-plugin/src/libs/stores";
@@ -31,7 +32,7 @@
         <select class="b3-select" style="min-width: 160px" bind:value={$digestLanding}>
             <option value="central">{tomatoI18n.落点集中归档}</option>
             <option value="source">{tomatoI18n.落点源文档下方}</option>
-            <option value="daily">{tomatoI18n.落点日记卡片}</option>
+            <option value="daily">{tomatoI18n.落点卡目录}</option>
             {#if !["central", "source", "daily"].includes($digestLanding)}
                 <option value={$digestLanding}>{$digestLanding} {tomatoI18n.已失效请重新选择}</option>
             {/if}
@@ -60,6 +61,15 @@
             bind:checked={$markOriginTextBG}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置摘抄背景}>{tomatoI18n.已摘抄块显示背景色}</span>
+    </div>
+
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$revTraceEnabled}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置修订痕迹}>{tomatoI18n.修订痕迹色条}</span>
     </div>
 
     <div>

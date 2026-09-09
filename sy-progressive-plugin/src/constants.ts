@@ -3,6 +3,9 @@ export const STORAGE_BOOKS = "books.json";
 export const STORAGE_PROGDATA = "prog-data-root.json";
 // v5 滚筒状态：书序数组 + 最后出片的书（plugin storage 独立键，books.json 不动结构）
 export const STORAGE_READING_ORDER = "reading-order.json";
+// revtrace 修订痕迹：enrollment 基线映射 {docID: 内核同构14位时间戳}——纯视图零档案的
+// 唯一持久化（首次纳入时刻=无色基线防满屏；无桶无快照，色层=f(updated 距今天数)实时算）
+export const STORAGE_REVTRACE = "revtrace.json";
 // v5 阅读日志：prog-data「阅读日志」文档内每日一子块，块 IAL 双键（date 锚查询 / data 存 JSON 真源）
 export const PLOG_DATE = "custom-proglog-date";
 export const PLOG_DATA = "custom-proglog-data";

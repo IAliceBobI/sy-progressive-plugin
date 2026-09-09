@@ -15,7 +15,7 @@
     import { createProtyle } from "./libs/bkUtils";
     import { DestroyManager } from "./libs/destroyer";
     import { deleteDraftBlock, newDraftBlock, readDraftText } from "./libs/annoDraft";
-    import { getAIConfig } from "./libs/openAI";
+    import { diagnoseAIAsync } from "./libs/openAI";
     import { events } from "./libs/Events";
     import { commentBoxAddFlashCard, commentBoxAnnoEditorFontSize, commentBoxAnnoEditorMode } from "./libs/stores";
     import { getTomatoPluginInstance, siyuan } from "./libs/utils";
@@ -29,6 +29,8 @@
         dm: DestroyManager;
         /** 批注条目 id（AI 对话缓存 key；Annotations.openEdit 传入） */
         annoId: string;
+        /** 被批注源块 id（□1 沉淀为块插块锚点；空=旧文档重建等场景，沉淀入口隐藏） */
+        hostID?: string;
         /** 被批注块原文（AI 讨论上下文；剥 IAL 尾行+本条标记链接后的 kramdown） */
         source: string;
         /** 选区级批注的原文快照（上下文展示，不参与保存） */
@@ -49,7 +51,7 @@
         draftReady?: Promise<string> | null;
         onSave: (text: string) => Promise<boolean>;
     }
-    let { dm, annoId, source, selText, initialText, autoChat = false, docTitle = "", prev = "", next = "", create = false, blockCount = 0, draftReady = null, onSave }: Props = $props();
+    let { dm, annoId, hostID = "", source, selText, initialText, autoChat = false, docTitle = "", prev = "", next = "", create = false, blockCount = 0, draftReady = null, onSave }: Props = $props();
 
     type EditorMode = "rich" | "plain";
     let mode = $state<EditorMode>(commentBoxAnnoEditorMode.get() === "plain" ? "plain" : "rich");
@@ -231,10 +233,10 @@
      *  不再弹孤儿 confirm（reasoning P2-2） */
     async function toggleChat() {
         if (!chatOpen) {
-            const cfg = await getAIConfig();
+            const d = await diagnoseAIAsync();
             if (dm.destroyed) return;
-            if (!cfg) {
-                confirm(tomatoI18n.未配置AI, tomatoI18n.尚未配置AI引导, () => { /* 引导即止 */ });
+            if ("reason" in d) {
+                confirm(tomatoI18n.未配置AI, tomatoI18n.annoAIGuideFor(d.reason), () => { /* 引导即止 */ });
                 return;
             }
             chatOpen = true;
@@ -355,6 +357,7 @@
         mobile={events.isMobile}
         open={chatOpen}
         {annoId}
+        {hostID}
         {source}
         {selText}
         {docTitle}

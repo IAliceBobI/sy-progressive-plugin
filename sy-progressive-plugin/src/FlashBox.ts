@@ -12,6 +12,7 @@ import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlug
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
+import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
 
 export enum CardType {
     Here = "Here", None = "None"
@@ -116,13 +117,18 @@ class FlashBox {
         // □3 右键制卡开关（2026-09-07 bear 拍板，默认关）：任意文档右键块/选块可制卡——
         // 快捷键通道本就全局注册，此入口补齐「右键直接用」。目标块取法沿 DigestProgressiveBox
         // 重访调度右键的既有结论（emitToPlugins 同步收集菜单项，全程零 await）：
-        // blockElements 是 click-blockicon 专属，open-menu-content 走 --select/element 同步取
+        // blockElements 是 click-blockicon 专属，open-menu-content 走统一选中工具两级链
+        // （□8 期2：块选/拖蓝+右键块语义，光标级不取——右键哪块作用哪块；旧版仅一级
+        // 块选+右键块，拖蓝形态漏检）
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             if (!cardContextMenu.get()) return;
             let els: HTMLElement[] = Object.values((detail as any).blockElements ?? {});
-            if (els.length === 0) {
-                els = [...(detail.protyle?.wysiwyg?.element?.querySelectorAll<HTMLElement>(".protyle-wysiwyg--select") ?? [])];
-                if (els.length === 0 && (detail as any).element) els = [(detail as any).element];
+            const wysiwyg = detail.protyle?.wysiwyg?.element;
+            if (els.length === 0 && wysiwyg) {
+                els = collectSelectedBlocks(wysiwyg, {
+                    range: detail.protyle?.toolbar?.range,
+                    blockEl: (detail as any).element,
+                }).blocks;
             }
             if (els.length === 0) return;
             (detail.menu as any).addItem({

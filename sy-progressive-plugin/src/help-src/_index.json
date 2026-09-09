@@ -1,12 +1,22 @@
 {
  "order": [
   "ZZr9dGoIno5pnVxn2vpch6BCn3f",
-  "KwZJdW9BeoHkiRxVg6jcLUnanqf",
-  "prog-writing"
+  "Zpnxdy7zeo36LlxkDEic5AhTnpd",
+  "LDYcdZaabooyxjxFUlvctvVKnsf",
+  "FgLKdkPlrojE82x5jbHcSSKpnfe",
+  "PaMudIknXoncs8xBwhUc5iKonNb",
+  "U23idAY0UorKIkxmcOCc7Iwbnkf",
+  "XvnUdrBEooOd1LxBdhmcpBWRnwc",
+  "KwZJdW9BeoHkiRxVg6jcLUnanqf"
  ],
  "titles": {
   "ZZr9dGoIno5pnVxn2vpch6BCn3f": "渐进学习-帮助",
-  "KwZJdW9BeoHkiRxVg6jcLUnanqf": "🍅闪卡优先级",
-  "prog-writing": "渐进写作"
+  "Zpnxdy7zeo36LlxkDEic5AhTnpd": "渐进阅读",
+  "LDYcdZaabooyxjxFUlvctvVKnsf": "渐进写作",
+  "FgLKdkPlrojE82x5jbHcSSKpnfe": "摘抄与笔记",
+  "PaMudIknXoncs8xBwhUc5iKonNb": "闪卡与复习",
+  "U23idAY0UorKIkxmcOCc7Iwbnkf": "界面与个性化",
+  "XvnUdrBEooOd1LxBdhmcpBWRnwc": "收费与附录",
+  "KwZJdW9BeoHkiRxVg6jcLUnanqf": "🍅闪卡优先级"
  }
 }

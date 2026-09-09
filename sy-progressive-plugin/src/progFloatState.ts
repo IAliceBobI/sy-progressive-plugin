@@ -305,13 +305,13 @@ export function formatDueCount(n: number): string {
  * Record<DigSubrankId, ...> 精确匹配——任一侧增删 id 都是编译错（make check 拦），
  * 防两源漂移（漂移的失效模式是 icon undefined 渲染期 TypeError，不是温和降级）。
  */
-export type DigSubrankId = "inbox" | "tobook" | "tohub" | "think" | "card" | "review" | "word" | "wordai" | "write" | "sched" | "whole";
+export type DigSubrankId = "inbox" | "tobook" | "tohub" | "splitinplace" | "think" | "card" | "review" | "word" | "wordai" | "write" | "sched" | "whole";
 
 /**
- * 摘抄子排 id 清单（□3 起单一事实源，渲染序）：digest 态不渲染子排（摘抄文档再摘抄
- * 落札记匣本就低频且无 ✂ 可收）；whole（整篇摘抄）限 piece+free——书态整本复制不
- * 实用走选中摘抄，free 态是右键退役后任意文档的整摘兜底入口。icon/tip 映射留 UI 层
- * （ProgressiveFloatBtns 的 DIG_ICONS/DIG_TIPS），此处只管 id 序与按态过滤。
+ * 摘抄子排 id 清单（□3 起单一事实源，渲染序）：digest 态精简子排；whole（整篇摘抄）限
+ * piece+free——书态整本复制不实用走选中摘抄，free 态是右键退役后任意文档的整摘兜底入口。
+ * icon/tip 映射留 UI 层（ProgressiveFloatBtns 的 DIG_ICONS/DIG_TIPS），此处只管 id 序与
+ * 按态过滤。
  */
 export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
     // □4 tobook/tohub=落点变体（挂书侧/归总夹，去向级覆盖不落盘）紧跟主摘抄钮——
@@ -319,7 +319,11 @@ export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
     // □11 digest 态开精简子排（bear「与分片差不多」）：再摘抄三档落点+问题+强制卡+
     // 单词两钮；review/sched 与首行 ✧ 复访组重复、write 与首行送仿写重复、whole 对卡片
     // 无意义（整摘复制）——不收。再摘抄走非书链路（落源文档下/札记匣）。
-    if (kind === "digest") return ["inbox", "tobook", "tohub", "think", "card", "word", "wordai"];
+    // splitinplace 就地断句（2026-09-09）限 free+digest——book 态不给（README 初版警告：
+    // 分片后改原书会让渐进找不到块），piece 态不收（重插菜单已是断句入口）。
+    if (kind === "digest") return ["inbox", "tobook", "tohub", "splitinplace", "think", "card", "word", "wordai"];
     const base: DigSubrankId[] = ["inbox", "tobook", "tohub", "think", "card", "review", "word", "wordai", "write", "sched"];
-    return kind === "book" ? base : [...base, "whole"];
+    if (kind === "book") return base;
+    if (kind === "piece") return [...base, "whole"];
+    return ["inbox", "tobook", "tohub", "splitinplace", ...base.slice(3), "whole"];
 }

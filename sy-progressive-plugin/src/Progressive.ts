@@ -1,4 +1,4 @@
-import { Menu, Plugin, openTab, confirm, IProtyle, IEventBusMap, Protyle } from "siyuan";
+import { Menu, Plugin, openTab, confirm, getFrontend, IProtyle, IEventBusMap, Protyle } from "siyuan";
 import "./index.scss";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
 import { closeTabByTitle, getActiveDocID, getActiveProtyle, getNotebookFirstOne, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
@@ -6,6 +6,7 @@ import * as utils from "../../sy-tomato-plugin/src/libs/utils";
 import * as help from "./helper";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import * as constants from "./constants";
+import { revTraceOnAppear } from "./revTrace";
 import {
     BlockNodeEnum, DATA_NODE_ID, DATA_TYPE, IN_BOOK_INDEX, MarkKey,
     PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_PARENT_ID, PROG_PIECE_PREVIOUS, RefIDKey
@@ -17,11 +18,14 @@ import SplitPieceDialogSvelte from "./SplitPieceDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
+import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
 import { HtmlCBType } from "./constants";
 import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
+import { mobileSelectBtns } from "../../sy-tomato-plugin/src/libs/stores";
 import { addClickEvent, progressiveBtnFloating } from "./ProgressiveBtn";
 import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
@@ -35,6 +39,9 @@ import { mount, } from "svelte";
 import { fullfilContent } from "./helper";
 import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
 import { pressSkip, showCardAnswer } from "../../sy-tomato-plugin/src/libs/cardUtils";
+import { addSelectionMLButtons, disposeSelectionML, getSelectionML } from "../../sy-tomato-plugin/src/libs/selectionML";
+import { collectSelectedBlocks, resolveSeedRange } from "../../sy-tomato-plugin/src/libs/selection";
+import { getCursorElement } from "../../sy-tomato-plugin/src/libs/domUtils";
 
 export const progSettingsOpenHK = winHotkey("alt+shift+,", "progSettingsOpenHK", "iconSettingsProg", () => tomatoI18n.渐进学习的设置)
 export const Progressive开始学习 = winHotkey("⌥-", "Progressive startToLearn", "iconProgPlay", () => tomatoI18n.开始今日阅读)
@@ -142,8 +149,30 @@ class Progressive {
             // □11 盘点整改 A 类：右键「开始学习」退役——火苗点击=startReading 全局出片 +
             // 书态 ▶ + 🔄 三重覆盖，右键不再重复占位
         });
+        // 文档树右键/行内 ⋯「加入渐进阅读」（bear 2026-09-08 拍板：恒显不设开关；多选/笔记本行
+        // 不给）。type="doc" 单文档行——右键与行内 ⋯ 内核同走 initFileMenu，一个分支覆盖两面；
+        // 多选 docs/文档笔记本混合 items/笔记本 notebook(s) 天然排除。传准确 items[0].id 加书，
+        // 根治无参通道身份漂移（□8 P2-3 备案的激活页签劫持面）；已在读守卫由 AddBook 弹窗
+        // onMount 知情警告承担（重加书=重置进度+重分片，合法路径），入口不重复设防
+        this.plugin.eventBus.on("open-menu-doctree", ({ detail }) => {
+            if (detail.type !== "doc" || !detail.items?.[0]?.id) return;
+            const docID = detail.items[0].id;
+            detail.menu?.addItem({
+                icon: Progressive添加当前文档到渐进阅读分片模式.icon,
+                label: tomatoI18n.加入渐进阅读,
+                click: () => {
+                    debugLog("prog.doctree", `add-book via doctree menu doc=${docID}`, "progressive");
+                    void this.addProgressiveReadingWithLock(docID);
+                },
+            });
+        });
         events.addListener("ProgressiveBox", (eventType, detail: Protyle) => {
             if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                // revtrace 修订痕迹（□8 修）：出场链独立挂点，解耦浮条四态链——普通文档
+                // （自由态未上岗）开新档/懒加载滚入新块同样要染（enrollment 基线门控自带
+                // 防满屏，域外无特殊化）；浮条总开关关也不影响（revTraceEnabled 自管）。
+                // 与 ProgressiveBtn 四态挂点幂等并存（那边另覆盖闪卡预览宿主）
+                revTraceOnAppear(detail.protyle, detail.protyle?.block?.rootID ?? "").catch(() => { });
                 navigator.locks.request(constants.TryAddStarsLock, { ifAvailable: true }, async (lock) => {
                     const protyle: IProtyle = detail.protyle;
                     const welement = protyle?.wysiwyg?.element as HTMLElement;
@@ -192,6 +221,52 @@ class Progressive {
                     if (lock && element && nextDocID && notebookId) {
                         await progressiveBtnFloating(protyle, eventType == EventType.destroy_protyle);
                     }
+                });
+            }
+        });
+        this.initSelectionMLMobile();
+    }
+
+    /** □8 期4（2026-09-09）：移动端逐块多选三钮——复用 □9 升格的 SelectionML（向上/
+     *  向下/取消最后一次，挂内核同款 protyle-wysiwyg--select 类，选完摘抄/制卡经
+     *  collectSelectedBlocks 一级链直接读走）。移动端无浮条 hover 生态、触屏拖蓝难，
+     *  三钮=选中工具的移动端输入法；桌面不挂（浮条 Ctrl 多选已在）。分叉判定用
+     *  getFrontend 勿 events.isMobile（2026-08-25 浮条 bundle 模块序坑纪律）。
+     *  data-type 复用 tomato-prev/next/cancel：与 tomato 同装时 addCustomButton 幂等
+     *  去重（先挂者赢），labels 同源 tomatoI18n——三插件同一套钮同一套文案。 */
+    private initSelectionMLMobile() {
+        const frontend = getFrontend();
+        if (frontend !== "mobile" && frontend !== "browser-mobile") return;
+        events.addListener("prog-selml □8期4", (eventType, detail: Protyle) => {
+            const protyle: IProtyle = detail?.protyle;
+            if (!protyle) return;
+            if (eventType == EventType.destroy_protyle) {
+                const wysiwyg = protyle.wysiwyg?.element;
+                if (wysiwyg) disposeSelectionML(wysiwyg);
+                return;
+            }
+            if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic
+                || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                // 设置关=不再挂钮（destroy 清残留分支不受门控；已挂钮随切文档/reload 退场）
+                if (!mobileSelectBtns.get()) return;
+                navigator.locks.request("prog selml lock", { ifAvailable: true }, async (lock) => {
+                    if (!lock) return;
+                    // destroy 后 debounce 尾巴可能在 detached protyle 上复活实例+挂按钮（□9 P2-3 同款守卫）
+                    if (!protyle.element?.isConnected) return;
+                    const wysiwyg = protyle.wysiwyg?.element as HTMLElement;
+                    if (!wysiwyg) return;
+                    // seed 与 tomato selectedDivsSync 对齐：活选区优先/toolbar.range 回退
+                    // （resolveSeedRange）+光标块兜底（顶层流语义=共享函数默认，点块后立即可向上连选）
+                    const sel = document.getSelection();
+                    const live = sel?.rangeCount ? sel.getRangeAt(0) : undefined;
+                    const range = resolveSeedRange(wysiwyg, live, protyle.toolbar?.range);
+                    const s = getSelectionML(wysiwyg, () => collectSelectedBlocks(wysiwyg, { range, cursorEl: getCursorElement() }).blocks);
+                    debugLog("selml", `evt=${eventType} root=${protyle.block?.rootID ?? ""} trace=${s.state.trace.length}`, "progressive");
+                    addSelectionMLButtons(protyle, wysiwyg, {
+                        prev: tomatoI18n.向上选择,
+                        next: tomatoI18n.向下选择,
+                        cancel: tomatoI18n.取消最后一次选择的内容,
+                    });
                 });
             }
         });
@@ -774,6 +849,7 @@ class Progressive {
     private async markReadSafe(bookID: string, point?: number) {
         try {
             await rollerMarkRead(bookID, point);
+            invalidateTailToday(); // □2 片尾卡「今日 n/q」胶囊即时刷新（review P1-3：TTL 内恒旧值）
             notifyFleetChanged(); // □6 火苗/面板即时联动（fleet.ts 不 import 本类，单向无环）
         } catch (e) {
             console.error("roller markRead failed", e);

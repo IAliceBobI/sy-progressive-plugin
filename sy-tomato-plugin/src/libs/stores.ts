@@ -6,6 +6,27 @@ import { zipNways } from "./functional";
 import { events } from "./Events";
 import { BaseTomatoPlugin } from "./BaseTomatoPlugin";
 import { getGlobal, setGlobal } from "stonev5-utils";
+import { TomatoPluginConfig } from "./gconst";
+
+/** 设置 store 热更注册表（siyuan383 □3）：各工厂 load() 时自动登记「从新 cfg 重放
+ *  读值语义」的回调（重绑捕获引用 + store.set 新值）；storageHotReload 的
+ *  syncSettingsFromDisk 替换 plugin.settingCfg 后遍历刷值——响应式 UI 无闪断热更。 */
+const settingStoreRegistry = new Map<string, (cfg: TomatoSettings) => void>();
+/** keys 省略=全量刷；传入=只刷指定键（热更走 diff 键集，免未变值的多余通知/写盘） */
+export function reloadSettingStores(cfg: TomatoSettings, keys?: string[]) {
+    if (!cfg) return;
+    const entries = keys ? keys.map(k => [k, settingStoreRegistry.get(k)] as const) : settingStoreRegistry;
+    for (const [, reloadFrom] of entries) reloadFrom?.(cfg);
+}
+
+/** 热更替换 settingCfg 后重绑两处全局引用（review P1-1）：onload 期只在启动赋值一次，
+ *  不重绑=PairBarBox 位置记忆/MarkdownExport 增量水位线等 getTomatoPluginConfig()
+ *  消费者写孤儿旧对象，随后 write() 落盘新对象=静默丢写。钩子与保存链共用。 */
+export function rebindTomatoConfigRefs(plugin: BaseTomatoPlugin) {
+    setGlobal(TomatoPluginConfig, plugin.settingCfg);
+    const w = window.tomato_zZmqus5PtYRi;
+    if (w) w.pluginConfig = plugin.settingCfg;
+}
 
 export function writableWithGet<T>(t: T) {
     const store = writable(t);
@@ -33,6 +54,10 @@ export const storeNoteBox_selectedNoteType = (() => {
         load: (p: Plugin, s: TomatoSettings) => {
             plugin = p;
             settingCfg = s;
+            settingStoreRegistry.set("storeNoteBox_selectedNoteType", (cfg) => {
+                settingCfg = cfg;
+                store.set(cfg["storeNoteBox_selectedNoteType"]);
+            });
             store.set(s["storeNoteBox_selectedNoteType"]);
         },
         save: (v?: string) => {
@@ -64,6 +89,10 @@ export const storeNoteBox_keep = (() => {
         load: (p: Plugin, s: TomatoSettings) => {
             plugin = p;
             settingCfg = s;
+            settingStoreRegistry.set("storeNoteBox_keep", (cfg) => {
+                settingCfg = cfg; // subscribe 即时写盘走此引用，须先重绑再重放
+                store.set(cfg["storeNoteBox_keep"] ?? false);
+            });
             store.set(s["storeNoteBox_keep"] ?? false);
         },
     };
@@ -78,6 +107,10 @@ export const storeNoteBox_pin = (() => {
         load: (p: Plugin, s: TomatoSettings) => {
             plugin = p;
             settingCfg = s;
+            settingStoreRegistry.set("storeNoteBox_pin", (cfg) => {
+                settingCfg = cfg;
+                store.set(cfg["storeNoteBox_pin"] ?? false);
+            });
             store.set(s["storeNoteBox_pin"] ?? false);
         },
         save: (v: boolean) => {
@@ -121,6 +154,11 @@ export const storeNoteBox_recentText = (() => {
         load: (p: Plugin, s: TomatoSettings) => {
             plugin = p;
             settingCfg = s;
+            settingStoreRegistry.set("storeNoteBox_recentText", (cfg) => {
+                settingCfg = cfg;
+                store.set(cfg["storeNoteBox_recentText"] ?? []);
+                storeNoteBox_noteCount.set(get(store).length);
+            });
             store.set(s["storeNoteBox_recentText"] ?? []);
             storeNoteBox_noteCount.set(get(store).length);
         },
@@ -148,6 +186,10 @@ export const storeNoteBox_noteAreaText = (() => {
         load: (p: Plugin, s: TomatoSettings) => {
             plugin = p;
             settingCfg = s;
+            settingStoreRegistry.set("storeNoteBox_noteAreaText", (cfg) => {
+                settingCfg = cfg;
+                store.set(cfg["storeNoteBox_noteAreaText"] ?? "");
+            });
             store.set(s["storeNoteBox_noteAreaText"] ?? "");
         },
         save: () => {
@@ -168,6 +210,10 @@ function notebookStoreFactory(k = "storeNoteBox_selectedNotebook") {
         load: (p: Plugin, s: TomatoSettings) => {
             plugin = p;
             settingCfg = s;
+            settingStoreRegistry.set(k, (cfg) => {
+                settingCfg = cfg; // 重绑捕获引用（save 写它），再重放读值
+                store.set(cfg[k] ?? "");
+            });
             store.set(s[k] ?? "");
         },
         getOr: () => {
@@ -302,6 +348,12 @@ const settingFactory = <T>(key: TSK, defaultValue: T, file: string, _void: TSK) 
         },
         load(p: BaseTomatoPlugin) {
             plugin = p;
+            settingStoreRegistry.set(key as string, (cfg) => {
+                // 读值语义重放（与下方同款）：null 补默认写回 cfg，防后续搭车写回落旧值
+                const v = cfg[key] != null ? cfg[key] : defaultValue;
+                store.set(v as T);
+                cfg[key] = v as never;
+            });
             if (plugin.settingCfg[key] != null) {
                 store.set(plugin.settingCfg[key] as T);
             } else {
@@ -339,6 +391,9 @@ export const licenseCloudSynced = settingFactory("licenseCloudSynced", "", STORA
 /** 批注收集使用记忆（2026-09-02，不出设置面板行——是记忆不是偏好）：范围/去向/指定文件目标 */
 export const annoCollectScope = settingFactory("annoCollectScope", "doc", STORAGE_SETTINGS, null as TSK);
 export const annoCollectDest = settingFactory("annoCollectDest", "daily", STORAGE_SETTINGS, null as TSK);
+/** 批注自动归档（annoarch □4）：开=批注保存（创建/编辑）后 fire-and-forget 全量重算
+ *  归位到各自日记；默认关（收集仍是显式动作） */
+export const annoAutoArchive = settingFactory("annoAutoArchive", false, STORAGE_SETTINGS, null as TSK);
 export const annoCollectTargetDoc = settingFactory("annoCollectTargetDoc", "", STORAGE_SETTINGS, null as TSK);
 export const exportIntervalSec = settingFactory("exportIntervalSec", "5", STORAGE_SETTINGS, null as TSK);
 export const exportIntervalSecOn = settingFactory("exportIntervalSecOn", true, STORAGE_SETTINGS, null as TSK);
@@ -727,12 +782,24 @@ export const digestNoBacktraceLink = settingFactory("digestNoBacktraceLink", tru
 export const pieceNoBacktraceLink = settingFactory("pieceNoBacktraceLink", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const ProgressiveStart2learn = settingFactory("ProgressiveStart2learn", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const ProgressiveJumpMenu = settingFactory("ProgressiveJumpMenu", false, STORAGE_Prog_SETTINGS, null as TSK);
+// □8期4 移动端选块三钮开关（2026-09-09 发版前 P1 拍板补）：默认开；关=Progressive.ts
+// 事件回调不再挂（已挂钮随切文档/reload 退场，与 tomato「多行选择」同口径——勿 subscribe
+// 主动摘钮：data-type 三插件共享，会误摘同装 tomato 挂的钮）
+export const mobileSelectBtns = settingFactory("mobileSelectBtns", true, STORAGE_Prog_SETTINGS, null as TSK);
 // □12 退役（2026-08-30，旧持久化值留着无害）：markOriginText（制卡/摘抄在原文写 + 链接、
 // & 链接与 style 背景落盘）——摘抄标记零触碰统一，原文痕迹唯一机制=digestMarker span 渲染态。
 // v5 □12 语义更新：markOriginTextBG 从「写 style 到 .sy」改为「CSS div:has(> .prog-digest-mark)
 // 渲染态背景」的总开关（index.ts 订阅挂 body 类 prog-digest-bg-on，span 在则背景在）
 export const markOriginTextBG = settingFactory("markOriginTextBG", false, STORAGE_Prog_SETTINGS, null as TSK);
+// 修订痕迹（revtrace □4）：块级「按编辑时间着色」回看视图总开关——纯视图零档案（revTrace.ts：
+// 色层=f(块 updated 距今天数)+enrollment 基线，关掉即无痕）；默认关（□6 呈 bear 拍板，荐默认关），
+// 命令 toggle 与设置面板同此状态（浮条系统开关 toggleFloatBarSystem 同款 .set() 不落盘，
+// 面板 confirm 才写盘；实时清/挂=index.ts 订阅同 markOriginTextBG 挂 body 类同位）
+export const revTraceEnabled = settingFactory("revTraceEnabled", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const hideBtnsInFlashCard = settingFactory("hideBtnsInFlashCard", true, STORAGE_Prog_SETTINGS, null as TSK);
+// □2 片尾收束卡总开关（默认开）：关=不再新建（fullfilContent/newDigestDoc 尾插跳过）+
+// 不再补插存量（retrofit 跳过）+ 已建卡渲染为一行细静条（可整块手删，不自动清理）
+export const pieceTailCard = settingFactory("pieceTailCard", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const openCardsOnOpenPiece = settingFactory("openCardsOnOpenPiece", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardUnderPiece = settingFactory("cardUnderPiece", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardAppendTime = settingFactory("cardAppendTime", false, STORAGE_Prog_SETTINGS, null as TSK);

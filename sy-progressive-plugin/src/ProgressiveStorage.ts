@@ -25,6 +25,8 @@ export class ProgressiveStorage {
         await this.plugin.loadData(constants.STORAGE_PROGDATA);
         // reading-order 此前只写不读，重载即丢书序/lastServed（由 mergeMissingBooks 重排兜底）
         await this.plugin.loadData(constants.STORAGE_READING_ORDER);
+        // revtrace enrollment 基线（加载即可用；写入走 enrollRevTrace 门闩）
+        await this.plugin.loadData(constants.STORAGE_REVTRACE);
         Object.entries(this.booksInfos()).forEach(([_k, v]) => {
             if (typeof v.autoCard === "string") {
                 if (v.autoCard === "yes") v.autoCard = true;
@@ -461,6 +463,34 @@ export class ProgressiveStorage {
         this.plugin.data[constants.STORAGE_READING_ORDER] = ro;
         await this.plugin.saveData(constants.STORAGE_READING_ORDER, ro);
     }
+
+    // ============ 修订痕迹 enrollment（revtrace.json，revtrace □2）============
+    // 纯视图零档案设计的唯一持久化：{docID: 14位内核同构时间戳}。首次纳入=当时状态全无色
+    // （基线规则②防满屏）；此后 updated>基线且在色窗内的块才上色（revTrace.shouldColor）。
+    // 跨设备各自独立（petal 不同步），v1 接受；残留条目量级 KB/年不做主动清扫（刻意小 v1）。
+
+    /** 读 docID 的 enrollment 基线；未纳入/存储损坏 → 空串（shouldColor 恒 false） */
+    revTraceEnrolledAt(docID: string): string {
+        const m = this.plugin?.data?.[constants.STORAGE_REVTRACE];
+        return (m && typeof m === "object" ? m[docID] : "") ?? "";
+    }
+
+    /** 首次纳入（幂等）：写入当下时刻为基线并落盘；返回有效基线（门闩窗口内返回空串=下轮再试） */
+    async enrollRevTrace(docID: string): Promise<string> {
+        const cur = this.revTraceEnrolledAt(docID);
+        if (cur) return cur;
+        if (!this.storageReady) return ""; // □13 门闩同款：loadData 往返窗口内不写
+        // loadData 对不存在的文件落 "" 占位（?? 不兜空串），空串/损坏一律重起干净对象
+        const raw = this.plugin.data[constants.STORAGE_REVTRACE];
+        const m = (raw && typeof raw === "object" ? raw : {}) as Record<string, string>;
+        m[docID] = utils.timeUtil.kernelTimeNow();
+        this.plugin.data[constants.STORAGE_REVTRACE] = m;
+        await this.plugin.saveData(constants.STORAGE_REVTRACE, m);
+        return m[docID];
+    }
+
+    /** 剔除 enrollment 条目已退役（□8：查询空≠已删——新建索引未就绪同形态，误删基线
+     * 吞编辑；残留条目量级无害见上注，调用点已撤）；保留方法签名注释仅供考古，勿再调 */
 
     async gotoBlock(bookID: string, point: number) {
         if (point >= 0) {

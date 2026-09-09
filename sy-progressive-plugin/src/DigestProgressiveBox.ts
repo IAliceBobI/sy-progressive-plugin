@@ -8,10 +8,11 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { DigestBuilder } from "./digestUtils";
 import { blockIconMenu, digestmenu, wholeDigestMenu, reviewSchedMenu, revisitRhythmMenu } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
-import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
+import { verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { kind, openDigestSubrank, show, toggleFreeFloat, digOpen, expanded, collapseFloatBar, freeFloatOff } from "./ProgressiveBtn";
 import { cardModeFor, type DigestIntent } from "./digestCardMode";
 import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
+import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "iconProgScissors", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "iconProgScissors", () => tomatoI18n.执行摘抄)
@@ -37,6 +38,11 @@ class DigestProgressiveBox {
     lute: Lute;
     singleTab: SingleTab;
 
+    /** □2 片间卡「再摘抄」钮入口（等价 ⌥Z 摘抄模式 toggle，卡内按钮直调） */
+    digestModeToggle() {
+        this.enterDigestMode();
+    }
+
     /** ⌥Z 命令/右键/块图标三入口共用的改道出口。writebook-next □10（bear 拍板）：toggle 化——
      *  子排开着按=收起，且与 ✂ 状态栏钮同生命周期矩阵（free 无球=下班消失、三态收成球）；
      *  球态或子排未开=展开+开子排（打开摘抄模式）。「摘抄模式激活态」锚定 digOpen。 */
@@ -58,6 +64,13 @@ class DigestProgressiveBox {
      *  子排「留档/背诵」按钮同构——不 saveCardMode 不改书全局。 */
     private execDigest(intent: DigestIntent, split = false) {
         return async (protyle: IProtyle) => {
+            // 断句整体 Pro（□14）补漏（2026-09-09）：⇧⌥X「摘抄并断句」自诞生无门禁——
+            // 加书 chip/重插菜单/splitAndInsert 兜底都有锁，本命令是免费后门；就地断句
+            // 钮上线时一并收口（splitAndInsert 同款 toast 引导，不静默）
+            if (split && !lastVerifyResult()) {
+                await siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
+                return;
+            }
             const s = await events.selectedDivs(protyle);
             const di = await initDi(s, protyle, this.settings);
             const cm = cardModeFor(intent);
@@ -128,12 +141,18 @@ class DigestProgressiveBox {
         //   原 await getBlockAttrs 后 addItem 迟到不进菜单。修=目标块走 element/--select
         //   同步取，调度态改读块 DOM 的 custom-prog-think 属性（custom IAL 渲染为块 div
         //   同名属性，setBlockAttrs 即刷），全程零 await。
+        // □8 期2 统一选中工具接入（2026-09-09）：块选/拖蓝两级链+右键块语义（子块上爬
+        // 容器、拖蓝覆盖块集、嵌套块右键归容器）——旧版仅一级块选+右键块，拖蓝形态漏检
+        // （思源 3.8 issue 8554 同病）；光标级不取（右键哪块作用哪块，光标兜底反语义）。
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
             let els: HTMLElement[] = Object.values((detail as any).blockElements ?? {});
-            if (els.length === 0) {
-                els = [...(detail.protyle?.wysiwyg?.element?.querySelectorAll<HTMLElement>(".protyle-wysiwyg--select") ?? [])];
-                if (els.length === 0 && (detail as any).element) els = [(detail as any).element];
+            const wysiwyg = detail.protyle?.wysiwyg?.element;
+            if (els.length === 0 && wysiwyg) {
+                els = collectSelectedBlocks(wysiwyg, {
+                    range: detail.protyle?.toolbar?.range,
+                    blockEl: (detail as any).element,
+                }).blocks;
             }
             const ids = els.map(el => el?.getAttribute("data-node-id")).filter(Boolean) as string[];
             if (ids.length === 0) return;

@@ -6,6 +6,7 @@
         windowOpenStyle,
         flashcardNotebook,
         initProgFloatBtnsDisable,
+        pieceTailCard,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import NotebookSelect from "../../sy-tomato-plugin/src/NotebookSelect.svelte";
 </script>
@@ -47,5 +48,15 @@
             bind:checked={$initProgFloatBtnsDisable}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置禁用浮条}>{tomatoI18n.禁用初始化渐进学习浮动按钮}</span>
+    </div>
+
+    <div>
+        <!-- □2 片尾收束卡总开关：关=停新建+停补插，存量卡降细静条（可整块手删） -->
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$pieceTailCard}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置片尾收束卡}>{tomatoI18n.片尾收束卡}</span>
     </div>
 </div>

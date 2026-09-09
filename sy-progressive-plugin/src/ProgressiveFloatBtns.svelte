@@ -48,6 +48,7 @@
     import { openReviewSchedMenu, openDigestReviewMenu, removeRevisitBySource } from "./reviewMenu";
     import { PdigestReviewKey, ReviewKey, parseReview, isDue } from "./reviewQueue";
     import { openRefillMenu } from "./refillMenu";
+    import { splitInPlaceRun } from "./splitInPlace";
 
     // v5 □5 浮条三态（docs/prog-v5-floatbar-design.md）：球（收起）↔ 浮条（展开）同屏只显示一个；
     // 片态出场直接展开，书/摘抄态收起成球。移动端保持顶栏（不做球）。
@@ -290,6 +291,8 @@
         // free 态挂源文档下（source 档原生语义）｜总夹/札记匣按是否在书（central 原生语义）
         tobook: () => tip3(tomatoI18n.摘抄挂书侧, tomatoI18n.tip摘抄挂书侧),
         tohub: () => tip3(tomatoI18n.摘抄归总夹, tomatoI18n.tip摘抄归总夹),
+        // 就地断句（2026-09-09）：Pro 标随钮名走（子排钮无锁角标，执行层兜底门禁+toast 引导）
+        splitinplace: () => tip3(tomatoI18n.就地断句 + " Pro", tomatoI18n.tip就地断句),
         think: () => tip3(tomatoI18n.思考, tomatoI18n.tip思考),
         card: () => tip3(tomatoI18n.背诵, tomatoI18n.tip背诵),
         review: () => tip3(tomatoI18n.复访, tomatoI18n.tip复访),
@@ -303,6 +306,7 @@
         inbox: "iconProgInbox",
         tobook: "iconProgDigestToBook",  // □4 落点变体：书+页内两行（裸 iconProgBook 撞主排 origin，vision P1-1）
         tohub: "iconProgDigestToHub",    // □4 落点变体：folder 线稿（iconProgContents 撞低频区打开目录）
+        splitinplace: "iconSplitTB",    // 就地断句：⇧⌥X「摘抄并断句」命令同款现成 sprite
         think: "iconProgThink",
         card: "iconProgRecite",
         review: "iconHistory", // 期2 复访档：内核内置历史图标（滚动复习语义）
@@ -1083,6 +1087,15 @@
             case "tohub": // □4 落点变体：显式归总夹/札记匣（覆盖全局档，一次性）
                 await runDigest(false, false, undefined, false, "central");
                 break;
+            case "splitinplace": { // 就地断句（2026-09-09）：选中段落块原位拆句，改的是原文档（Pro）
+                const protyle = resolveSubrankProtyle();
+                if (!protyle) {
+                    await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪);
+                    break;
+                }
+                await splitInPlaceRun(protyle);
+                break;
+            }
             case "think":
                 await runDigest(false, true);
                 break;

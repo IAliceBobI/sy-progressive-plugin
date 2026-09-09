@@ -18,8 +18,9 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, initProgFloatBtnsDisable, markOriginTextBG, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFlatCollapsed, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, revTraceEnabled, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
+import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import SettingsSvelte from "./Settings.svelte"
@@ -37,14 +38,18 @@ import { initProgFloatBtns, toggleFloatBarSystem, toggleFreeFloat } from "./Prog
 import { PROG_FLOAT_ICONS } from "./progIcons";
 import { initDigestMarker } from "./digestMarker";
 import { initMaterialMarker } from "./materialMarker";
+import { applyRevTraceEnabled } from "./revTrace";
 import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
 import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
+import { syncSettingsFromDisk } from "../../sy-tomato-plugin/src/libs/storageHotReload";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { notifyFleetChanged } from "./fleetNotify";
 import { closeFloatPopover } from "./overlays";
 import { openDueReviewList } from "./reviewMenu";
 import { buildContentBlocks, computePieceIndex, runSplit } from "./Split2Pieces";
 import { createPiece, deleteAllPieces, fullfilContent } from "./helper";
 import { invalidateBookStatusCache } from "./bookStatus";
+import { registerTailCardRender } from "./tailCardRender";
 
 // 更新日志按年拆分存储（src/changelog/<年>.json，当年文件追加、往年冻结），此处组装倒序全集
 const changelog = [...changelog2026, ...changelog2025];
@@ -59,6 +64,7 @@ function loadStore(plugin: BaseTomatoPlugin) {
     ProgressiveJumpMenu.load(plugin);
     piecesmenu.load(plugin);
     ProgressiveStart2learn.load(plugin);
+    mobileSelectBtns.load(plugin);
     digestmenu.load(plugin);
     wholeDigestMenu.load(plugin);
     cardContextMenu.load(plugin);
@@ -91,7 +97,11 @@ function loadStore(plugin: BaseTomatoPlugin) {
     // □12 摘抄背景渲染态总开关：body 类即 CSS 总闸（index.scss div:has(> .prog-digest-mark)），
     // 订阅在 load 后挂——subscribe 立即同步一次，之后设置面板改值实时生效
     markOriginTextBG.subscribe(v => document.body.classList.toggle("prog-digest-bg-on", !!v));
+    // revtrace □4 修订痕迹总开关：订阅实时清/挂（命令 toggle 与设置面板同源；初始同步一次无害——开时无编辑器则 no-op，关时清零残留）
+    revTraceEnabled.load(plugin);
+    revTraceEnabled.subscribe(v => applyRevTraceEnabled(!!v));
     hideBtnsInFlashCard.load(plugin);
+    pieceTailCard.load(plugin);
     openCardsOnOpenPiece.load(plugin);
     cardUnderPiece.load(plugin);
     cardAppendTime.load(plugin);
@@ -223,6 +233,34 @@ export default class ThePlugin extends BaseTomatoPlugin {
         initProgFloatBtns();
     }
 
+    /** siyuan383 □3 多端热更：覆盖即自管（未覆盖=内核对他端每条 petal 写入自动整重载）。
+     *  渐进版=共享刷值（Prog_SETTINGS 同落共享 store 键）+ 全局配置/皮肤重应用 + 数据
+     *  文件缓存刷新；保存方链路（Settings.svelte / 原生 Setting confirm）调同一方法。 */
+    async onStorageHotReload(beforeCfg?: unknown) {
+        const r = await syncSettingsFromDisk(this, STORAGE_Prog_SETTINGS, beforeCfg);
+        if (r.changed.length) {
+            if (window.prog_zZmqus5PtYRi) window.prog_zZmqus5PtYRi.pluginConfig = this.settingCfg;
+            setGlobal(ProgressivePluginConfig, this.settingCfg);
+            applyProgSkins(this.settingCfg);
+        }
+        // 数据文件缓存刷新：ProgressiveStorage 直读 plugin.data（books/阅读顺序/分片数据），
+        // 整重载时代由重载兜底读新，自管后须显式 loadData 刷本端缓存
+        await Promise.all([STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER].map(f => this.loadData(f)));
+        // 结构性重载放最后（review P2-1）：热更动作全跑完再整重载，防 teardown 410 掐断
+        // 上面 loadData 落进钩子 catch 再重载一轮（双重重载多闪一次）
+        if (r.structural.length) await reloadSelfPlugin(this.name);
+    }
+
+    async onDataChanged(reason?: string) {
+        debugLog("onDataChanged", `${this.name} reason=${reason ?? "?"}`);
+        try {
+            await this.onStorageHotReload();
+        } catch (e) {
+            debugLog("onDataChanged", `${this.name} 热更失败回退整重载：${e}`);
+            await reloadSelfPlugin(this.name);
+        }
+    }
+
     onunload(): void {
         prog.onunload();
         onunloadFleet();
@@ -306,6 +344,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
         initMaterialMarker(this);
         events.onload(this);
         tomatoI18n.init();
+        // □2 片尾收束卡渲染器（3.8.3+；旧内核 customBlockRenders 缺省=注册即无操作，
+        // 建卡链 supportsTailCardBlock 同判 false 整体不触发）
+        registerTailCardRender(this);
 
         // v5 □5：浮条系统总开关命令（与设置项 initProgFloatBtnsDisable 同一状态）
         this.addCommand({
@@ -316,11 +357,28 @@ export default class ThePlugin extends BaseTomatoPlugin {
             },
         });
 
+        // revtrace □4：修订痕迹开关命令（与设置项 revTraceEnabled 同一状态；无默认键位——
+        // 命令面板可搜，免去 winHotkey 全仓比对；实时生效走 loadStore 里的 store 订阅）
+        this.addCommand({
+            langKey: "revTraceToggle",
+            langText: tomatoI18n.修订痕迹开关,
+            callback: () => {
+                revTraceEnabled.set(!revTraceEnabled.get());
+                // set 只改内存（stores P1-1 教训），命令通道确定落盘紧跟 write——
+                // 否则重启/插件 reload 后开关回旧值，与设置面板通道行为不对称
+                revTraceEnabled.write().catch(() => { });
+            },
+        });
+
         this.setting = new Setting({
             confirmCallback: async () => {
-                // await 落盘再触发重载：saveData 异步写被抢跑会掐断，文件保持旧值
+                // await 落盘再热更：saveData 异步写被抢跑会掐断，文件保持旧值；
+                // □3 与钩子共用 onStorageHotReload（常规键不再整重载，结构性键兜底在内）。
+                // oldCfg 用 saveData 前落盘值——面板 bind 编辑保存前已进内存 cfg，快照内存
+                // =diff 恒空结构性漏判（review P0-1）；盘上才是编辑前值
+                const diskBefore = await this.loadData(STORAGE_Prog_SETTINGS);
                 await this.saveData(STORAGE_Prog_SETTINGS, this.settingCfg);
-                await reloadSelfPlugin("sy-progressive-plugin");
+                await this.onStorageHotReload(diskBefore);
             }
         });
         // v5 □7：原生 Setting 面板不再放条目（与自绘设置面板两套并存易不一致，统一走顶栏齿轮 openSettings）

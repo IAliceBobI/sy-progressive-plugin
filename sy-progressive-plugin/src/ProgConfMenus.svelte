@@ -13,6 +13,7 @@
         revisitRhythmMenu,
         ProgressiveStart2learn,
         ProgressiveJumpMenu,
+        mobileSelectBtns,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import { digest渐进阅读摘抄模式 } from "./DigestProgressiveBox";
     import { flashBox制卡 } from "./FlashBox";
@@ -117,5 +118,16 @@
         {tomatoI18n.移动端菜单显示开始学习}:
         {Progressive开始学习.langText()}
         <HotkeyCap hk={Progressive开始学习} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+
+    <!-- □8期4 移动端选块三钮（2026-09-09 发版前 P1 拍板补）：编辑器顶栏 breadcrumb 行的
+         向上/向下/取消；关=新开的编辑器不再挂（已挂的随切文档/刷新退场） -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$mobileSelectBtns}
+        />
+        {tomatoI18n.移动端选块按钮}
     </div>
 </div>

@@ -127,6 +127,14 @@ body.prog-topbar-on #editor {
   --prog-heat-3: var(--prog-accent);
   --prog-heat-4: var(--prog-accent-strong);
 
+  /* revtrace 修订痕迹 5 档色（t0=今天最浓 … t4=前4天最淡，更早无色）：单色相浓度衰减
+     （有序编码=时间近远），紫罗兰系避让 accent 青灰/yours 琥珀/状态绿红四家已有语义 */
+  --prog-rt-0: #6d28d9;
+  --prog-rt-1: rgba(109, 40, 217, 0.78);
+  --prog-rt-2: rgba(109, 40, 217, 0.58);
+  --prog-rt-3: rgba(109, 40, 217, 0.40);
+  --prog-rt-4: rgba(109, 40, 217, 0.26);
+
   /* 面板容器 */
   --prog-panel-bg: var(--b3-theme-surface);
   --prog-panel-border: var(--b3-border-color);
@@ -162,6 +170,13 @@ html[data-theme-mode="dark"] {
   --prog-heat-2: color-mix(in srgb, var(--prog-accent) 34%, var(--b3-theme-surface));
   --prog-heat-3: var(--prog-accent);
   --prog-heat-4: var(--prog-accent-strong);
+
+  /* revtrace 暗档：紫罗兰提亮保可感（浅档深紫在暗底发闷） */
+  --prog-rt-0: #a78bfa;
+  --prog-rt-1: rgba(167, 139, 250, 0.80);
+  --prog-rt-2: rgba(167, 139, 250, 0.62);
+  --prog-rt-3: rgba(167, 139, 250, 0.45);
+  --prog-rt-4: rgba(167, 139, 250, 0.30);
 
   --prog-panel-bg: var(--b3-theme-surface);
   --prog-panel-border: var(--b3-border-color);
@@ -515,6 +530,41 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   background-color: var(--prog-accent-strong);
   transform: translateY(-50%) scale(1.12);
 }
+
+
+// ============================================================
+// revtrace 修订痕迹（revTrace.ts 注入 span）：块左侧 3px 全高色条，5 档浓度衰减。
+// 零落盘四件套同 digest 痕迹：span 零 textContent+contenteditable=false+块 div 零改动
+// +:has() 锚定让位。纯展示无交互（hover tip 归 □4 i18n 接线后再挂）。
+// ============================================================
+.protyle-wysiwyg div:has(> .prog-revtrace-mark) {
+  position: relative;
+  padding-left: 8px;
+}
+// 双痕共存让位：digest/material 的 22px 徽章栏优先（双 :has 特异性压过上面单 :has，
+// 防 8px 压扁徽章栏）；trace 条退 left:0 全高，与 digest 短条+羽毛笔高低错开
+.protyle-wysiwyg div:has(> .prog-digest-mark):has(> .prog-revtrace-mark),
+.protyle-wysiwyg div:has(> .prog-material-mark):has(> .prog-revtrace-mark) {
+  padding-left: 22px;
+}
+.protyle-wysiwyg div:has(> .prog-digest-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark,
+.protyle-wysiwyg div:has(> .prog-material-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark {
+  left: 0;
+}
+.prog-revtrace-mark {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.prog-revtrace-mark.prog-revtrace-t0 { background: var(--prog-rt-0); }
+.prog-revtrace-mark.prog-revtrace-t1 { background: var(--prog-rt-1); }
+.prog-revtrace-mark.prog-revtrace-t2 { background: var(--prog-rt-2); }
+.prog-revtrace-mark.prog-revtrace-t3 { background: var(--prog-rt-3); }
+.prog-revtrace-mark.prog-revtrace-t4 { background: var(--prog-rt-4); }
 
 // 期5 素材徽标（materialMarker 注入 span，写作书片内素材块）：与摘抄痕迹同族
 // 形态（竖条+mask 徽章），图标=素材语义（下箭头入托盘，iconProgMaterial 同形）；
@@ -1767,4 +1817,142 @@ button.prog-popover-item:hover {
 html[data-theme-mode="dark"] .prog-digest-tag {
   color: var(--b3-theme-primary-light);
   background: transparent;
+}
+
+/* □2 片尾收束卡（custom 块 tail-card 渲染器产物；aigrade/anno-chat 同构卡形态）：
+   整卡 user-select:none——点击卡钮不清编辑器选区（浮条配方同款防线） */
+.prog-tailcard {
+    margin: 6px 0 2px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: 1px solid var(--b3-border-color);
+    border-radius: var(--b3-border-radius);
+    background: var(--b3-theme-surface);
+    font-size: 13px;
+    line-height: 1.6;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.prog-tailcard__broken {
+    padding: 6px 8px;
+    font-size: 12px;
+    color: var(--b3-theme-on-surface-light, #999);
+}
+.prog-tailcard__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 22px;
+    margin-bottom: 6px;
+}
+.prog-tailcard__title {
+    font-weight: 500;
+    font-size: 12px; /* 比 aigrade 卡标题（13px）弱一级：收束卡头行是态标签、钮行才是主角（vision P2-1 拍板差异） */
+    color: var(--b3-theme-on-surface-light, #999);
+    white-space: nowrap;
+}
+.prog-tailcard__chips {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+.prog-tailcard__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 18px;
+    white-space: nowrap;
+    color: var(--b3-theme-on-surface-light, #999);
+    background: var(--b3-theme-surface-lighter);
+    border: none;
+    font-family: inherit;
+}
+button.prog-tailcard__chip { cursor: pointer; }
+/* 附属卡到期角标：同款红点语义（revisit 红点/火苗欠债标签先例） */
+.prog-tailcard__chip-due {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    font-size: 10px;
+    line-height: 1;
+    color: var(--b3-theme-error);
+    background: color-mix(in srgb, var(--b3-theme-error) 14%, transparent);
+}
+html[data-theme-mode="dark"] .prog-tailcard__chip-due {
+    color: color-mix(in srgb, var(--b3-theme-error) 60%, #fff);
+}
+/* 动作钮：主钮=品牌色描边强调（不铺满底——文档流内轻量），次钮=中性描边 */
+.prog-tailcard__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.prog-tailcard__row + .prog-tailcard__row { margin-top: 6px; }
+.prog-tailcard__row--wrap { flex-wrap: wrap; }
+.prog-tailcard__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 9px;
+    flex-shrink: 0;
+    border: 1px solid var(--b3-border-color);
+    border-radius: var(--b3-border-radius-b);
+    background: transparent;
+    color: var(--b3-theme-on-surface);
+    font-size: 12px;
+    font-family: inherit;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+.prog-tailcard__btn > svg { width: 13px; height: 13px; flex: none; }
+.prog-tailcard__btn:hover {
+    background: var(--b3-theme-surface-lighter);
+    border-color: var(--b3-theme-primary-light);
+}
+.prog-tailcard__btn--primary {
+    color: var(--b3-theme-primary);
+    border-color: var(--b3-theme-primary);
+    background: var(--b3-theme-primary-lightest);
+}
+.prog-tailcard__btn--primary:hover {
+    background: var(--b3-theme-primary-lightest);
+    filter: brightness(1.04);
+}
+html[data-theme-mode="dark"] .prog-tailcard__btn--primary {
+    background: transparent;
+    color: var(--b3-theme-primary-light);
+}
+
+/* □2 片尾收束卡总开关关态：存量卡降一行细静条（弱化到几乎不占注意力，块可整块手删） */
+.prog-tailcard--off {
+    padding: 2px 8px;
+    border-style: dashed;
+    background: transparent;
+    opacity: .65; /* vision P2-3：.55 叠 11px 灰字对比度低于 3:1，提到 .65 兼顾可认读 */
+}
+.prog-tailcard--off .prog-tailcard__title {
+    font-weight: 400;
+    font-size: 11px;
+}
+/* □9 暗色静态试板 vision P1：关态虚线整卡 opacity .65 叠加后实渲染≈57 对底 30 仅 1.44:1
+   （<非文本 3:1 线）——dark 分支基色提亮（on-surface-light 75% 混 border；首轮用 on-surface
+   实测 154 基色实渲染 2.83:1 仍差一口，186 基色实渲染≈113=3.5:1 过线）；浅色态不动 */
+html[data-theme-mode="dark"] .prog-tailcard--off {
+    border-color: color-mix(in srgb, var(--b3-theme-on-surface-light) 75%, var(--b3-border-color));
+}
+
+/* vision P2-2：可点胶囊 hover=字色+底色双反馈（可发现性）；关态 opacity .65 见 --off 段 */
+button.prog-tailcard__chip:hover {
+    color: var(--b3-theme-on-surface);
+    background: var(--b3-theme-surface-light);
 }

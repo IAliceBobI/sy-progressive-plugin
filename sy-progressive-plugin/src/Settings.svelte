@@ -8,7 +8,6 @@
     // 改造；2026-09-03 双栏改造复刻番茄终态架构：左导航域列表+右侧单域渲染+搜索聚合视图）
     import "../../sy-tomato-plugin/src/IndexConf.css";
     import { floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
-    import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import UpgradeBar from "../../sy-tomato-plugin/src/UpgradeBar.svelte";
     import { saveRestorePagePosition } from "../../sy-tomato-plugin/src/libs/utils";
@@ -145,11 +144,15 @@
 
     async function save() {
         dm.destroyBy();
+        // □3 与 onDataChanged 钩子共用热更通道：常规键不再整重载，结构性键兜底在内。
+        // oldCfg 用 saveData 前落盘值——面板 bind 编辑保存前已进内存 cfg，快照内存
+        // =diff 恒空结构性漏判（review P0-1）；盘上才是编辑前值
+        const diskBefore = await plugin.loadData(STORAGE_Prog_SETTINGS);
         if (pieceMainBtnsDirty) {
             floatbarMainBtns.set([...pieceMainBtns]);
         }
         await plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg);
-        await reloadSelfPlugin("sy-progressive-plugin");
+        await plugin.onStorageHotReload(diskBefore);
     }
 </script>
 

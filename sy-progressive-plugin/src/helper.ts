@@ -11,6 +11,7 @@ import { isMultiLineElement } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { SplitSentence } from "./SplitSentence";
 import { prog } from "./Progressive";
 import { pieceDocName, pieceAlias, getDocIalWords, getDocIalPieces } from "./progData";
+import { appendTailCard } from "./tailCardAppend";
 
 // getDocIalWords 定义已挪 progData.ts（v5 words 进 prog-data，ProgressiveStorage 也要用，避免循环 import）
 export { getDocIalWords };
@@ -295,6 +296,12 @@ export async function fullfilContent(point: number, bookID: string, piecePre: st
         await siyuan.insertBlockAsChildOf(content.join("\n\n"), noteID);
     }
     await removePieceEmptyBlocks(noteID);
+    // □2 片尾收束卡：清完空块后尾插（保证卡=文档最末块）；本函数两个调用方——createPiece
+    // （新片）与 refillPiece（重插，先清空再填）——都保证文档无旧卡，直接追加无重复风险。
+    // 写作书一期不做（拍板）；旧内核 supports=false 零动作（appendTailCard 内自守卫）。
+    if (!info.writing) {
+        await appendTailCard({ v: 1, kind: "piece", bookID, point, docID: noteID });
+    }
 }
 
 /** □1 重插失真（2026-09-01）：clearAll 删光子块后内核按「文档不可零块」自动补一个空段落，
