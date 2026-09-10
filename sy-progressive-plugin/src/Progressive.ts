@@ -15,25 +15,30 @@ import AddBookSvelte from "./AddBook.svelte";
 import AddWritingBookSvelte from "./AddWritingBook.svelte";
 import MaterialPickerSvelte from "./MaterialPicker.svelte";
 import SplitPieceDialogSvelte from "./SplitPieceDialog.svelte";
+import AppendSlotDialogSvelte from "./AppendSlotDialog.svelte";
+import DigestAllDialogSvelte from "./DigestAllDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
+import { addToReadingCurve, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, sweepReadCurve } from "./readCurve";
+import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
 import { HtmlCBType } from "./constants";
 import { lockWithLease, type LockLeaseResult } from "./lockLease";
 import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
-import { mobileSelectBtns } from "../../sy-tomato-plugin/src/libs/stores";
-import { addClickEvent, progressiveBtnFloating } from "./ProgressiveBtn";
+import { mobileSelectBtns, readCurveTakeover } from "../../sy-tomato-plugin/src/libs/stores";
+import { addClickEvent, progressiveBtnFloating, yieldFloatbarForMenu, restoreFloatbarAfterMenu } from "./ProgressiveBtn";
 import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { findPieceByCandidates } from "./contentsJump";
 import { queryDigestTree } from "./digestUtils";
-import { fetchWritingPieces, pickWritingTarget } from "./writeBook";
+import { fetchWritingPieces, pickWritingDispatch, listWritingSlotTargets, insertBlocksIntoPiece, insertDigestIntoPiece, moveDigestIntoPiece, pickWritingFlameBook, feedBlocksToPool, type WritingSlotTarget } from "./writeBook";
+import { escapeHtml } from "./progData";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
 import { pieceRowsNoneInsertable, pieceUnbuildable } from "./pieceEmpty";
@@ -52,6 +57,10 @@ export const Progressive上一页 = winHotkey("ctrl+left", "上一页", "iconPro
 export const Progressive下一页 = winHotkey("ctrl+right", "下一页", "iconProgFFast", () => tomatoI18n.下一页)
 export const Progressive跳到分片或回到原文 = winHotkey("⇧⌥w", "跳到分片或回到原文", "iconProgSwap", () => tomatoI18n.跳到分片或回到原文)
 export const Progressive添加当前文档到渐进阅读分片模式 = winHotkey("⇧⌥m", "添加当前文档到渐进阅读(分片模式)", "iconProgAddBook", () => tomatoI18n.添加当前文档到渐进阅读分片模式)
+// □1-③ 直接入槽（鸟 09-08 反馈③）：dev 实测 keymap 全量扫描 ⌥⌘ 字母已全占（官方+四插件；
+// 初选 ⌥⌘O 撞 recite 练靶实锤后弃）、⇧⌥ 仅剩 S 且有 AIBox 关态暗雷（keymap 扫描盲区在案），
+// 落 ⌥;——纯 ⌥ 符号键全 keymap 无占用、无 macOS 系统冲突，与 ⌥-（开始阅读）同族单修饰风格
+export const Progressive直接入槽 = winHotkey("⌥;", "直接入槽", "iconProgMaterial", () => tomatoI18n.直接入槽)
 
 class Progressive {
     plugin: Plugin;
@@ -76,6 +85,9 @@ class Progressive {
     onunload() {
         this.observer?.disconnect();
         this.observer = null;
+        disposeReadCurve();
+        disposeRevCardUI();
+        delete (window as any).__progReadCurve;
     }
 
     async onload(plugin: Plugin, settings: TomatoSettings) {
@@ -126,6 +138,15 @@ class Progressive {
                 this.addProgressiveReadingWithLock();
             }
         });
+        // □1-③ 直接入槽：编辑器选区直送进槽（与浮条直送钮同菜单；锚点=选中首块下方）
+        this.plugin.addCommand({
+            langKey: Progressive直接入槽.langKey,
+            langText: Progressive直接入槽.langText(),
+            hotkey: Progressive直接入槽.m,
+            callback: () => {
+                void this.directSlotCommand();
+            }
+        });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
             if (piecesmenu.get()) {
@@ -150,6 +171,24 @@ class Progressive {
             }
             // □11 盘点整改 A 类：右键「开始学习」退役——火苗点击=startReading 全局出片 +
             // 书态 ▶ + 🔄 三重覆盖，右键不再重复占位
+            // matfeed □2 槽片右键「管理素材池」（入口前移第二面；恒显不设开关——场景
+            // 判定窄=只在写作书片内出现，文档树右键「加入渐进阅读」同款拍板）。片身份
+            // 同步判读零 await（emitToPlugins 同步收集菜单项，重访调度 2026-09-02 实锤
+            // await 后 addItem 迟到不进菜单）：custom IAL 渲染为 wysiwyg 根 DOM 同名
+            // 属性——digest 宿主（素材文档，挂 PDIGEST_CTIME）先排除（detectFloatDoc
+            // pdigest>mark 优先级同判据），再从 mark（TEMP#bookID,point）取书 ID 判
+            // writing；booksInfos 未加载窗口 peek 空=不加（冷启动即右键的低频场景）
+            const wysiwygEl = detail.protyle?.wysiwyg?.element;
+            const markRaw = wysiwygEl?.getAttribute(MarkKey) ?? "";
+            const poolBookID = markRaw.split("#")?.at(1)?.split(",")?.[0] ?? "";
+            debugLog("prog.managemenu", `mark=${markRaw} book=${poolBookID} writing=${!!(poolBookID && progStorage.peekBookInfo(poolBookID)?.writing)}`, "progressive");
+            if (wysiwygEl && !wysiwygEl.getAttribute(PDIGEST_CTIME) && poolBookID && progStorage.peekBookInfo(poolBookID)?.writing) {
+                menu.addItem({
+                    label: tomatoI18n.管理素材池,
+                    icon: "iconProgPoolManage",
+                    click: () => { this.openManagePoolDialog(poolBookID); },
+                });
+            }
         });
         // 文档树右键/行内 ⋯「加入渐进阅读」（bear 2026-09-08 拍板：恒显不设开关；多选/笔记本行
         // 不给）。type="doc" 单文档行——右键与行内 ⋯ 内核同走 initFileMenu，一个分支覆盖两面；
@@ -168,8 +207,34 @@ class Progressive {
                 },
             });
         });
+        // 阅读曲线接管（1530 期1，实验默认关）：开关边缘/频率档/定时兜底接线 + onload
+        // 只对账拉平不建片（开关一开凭空多 N 个预建片=惊扰，建片延迟到首个非 onload 触发点）
+        initReadCurveTriggers();
+        // takeover 关闭顺手撤复习界面注入物（review P2-7）；接线在本侧静态 import
+        // 两模块——readCurve.ts 若动态 import CardUI 会重排 CJS 打包图致 svelte
+        // internal 循环初始化崩（EFFECT_TRANSPARENT of undefined，插件 run 不加载）
+        readCurveTakeover.subscribe(v => { if (!v) disposeRevCardUI(); });
+        // 互转通道命令位（1530 期3 预留：window 挂点供 e2e/外挂脚本，无 UI；
+        // reload 重挂容忍重注册〔window.eval 无模块缓存，挂点整对象重赋值〕）
+        (window as any).__progReadCurve = {
+            add: addToReadingCurve,
+            remove: removeFromReadingCurve,
+            sweep: (reason = "manual") => void sweepReadCurve(reason),
+        };
+        void sweepReadCurve("onload", { noCreate: true });
         events.addListener("ProgressiveBox", (eventType, detail: Protyle) => {
             if (eventType == EventType.loaded_protyle_static || eventType == EventType.loaded_protyle_dynamic || eventType == EventType.click_editorcontent || eventType == EventType.switch_protyle) {
+                // 阅读曲线期2：阅读卡换皮「下一张」主钮+徽标——四事件全挂（翻卡=loaded
+                // /switch、点击=click；复习容器判定在 revCardOnAppear 内做，普通文档自短路）
+                revCardOnAppear((detail.protyle as any)?.element as HTMLElement | undefined);
+                // 阅读曲线：官方复习界面翻卡触发对账（容器判定=CardBox 同款 card__block；
+                // 普通编辑器点击不触发——全量巡查太重。纯键盘空格流无此事件=期2 主钮补）
+                if (eventType == EventType.click_editorcontent) {
+                    const el = (detail.protyle as any)?.element as HTMLElement | undefined;
+                    if (el?.classList?.contains("card__block")) {
+                        void sweepReadCurve("cardflip");
+                    }
+                }
                 // revtrace 修订痕迹（□8 修）：出场链独立挂点，解耦浮条四态链——普通文档
                 // （自由态未上岗）开新档/懒加载滚入新块同样要染（enrollment 基线门控自带
                 // 防满屏，域外无特殊化）；浮条总开关关也不影响（revTraceEnabled 自管）。
@@ -589,6 +654,32 @@ class Progressive {
 
     async startToLearnWithLock(bookID = "", isRand = false): Promise<void> {
         await this.startToLearnLeased(bookID, isRand);
+        // 阅读曲线：推片后该书投影即时刷新（锁已释放，巡查避让判定不撞自己持有的
+        // StartToLearnLock——这是它必须放在锁外 fire 的原因）
+        void sweepReadCurve("dispatch");
+    }
+
+    /** □5 写作火苗点击=直达当前写作书的写作现场。书的选择与火苗数据同源
+     *  （pickWritingFlameBook：滚筒序第一本有未定稿槽的写作书，全完稿回落序首），
+     *  打开走 startToLearnWithLock 指定书路径——与滚筒轮转/书卡续读同一条调度链
+     *  （片选择/状态判定/计数同权），写作侧只多一步「限定写作书集」。 */
+    async openWritingFlameTarget() {
+        try {
+            const hit = await pickWritingFlameBook();
+            if (!hit) {
+                // 火苗渲染由 writingFlameState 门控，正常点不到 null；此处=书集在刷新
+                // 间隙被清空（如刚归档最后一本）的兜底，给反馈不静默（review P1-1）
+                debugLog("wflame", "open skipped: no writing book", "progressive");
+                await siyuan.pushMsg(tomatoI18n.暂无可用写作书, 2500);
+                return;
+            }
+            debugLog("wflame", `open book=${hit.bookName}(${hit.bookID}) target=${hit.target ? `point#${hit.target.point}` : "none"}`, "progressive");
+            await this.startToLearnWithLock(hit.bookID);
+        } catch (e) {
+            // SQL 抖动等异常兜底：onclick 的 promise 无人接，不包=unhandled rejection
+            console.error("openWritingFlameTarget failed", e);
+            await siyuan.pushMsg(tomatoI18n.请稍后再试, 2500);
+        }
     }
 
     /** ⏸/⚠ 书的统一处理：闭笔记本=提示开箱恢复（书可能只是暂不可见，绝不清理）；
@@ -642,34 +733,66 @@ class Progressive {
         }
         const bookInfo = await progStorage.booksInfo(bookID);
         // 期3 手动分片书：无自动片，统一拦截（Dock 书卡/管理页/浮条 ▶ 全入口）。manualbook □3
-        //  起：片=摘抄，点击直达最近一片（queryDigestTree.flat 首位=ctime 最新，续读语义）；
+        //  起：片=摘抄，点击直达最早一篇摘抄（鸟 09-08 17:41：手动书无续读指针，原 flat[0]
+        //  =ctime 最新的「续读」只是静态近似；自动书从第一片推进，跳最早才语义统一）；
         //  0 片回落原行为（开原书+「请直接摘抄」引导）。无参滚筒路径不会选中手动书（空索引恒
         //  finished），无需再判
         if (bookInfo.manualMode) {
             const tree = await queryDigestTree(bookID);
             if (tree.flat.length > 0) {
-                await OpenSyFile2(this.plugin, tree.flat[0].id);
+                // flat 经 byCtimeDesc 全局降序（digestUtils queryDigestTree 尾部 flat.sort），
+                // 末位即全局 ctime 最早；DigestAllDialog 同源此序
+                const earliest = tree.flat.at(-1)!;
+                await OpenSyFile2(this.plugin, earliest.id);
                 return;
             }
             await siyuan.pushMsg(tomatoI18n.手动分片书请直接摘抄);
             await this.openOriginBook(bookID);
             return;
         }
-        // 期2 写作书调度：轮到=开 activePoint 片（续转指针），已定稿/删/越界顺延首个
-        // 未定稿片；无片/全定稿=终态提示（开书给建槽现场）。索引恒空不走 createPiece 链
+        // 期A 写作书调度（素材优先、清空转槽，设计共识 memory material-parallel-design）：
+        // 素材池（digest-书名 夹）有未读素材→推最老未读，推过即打 🔨 锤（ctime 锤前缀=
+        // 手动书完成态同款格式，读侧 queryDigestTree/DigestAllDialog 已弱化显示），
+        // 素材对标分片计数同权（鸟 09-08 模型）；池清空→activePoint 槽（期2 原行为）；
+        // 两者皆空（0 槽纯收集书空池/全定稿）=终态提示（开书给建槽/摘抄现场）。
+        // 索引恒空不走 createPiece 链
         if (bookInfo.writing) {
+            const flat = (await queryDigestTree(bookID)).flat;
             const pieces = await fetchWritingPieces(bookID);
-            const target = pickWritingTarget(pieces, bookInfo.activePoint);
-            if (!target) {
-                await siyuan.pushMsg(tomatoI18n.写作书请从槽位开始, 2500);
+            const dispatch = pickWritingDispatch(flat, pieces, bookInfo.activePoint);
+            if (!dispatch) {
+                // 终态分态（review P2-5）：0 槽纯收集书池空=先摘素材；有槽全定稿=从槽开始
+                await siyuan.pushMsg(
+                    pieces.length === 0 ? tomatoI18n.纯收集书还没有素材 : tomatoI18n.写作书请从槽位开始, 2500);
                 await this.openOriginBook(bookID);
                 return;
             }
-            await progStorage.setActivePoint(bookID, target.point);
-            events.setDocID(target.docID);
-            await OpenSyFile2(this.plugin, target.docID);
-            // 计数同权：轮到写作书开片=今日阅读 +1（与阅读书翻片同 quota 池）
-            await this.markReadSafe(bookID);
+            if (dispatch.kind === "material") {
+                // ctime 节点值=「bookID#ct」整串（queryDigestTree 原样剥 🔨 前缀），锤=前插 🔨#
+                // 即得 🔨#bookID#ct（doneCtime 循环自洽；单测用例同形态锁行为）。
+                // 锤后复核：setBlockAttrs 端点 data 恒 null（返回值不可判成败——首版判 null
+                // 100% 误判触发重试环，09-09 e2e 实锤），改读 IAL 验真；文档已被删=复核不中
+                // → false 交 WithLock 重试环重跑分派（已删素材自然消失改推下条），防死开+幻计数
+                const hammer = `🔨#${dispatch.ctime}`;
+                await siyuan.setBlockAttrs(dispatch.id, { [PDIGEST_CTIME]: hammer } as any);
+                const after = ((await siyuan.getBlockAttrs(dispatch.id)) ?? {})[PDIGEST_CTIME] ?? "";
+                if (after !== hammer) {
+                    debugLog("wdispatch", `hammer miss doc=${dispatch.id} after=${after}`, "progressive");
+                    return false;
+                }
+                debugLog("wdispatch", `material book=${bookID} doc=${dispatch.id} ct=${dispatch.ctime}`, "progressive");
+                events.setDocID(dispatch.id);
+                await OpenSyFile2(this.plugin, dispatch.id);
+                await this.markReadSafe(bookID);
+                return true;
+            }
+            await progStorage.setActivePoint(bookID, dispatch.point);
+            events.setDocID(dispatch.docID);
+            await OpenSyFile2(this.plugin, dispatch.docID);
+            // 计数同权：轮到写作书开片=今日阅读 +1（与阅读书翻片同 quota 池）。补传
+            // slotPoint 锚（1530 期1 配套修正）：官方复习评分回写走同锚——双入口同锚
+            // 互斥零双计，同日重复开同 slot 不再重复计（旧语义与阅读书不对称，顺手修正）
+            await this.markReadSafe(bookID, dispatch.point);
             return true;
         }
         const bookIndex = await progStorage.loadBookIndexIfNeeded(bookInfo.bookID);
@@ -962,6 +1085,9 @@ class Progressive {
         confirm("📦", tomatoI18n.归档本书确认.replace("{name}", name ?? bookID), async () => {
             await rollerArchiveBook(bookID);
             await siyuan.pushMsg(tomatoI18n.已归档本书);
+            // confirm 落定后即时通知（□5 review P1-1：原本只靠 30s 刷新兜底，归档最后一本
+            // 写作书后写作火苗残留旧书 ≤30s，期间点击静默无反应）
+            notifyFleetChanged();
         });
     }
 
@@ -1156,6 +1282,43 @@ class Progressive {
         });
     }
 
+    /** matfeed □2 管理素材池直开通道（manage 态挂载单一事实源）：浮条平铺区格/槽片
+     *  右键/OriginDigestPopover 底部旧入口三面共用。原浮条内联版（openDigestAllDialog
+     *  的 manage 支路）随本通道收编退役。onSend 链=期D 原样（listWritingSlotTargets
+     *  空目标 toast + 锚下方弹批量槽菜单）。bookID 开菜单前由调用方捕获（切页签漂移
+     *  防护同 openSlotMenuForDigest 的 P1-2 纪律） */
+    openManagePoolDialog(bookID: string) {
+        if (!bookID) return;
+        showDialog((target, dm) => {
+            return mount(DigestAllDialogSvelte, {
+                target,
+                props: {
+                    dm,
+                    bookID,
+                    freeDoc: false,
+                    manage: true,
+                    onJumpDoc: (id: string) => {
+                        dm.destroyBy();
+                        void this.jumpTo(id);
+                    },
+                    onSend: async (ids: string[], mode: "copy" | "move", anchor: HTMLElement) => {
+                        const targets = await listWritingSlotTargets();
+                        if (targets.length === 0) {
+                            await siyuan.pushMsg(tomatoI18n.还没有可入槽的写作书, 2500);
+                            return null;
+                        }
+                        const r = anchor.getBoundingClientRect();
+                        return await this.openBatchSlotMenu(Math.round(r.left), Math.round(r.bottom + 6), targets, ids, mode);
+                    },
+                },
+            });
+        }, {
+            title: tomatoI18n.管理素材池,
+            width: events.isMobile ? "90vw" : undefined,
+            height: events.isMobile ? "180vw" : "min(700px, 90vh)",
+        });
+    }
+
     /** 期4 拆为新片：选中块已在调用前捕获（弹窗聚焦后编辑器选区不可靠） */
     openSplitPieceDialog(pieceDocID: string, bookID: string, blockIDs: string[]) {
         showDialog((target, dm) => {
@@ -1168,6 +1331,190 @@ class Progressive {
             width: events.isMobile ? "90vw" : "460px",
             height: "auto", // 单字段弹窗内容自适应（showDialog 默认 700px 定高会撑出大片空白）
         });
+    }
+
+    /** 期D 新建空槽（管理页写作书卡）：槽名小弹窗（SplitPieceDialog 同形态），
+     *  appendEmptyPiece 书尾建片；成功 notifyFleetChanged 槽数 +1 即时刷新 */
+    openAppendSlotDialog(bookID: string) {
+        showDialog((target, dm) => {
+            return mount(AppendSlotDialogSvelte, {
+                target,
+                props: { dm, bookID },
+            });
+        }, {
+            title: tomatoI18n.新建槽,
+            width: events.isMobile ? "90vw" : "460px",
+            height: "auto",
+        });
+    }
+
+    /** 期D 池管理批量发送菜单（DigestAllDialog manage 模式「复制入槽/移动入槽」）：
+     *  两级书→槽同 openSlotMenuCommon 形态（皮肤/让路共用）。点槽后循环 digestIDs
+     *  逐篇执行——单篇失败不阻断（失败计数续跑，源未空的篇目留在池里数据无损）；
+     *  汇总 {ok, skipped, failed, movedIds} 交 Dialog（movedIds=move 成功删除源的
+     *  篇目，Dialog 按它精准剔除列表行——skipped/failed 篇源还在池里不能剔，
+     *  reasoning P1-1）。用户关菜单不点=resolve(null)（Dialog 保持选择集不动）。
+     *  Mode 由调用方确认（移动须先 confirm） */
+    openBatchSlotMenu(x: number, y: number, targets: WritingSlotTarget[],
+        digestIDs: string[], mode: "copy" | "move"): Promise<{ ok: number; skipped: number; failed: number; movedIds: string[] } | null> {
+        const yielded = yieldFloatbarForMenu();
+        let settle: (s: { ok: number; skipped: number; failed: number; movedIds: string[] } | null) => void;
+        const done = new Promise<{ ok: number; skipped: number; failed: number; movedIds: string[] } | null>(r => { settle = r; });
+        // closeCB null 结算竞态双保险（reasoning 复核内核 Menu.ts：点项路径=先同步调
+        // click 再 menu.remove()，closeCB 的 setTimeout 在 click 同步段之后才创建）。
+        // 胜负手不是「closeCB vs click」而是「closeCB 的同步 settle vs click 循环的
+        // async 尾」——click 同步段置 settledByClick（早于定时器触发），closeCB 延迟
+        // 结算时被标志压住：纯关闭（外点/Esc 无 click）照常 resolve null，点项下
+        // summary 不被竞态 null 冻结（循环多 await，纯时序推迟必输——勿据「click 先
+        // 于 close」简化掉标志位）
+        let settledByClick = false;
+        const menu = new (Menu as any)("progBatchSlotMenu", () => {
+            restoreFloatbarAfterMenu(yielded);
+            setTimeout(() => { if (!settledByClick) settle(null); }, 0);
+        }, true) as Menu;
+        menu.element.classList.add("prog-slot-menu");
+        for (const t of targets) {
+            menu.addItem({
+                label: escapeHtml(t.name),
+                submenu: t.slots.map(s => ({
+                    label: escapeHtml(s.title),
+                    click: async () => {
+                        // Menu click 自带兜底纪律（openSlotMenuCommon 同款：内核不接 promise）
+                        settledByClick = true;
+                        try {
+                            const summary = { ok: 0, skipped: 0, failed: 0, movedIds: [] as string[] };
+                            for (const id of digestIDs) {
+                                try {
+                                    const n = mode === "copy"
+                                        ? await insertDigestIntoPiece(s.docID, t.bookID, id)
+                                        : await moveDigestIntoPiece(s.docID, t.bookID, id);
+                                    if (n > 0) {
+                                        summary.ok++;
+                                        if (mode === "move") summary.movedIds.push(id);
+                                    } else {
+                                        summary.skipped++;
+                                    }
+                                } catch (e) {
+                                    summary.failed++;
+                                    console.error("batch slot send failed", id, e);
+                                }
+                            }
+                            settle(summary);
+                            await siyuan.pushMsg(tomatoI18n.批量入槽汇总(summary.ok, summary.skipped, summary.failed), 2500);
+                            notifyFleetChanged(); // activePoint 可能迁移（markPieceActive）
+                        } catch (e) {
+                            console.error("batch slot menu failed", e);
+                            await siyuan.pushMsg(tomatoI18n.插入素材失败请重试, 2500);
+                            settle(null);
+                        }
+                    },
+                })),
+            });
+        }
+        menu.open({ x, y });
+        return done;
+    }
+
+    /** □1 入槽菜单统一开口（浮条推式/直送两钮 + 直接入槽命令三入口共用）：两级
+     *  书→未定稿槽。①视觉对齐浮条（鸟 09-08 反馈①）：挂 prog-slot-menu 类，样式
+     *  在 index.scss（surface/6px/point-shadow，覆盖容器/菜单项/子菜单三处自画背景）；
+     *  ②遮挡让路（反馈②）：弹前降层、closeCB 还原（ProgressiveBtn yieldFloatbarForMenu）。
+     *  onPicked=入槽动作，返回入块数（toast 口径统一：已入槽/该摘抄无内容块）。
+     *  □1 定向喂池：pool 传入时每本书 submenu 首项加池动作（划词直喂「→ 收进素材池」/
+     *  整篇搬运「移入素材池」——label 由调用方给）；无槽空书 submenu=[池项] 唯一目标
+     *  （此前空行）；excludeBookID=digest 搬运时源书不列池项（槽项照常）。池动作 toast
+     *  口径=done(书名)，成功后 notifyFleetChanged（池未读数变化，火苗/舰队即时刷新） */
+    openSlotMenuCommon(x: number, y: number, targets: WritingSlotTarget[],
+        onPicked: (slot: WritingSlotTarget["slots"][number], target: WritingSlotTarget) => Promise<number>,
+        pool?: {
+            label: string;
+            done: (book: string) => string;
+            excludeBookID?: string;
+            run: (target: WritingSlotTarget) => Promise<number>;
+        }) {
+        const yielded = yieldFloatbarForMenu();
+        const menu = new (Menu as any)("progSlotMenu", () => restoreFloatbarAfterMenu(yielded), true) as Menu;
+        menu.element.classList.add("prog-slot-menu");
+        for (const t of targets) {
+            // label=用户书名/槽名，Menu label 走 innerHTML 须转义（□12 存量补——
+            // openBatchSlotMenu 期D 起已转义，此收口点补齐同款）
+            const poolItem = pool && pool.excludeBookID !== t.bookID ? [{
+                label: escapeHtml(pool.label),
+                click: async () => {
+                    // Menu click 兜底纪律同槽项（内核 Menu.ts 丢弃 async click 的 rejection）
+                    try {
+                        const n = await pool.run(t);
+                        if (n > 0) {
+                            notifyFleetChanged();
+                            await siyuan.pushMsg(pool.done(t.name), 2500);
+                        } else {
+                            await siyuan.pushMsg(tomatoI18n.该摘抄无内容块, 2500);
+                        }
+                    } catch (e) {
+                        console.error("pool feed failed", e);
+                        await siyuan.pushMsg(tomatoI18n.插入素材失败请重试, 2500);
+                    }
+                },
+            }] : [];
+            menu.addItem({
+                label: escapeHtml(t.name),
+                submenu: [...poolItem, ...t.slots.map(s => ({
+                    label: escapeHtml(s.title),
+                    click: async () => {
+                        // 思源 Menu click 既不 catch 也不接 promise——入槽动作自带
+                        // 兜底（reasoning P1-1：内核 Menu.ts 丢弃 async click 的
+                        // rejection，胶囊链失败=零 toast 静默）
+                        try {
+                            const n = await onPicked(s, t);
+                            await siyuan.pushMsg(n > 0
+                                ? tomatoI18n.已入槽本书该槽(n, t.name)
+                                : tomatoI18n.该摘抄无内容块, 2500);
+                        } catch (e) {
+                            console.error("slot insert failed", e);
+                            await siyuan.pushMsg(tomatoI18n.插入素材失败请重试, 2500);
+                        }
+                    },
+                }))],
+            });
+        }
+        menu.open({ x, y });
+    }
+
+    /** □1-③ 直接入槽命令体（⌥;）：激活编辑器选区直送进槽——与浮条直送钮同菜单，
+     *  选区空时光标兜底块算数（直送宽松语义，宁顺勿拦）。锚点=选中首块正下方（命令
+     *  通道无鼠标坐标），限定激活编辑器内查（P2-3：分屏/双页签同 id 块取全局第一份
+     *  会锚到非激活屏），块不在 DOM（罕见）兜底屏幕中上。
+     *  移动端备案（P2-2）：getActiveProtyle 恒 null → toast 拦截（宁 toast 勿错插，
+     *  readThisPiece 式全局回退待移动端命令面板实测需要时再补） */
+    private async directSlotCommand() {
+        const protyle = getActiveProtyle();
+        if (!protyle) {
+            await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪, 2500);
+            return;
+        }
+        const { ids } = await events.selectedDivs(protyle);
+        if (!ids || ids.length === 0) {
+            await siyuan.pushMsg(tomatoI18n.请先选中要入槽的内容, 2500);
+            return;
+        }
+        const captured = [...ids];
+        const targets = await listWritingSlotTargets();
+        if (targets.length === 0) {
+            await siyuan.pushMsg(tomatoI18n.还没有可入槽的写作书, 2500);
+            return;
+        }
+        const r = protyle.wysiwyg?.element?.querySelector(`[data-node-id="${captured[0]}"]`)?.getBoundingClientRect();
+        this.openSlotMenuCommon(
+            r ? Math.round(r.left) : Math.round(innerWidth / 2),
+            r ? Math.round(r.bottom + 6) : Math.round(innerHeight / 3),
+            targets,
+            (s, t) => insertBlocksIntoPiece(s.docID, t.bookID, protyle.block?.rootID ?? "", captured),
+            // □1 划词直喂：同菜单每本书首项「→ 收进素材池」（选中块建新素材文档进目标书池）
+            {
+                label: tomatoI18n.收进素材池,
+                done: book => tomatoI18n.已收进素材池书名(book),
+                run: t => feedBlocksToPool(t.bookID, protyle.block?.rootID ?? "", captured).then(id => id ? 1 : 0),
+            });
     }
 }
 

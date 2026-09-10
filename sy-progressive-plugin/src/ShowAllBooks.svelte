@@ -15,7 +15,7 @@
     import { createAllPieces } from "./helper";
     import { objOverrideNull } from "stonev5-utils";
     import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
-    import { notifyFleetChanged } from "./fleetNotify";
+    import { notifyFleetChanged, onFleetChanged } from "./fleetNotify";
     import { fetchWritingPieces } from "./writeBook";
     import { writingCompareBox } from "./WritingCompareBox";
 
@@ -44,22 +44,30 @@
     let statuses = $state(new Map<string, BookStatusInfo>());
     let orderIdx = $state(new Map<string, number>());
     let loaded = $state(false);
+    let loadGen = 0; // 代际计数（非渲染态）：并发 load 交错时旧完成者丢弃
     let expanded = $state<Record<string, boolean>>({});
     let rootEl = $state<HTMLDivElement>();
 
     // 挂载点是 showDialog 生成的空 div（height:auto），撑满 .b3-dialog__content（flex:1 定高）
     // 列表才能内部滚动、工具栏不随滚走；内容区自身 overflow:auto 是兜底（退化为 Dialog 级滚动）。
+    // 期D 订阅 fleet 变化：外部写点（新建槽/定稿/归档）改片数后书卡即时刷新——此前
+    // 挂载快照，Dialog 开着时数据错到重开（e2e 实锤新建槽后 ✍ 计数不动）
     onMount(() => {
         const p = rootEl?.parentElement;
         if (p) {
             p.style.height = "100%";
             p.style.minHeight = "0";
         }
-        return load(false);
+        // 代际守卫（□13-1）：密集 notify 下多个 load 交错，慢的旧 load 后完成会盖掉
+        // 新数据——load 自增计数，后完成者发现代际落后即丢弃
+        const off = onFleetChanged(() => { void load(false); });
+        void load(false);
+        return off;
     });
     onDestroy(destroy);
 
     async function load(force: boolean) {
+        const gen = ++loadGen;
         await progStorage.healHalfRegistered(); // □1 半注册自愈：救回断链书后再列书
         const ids = Object.keys(progStorage.booksInfos()).filter(
             // 全库唯一谓词：非块 id 形状脏键（_cache 等）不渲染成幽灵行；
@@ -96,6 +104,7 @@
             const name = (await row)?.content || bookInfo.bookName || bookID;
             list.push({ bookID, bookInfo, bookIndex, name, doneOf, pieceLen });
         }
+        if (gen !== loadGen) return; // 旧代际完成：丢弃防盖新数据（□13-1）
         statuses = st;
         orderIdx = oIdx;
         books = list;
@@ -404,8 +413,16 @@
                                     <!-- 期3 手动分片书：无分片设置可用（空索引+无断句/建片语义），说明行替代 -->
                                     <div class="dig-row">{tomatoI18n.手动书设置说明}</div>
                                 {:else if b.bookInfo.writing}
-                                    <!-- 期1 写作书：无切分语义，说明行替代（调度/入槽后续期接入） -->
+                                    <!-- 期1 写作书无切分语义说明行；期D 加「新建槽」（先建槽后放素材：
+                                        纯收集书攒了素材后开槽，或写到中途加新章） -->
                                     <div class="dig-row">{tomatoI18n.写作书设置说明}</div>
+                                    <div class="dig-row">
+                                        <button
+                                            class="btn ghost emph"
+                                            aria-label={`${tomatoI18n.新建槽}《${b.name}》`}
+                                            onclick={() => prog.openAppendSlotDialog(b.bookID)}
+                                        >{tomatoI18n.新建槽}</button>
+                                    </div>
                                 {:else}
                                 <label class="dig-row">
                                     <input

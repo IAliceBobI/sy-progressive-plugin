@@ -77,4 +77,7 @@ export const PROG_FLOAT_ICONS = `
 <symbol id="iconProgTraceUp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="14" rx="2"/><path d="M9 7h6"/><path d="M9 11h4"/><path d="M9 21h9a3 3 0 0 0 3-3v-3"/><path d="m18 18 3-3-3-3"/></symbol>
 <!-- 菜单翻新（2026-09-02）：随机阅读=标准 shuffle 交叉双箭头（lucide shuffle 线稿化） -->
 <symbol id="iconProgShuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.8-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/></symbol>
+<!-- matfeed □2 管理素材池：inbox 托盘家族变体——右下角开口让位给对勾（勾选/批量语义；
+     与「留档」iconProgInbox 同家族可区分，与「插入素材」iconProgMaterial（纯下载箭头）不撞） -->
+<symbol id="iconProgPoolManage" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h6"/><path d="m15 17 2 2 4-4"/></symbol>
 `;

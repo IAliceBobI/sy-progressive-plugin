@@ -7,6 +7,8 @@
         digestLanding,
         digestNoBacktraceLink,
         markOriginTextBG,
+        materialCapsuleBorder,
+        writingPoolUnderBook,
         revTraceScope,
         digestAddReadingpoint,
         digestGlobalSigle,
@@ -85,5 +87,27 @@
             bind:checked={$digestAddReadingpoint}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置阅读点}>{tomatoI18n.摘抄后加入阅读点}</span>
+    </div>
+
+    <div>
+        <!-- matfeed □3 入槽胶囊边框：写作书槽内素材胶囊（row 超级块）默认无边框看不出
+             边界，默认开细边框（body 类总闸实时生效，markOriginTextBG 同款） -->
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$materialCapsuleBorder}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置胶囊边框}>{tomatoI18n.入槽素材胶囊显示边框}</span>
+    </div>
+
+    <div>
+        <!-- matfeed □4 写作书素材池位置：只决定新建夹落点（书下=槽+素材一棵树 / 摘抄
+             总夹），已有夹位置无关不受影响——存量夹显式搬走管理界面搬迁钮 -->
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$writingPoolUnderBook}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip写作书素材池挂书下}>{tomatoI18n.写作书素材池挂书下}</span>
     </div>
 </div>

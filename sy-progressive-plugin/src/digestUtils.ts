@@ -295,10 +295,10 @@ export interface DigestTreeData {
     flat: DigestTreeNode[];
 }
 
-/** ctime 值剥 🔨 完成态前缀（finishDigest 写「🔨#bookID#ct」）；非完成态返回 null */
-function doneCtime(v: string): string | null {
-    return v.startsWith("🔨#") ? v.slice(2) : null;
-}
+// doneCtime 迁至 progData.ts（vitest 链禁 .svelte——纯函数落纯模块可单测）；re-export
+// 保外部消费不变，另 import 原名供 queryDigestTree 内部引用（export…from 不占本地绑定）
+export { doneCtime } from "./progData";
+import { doneCtime } from "./progData";
 
 /**
  * 查书的全摘抄树（路线图浮层/原文侧追溯浮层共用）：SQL 取书+全部摘抄文档（ctime

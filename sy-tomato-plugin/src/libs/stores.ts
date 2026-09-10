@@ -791,6 +791,14 @@ export const mobileSelectBtns = settingFactory("mobileSelectBtns", true, STORAGE
 // v5 □12 语义更新：markOriginTextBG 从「写 style 到 .sy」改为「CSS div:has(> .prog-digest-mark)
 // 渲染态背景」的总开关（index.ts 订阅挂 body 类 prog-digest-bg-on，span 在则背景在）
 export const markOriginTextBG = settingFactory("markOriginTextBG", false, STORAGE_Prog_SETTINGS, null as TSK);
+// matfeed □3 入槽胶囊边框（bear 实测「不知道边界」）：sb[custom-prog-material] 细边框总开关
+// （index.scss 经 body 类 prog-material-border-on 总闸，markOriginTextBG 同款）；默认开
+export const materialCapsuleBorder = settingFactory("materialCapsuleBorder", true, STORAGE_Prog_SETTINGS, null as TSK);
+// matfeed □4 写作书素材池位置档（bear「素材池子是不是应该在这本书底下放着」）：true=新建
+// digest-书名 夹直接挂书下（槽+素材一棵树），false=摘抄总夹集中档。只决定**新建**落点与
+// 管理界面的搬迁钮方向——已有夹按 IAL 原位认回（位置无关），改档不自动搬（显式搬走
+// DigestAllDialog 搬迁钮）；阅读书摘抄落点仍由 digestLanding 三档管，两设置互不干涉
+export const writingPoolUnderBook = settingFactory("writingPoolUnderBook", true, STORAGE_Prog_SETTINGS, null as TSK);
 // 修订痕迹（revtrace □4）：块级「按编辑时间着色」回看视图总开关——纯视图零档案（revTrace.ts：
 // 色层=f(块 updated 距今天数)+enrollment 基线，关掉即无痕）；默认关（□6 呈 bear 拍板，荐默认关），
 // 命令 toggle 与设置面板同此状态（浮条系统开关 toggleFloatBarSystem 同款 .set() 不落盘，
@@ -812,6 +820,11 @@ export const hideBtnsInFlashCard = settingFactory("hideBtnsInFlashCard", true, S
 // 不再补插存量（retrofit 跳过）+ 已建卡渲染为一行细静条（可整块手删，不自动清理）
 export const pieceTailCard = settingFactory("pieceTailCard", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const openCardsOnOpenPiece = settingFactory("openCardsOnOpenPiece", false, STORAGE_Prog_SETTINGS, null as TSK);
+// 阅读曲线接管（1530 期1，实验默认关）：分片卡 due=滚筒节奏投影进官方复习界面，
+// 官方评分回流滚筒状态（双入口一账）。关=末次清场（readCurve.clearReadCurve）
+export const readCurveTakeover = settingFactory("readCurveTakeover", false, STORAGE_Prog_SETTINGS, null as TSK);
+// 巡查频率档（分钟）：0=关/30/60/360；事件触发（推片/翻卡/设置变更）不受此档影响
+export const readCurveSweepMins = settingFactory("readCurveSweepMins", 30, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardUnderPiece = settingFactory("cardUnderPiece", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardAppendTime = settingFactory("cardAppendTime", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const mobileTopBar = settingFactory("mobileTopBar", true, STORAGE_Prog_SETTINGS, null as TSK);
@@ -826,6 +839,14 @@ export const floatbarMainBtns = settingFactory(
 // （✂ 摘抄子排 + 📥 加书），低频四项（目录/关联摘抄/路线指引/不再推送）拖上首行即入清单
 export const floatbarFreeMainBtns = settingFactory(
     "floatbarFreeMainBtns", ["digest", "addBook"], STORAGE_Prog_SETTINGS, null as TSK);
+// 摘抄/书态浮条首行清单（650189 第二轮「片摘处的浮窗也无法拖动排序」v3.6.1，2026-09-10
+// 四态机制补全）：独立 store 独立池（与 free 同款），默认 = 各态 common+SCENE 固有编排
+// （老用户升级零迁移），平铺区低频项（digest 态 map；书态 目录/本书摘抄/忽略/路线指引）
+// 拖上首行即入清单
+export const floatbarDigestMainBtns = settingFactory(
+    "floatbarDigestMainBtns", ["digest", "cards", "recite", "revisit", "prev", "next", "origin", "tree", "summary"], STORAGE_Prog_SETTINGS, null as TSK);
+export const floatbarBookMainBtns = settingFactory(
+    "floatbarBookMainBtns", ["digest", "cards", "swap", "continue", "toPiece", "summary", "addBook", "archive"], STORAGE_Prog_SETTINGS, null as TSK);
 // □14b 平铺区折叠偏好：持久化（布局偏好非临时状态，重启不再收一次）；默认展开与
 // □10 已发布行为兼容
 export const floatbarFlatCollapsed = settingFactory(

@@ -18,7 +18,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarFlatCollapsed, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
@@ -38,6 +38,7 @@ import { initProgFloatBtns, toggleFloatBarSystem, toggleFreeFloat } from "./Prog
 import { PROG_FLOAT_ICONS } from "./progIcons";
 import { initDigestMarker } from "./digestMarker";
 import { initMaterialMarker } from "./materialMarker";
+import { initMaterialTrace } from "./materialTrace";
 import { applyRevTraceEnabled, lastRevTraceScope, rememberRevTraceScope } from "./revTrace";
 import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
 import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
@@ -97,6 +98,12 @@ function loadStore(plugin: BaseTomatoPlugin) {
     // □12 摘抄背景渲染态总开关：body 类即 CSS 总闸（index.scss div:has(> .prog-digest-mark)），
     // 订阅在 load 后挂——subscribe 立即同步一次，之后设置面板改值实时生效
     markOriginTextBG.subscribe(v => document.body.classList.toggle("prog-digest-bg-on", !!v));
+    // matfeed □3 入槽胶囊边框：同款 body 类总闸（index.scss sb[custom-prog-material]）
+    materialCapsuleBorder.load(plugin);
+    materialCapsuleBorder.subscribe(v => document.body.classList.toggle("prog-material-border-on", !!v));
+    // matfeed □4 写作书素材池位置档：纯数据档位（writeBook 池动作 ensure 的 underBook 参）
+    // 无渲染态总闸，读值点在喂池/搬运两处——漏 load 则 .set 后重启回默认（settings.md 四步对账）
+    writingPoolUnderBook.load(plugin);
     // revtrace-scope 范围三档迁移（digestLanding 同款幂等）：revTraceScope 无存量值时
     // 老开关 revTraceEnabled=true → "all"（旧开关开着=全局染，保持原行为），否则默认
     // "off"；.set 只写内存——即便未持久化，每次启动重跑也幂等。旧键留盘仅作迁移读源
@@ -115,12 +122,17 @@ function loadStore(plugin: BaseTomatoPlugin) {
     hideBtnsInFlashCard.load(plugin);
     pieceTailCard.load(plugin);
     openCardsOnOpenPiece.load(plugin);
+    // 阅读曲线接管（1530 期1）：漏登记=开关/频率档 set 全部静默无效（settings.md 坑）
+    readCurveTakeover.load(plugin);
+    readCurveSweepMins.load(plugin);
     cardUnderPiece.load(plugin);
     cardAppendTime.load(plugin);
     mobileTopBar.load(plugin);
     initProgFloatBtnsDisable.load(plugin);
     floatbarMainBtns.load(plugin);
     floatbarFreeMainBtns.load(plugin);
+    floatbarDigestMainBtns.load(plugin);
+    floatbarBookMainBtns.load(plugin);
     floatbarFlatCollapsed.load(plugin);
     digSubrankOpen.load(plugin);
     floatbarExpandPref.load(plugin);
@@ -294,7 +306,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
             title: " ", // 占位保住 header，真实标题按钮组创建后以节点形式挂入
             content: `<div id="${id}"></div>`,
             width: events.isMobile ? "90vw" : "min(700px, 92vw)",
-            height: events.isMobile ? "180svw" : "700px",
+            // 700px 硬编在矮视口（分屏/小屏）下把 footer「保存并关闭」挤出屏幕不可点
+            // （matfeed □4 vision P2 + DOM 实锤：633px 视口 bottom=653>633）；92vh 封顶同族
+            height: events.isMobile ? "180svw" : "min(700px, 92vh)",
             destroyCallback: () => {
                 dm.destroyBy("1")
             },
@@ -355,6 +369,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         this.addIcons(PROG_FLOAT_ICONS);
         initDigestMarker(this);
         initMaterialMarker(this);
+        initMaterialTrace(this);
         events.onload(this);
         tomatoI18n.init();
         // □2 片尾收束卡渲染器（3.8.3+；旧内核 customBlockRenders 缺省=注册即无操作，
@@ -461,6 +476,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             continueReading: (bookID) => prog.startToLearnWithLock(bookID),
             manageBooks: () => prog.viewAllProgressiveBooks(),
             addWritingBook: () => prog.openAddWritingBookDialog(),
+            openWriting: () => prog.openWritingFlameTarget(),
             openSettings: () => this.openSettings(),
             reciteAction: async () => {
                 if (prog.isReciteInstalled()) {

@@ -19,8 +19,23 @@ import { progStorage } from "./ProgressiveStorage";
  *  基线写入用，与 updated 直接字典序比较） */
 export const kernelTimeNow = (d?: Date) => timeUtil.kernelTimeNow(d);
 
-/** 色窗档数：K=5（今天+前 4 天，Scrivener 5 档先例），更早无色 */
+/** 色窗天数：今天+前 4 天（Scrivener 5 档先例窗宽保留），更早无色 */
+export const REVTRACE_WINDOW_DAYS = 5;
+
+/** 视觉档数（matfeed □5 形态分工后 09-10 bear 拍板恢复 5 档）：形态互斥已由
+ * 徽章分工保证（竖条专留本族），「五颜六色难区分」根因消除——恢复 Scrivener
+ * 一天一档颗粒度（t0=今天 … t4=前4天，与窗宽相等）。
+ * ⚠三方手动同步点：改档数须同改 bucketTier 映射与 index.scss 的 .prog-revtrace-tN
+ * 规则（本常量生产代码零消费，仅测试锁定防漂移） */
 export const REVTRACE_TIERS = 5;
+
+/** 天数 → 视觉档：一天一档恒等映射（0..4 → t0..t4）。保留这层间接=档位颗粒度
+ * 的单点调节阀（3 档折叠期教训：bear 一句话改回，将来再调只动此函数+色值）。
+ * hover 文案仍按真实天数（markLabel 收 days 非档位）；幂等分支的 label 刷新
+ * 防御保留（恒等下为 no-op，折叠形态回归时立即生效） */
+export function bucketTier(days: number): number {
+    return days;
+}
 
 /** 内核 IAL updated 形态：yyyyMMddHHmmss 本地时间，14 位数字典序=时间序 */
 const KERNEL_TIME_RE = /^\d{14}$/;
@@ -36,7 +51,7 @@ export function parseKernelTime(s: string): number | null {
 }
 
 /**
- * 距今天数档位：0=今天 … REVTRACE_TIERS-1=前4天；更早/解析失败/未来 → null（无色）。
+ * 距今天数：0=今天 … REVTRACE_WINDOW_DAYS-1=前4天；更早/解析失败/未来 → null（无色）。
  * 日历日差非 24h 差（分桶单位=按天拍板；昨晚 23:59 距今晨 00:30=昨天档）。
  */
 export function tierOf(updated: string, now: Date): number | null {
@@ -46,7 +61,7 @@ export function tierOf(updated: string, now: Date): number | null {
     // 本地日期分量拼 UTC 零点做纯日差：两 UTC 零点差恒为整天数，DST/闰年免疫
     const dayOf = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
     const diff = (dayOf(now) - dayOf(u)) / 86400000;
-    return diff >= 0 && diff < REVTRACE_TIERS ? diff : null;
+    return diff >= 0 && diff < REVTRACE_WINDOW_DAYS ? diff : null;
 }
 
 /**
@@ -125,16 +140,28 @@ export function invalidateRevTrace(docID?: string) {
     else cache.clear();
 }
 
+/** SQL rows → (blockID → updated) 快照构建（含空块过滤）。空内容块永不入 map：空段落/
+ *  空标题/空列表项在 blocks 表 content 列实测=纯空串（DOM 的零宽空格是渲染层事，SQL 层
+ *  干净——kernel/data.md「思源空块 textContent=零宽空格」），哪怕 updated 在窗口内也不染
+ *  （bear 拍板 2026-09-09：空行零信息量，砍视觉噪音）。对账层「map 无此块」即不插/
+ *  存量条剥，数据侧过滤一处全链生效；图片段落实测 content='<img … />' 非空、公式/代码
+ *  块同理（源文本即 content），不误杀 */
+export function rowsToUpdatedMap(rows: any[]): Map<string, string> {
+    return new Map(
+        rows
+            .filter((r: any) => r?.id && r?.updated && typeof r.content === "string" && r.content.trim() !== "")
+            .map((r: any) => [r.id as string, r.updated as string]),
+    );
+}
+
 /** docID → (blockID → updated) 全量快照；rows 空文档查无（删除/索引未就绪）返回空 Map */
 export async function updatedMapOf(docID: string): Promise<Map<string, string>> {
     const hit = cache.get(docID);
     if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.map;
     const rows = ((await siyuan.sql(
-        `select id, updated from blocks where root_id='${docID}' limit 1000000`,
+        `select id, updated, content from blocks where root_id='${docID}' limit 1000000`,
     )) ?? []) as any[];
-    const map = new Map(
-        rows.filter((r: any) => r?.id && r?.updated).map((r: any) => [r.id as string, r.updated as string]),
-    );
+    const map = rowsToUpdatedMap(rows);
     cache.set(docID, { map, ts: Date.now() });
     return map;
 }
@@ -199,7 +226,7 @@ function editingBlockID(welement: HTMLElement): string {
 
 /**
  * 出场链入口（ProgressiveBtn 四态路径调用）：取数→enroll 基线→按 updated 色层打标。
- * 幂等清旧重打；懒加载双向窗口随出场五事件反复调用（digestMarker □15 同款）。
+ * 幂等单块对账（revperf：稳定态出场零 DOM 变更，防高频出场的布局翻转迟顿）；懒加载双向窗口随出场五事件反复调用（digestMarker □15 同款）。
  * 叶子块过滤：div 内嵌套 [data-node-id] 的容器块（列表/引用/超级块）不染——内核
  * RefreshUpdated 级联刷父链，不过滤会把容器染花。span 零 textContent 硬约束。
  */
@@ -224,26 +251,66 @@ export async function revTraceOnAppear(protyle: any, docID: string) {
     }
 }
 
-/** 单块打标（出场全量与重画补挂共用）：叶子过滤+幂等（已有条早退）+编辑现场跳过+
- *  基线/窗口判染；命中染返回 true。span 形态/tier 类名/aria-label 见 insertMarkSpan */
-function markBlockIfDue(
+/** 单块对账（出场全量与重画补挂共用，revperf 改造，导出供单测）：按块当前条态与
+ *  应染态 diff，返回是否发生 DOM 变更——
+ *  ① 应染（窗口内且晚于基线）：无条→插；有条且 tier 类名一致→零 DOM 变更（出场幂等
+ *    主路径）；tier 漂移（跨天换档）→原位改类名+aria-label（span absolute 不参与文本
+ *    流，宿主 :has 匹配不变，无布局翻转）
+ *  ② 不应染：有条→剥（褪色/出窗/基线内/换文档残留）；无条→不动
+ *  ③ 容器块（嵌套 data-node-id，叶子过滤）：有条→剥（历史残留）；无条→跳过
+ *  ④ 编辑现场块（editingID）：不插不改（防 IME/光标打断），既有条保留——旧实现出场
+ *    先清空恒无条，对账模型下可能带条出场，条陈旧由下次出场修正 */
+export function reconcileBlock(
     div: HTMLElement,
     map: Map<string, string>,
     base: string,
     now: Date,
     editingID: string,
 ): boolean {
-    if (div.querySelector("[data-node-id]")) return false; // 容器块跳过（叶子过滤）
-    if (div.querySelector(`:scope > .${MARK_CLASS}`)) return false; // 幂等（出场/补挂双通道并发安全）
+    const span = div.querySelector<HTMLElement>(`:scope > .${MARK_CLASS}`);
+    if (div.querySelector("[data-node-id]")) { // 容器块（叶子过滤）
+        if (span) { removeMarkSpan(span); return true; }
+        return false;
+    }
     const id = div.getAttribute("data-node-id");
-    if (!id || id === editingID) return false;
+    if (!id) return false;
     const updated = map.get(id);
-    if (!updated || !shouldColor(updated, base, now)) return false;
-    insertMarkSpan(div, tierOf(updated, now) ?? 0, updated); // shouldColor 已保证 tier 非空
-    return true;
+    if (!updated || !shouldColor(updated, base, now)) {
+        if (span) { removeMarkSpan(span); return true; }
+        return false;
+    }
+    if (id === editingID) return false; // 编辑现场：保条不保插（防打断，下场修正）
+    const days = tierOf(updated, now) ?? 0; // shouldColor 已保证非 null
+    const tier = bucketTier(days); // 档位映射（当前=一天一档恒等；文案仍按真实天数）
+    if (!span) {
+        insertMarkSpan(div, tier, days, updated);
+        return true;
+    }
+    if (!span.classList.contains(`prog-revtrace-t${tier}`)) {
+        span.className = `${MARK_CLASS} prog-revtrace-t${tier}`;
+        span.setAttribute("aria-label", markLabel(days, updated));
+        return true;
+    }
+    // 折叠形态（如 3 档期）下同档跨天类名不变，label 会陈旧——无条件按真实天数刷新；
+    // 恒等映射下为 no-op，作为档位再折叠时的防御保留
+    span.setAttribute("aria-label", markLabel(days, updated));
+    return false;
 }
 
-function insertMarkSpan(div: HTMLElement, tier: number, updated: string) {
+/** 剥单条（对账用）：连带收自己持有的 tip（全量 clearRevTrace 同款收尾） */
+function removeMarkSpan(span: HTMLElement) {
+    if (span === tipOwner) {
+        tipOwner = null;
+        hideFloatTip();
+    }
+    span.remove();
+}
+
+function markLabel(days: number, updated: string): string {
+    return tomatoI18n.修订痕迹提示(days, +updated.slice(4, 6), +updated.slice(6, 8));
+}
+
+function insertMarkSpan(div: HTMLElement, tier: number, days: number, updated: string) {
     const span = document.createElement("span");
     // tier 修饰类名=prog-revtrace-tN（无 -mark 中段，与 scss .prog-revtrace-mark.prog-revtrace-tN
     // 对齐；曾错写 -mark-tN 致 tier 背景规则全不命中=span 隐形，视觉评审二轮破案）
@@ -253,7 +320,7 @@ function insertMarkSpan(div: HTMLElement, tier: number, updated: string) {
     // 自建元素对思源 tip 生态隐身防补刀）；tier=距今天数，日月分量取自 updated 本体。
     // □7 后悬停走宿主块委托（ensureHoverDelegate，span 本体 pointer-events:none 真鼠标
     // 永不命中——旧 span mouseenter 是死通道已拆，勿再挂回来）
-    span.setAttribute("aria-label", tomatoI18n.修订痕迹提示(tier, +updated.slice(4, 6), +updated.slice(6, 8)));
+    span.setAttribute("aria-label", markLabel(days, updated));
     div.insertBefore(span, div.firstChild);
 }
 
@@ -261,9 +328,11 @@ async function revTraceOnAppear0(welement: HTMLElement, docID: string) {
     const map = await updatedMapOf(docID);
     debugLog("revtrace", `appear docID=${docID} rows=${map.size}`, "progressive");
     ensureHoverDelegate(welement);
-    // 清旧紧贴打标（digestMarker review P1#1 同款：清在 await 前的并发交错会同块双插
-    // span）；查询空（文档已删/索引未就绪）也清——重渲染孤儿 span 直接按类剥
-    clearRevTrace(welement);
+    // revperf：出场不再无条件「全剥→全插」——宿主 :has(>mark) 挂着 padding-left，每轮
+    // 剥插=窗口内全部染色块布局翻转两遍（实测 97 块窗口 5~7ms/轮），click_editorcontent
+    // 级高频出场累计=可感知迟顿（群反馈 650189）；改单块对账（reconcileBlock），稳定态
+    // 出场零 DOM 变更。查询空（文档已删/索引未就绪）由对账自然全剥（所有块无 updated
+    // =不应染）；并发交错（await 后同块双插）由对账幂等分支吸收。
     if (map.size === 0) {
         // 查询空两形态：①新建索引未就绪（首开热路径）→ 无条目先 enroll 占基线，防
         // 「基线迟到至就绪后的出场」吞掉创建→就绪窗口内的编辑（A2 回归实锤：编辑
@@ -274,18 +343,17 @@ async function revTraceOnAppear0(welement: HTMLElement, docID: string) {
             await progStorage.enrollRevTrace(docID);
         }
         debugLog("revtrace", `docID=${docID} 查询空（索引未就绪占基线/已删条目留存）`, "progressive");
-        return;
     }
     const base = progStorage.revTraceEnrolledAt(docID) || await progStorage.enrollRevTrace(docID);
-    if (!base) return; // □13 门闩窗口内 enroll 未成——本轮不染，下轮出场补
+    if (!base) return; // □13 门闩窗口内 enroll 未成——本轮不动（不剥不插），下轮出场补
     const now = new Date();
     const editingID = editingBlockID(welement);
-    let marks = 0;
+    let changed = 0;
     welement.querySelectorAll<HTMLElement>("div[data-node-id]").forEach((div) => {
-        if (markBlockIfDue(div, map, base, now, editingID)) marks++;
+        if (reconcileBlock(div, map, base, now, editingID)) changed++;
     });
     ensureReplantObserver(welement, docID, base);
-    debugLog("revtrace", `docID=${docID} base=${base} marks=${marks}/${map.size} tier0..4`, "progressive");
+    debugLog("revtrace", `docID=${docID} base=${base} changed=${changed} rows=${map.size} t0..4`, "progressive");
 }
 
 // ============ □8 重画补挂：MutationObserver 按块增量 ============
@@ -295,7 +363,7 @@ async function revTraceOnAppear0(welement: HTMLElement, docID: string) {
 // 继续编辑又被吞=「又消失」。大段落编辑久、出场间隔长故最显眼，小块同机制「时隐时现」。
 // 对策：wysiwyg 挂 MutationObserver，块 div 被重画/滚入（addedNodes）时按块补挂——数据
 // 走 peekUpdatedMap 只读缓存（零 SQL 红线：出场=真相修正，补挂=乐观续条，色档偏差窗
-// by design）；与出场全量双通道并发安全（markBlockIfDue 幂等）；编辑中块照旧跳过（防
+// by design）；与出场全量双通道并发安全（reconcileBlock 幂等）；编辑中块照旧跳过（防
 // IME 打断，出场补）；出场清旧重打自身产生的 span 插入被 Observer 识别为非块忽略。
 // 弃选 ws 广播 invalidate：击穿 10s TTL 兜底=出场（每次点击都触发）频率直通 SQL，红线不动。
 
@@ -328,7 +396,7 @@ function ensureReplantObserver(welement: HTMLElement, docID: string, base: strin
         const editingID = editingBlockID(welement);
         const now = new Date();
         let n = 0;
-        divs.forEach((d) => { if (markBlockIfDue(d, map!, st.base, now, editingID)) n++; });
+        divs.forEach((d) => { if (reconcileBlock(d, map!, st.base, now, editingID)) n++; });
         if (n) debugLog("revtrace", `replant docID=${st.docID} blocks=${n}`, "progressive");
     });
     mo.observe(welement, { childList: true, subtree: true });

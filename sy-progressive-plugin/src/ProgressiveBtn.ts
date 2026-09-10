@@ -9,12 +9,14 @@ import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
 import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, pieceTailCard, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue, digestMarkBookID } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests, markDigestTag, clearDigestMarks } from "./digestMarker";
 import { revTraceOnAppear } from "./revTrace";
 import { markMaterials } from "./materialMarker";
+import { markMaterialTraces, markMaterialTag } from "./materialTrace";
 import { findDocByIal, getDocIalDigestDirUnder, getDocIalDigestDirHub } from "./progData";
 import { ensureDigestTailCard } from "./tailCardAppend";
 
@@ -36,6 +38,22 @@ let noteID = writableWithGet("")
 let bookID = writableWithGet("")
 let zIndexPlus = writableWithGet(false)
 let dueText = writableWithGet("")        // 附属卡到期胶囊文案（空=不渲染，formatDueCount 产出）
+
+/** □1-② 入槽菜单遮挡让路（鸟 09-08 反馈②）：闪卡预览态浮条 z=999 会整盖内核 Menu
+ *  （内核弹层走 ++zIndex 计数器自 11 起，恒 <999）。弹菜单前临时降回安全档 10，
+ *  菜单关闭（点项/外点/Esc 都走 remove→closeCB）后还原；闪卡预览抬层的既有语义
+ *  本身不动。返回是否真的降了层，供还原侧条件判断（常态浮条本就 z=10 无需动） */
+export function yieldFloatbarForMenu(): boolean {
+    if (!zIndexPlus.get()) return false;
+    zIndexPlus.set(false);
+    debugLog("slotmenu", "yield floatbar z 999→10（入槽菜单让路）", "progressive");
+    return true;
+}
+export function restoreFloatbarAfterMenu(yielded: boolean) {
+    if (!yielded) return;
+    zIndexPlus.set(true);
+    debugLog("slotmenu", "restore floatbar z→999（菜单关闭）", "progressive");
+}
 const digOpen = digSubrankOpen          // □2 摘抄子排开合：持久记忆（digSubrankOpen，收起跨分片/
                                          // 跨会话记住）；开合只归 ✂ 管与显式命令（⌥Z 改道），出场链不再强制展开
 
@@ -266,6 +284,9 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // 语义不变：普通文档不出场（show=false 原样）。
         if (docID != null && nextKind == null) {
             markDigests(protyle, docID).catch(() => { });
+            // 期C 变形汇总：普通文档也可能被直送过入槽（血缘=源doc#块），同权补挂
+            markMaterialTraces(protyle).catch(() => { });
+            markMaterialTag(protyle).catch(() => { });
         }
         show.set(false);
         return;
@@ -302,6 +323,13 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // 卡片只清不打：剥掉修复前版本满挂的残留 span（纯 DOM 零落盘，但插件热升级
         // reload 不重建已开文档 DOM，须出场主动清；零 SQL）
         clearDigestMarks(protyle);
+    }
+    // 期C 变形汇总（□9）：反查「本文档内容进了哪些槽」——块侧痕迹+文档级徽标
+    // 「已入 N 槽」。四态统一挂（digest 态=素材文档核心场景；空结果负缓存防抖），
+    // 与 markDigests 同随出场事件反复调用幂等补挂
+    if (docID != null) {
+        markMaterialTraces(protyle).catch(() => { });
+        markMaterialTag(protyle).catch(() => { });
     }
     // revtrace 修订痕迹（□3）：四态出场全染（book/piece/digest/free，闪卡预览宿主同权
     // ——digest 痕迹同款无特殊化）；纯视图零档案，enroll 基线+updated 色层实时算。

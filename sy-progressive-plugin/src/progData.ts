@@ -7,6 +7,12 @@ export function getDocIalProgData(): string {
     return `progdata#${TEMP_CONTENT}`;
 }
 
+/** Menu label 走 innerHTML，用户文本（书名/槽名/标题）须转义防注入/破渲染（踩坑
+ *  索引明令；期C 起公共化，存量直喂点见 □12） */
+export function escapeHtml(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export function getDocIalDigestDir(bookID: string): string {
     return `digestdir#${TEMP_CONTENT}#${bookID}`;
 }
@@ -236,6 +242,13 @@ export function parseBookIDFromCtime(value: string): string {
     // slice 按 code unit 切：🔨 占 2 unit，slice(2) 落在 # 上、首段解析成空串（fleetData 单测抓出）
     const v = value.startsWith("🔨#") ? value.slice("🔨#".length) : value;
     return v.split("#")[0] ?? "";
+}
+
+/** ctime 值剥 🔨 完成态前缀（期A 素材推过即锤），返回干净「bookID#ct」；非完成态 null。
+ *  从 digestUtils 迁来（vitest 链禁 .svelte，纯函数落纯模块可单测）。⚠ slice 按
+ *  「🔨#」整串长度——slice(2) 只剥 emoji 残留前导 #（期A review P2-4 地雷，单测锁形态） */
+export function doneCtime(v: string): string | null {
+    return v.startsWith("🔨#") ? v.slice("🔨#".length) : null;
 }
 
 /** 思源文档 path 形如 /父ID/.../本ID.sy——文档级 parent 不在 blocks.parent_id（恒空），取 path 倒数第二段 */

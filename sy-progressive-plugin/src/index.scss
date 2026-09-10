@@ -71,6 +71,10 @@
 
 .tomato-button {
   color: var(--b3-font-color3);
+  // 描边跟文字同色（vision 期D P2-2）：b3-button--outline 的 inset 描边取
+  // --b3-theme-primary，宿主主题该值≠--b3-font-color3 时文字/描边异色——
+  // 覆盖成套（CardBoxFloat 局部修正先例的全局版）
+  box-shadow: inset 0 0 0 0.6px var(--b3-font-color3);
 }
 
 // 移动端分片顶栏（PieceTopBar）：body 类驱动编辑宿主 #editor 顶开。#editor 本身是
@@ -127,13 +131,16 @@ body.prog-topbar-on #editor {
   --prog-heat-3: var(--prog-accent);
   --prog-heat-4: var(--prog-accent-strong);
 
-  /* revtrace 修订痕迹 5 档色（t0=今天最浓 … t4=前4天最淡，更早无色）：单色相浓度衰减
-     （有序编码=时间近远），紫罗兰系避让 accent 青灰/yours 琥珀/状态绿红四家已有语义 */
-  --prog-rt-0: #6d28d9;
-  --prog-rt-1: rgba(109, 40, 217, 0.78);
-  --prog-rt-2: rgba(109, 40, 217, 0.58);
-  --prog-rt-3: rgba(109, 40, 217, 0.40);
-  --prog-rt-4: rgba(109, 40, 217, 0.26);
+  /* revtrace 修订痕迹 5 档色（matfeed □5 形态分工后 09-10 bear 拍板恢复 5 档：
+     竖条专留本族+徽章分工落地后「五颜六色难区分」根因消除，恢复 Scrivener
+     一天一档颗粒度 t0=今天 … t4=前4天，更早无色）：t0 降饱和 #7c5bd6——明度
+     不再碾压 digest/material 徽章；单色相浓度均匀梯度衰减=有序编码时间近远，
+     紫罗兰系避让 accent 青灰/yours 琥珀/状态绿红四家已有语义 */
+  --prog-rt-0: #7c5bd6;
+  --prog-rt-1: rgba(124, 91, 214, 0.68);
+  --prog-rt-2: rgba(124, 91, 214, 0.50);
+  --prog-rt-3: rgba(124, 91, 214, 0.34);
+  --prog-rt-4: rgba(124, 91, 214, 0.20);
 
   /* 面板容器 */
   --prog-panel-bg: var(--b3-theme-surface);
@@ -171,12 +178,8 @@ html[data-theme-mode="dark"] {
   --prog-heat-3: var(--prog-accent);
   --prog-heat-4: var(--prog-accent-strong);
 
-  /* revtrace 暗档：紫罗兰提亮保可感（浅档深紫在暗底发闷） */
-  --prog-rt-0: #a78bfa;
-  --prog-rt-1: rgba(167, 139, 250, 0.80);
-  --prog-rt-2: rgba(167, 139, 250, 0.62);
-  --prog-rt-3: rgba(167, 139, 250, 0.45);
-  --prog-rt-4: rgba(167, 139, 250, 0.30);
+  /* revtrace 暗档不再单独提亮（matfeed □5）：降饱和后同色两轨可感（试板暗色双轨
+     vision 终审过），旧 #a78bfa 提亮 5 档随之退役 */
 
   --prog-panel-bg: var(--b3-theme-surface);
   --prog-panel-border: var(--b3-border-color);
@@ -473,82 +476,75 @@ html:not([data-theme-mode="dark"]) .prog-fb-flat .prog-fb-flat-btn {
 // □12：块 div 不挂任何属性（custom-* 会被编辑事务卷进 IAL 落盘），定位锚改 :has() 纯 CSS。
 // □12 背景渲染态：markOriginTextBG 开关经 body 类 prog-digest-bg-on 总闸（index.ts 订阅挂载），
 // span 在则背景在——零属性写入，reload 后随 markDigests 重打恢复；不再写 style 到 .sy。
-body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
+body.prog-digest-bg-on .protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark) {
   background-color: var(--b3-font-background11);
 }
-.protyle-wysiwyg div:has(> .prog-digest-mark) {
+.protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark) {
   position: relative;
-  // 可见性期1 □1 A：常显徽章 13px 后 absolute span 会压块首字，让位一栏
-  // （竖条 3 + 隙 2 + 羽毛笔 13 + 余量 4）；纯 CSS 表现层不落盘
+  // matfeed □5 竖条退役（形态分工：看到竖条=改过/看到羽毛笔=被摘抄过）后徽章独挑，
+  // abs 占位 2~19px；22px 让位链保持不动——正文零位移换版无跳动（纯 CSS 表现层不落盘）
   padding-left: 22px;
 }
 .prog-digest-mark {
   position: absolute;
   left: 2px;
   top: 12px;
-  width: 18px; // 热区随徽章加宽（竖条 3px + 间隙 + 羽毛笔 13px），点击不再只认竖条
+  width: 18px; // 热区=徽章+边距（abs 2~20px），点击语义不随竖条退役缩水
   height: 16px;
   cursor: pointer;
-  color: var(--prog-accent);
-}
-.prog-digest-mark::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--prog-accent);
-  transition: width 0.12s ease-out, background-color 0.12s ease-out;
+  color: var(--prog-accent-strong);
 }
 .prog-digest-mark::after {
-  // 可见性期1（2026-09-04 □1 A）：徽章常显——iconProgQuill 羽毛笔 13px mask（静态试板
-  // 三候选定案：箭头 ↗︎ 常态 0.55 太淡且与浮条 origin「跳转」语义混淆，退役；旧字符
-  // 箭头须 U+FE0E 防 emoji 接管的坑随 mask 方案消解——mask 走 alpha 通道，色随
-  // --prog-accent 变量）。0.55 常态不抢正文，hover 强化加亮+微放大。
+  // matfeed □5（bear 拍板方案1 形态分工）：羽毛笔徽章独挑「被摘抄过」——旧 13px@0.55
+  // 与 material 同色同形，用户眼里是同一个标记；改 15px@0.92 accent-strong 深色提对比
+  // （提对比非提亮，试板 vision 终审定案）。mask 走 alpha 通道色随变量，hover 加亮+微放大。
   content: "";
   position: absolute;
-  left: 5px;
+  left: 2px;
   top: 50%;
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   transform: translateY(-50%);
-  background-color: var(--prog-accent);
-  opacity: 0.55;
+  background-color: var(--prog-accent-strong);
+  opacity: 0.92;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E") no-repeat center / contain;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E") no-repeat center / contain;
   pointer-events: none;
   transition: opacity 0.12s ease-out, transform 0.12s ease-out, background-color 0.12s ease-out;
 }
-.prog-digest-mark:hover::before {
-  width: 4px;
-  background: var(--prog-accent-strong);
-}
 .prog-digest-mark:hover::after {
   opacity: 1;
-  background-color: var(--prog-accent-strong);
   transform: translateY(-50%) scale(1.12);
+}
+// matfeed □5 暗轨 chip（vision P2 实现期吸收）：暗底徽章垫 10% 白底+圆角，15px mask
+// 图标在暗色编辑面「坐落纸上」而非浮着；亮轨对比充足不垫（试板双轨定案）
+html[data-theme-mode="dark"] .prog-digest-mark,
+html[data-theme-mode="dark"] .prog-material-mark,
+html[data-theme-mode="dark"] .prog-material-trace {
+  background-color: rgba(255, 255, 255, 0.10);
+  border-radius: 4px;
 }
 
 
 // ============================================================
-// revtrace 修订痕迹（revTrace.ts 注入 span）：块左侧 3px 全高色条，5 档浓度衰减。
+// revtrace 修订痕迹（revTrace.ts 注入 span）：块左侧 3px 全高色条，5 档一天一档浓度衰减
+// （09-10 bear 拍板恢复 5 档；竖条=改过，本族是竖条形态唯一持有者——形态分工不变）。
 // 零落盘四件套同 digest 痕迹：span 零 textContent+contenteditable=false+块 div 零改动
 // +:has() 锚定让位。纯展示无交互（hover tip 归 □4 i18n 接线后再挂）。
 // ============================================================
-.protyle-wysiwyg div:has(> .prog-revtrace-mark) {
+.protyle-wysiwyg div[data-node-id]:has(> .prog-revtrace-mark) {
   position: relative;
   padding-left: 8px;
 }
 // 双痕共存让位：digest/material 的 22px 徽章栏优先（双 :has 特异性压过上面单 :has，
-// 防 8px 压扁徽章栏）；trace 条退 left:0 全高，与 digest 短条+羽毛笔高低错开
-.protyle-wysiwyg div:has(> .prog-digest-mark):has(> .prog-revtrace-mark),
-.protyle-wysiwyg div:has(> .prog-material-mark):has(> .prog-revtrace-mark) {
+// 防 8px 压扁徽章栏）；trace 条退 left:0（0~3px）与徽章（4~19px）邻接不叠压——
+// 「一根竖条+一个徽章」=形态分工后双痕的天然分层语言
+.protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark):has(> .prog-revtrace-mark),
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-mark):has(> .prog-revtrace-mark) {
   padding-left: 22px;
 }
-.protyle-wysiwyg div:has(> .prog-digest-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark,
-.protyle-wysiwyg div:has(> .prog-material-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark {
+.protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark,
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark {
   left: 0;
 }
 .prog-revtrace-mark {
@@ -566,55 +562,56 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
 .prog-revtrace-mark.prog-revtrace-t3 { background: var(--prog-rt-3); }
 .prog-revtrace-mark.prog-revtrace-t4 { background: var(--prog-rt-4); }
 
-// 期5 素材徽标（materialMarker 注入 span，写作书片内素材块）：与摘抄痕迹同族
-// 形态（竖条+mask 徽章），图标=素材语义（下箭头入托盘，iconProgMaterial 同形）；
-// 素材块不挂 progref（期3 materialize 剥离）故与 .prog-digest-mark 永不同块。
-.protyle-wysiwyg div:has(> .prog-material-mark) {
+// 期5 素材徽标（materialMarker 注入 span，写作书片内素材块）：matfeed □5 形态分工后
+// =入托盘徽章独挑（图标=素材语义，与原书侧 .prog-material-trace 同形同参）+胶囊
+// 边框（下方 border-on 总闸）双信号，竖条形态退役让给 revtrace；素材块不挂 progref
+// （期3 materialize 剥离）故与 .prog-digest-mark 永不同块。
+// 期B：徽标宿主多了 sb 胶囊——内核 `.protyle-wysiwyg [data-node-id].sb{padding:0}`
+// 特异性 (0,3,0)，宿主选择器须带 [data-node-id] 提到 (0,3,1) 才压得过（vision 像素
+// 实测 padding-left 被 sb 规则清零致图标压字）。
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-mark) {
   position: relative;
   padding-left: 22px;
+}
+// matfeed □3 入槽胶囊边框（bear 实测「看起来不大顺，不知道边界」）：sb 挂
+// custom-prog-material（MATERIAL_KEY IAL 渲染为 DOM 同名属性）精确命中，普通超级块
+// 零污染；形态对齐官方块视觉=细边框+圆角、颜色 --b3-border-color 档（勿高饱和抢
+// 痕迹族色语义，与 □5 协调）。开关经 body 类 prog-material-border-on 总闸
+// （markOriginTextBG 同款，index.ts 订阅挂载）。选择器带 [data-node-id] 提特异性
+// 防 sb{padding:0} 家族压制边框值。
+body.prog-material-border-on .protyle-wysiwyg div[data-node-id].sb[custom-prog-material] {
+  border: 1px solid var(--b3-border-color);
+  border-radius: var(--b3-border-radius, 6px);
 }
 .prog-material-mark {
   position: absolute;
   left: 2px;
   top: 12px;
-  width: 18px;
+  width: 18px; // 热区=徽章+边距（abs 2~20px），点击语义不随竖条退役缩水
   height: 16px;
   cursor: pointer;
-  color: var(--prog-accent);
-}
-.prog-material-mark::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--prog-accent);
-  transition: width 0.12s ease-out, background-color 0.12s ease-out;
+  color: var(--prog-accent-strong);
 }
 .prog-material-mark::after {
+  // matfeed □5（bear 拍板方案1 形态分工）：托盘徽章独挑「素材」——15px@0.92
+  // accent-strong 深色提对比（与 digest 羽毛笔/原书侧 material-trace 三面同参），
+  // hover 加亮+微放大；mask 走 alpha 通道色随变量。
   content: "";
   position: absolute;
-  left: 5px;
+  left: 2px;
   top: 50%;
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   transform: translateY(-50%);
-  background-color: var(--prog-accent);
-  opacity: 0.55;
+  background-color: var(--prog-accent-strong);
+  opacity: 0.92;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v10'/%3E%3Cpath d='m8 9 4 4 4-4'/%3E%3Cpath d='M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'/%3E%3C/svg%3E") no-repeat center / contain;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v10'/%3E%3Cpath d='m8 9 4 4 4-4'/%3E%3Cpath d='M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'/%3E%3C/svg%3E") no-repeat center / contain;
   pointer-events: none;
   transition: opacity 0.12s ease-out, transform 0.12s ease-out, background-color 0.12s ease-out;
 }
-.prog-material-mark:hover::before {
-  width: 4px;
-  background: var(--prog-accent-strong);
-}
 .prog-material-mark:hover::after {
   opacity: 1;
-  background-color: var(--prog-accent-strong);
   transform: translateY(-50%) scale(1.12);
 }
 
@@ -671,6 +668,18 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
   line-height: 1;
   color: var(--prog-flame-core);
 }
+/* □11 绿芯数字对比度（写作 wrote+阅读 ok 同族）：亮轨 #3f8b4f 对白 4.20:1、暗轨
+   #67b07f 对面板底抗锯齿 3.76:1 双压线——数字层单独加深/提亮一档（#357742≈5.4:1/
+   #7cc98f≈8:1），status-ok 本值不动（芯焰是图形不受文字对比度约束；warn/over
+   数字未在案不扩期） */
+.prog-flame[data-state="ok"] .prog-flame-num,
+.prog-wflame[data-state="wrote"] .prog-flame-num {
+  color: #357742;
+}
+html[data-theme-mode="dark"] .prog-flame[data-state="ok"] .prog-flame-num,
+html[data-theme-mode="dark"] .prog-wflame[data-state="wrote"] .prog-flame-num {
+  color: #7cc98f;
+}
 /* 状态色注入（默认 ok 由 :root 的 flame-core= status-ok 兜底） */
 .prog-flame[data-state="warn"] {
   --prog-flame-core: var(--prog-status-warn);
@@ -689,6 +698,33 @@ body.prog-digest-bg-on .protyle-wysiwyg div:has(> .prog-digest-mark) {
 @keyframes prog-flame-breathe {
   0%, 100% { filter: drop-shadow(0 0 2px var(--prog-flame-base-soft)); }
   50% { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--prog-flame-core) 55%, transparent)); }
+}
+
+// ============================================================
+// □5 写作小火焰：布局全继承 .prog-flame（button 挂两类），只换壳色与芯语义——
+// 壳=恒冷青身份色（亮 #35606e/暗 #85b3bd，不派生 --prog-accent：主题族如 amber
+// 会把 accent 调成琥珀与阅读火苗撞车，身份区分须跨主题恒成立）；芯两态（写过=绿/
+// 未写=熄灭感），写作无欠债概念不设 warn/over 惩罚色；数字=今日已写片数。
+// idle 芯=壳色明暗一档（vision P1-1：透明灰叠壳=1:1 融合芯不可见，改不透明亮度差；
+// 暗档 35% 黑提余量——熄灭态弱于活跃态是语义，不追 3:1）；idle 数字=实色 on-surface
+// （vision P1-2：数字色绑 --prog-flame-core 会被芯色拖到 2.2:1，数字是数据主体不应
+// 弱于 label）。可辨性分工：芯承担亮度差、数字承担色相/饱和度差（灰 vs 绿），
+// 红绿色盲两通道互补可分 idle/wrote（vision 复评 P2-2 校正后的准确表述）。
+// ============================================================
+.prog-wflame {
+  --prog-flame-base: #35606e;
+}
+html[data-theme-mode="dark"] .prog-wflame {
+  --prog-flame-base: #85b3bd;
+}
+.prog-wflame[data-state="idle"] {
+  --prog-flame-core: color-mix(in srgb, #fff 30%, var(--prog-flame-base));
+}
+html[data-theme-mode="dark"] .prog-wflame[data-state="idle"] {
+  --prog-flame-core: color-mix(in srgb, #000 35%, var(--prog-flame-base));
+}
+.prog-wflame[data-state="idle"] .prog-flame-num {
+  color: var(--b3-theme-on-surface);
 }
 
 // ============================================================
@@ -1851,6 +1887,13 @@ html[data-theme-mode="dark"] .prog-digest-tag {
     color: var(--b3-theme-on-surface-light, #999);
     white-space: nowrap;
 }
+// 复习宿主守卫态小字（bear 拍板 B 2026-09-09）：与 title 同色（--b3-theme-on-surface-light
+// 暗色自动反色），只靠 11px 尺寸差做层级——vision P2 吸收：再加 opacity 会淡过可读保底线
+.prog-tailcard__quiet {
+    font-size: 11px;
+    color: var(--b3-theme-on-surface-light, #999);
+    white-space: nowrap;
+}
 .prog-tailcard__chips {
     display: inline-flex;
     align-items: center;
@@ -1955,4 +1998,161 @@ html[data-theme-mode="dark"] .prog-tailcard--off {
 button.prog-tailcard__chip:hover {
     color: var(--b3-theme-on-surface);
     background: var(--b3-theme-surface-light);
+}
+
+/* □1 入槽菜单视觉对齐浮条（鸟 09-08 反馈①：与悬浮窗同色统一）。内核 .b3-menu 默认
+   --b3-menu-background（纯白系）+border-radius-b（12px）+dialog 大阴影+1px 边框，与
+   浮条（surface 半透明+6px+point-shadow+无边框）两套观感。只改容器皮肤，hover/current
+   等交互态保持内核语义（--b3-list-hover 与浮条关闭钮 hover 同源）。
+   菜单项与子菜单容器自画 --b3-menu-background 背景，须一并覆盖；
+   :not 排除移动端 sheet/fullscreen 形态（全宽弹层不吃浮条皮肤） */
+.prog-slot-menu.b3-menu:not(.b3-menu--sheet):not(.b3-menu--fullscreen),
+.prog-slot-menu:not(.b3-menu--sheet):not(.b3-menu--fullscreen) .b3-menu__submenu {
+    background-color: var(--b3-theme-surface);
+    border: 0;
+    border-radius: 6px;
+    box-shadow: var(--b3-point-shadow);
+}
+.prog-slot-menu.b3-menu:not(.b3-menu--sheet):not(.b3-menu--fullscreen) .b3-menu__item {
+    background-color: var(--b3-theme-surface);
+}
+/* P1-1 交互态重申：上条 (0,5,0) 恒压内核 --current (0,3,0)/--show (0,1,0) 的
+   --b3-list-hover 高亮（菜单项 hover 是 JS 挂 --current 非 CSS :hover）——补更高
+   特异性重申恢复内核语义（滑过/展开子菜单的背景反馈） */
+.prog-slot-menu.b3-menu:not(.b3-menu--sheet):not(.b3-menu--fullscreen) .b3-menu__item.b3-menu__item--current:not(.b3-menu__item--readonly),
+.prog-slot-menu.b3-menu:not(.b3-menu--sheet):not(.b3-menu--fullscreen) .b3-menu__item.b3-menu__item--show {
+    background-color: var(--b3-list-hover);
+}
+
+// ============================================================
+// 期C 变形汇总（□9）：本文档内容 → 槽 反查痕迹。块侧 .prog-material-trace
+// （matfeed □5 形态分工改版：3px 竖条 → 入托盘徽章独挑，与池侧 .prog-material-mark
+// 同形同参=「素材」语义双面一致；竖条形态让给 revtrace 专留）+ 文档级
+// .prog-material-tag（「已入 N 槽」胶囊，digest-tag 同位右邻）。宿主避让带
+// [data-node-id]（内核 sb{padding:0} 特异性坑，见 material 徽标注）。
+// ============================================================
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace) {
+  position: relative;
+  padding-left: 22px;
+}
+.prog-material-trace {
+  position: absolute;
+  left: 2px;
+  top: 12px;
+  width: 18px; // 热区=徽章+边距（abs 2~20px）——原 3px 细条点击/悬停难命中，形态分工顺带根治
+  height: 16px;
+  cursor: pointer;
+}
+.prog-material-trace::after {
+  // matfeed □5：托盘徽章 15px@0.92 accent-strong（提对比非提亮；与 digest 羽毛笔/
+  // 池侧 material 徽章三面同参）；单胶囊直跳/多胶囊弹槽列表的点击语义不动
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
+  background-color: var(--prog-accent-strong);
+  opacity: 0.92;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v10'/%3E%3Cpath d='m8 9 4 4 4-4'/%3E%3Cpath d='M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v10'/%3E%3Cpath d='m8 9 4 4 4-4'/%3E%3Cpath d='M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2'/%3E%3C/svg%3E") no-repeat center / contain;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out, background-color 0.12s ease-out;
+}
+.prog-material-trace:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.12);
+}
+
+.prog-material-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  vertical-align: middle;
+  color: #35606e;
+  background: color-mix(in srgb, #35606e 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #35606e 45%, transparent);
+  cursor: pointer;
+  user-select: none;
+}
+.prog-material-tag:hover {
+  filter: brightness(1.05);
+}
+.prog-material-tag svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+html[data-theme-mode="dark"] .prog-material-tag {
+  color: #85b3bd;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #85b3bd 40%, transparent);
+}
+
+// 期C 双痕共存（matfeed □5 形态分工改版）：与 digest 徽章同块（书态直送块既被摘抄
+// 又被直送）→ 双徽章并排 [羽毛笔 4~19][托盘 21~36]，栏宽 40px；与 revtrace 竖条
+// 同块（素材文档编辑过=期C 核心场景）→ 竖条退 left:0（0~3px）与徽章（4~19px）
+// 邻接不叠压；三痕同块由末条 (0,5,1) 显式定格 40px
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-revtrace-mark) {
+  padding-left: 22px;
+}
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-revtrace-mark) .prog-revtrace-mark {
+  left: 0;
+}
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-digest-mark) {
+  padding-left: 40px;
+}
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-digest-mark) .prog-material-trace {
+  left: 19px;
+}
+.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-digest-mark):has(> .prog-revtrace-mark) {
+  padding-left: 40px;
+}
+
+// 阅读曲线接管（1530 期2）：官方复习界面阅读卡评分套——注入独立「下一张」主钮
+// （b3-button--info=官方 Good 同款主色），官方评分钮组（1/2/3/4）整组 CSS 隐藏
+// （外层 div 同藏防空占位；官方 DOM 零就地改动，翻到普通卡 teardown 即还原）；
+// 跳过 -3 与左移 -2 官方原生保留。徽标=评分套行内左端小灰标（tomato-rp-card
+// 身份行同款视觉）
+.prog-revcard .card__action > div:has(button[data-type="1"]),
+.prog-revcard .card__action > div:has(button[data-type="2"]),
+.prog-revcard .card__action > div:has(button[data-type="3"]),
+.prog-revcard .card__action > div:has(button[data-type="4"]) {
+  display: none;
+}
+// 答题行（行内有直接 button 子级）藏我方主钮组：阅读卡若被用户加了挖空会先出答题态，
+// good.click() 在该态打空无动作——藏掉防死钮（评分行=组式布局无直接 button 子级，不受影响）
+.prog-revcard .card__action:has(> button) .prog-revcard-next-el {
+  display: none;
+}
+.prog-revcard-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: center;
+  margin-right: 8px;
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light, #999);
+  white-space: nowrap;
+}
+// P2-1：评分行=组式布局（行内无直接 button 子级）首段 36px 是紧凑上一步钮带、
+// 高钮带 y=44~130（3.8.3 实测）——徽标盒对齐高钮带（同顶同高、内容居中=与
+// 跳过/下一张钮中线齐平）；行几何中心在钮带上方 18px=视觉偏上根因。
+// 36/86 来自官方 DOM 实测，随 3.9.0 复习界面重写一并重验（文件头预警同款）
+.prog-revcard .card__action:not(:has(> button)) .prog-revcard-badge {
+  align-self: flex-start;
+  height: 86px;
+  margin-top: 36px;
+}
+.prog-revcard-badge > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--b3-theme-secondary);
 }

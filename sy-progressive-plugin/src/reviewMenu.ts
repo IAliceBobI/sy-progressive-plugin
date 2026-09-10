@@ -8,7 +8,7 @@ import { getProgressivePluginInstance } from "../../sy-tomato-plugin/src/libs/gl
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 import { notifyFleetChanged } from "./fleetNotify";
-import { findDocByIal, getDocIalDigestDir } from "./progData";
+import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
 import { digestStateOf, digestStateIcon, DigestState } from "./digestState";
 import {
     ReviewKey, ReviewState, SCHED_PRESETS, PdigestReviewKey,
@@ -259,10 +259,11 @@ export async function openDueReviewList(ev: { clientX: number; clientY: number }
     ]);
     let rows = mergeDueRows(thinkRows ?? [], pdigestRows ?? []);
     if (bookID) {
-        // 显式 limit 防内核 64 截尾（fleetData 同款）：全库摘抄 >64 条时 docs 集不全 → 该书排期条目误滤
+        // 显式 limit 防内核 64 截尾（fleetData 同款）：全库摘抄 >64 条时 docs 集不全 → 该书排期条目误滤。
+        // parseBookIDFromCtime 兼容 🔨 锤前缀（期A 素材推过即锤，单前缀 startsWith 会漏——review P2-3）
         const ctimeRows = (await siyuan.sql(
             `select block_id, value from attributes where name='${PDIGEST_CTIME}' limit 10000000`)) as any[] ?? [];
-        const docs = new Set(ctimeRows.filter(r => String(r.value).startsWith(bookID + "#")).map(r => r.block_id));
+        const docs = new Set(ctimeRows.filter(r => parseBookIDFromCtime(String(r.value)) === bookID).map(r => r.block_id));
         rows = rows.filter(r => docs.has(r.root_id));
     }
     const { header, sections } = dueScheduleSections(rows, now);
@@ -393,9 +394,9 @@ function reviewRowItem(
 export async function removeRevisitBySource(docID: string): Promise<number> {
     if (!docID) return 0;
     // 显式 limit 防内核 64 截尾：本函数目标场景=单文档摘抄批量移除，>64 条时尾部
-    // 清不掉且无 order by 重跑还是同 64 条=永不可自愈
+    // 清不掉且无 order by 重跑还是同 64 条=永不可自愈。双 like 含 🔨 锤（期A 对齐）
     const rows = (await siyuan.sql(
-        `select block_id from attributes where name='${PDIGEST_CTIME}' and value like '${docID}#%' limit 10000000`)) as any[] ?? [];
+        `select block_id from attributes where name='${PDIGEST_CTIME}' and (value like '${docID}#%' or value like '🔨#${docID}#%') limit 10000000`)) as any[] ?? [];
     const ids = (rows ?? []).map(r => r.block_id);
     for (const id of ids) {
         await siyuan.setBlockAttrs(id, { [PdigestReviewKey]: "" } as any);

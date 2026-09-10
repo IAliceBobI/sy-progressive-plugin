@@ -159,7 +159,7 @@ import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
 import { progStorage } from "./ProgressiveStorage";
 import * as constants from "./constants";
 import { loadBookStatuses } from "./bookStatus";
-import { fetchWritingPieces, isWritingFinished } from "./writeBook";
+import { fetchWritingPieces, isWritingFinished, hasUnreadMaterial } from "./writeBook";
 
 function todayStr(): string {
     const n = new Date();
@@ -196,9 +196,11 @@ function makeRollerDeps(): RollerDeps {
             for (const [id, info] of Object.entries(progStorage.booksInfos())) {
                 if (info.ignored || info.archived) continue;
                 // 期2 写作书：索引恒空，isFinished(point>=0) 恒 true=误伤（写作书被滚筒
-                // 静默排除）；finished 语义=片列表全定稿（0 槽书不算完，提示建槽）
+                // 静默排除）；finished 语义=片列表全定稿（0 槽书不算完，提示建槽）。
+                // 期A 补判（review P1-1）：片全定稿但素材池有未读 → 不退役——
+                // 「定稿完继续往里摘」是素材并行的常见稳态，退役会让素材饿死
                 if (info.writing) {
-                    if (isWritingFinished(await fetchWritingPieces(id))) s.add(id);
+                    if (isWritingFinished(await fetchWritingPieces(id)) && !(await hasUnreadMaterial(id))) s.add(id);
                     continue;
                 }
                 const idx = await progStorage.loadBookIndexIfNeeded(id);

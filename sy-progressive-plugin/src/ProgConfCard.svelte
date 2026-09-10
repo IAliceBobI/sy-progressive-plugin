@@ -12,6 +12,8 @@
         hideBtnsInFlashCard,
         openCardsOnOpenPiece,
         pieceNoBacktraceLink,
+        readCurveSweepMins,
+        readCurveTakeover,
     } from "../../sy-tomato-plugin/src/libs/stores";
 </script>
 
@@ -96,4 +98,29 @@
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置复习隐藏}>{tomatoI18n.复习闪卡时隐藏分片按钮组}</span>
     </div>
+
+    <!-- 阅读曲线接管（1530 期1，实验默认关）：分片卡 due=滚筒节奏投影进官方复习；
+         关=末次清场（readCurve.clearReadCurve）。开关+频率档同卡（紧凑偏好） -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$readCurveTakeover}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置阅读曲线}>{tomatoI18n.阅读曲线接管实验}</span>
+    </div>
+    {#if $readCurveTakeover}
+        <div>
+            <select class="b3-select" style="min-width: 160px" bind:value={$readCurveSweepMins}>
+                <option value={0}>{tomatoI18n.关闭}</option>
+                <option value={30}>30 min</option>
+                <option value={60}>1 h</option>
+                <option value={360}>6 h</option>
+                {#if ![0, 30, 60, 360].includes($readCurveSweepMins)}
+                    <option value={$readCurveSweepMins}>{$readCurveSweepMins} {tomatoI18n.已失效请重新选择}</option>
+                {/if}
+            </select>
+            <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip巡查频率}>{tomatoI18n.巡查频率}</span>
+        </div>
+    {/if}
 </div>

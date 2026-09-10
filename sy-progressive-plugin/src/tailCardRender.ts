@@ -7,7 +7,7 @@
 // （同动作跨入口同语义）；选中类动作（摘抄/制卡/收集）不上卡——归宿=快捷键+浮条（拍板）。
 // 防御守卫：闪卡预览宿主（.card__block，浮条先例 ProgressiveBtn.ts 同判法）同源渲染时
 // 隐全部动作钮与胶囊，只留静态头（防复习现场点「下一片」搅局）。
-import { icon } from "../../sy-tomato-plugin/src/libs/utils";
+import { icon, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { pieceTailCard } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -20,6 +20,7 @@ import { showFloatTip, hideFloatTip } from "./floatTip";
 import DigestTreePopover from "./DigestTreePopover.svelte";
 import { formatDueCount } from "./progFloatState";
 import { capsuleTodayText, capsuleBookDue } from "./tailCardAppend";
+import { parseBookIDFromCtime } from "./progData";
 import {
     TAIL_CARD_BLOCK_TYPE, markTailCardRegistered, parseTailCardContent, TailCardBlockData,
 } from "./tailCardBlock";
@@ -109,6 +110,18 @@ const pieceActions = (): TailAction[] => [
     },
 ];
 
+/** digest 尾卡 tree/summary 的归属书实时解析（matfeed □1 reasoning P1-1）：尾卡内容
+ *  烤入的 bookID 是建卡时刻快照，素材被整篇搬运（ctime 重写归属）后失锚——点击时按
+ *  宿主 IAL 现值解析，解析不出（宿主已删/瞬态）回落烤入值（建卡时刻的旧行为） */
+async function digestHostBookID(d: TailCardBlockData): Promise<string> {
+    try {
+        const attrs = await siyuan.getBlockAttrs(d.docID);
+        return parseBookIDFromCtime(attrs?.["custom-pdigest-ctime"] ?? "") || d.bookID;
+    } catch {
+        return d.bookID;
+    }
+}
+
 const digestActions = (): TailAction[] => [
     {
         act: "recite", icon: "iconProgSend", primary: true,
@@ -124,24 +137,26 @@ const digestActions = (): TailAction[] => [
         act: "tree", icon: "iconProgTree",
         label: () => tomatoI18n.路线图,
         run: (d, ev) => {
-            openFloatPopover({
-                title: tomatoI18n.路线图,
-                x: ev.clientX, y: ev.clientY,
-                component: DigestTreePopover,
-                props: {
-                    bookID: d.bookID,
-                    onJump: (id: string) => {
-                        closeFloatPopover();
-                        void prog.jumpTo(id);
+            void digestHostBookID(d).then(bookID => {
+                openFloatPopover({
+                    title: tomatoI18n.路线图,
+                    x: ev.clientX, y: ev.clientY,
+                    component: DigestTreePopover,
+                    props: {
+                        bookID,
+                        onJump: (id: string) => {
+                            closeFloatPopover();
+                            void prog.jumpTo(id);
+                        },
                     },
-                },
+                });
             });
         },
     },
     {
         act: "summary", icon: "iconProgQuill",
         label: () => tomatoI18n.摘抄汇总,
-        run: d => prog.openDigestSummary(d.bookID),
+        run: d => void digestHostBookID(d).then(bookID => prog.openDigestSummary(bookID)),
     },
     {
         act: "redigest", icon: "iconProgScissors",
@@ -201,8 +216,14 @@ function renderCard(element: HTMLElement, content: string): void {
         return;
     }
 
-    // 闪卡预览宿主：只留静态头（隐动作钮+胶囊——复习现场点「下一片」会搅局，浮条先例同判法）
+    // 闪卡预览宿主：只留静态头（隐动作钮+胶囊——复习现场点「下一片」会搅局，浮条先例同判法）；
+    // 头行补「复习中 · 动作已收起」小字（bear 拍板 B 2026-09-09，鸟 17:31 帖）：光秃标题
+    // 被用户读成「默认折叠/坏了」，交代一句=故意收起
     if (element.closest(".card__block")) {
+        const quiet = document.createElement("span");
+        quiet.className = "prog-tailcard__quiet";
+        quiet.textContent = tomatoI18n.片尾卡复习态;
+        head.append(quiet);
         element.append(card);
         return;
     }

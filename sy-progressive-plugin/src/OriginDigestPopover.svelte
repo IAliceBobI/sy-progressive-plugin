@@ -16,9 +16,11 @@
         blockID,
         point,
         freeDoc = false,
+        manage = false,
         onJumpDoc,
         onJumpPiece,
         onShowAll,
+        onManage,
     }: {
         bookID: string;
         /** 光标/选中块（书态=书原文块 id，块 id 本身即索引键；可空） */
@@ -29,10 +31,15 @@
         /** free 态复用（群反馈 650189）：普通文档无书，清单文案「本书摘抄」→「关联摘抄」；
          *  bookID 由浮条层传 $noteID（free 摘抄 ctime 自指 docID，queryDigestTree 直查） */
         freeDoc?: boolean;
+        /** 期D 写作书书态：清单=素材池，底部出「管理素材池」（批量发送大界面入口），
+         *  替代「查看全部」（manage 大界面内含全量浏览，不再双按钮） */
+        manage?: boolean;
         onJumpDoc: (id: string) => void;
         onJumpPiece: (point: number) => void;
         /** □29 清单超 PREVIEW_N 条时的升级入口（开大 Dialog） */
         onShowAll?: () => void;
+        /** 期D 管理素材池入口（浮条层开 DigestAllDialog manage 模式） */
+        onManage?: () => void;
     } = $props();
 
     let loading = $state(true);
@@ -98,7 +105,14 @@
                 </button>
             {/each}
         </div>
-        {#if flat.length > PREVIEW_N && onShowAll}
+        {#if manage && onManage}
+            <!-- 期D 写作书：素材池管理入口（大界面含全量浏览，替代「查看全部」双按钮） -->
+            <div class="prog-popover-list prog-popover-more-wrap">
+                <button class="prog-popover-item" onclick={() => onManage()}>
+                    <span class="prog-popover-item-text">{tomatoI18n.管理素材池}</span>
+                </button>
+            </div>
+        {:else if flat.length > PREVIEW_N && onShowAll}
             <div class="prog-popover-list prog-popover-more-wrap">
                 <button class="prog-popover-item" onclick={() => onShowAll()}>
                     <span class="prog-popover-item-text">{tomatoI18n.查看全部N条(flat.length)}</span>

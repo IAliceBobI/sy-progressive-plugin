@@ -6,9 +6,12 @@
 import { mount, unmount } from "svelte";
 import { writable } from "svelte/store";
 import FleetFlame from "./FleetFlame.svelte";
+import WritingFlame from "./WritingFlame.svelte";
 import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
-import { rollerDebtSummary, type DebtSummary } from "./roller";
+import { rollerDebtSummary, rollerTodayReads, type DebtSummary } from "./roller";
+import { pickWritingFlameBook } from "./writeBook";
+import { progStorage } from "./ProgressiveStorage";
 import { PdigestReviewKey, ReviewKey, dueReviewSQLFor } from "./reviewQueue";
 import { onFleetChanged } from "./fleetNotify";
 import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
@@ -29,6 +32,8 @@ export interface FleetActions {
     manageBooks(): any;
     /** 期1 写作书：新建写作书弹窗（书名+落点笔记本+可选大纲） */
     addWritingBook(): any;
+    /** □5 写作火苗点击=直达当前写作书的写作现场（与滚筒调度同源） */
+    openWriting(): any;
     /** 打开设置 */
     openSettings(): any;
     /** recite 导流：装了=触发仿写练习，未装=提示 */
@@ -56,9 +61,23 @@ export const digestDueState = writable(0);
 /** 面板数据（Dock 消费，重查询） */
 export const panelState = writable<FleetSummary | null>(null);
 
+/** □5 写作火苗数据（WritingFlame 消费）：null=无写作书不渲染。
+ *  today=今日已写片数（写作书在 DayLogData.b 里的计数拆出独立显示，滚筒计数同权）；
+ *  slotTitle=pickWritingTarget 命中槽的文档标题（null=无未定稿槽，tooltip 换素材/完稿
+ *  口径）；materialUnread=期B 槽空态的未读素材数（tooltip 素材态分叉依赖） */
+export interface WritingFlameData {
+    bookID: string;
+    bookName: string;
+    today: number;
+    slotTitle: string | null;
+    materialUnread: number;
+}
+export const writingFlameState = writable<WritingFlameData | null>(null);
+
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let refreshing = false;
 let flameApp: any = null;
+let wflameApp: any = null;
 let quotaSubStop: (() => void) | null = null;
 let notifySubStop: (() => void) | null = null;
 
@@ -91,8 +110,41 @@ export async function refreshPanel() {
     }
 }
 
+/** □5 写作火苗刷新：书选择走 pickWritingFlameBook（与打开侧共用防漂移）；
+ *  今日已写=DayLogData.b 中写作书集合的计数求和（滚筒对写作书计数同权，此处只是
+ *  拆出独立显示，不改记账）。并发闸与 refreshPanel 同款（review P2-1：防慢旧轮
+ *  在新轮 set(null) 后回写旧值）。槽标题查失败回落 [point]（review P2-3：null 严格
+ *  留给「真无未定稿槽」，tooltip 文案分叉依赖它） */
+let wrefreshing = false;
+export async function refreshWritingFlame() {
+    if (wrefreshing) return;
+    wrefreshing = true;
+    try {
+        const hit = await pickWritingFlameBook();
+        if (!hit) {
+            writingFlameState.set(null);
+            return;
+        }
+        const reads = await rollerTodayReads();
+        const infos = progStorage.booksInfos();
+        const today = Object.entries(infos).reduce((s, [id, info]) =>
+            info?.writing && !info.ignored && !info.archived && progStorage.isRegisteredBook(id)
+                ? s + (reads[id] ?? 0) : s, 0);
+        let slotTitle: string | null = null;
+        if (hit.target) {
+            const row = await siyuan.sqlOne(`select content from blocks where type='d' and id='${hit.target.docID}'`);
+            slotTitle = row?.content ?? `[${hit.target.point}]`;
+        }
+        writingFlameState.set({ bookID: hit.bookID, bookName: hit.bookName, today, slotTitle, materialUnread: hit.materialUnread });
+    } catch (e) {
+        console.error("fleet refreshWritingFlame failed", e);
+    } finally {
+        wrefreshing = false;
+    }
+}
+
 export async function refreshFleet() {
-    await Promise.all([refreshFlame(), refreshPanel()]);
+    await Promise.all([refreshFlame(), refreshWritingFlame(), refreshPanel()]);
 }
 
 /** 档位切换（Dock 今日状态区胶囊）：落盘 + 立即重刷（今天的 q 以实时档位覆盖） */
@@ -115,6 +167,16 @@ export function initFleet(plugin: any, actions: FleetActions) {
     });
     freeHost.appendChild(freeBtn);
     plugin.addStatusBar({ element: freeHost, position: "left" });
+
+    // ---- □5 状态栏写作火苗（阅读火苗与 ✂ 之间：先于阅读火苗注册=靠右一位；afterbegin
+    //      插头部，最终左→右=阅读火苗、写作火苗、✂）。无写作书组件内 {#if} 不渲染 ----
+    const whost = document.createElement("div");
+    whost.className = "prog-flame-host";
+    wflameApp = mount(WritingFlame, {
+        target: whost,
+        props: { flame: writingFlameState, onOpen: actions.openWriting },
+    }) as any;
+    plugin.addStatusBar({ element: whost, position: "left" });
 
     // ---- 状态栏火苗 ----
     const host = document.createElement("div");
@@ -174,5 +236,9 @@ export function onunloadFleet() {
     if (flameApp) {
         unmount(flameApp);
         flameApp = null;
+    }
+    if (wflameApp) {
+        unmount(wflameApp);
+        wflameApp = null;
     }
 }

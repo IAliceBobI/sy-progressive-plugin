@@ -61,3 +61,24 @@ export function planWritingPieces(bookID: string, bookName: string, slots: strin
         } as AttrType,
     }));
 }
+
+/** 期D 书尾新建空槽计划：point=现有最大 +1（空书 0 起），attrs 与建书片同款。
+ *  纯函数只算计划；路径占用由 IO 层 docIDAtPath 预检（title 带序号前缀，同槽名
+ *  不同序天然共存，无需查重）。槽名空抛错（parseOutlineLines 取首行同 splitPiece） */
+export function planAppendPiece(
+    bookID: string, bookName: string,
+    pieces: { point: number }[], slotNameRaw: string,
+): WritingPiecePlan {
+    const slotName = parseOutlineLines(slotNameRaw)[0] ?? "";
+    if (!slotName) throw new Error("appendPiece: empty slot name");
+    const point = pieces.reduce((m, p) => Math.max(m, p.point), -1) + 1;
+    return {
+        point,
+        title: pieceDocName(point, slotName),
+        attrs: {
+            "custom-card-priority": "50",
+            [MarkKey]: getDocIalPieces(bookID, point),
+            alias: pieceAlias(bookName, slotName),
+        } as AttrType,
+    };
+}

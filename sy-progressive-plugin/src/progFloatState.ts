@@ -153,9 +153,10 @@ const TRAY_SCENE: FloatButtonSpec[] = [
  * 构造某态的主按钮组（不含 [+]——它是恒定 affordance 由 UI 直接渲染）。
  * 公共组：书+片 = ✂摘抄/🗂附属卡/🔄换书；三态 = 🗂附属卡（摘抄态无 ✂ 无 🔄）；
  * 自由态 = 无公共组（✂📥 两键起步，附属卡/换书无书可挂）。
- * opts.mainIds：片态首行有序清单（□14c 拖拽 B 档升级——全量 28 项任意可入，顺序即
- * 渲染序；设置面板 checkbox 与浮条拖拽双通道共写）。mainIds 缺省走固有编排（兼容
- * 未初始化路径）。非片态不受 mainIds 影响（书/摘抄态 4 键无精简空间）。
+ * opts.mainIds：首行有序清单（□14c 拖拽 B 档升级——全量池任意可入，顺序即渲染序；
+ * 设置面板 checkbox 与浮条拖拽双通道共写；free/digest/book 态同机制独立清单独立池
+ * ——650189 两轮反馈：2026-09-09 自由态、2026-09-10 书/摘抄态，四态行为一致）。
+ * mainIds 缺省走固有编排（兼容未初始化路径）。
  */
 export function buildFloatButtons(
     kind: FloatDocKind,
@@ -189,6 +190,22 @@ export function buildFloatButtons(
     if (kind === "free" && opts.mainIds) {
         // 自由态同机制（650189 拖动排序反馈）：独立清单独立池，与片态互不投影
         const map = new Map(FREE_ALL_MAIN.map(b => [b.id, b]));
+        return opts.mainIds.map(id => map.get(id)).filter(b => b != null);
+    }
+    if (kind === "digest" && opts.mainIds) {
+        // 摘抄态同机制（650189 第二轮「片摘处的浮窗也无法拖动排序」）：recite 未装的
+        // 滤除+origin 升 primary 与上面 SCENE 分支同语义（拷贝再改，同 review P2 纪律）
+        const pool = DIGEST_ALL_MAIN.map(b => ({ ...b })).filter(b => b.id !== "recite" || opts.reciteInstalled);
+        if (!opts.reciteInstalled) {
+            const origin = pool.find(b => b.id === "origin");
+            if (origin) origin.kind = "primary";
+        }
+        const map = new Map(pool.map(b => [b.id, b]));
+        return opts.mainIds.map(id => map.get(id)).filter(b => b != null);
+    }
+    if (kind === "book" && opts.mainIds) {
+        // 书态同机制（四态补全）：无 reciteInstalled 分叉（recite 只在 digest/片态池）
+        const map = new Map(BOOK_ALL_MAIN.map(b => [b.id, b]));
         return opts.mainIds.map(id => map.get(id)).filter(b => b != null);
     }
     return [...common, ...scene];
@@ -287,17 +304,77 @@ const FREE_ALL_MAIN: FloatButtonSpec[] = [
 export const FREE_ALL_MAIN_IDS = new Set(FREE_ALL_MAIN.map(b => b.id));
 
 /**
+ * 摘抄态首行全量池（650189 第二轮反馈，2026-09-10）：10 项 = common 两键 + SCENE.digest
+ * 7 键 + 平铺区低频 map。kind/icon 与 SCENE 段同源同值（recite=primary，summary=ghost）；
+ * recite 未装的滤除/origin 升 primary 在 buildFloatButtons mainIds 分支处理（与 SCENE
+ * 分支同语义）。片/书态专属动作（swap/toPiece/continue 等）不入池。
+ */
+const DIGEST_ALL_MAIN: FloatButtonSpec[] = [
+    { id: "digest", icon: "iconProgScissors", kind: "common", group: "common" },
+    { id: "cards", icon: "iconProgCard", kind: "common", group: "common" },
+    { id: "recite", icon: "iconProgSend", kind: "primary", group: "scene" },
+    { id: "revisit", icon: "iconProgSched", kind: "normal", group: "scene" },
+    { id: "prev", icon: "iconProgPrev", kind: "normal", group: "scene" },
+    { id: "next", icon: "iconProgFFast", kind: "normal", group: "scene" },
+    { id: "origin", icon: "iconProgBook", kind: "normal", group: "scene" },
+    { id: "tree", icon: "iconProgTree", kind: "normal", group: "scene" },
+    { id: "summary", icon: "iconProgQuill", kind: "ghost", group: "scene" },
+    { id: "map", icon: "iconProgMap", kind: "normal", group: "scene" },
+];
+
+/** 摘抄态全量池 id 集（mainIds 载入/落盘过滤面，同 PIECE_ALL_MAIN_IDS 语义） */
+export const DIGEST_ALL_MAIN_IDS = new Set(DIGEST_ALL_MAIN.map(b => b.id));
+
+/**
+ * 书态首行全量池（650189 第二轮反馈，2026-09-10）：12 项 = common 三键 + SCENE.book
+ * 5 键 + 平铺区低频四项（contents/traceUp/ignore/map）。kind 与 SCENE 段同源同值
+ * （continue=primary，addBook/archive/ignore=ghost）。摘抄/片态专属动作不入池。
+ */
+const BOOK_ALL_MAIN: FloatButtonSpec[] = [
+    { id: "digest", icon: "iconProgScissors", kind: "common", group: "common" },
+    { id: "cards", icon: "iconProgCard", kind: "common", group: "common" },
+    { id: "swap", icon: "iconProgSwap", kind: "common", group: "common" },
+    { id: "continue", icon: "iconProgPlay", kind: "primary", group: "scene" },
+    { id: "toPiece", icon: "iconProgPiece", kind: "normal", group: "scene" },
+    { id: "summary", icon: "iconProgQuill", kind: "normal", group: "scene" },
+    { id: "addBook", icon: "iconProgAddBook", kind: "ghost", group: "scene" },
+    { id: "archive", icon: "iconProgArchive", kind: "ghost", group: "scene" },
+    { id: "contents", icon: "iconProgContents", kind: "normal", group: "scene" },
+    { id: "traceUp", icon: "iconProgTraceUp", kind: "normal", group: "scene" },
+    { id: "ignore", icon: "iconProgIgnore", kind: "ghost", group: "scene" },
+    { id: "map", icon: "iconProgMap", kind: "normal", group: "scene" },
+];
+
+/** 书态全量池 id 集（mainIds 载入/落盘过滤面，同 PIECE_ALL_MAIN_IDS 语义） */
+export const BOOK_ALL_MAIN_IDS = new Set(BOOK_ALL_MAIN.map(b => b.id));
+
+/**
+ * 首行拖拽重排数学（□14c，四态共用）：renderIds=当前首行渲染序（data 序可能含被
+ * 滤除不渲染的隐藏 id——digest 态 recite 未装；「显示序≡数据序」不变量在该分叉破缺，
+ * 故事实源取渲染序，reasoning review P0-1）；dropIndex=显示序插入位（dragover 钮中点
+ * 二分量得）。原位在插入位之前时移除后索引前移一格；从平铺区拖入 dragIdx0=-1 不修。
+ * 隐藏 id 被顺带清出清单：渲染无感知，recite 装上后走平铺区兜底找回（不彻底消失）。
+ */
+export function reorderMainIds(renderIds: string[], dragId: string, dropIndex: number): string[] {
+    const dragIdx0 = renderIds.indexOf(dragId);
+    const adj = dragIdx0 >= 0 && dragIdx0 < dropIndex ? -1 : 0;
+    const next = renderIds.filter(id => id !== dragId);
+    next.splice(dropIndex + adj, 0, dragId);
+    return next;
+}
+
+/**
  * □10 平铺区低频段动作清单（id 对接旧 HtmlCBType 通道 + □11 浮层族）：
  * 片=未勾池钮 + 目录/重插/清理原文/删片退/忽略本书/路线指引；
  * 书=目录/原文侧追溯/忽略本书/路线指引；摘抄=路线指引；自由态=目录/关联摘抄/路线指引
  * （群反馈 650189 补齐，无 ignore）。
  * contents（□11 起改弹目录浮层）、map（🗺 路线指引）、traceUp（原文侧追溯）走浮层族，
  * 不再产维护型文档。
- * opts.mainIds（片态）：全量池中未进首行的落平铺区首段（排在固有低频动作前）——
- * □14c 后低频/高级钮也可能被拖上首行，一律从平铺区滤除（任何按钮都不会彻底消失，
- * 拖出首行即落回固有段位）。高级组的过滤在 UI 层 advVisible（组语义渲染）。
+ * opts.mainIds（四态）：全量池中未进首行的落平铺区——低频/高级钮被拖上首行即从平铺区
+ * 滤除，拖出首行落回固有段位（任何按钮都不会彻底消失）。高级组的过滤在 UI 层
+ * advVisible（组语义渲染）。
  */
-export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[] }): string[] {
+export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[]; reciteInstalled?: boolean }): string[] {
     if (kind === "piece") {
         if (opts?.mainIds) {
             const inMain = new Set(opts.mainIds);
@@ -309,8 +386,26 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[] }
         }
         return ["contents", "refill", "clean", ...PIECE_TRAY_POOL, "delExit", "ignore", "map", "traceUp", "recite"];
     }
-    if (kind === "book") return ["contents", "traceUp", "ignore", "map"];
-    if (kind === "digest") return ["map"];
+    if (kind === "book") {
+        // 书/摘抄态 mainIds（650189 第二轮，2026-09-10）：池内未进首行的一律落平铺区
+        if (opts?.mainIds) {
+            const inMain = new Set(opts.mainIds);
+            return BOOK_ALL_MAIN.map(b => b.id).filter(id => !inMain.has(id));
+        }
+        return ["contents", "traceUp", "ignore", "map"];
+    }
+    if (kind === "digest") {
+        // reciteInstalled 透传（reasoning review P2-1）：digest 态 recite 走 SCENE「未装
+        // 不显示」政策（区别于片态恒可见导流），未装时平铺区也不给——否则拖上首行被
+        // buildFloatButtons 滤除=两处都不渲染，违反「任何按钮不彻底消失」不变量。
+        // 缺省按已装宽松显示（错显有害小=点击 toast 引导；漏显=入口消失）
+        if (opts?.mainIds) {
+            const inMain = new Set(opts.mainIds);
+            return DIGEST_ALL_MAIN.map(b => b.id)
+                .filter(id => !inMain.has(id) && !(id === "recite" && opts.reciteInstalled === false));
+        }
+        return ["map"];
+    }
     // free（群反馈 650189）：书态基础入口——contents/traceUp 复用书态浮层（free 摘抄
     // ctime 自指 docID，清单浮层按 noteID 即查）；期2 ignore=不再推送（该源文档全部
     // 复访批量移除，与书忽略正交；free 不参与片推送调度，ignoreBook 语义不适用）。

@@ -14,7 +14,7 @@ import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { PDIGEST_CTIME, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import { PdigestReviewKey, ReviewKey } from "./reviewQueue";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
+import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime, escapeHtml } from "./progData";
 import { PIECE_IDX_KEY, digestTagKind } from "./originTrace";
 import { progStorage } from "./ProgressiveStorage";
 import { showFloatTip, hideFloatTip } from "./floatTip";
@@ -48,10 +48,12 @@ export function invalidateDigestMarker(bookID: string) {
     emptyRefBooks.delete(bookID);
 }
 
-/** ref值 → 摘抄块 ID 数组（升序=时间序；同原文块多次摘抄全部收集，□15 前只留最新） */
+/** ref值 → 摘抄块 ID 数组（升序=时间序；同原文块多次摘抄全部收集，□15 前只留最新）。
+ *  ctime 双 like 含 🔨 锤前缀（期A 写作书素材推过即锤——单 like 会漏已锤素材，
+ *  原文侧痕迹凭空消失；queryDigestTree:313 同款双 like） */
 async function buildRefMap(bookID: string): Promise<Map<string, string[]>> {
     const docRows = await siyuan.sqlAttr(
-        `select block_id from attributes where name="${PDIGEST_CTIME}" and value like "${bookID}#%" limit 1000000`,
+        `select block_id from attributes where name="${PDIGEST_CTIME}" and (value like "${bookID}#%" or value like "🔨#${bookID}#%") limit 1000000`,
     );
     const docIDs = docRows.map((r: any) => r.block_id);
     if (docIDs.length === 0) {
@@ -188,7 +190,8 @@ async function openDigestListMenu(ev: MouseEvent, ids: string[], bookID = "") {
     for (const it of items) {
         menu.addItem({
             icon: it.icon,
-            label: it.label,
+            // label=用户标题/内容预览，Menu label 走 innerHTML 须转义（□12 存量补）
+            label: escapeHtml(it.label),
             click: () => { if (pluginRef) OpenSyFile2(pluginRef, it.id); },
         });
     }

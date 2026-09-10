@@ -153,7 +153,8 @@ export function buildHeat(days: { date: string; q: number; read: number }[], tod
 
 /** 书卡聚合：滚筒序输出，过滤忽略/归档/隐匿（□2 hidden 纯视觉：调度链不含 hidden）；
  *  order 外的书按 books.json 序兜底排尾。
- *  status 缺省全 ok（与管理页同 rank：⚠ lost 次之、⏸ closed 沉底）。
+ *  status 缺省全 ok（lost/closed 相对序与管理页一致；在读/读完分档为总览面板专属，
+ *  管理页仍是自己的三档——勿同步）。
  *  期2 写作书：point/total 语义=定稿片数/片数（doneLens 注入；进度=定稿占比） */
 export function buildFleetBooks(args: {
     infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean; writing?: boolean; pinned?: boolean; hidden?: boolean } };
@@ -166,9 +167,15 @@ export function buildFleetBooks(args: {
     statuses?: { [bookID: string]: "ok" | "closed" | "lost" };
     /** 写作书定稿片数（point 换源）；缺省按 0 计 */
     doneLens?: { [bookID: string]: number };
+    /** 期A 写作书未读素材数（未锤 ctime 行按书计）：片全定稿但池有未读 → 不算
+     *  finished（与滚筒 finishedIDs 同口径，review P1-1——防「定稿完继续摘」的书
+     *  被标『读完待归档』而素材饿死）；缺省视为 0（保守=维持旧 finished 位） */
+    materialUnread?: Map<string, number>;
 }): FleetBook[] {
     const merged = mergeMissingBooks({ order: args.order, lastServed: "" }, Object.keys(args.infos));
-    const rank = (s: string) => (s === "ok" ? 0 : s === "lost" ? 1 : 2);
+    // □3 档位：在读 0 → 读完 1 → ⚠lost 2 → ⏸closed 3（异常书仍垫底；lost/closed 不看 finished）
+    const rank = (b: FleetBook) =>
+        b.status === "ok" ? (b.finished ? 1 : 0) : b.status === "lost" ? 2 : 3;
     const books: FleetBook[] = [];
     for (const bookID of merged.order) {
         const info = args.infos[bookID];
@@ -191,15 +198,17 @@ export function buildFleetBooks(args: {
             manual: !!info.manualMode,
             writing: !!info.writing,
             pinned: !!info.pinned,
-            finished: total > 0 && point >= total,
+            // 期A：写作书全定稿仍要看池（未读素材在=书还活着）；非写作书 materialUnread 恒空不受影响
+            finished: total > 0 && point >= total && (info.writing ? (args.materialUnread?.get(bookID) ?? 0) === 0 : true),
         });
     }
-    // □2 置顶组最优先（组内保滚筒序=不按 status 分层）；其余维持现状 rank（ok→lost→closed）。
+    // □2 置顶组最优先（组内保滚筒序=不按 status 分层，📌 读完书天然豁免 □3 沉底）；
+    // □3 其余四档：在读 → 读完 → lost → closed（组内保滚筒序）。
     // JS sort 稳定：组内比较返回 0 即保输入（滚筒）序
     books.sort((a, b) => {
         if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
         if (a.pinned && b.pinned) return 0;
-        return rank(a.status) - rank(b.status);
+        return rank(a) - rank(b);
     });
     return books;
 }
@@ -271,6 +280,14 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
     // 书籍状态判定链（30s 缓存，与 fleet 30s 刷新同量级）：异常卡沉底+Dock 灰化
     const statusesObj: { [bookID: string]: "ok" | "closed" | "lost" } = {};
     for (const [id, s] of await loadBookStatuses()) statusesObj[id] = s.status;
+    // 期A 写作书未读素材数（ctimeRows 已全量在手，纯内存：未锤行按书计数）
+    const materialUnread = new Map<string, number>();
+    for (const r of ctimeRows ?? []) {
+        const v = String(r.value ?? "");
+        if (v.startsWith("🔨#")) continue; // 锤=已读
+        const id = bookIDOfCtime(v);
+        if (id) materialUnread.set(id, (materialUnread.get(id) ?? 0) + 1);
+    }
     const books = buildFleetBooks({
         infos,
         order: ro.order,
@@ -279,6 +296,7 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
         doneLens,
         names,
         statuses: statusesObj,
+        materialUnread,
         digestCounts: digestCountsFrom(ctimeRows ?? []),
         // 期2 ✧ 双源：think 块级 + pdigest 文档级（spec 定稿节 3——书卡到期数含复访）
         thinkBadges: combineBadges(

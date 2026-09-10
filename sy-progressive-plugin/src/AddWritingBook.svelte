@@ -29,7 +29,8 @@
     const nbStore = writable("");
 
     const slots = $derived(parseOutlineLines(outline));
-    const slotCount = $derived(slots.length || 1);
+    // 期A：大纲空=纯收集书（0 槽），不再兜底默认槽
+    const slotCount = $derived(slots.length);
     const canSubmit = $derived(
         !busy && bookName.trim().length > 0 && !!$nbStore,
     );
@@ -109,10 +110,15 @@
                     </span>
                 {/if}
             </div>
+            {#if slots.length === 0}
+                <!-- 期A vision P2-1：0 槽态说明并进槽位条第二行（条内 flex-column 多行配方），
+                     小视口下外置 hint 会被不透明 sticky footer 盖住——用户看到 0 却看不到解释 -->
+                <div class="prog-piece-hint">{tomatoI18n.大纲说明}</div>
+            {/if}
         </div>
-        <div class="prog-field-hint">
-            {slots.length > 0 ? tomatoI18n.大纲已识别说明 : tomatoI18n.大纲说明}
-        </div>
+        {#if slots.length > 0}
+            <div class="prog-field-hint">{tomatoI18n.大纲已识别说明}</div>
+        {/if}
     </section>
 
     <!-- 卡3 工作流程：五步玩法速览（帮助篇同口径，术语与浮条按钮一致） -->
@@ -215,6 +221,14 @@
         resize: vertical;
         font-family: inherit;
     }
+    /* 期A vision P2-1 二轮：≤720px 视口下卡1+卡2 超出「滚动口−footer」预算，槽位条
+       第二行说明被不透明 sticky footer 切掉下半截——压 textarea 默认高度补预算
+       （rows=8 的默认高 ~184px 压到 126px，输入空间仍足，可手拉） */
+    @media (max-height: 720px) {
+        .prog-outline {
+            height: 126px;
+        }
+    }
     .prog-field-hint {
         margin-top: 6px;
         font-size: 12px;
@@ -238,6 +252,13 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 4px 12px;
+    }
+    /* 期A 0 槽态第二行说明（vision P2-1）：与外置 hint 同视觉档但随条走 */
+    .prog-piece-hint {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.64;
     }
     .prog-piece-value {
         min-width: 34px;
