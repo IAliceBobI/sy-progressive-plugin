@@ -50,6 +50,7 @@ type TomatoSettings = {
     exportWhiteList: string[],
     exportBlackList: string[],
     hiddenMenuItems: string[],
+    commandToggles: Record<string, boolean>,
     exportCleanFilesOn: boolean,
     exportIntervalSecOn: boolean,
     markdownExportPics: boolean,
@@ -99,11 +100,16 @@ type TomatoSettings = {
     toolbarrefreshVr: boolean,
     toolbarspacerepeat: boolean,
     bigReloadTopbar: boolean,
+    /** 打字标点自动整理（puncttidy 2026-09-10 seller 迁入）：总开关+速记折叠扩展子开关+自定义映射原文 */
+    punctTidyEnable: boolean,
+    punctTidyExtRules: boolean,
+    punctTidyCustomMap: string,
     tag2RefSearchLnk: boolean,
     tag2RefSearchRef: boolean,
     readingAddJumpMenu: boolean,
     readingAddDeleteMenu: boolean,
     dbBkBoxRefreshMenu: boolean,
+    dbBkBoxMenuTools: boolean,
     readingAddRPmenu: boolean,
     /** rpfloatbar 战役（2026-09-05）：悬浮球主控/显隐标记/位置（九宫格锚点+偏移）；
      *  readingAdd2Card=设点入闪卡（readpoint □2-B 复活，老版同名） */
@@ -123,7 +129,6 @@ type TomatoSettings = {
     cardPriorityBoxPriorityMenu: boolean,
     cardPriorityBoxSpradDelayMenu: boolean,
     cardPriorityBoxPostponeCardMenu: boolean,
-    cozeSearchMenuShow: boolean,
     imgBoxShowMenu: boolean,
     aiBoxMenuShow: boolean,
     digest2dailycard: boolean,
@@ -140,6 +145,23 @@ type TomatoSettings = {
     readCurveTakeover: boolean,
     /** 巡查频率档（分钟）：0=关/30/60/360，默认 30 */
     readCurveSweepMins: number,
+    /** 阅读点卡块接管类开关（1141 期3，默认开）：关=新阅读点不再挂键接管 */
+    readCurveReadingPoint: boolean,
+    /** 「我的文档卡」自动收编总开关（1141 期3，默认关）；单卡入口=右键「加入阅读卡」 */
+    readCurvePlainDocs: boolean,
+    /** 分片类开关（1141 期5，默认开）：关=不再建新分片卡 */
+    readCurvePiece: boolean,
+    /** 素材类开关（1141 期5，默认开）：关=素材不再首推建卡 */
+    readCurveMaterial: boolean,
+    /** 摘抄类开关（1141 期5，默认开）：关=不再为无键摘抄建卡 */
+    readCurveDigest: boolean,
+    /** 重现族节奏档位（1141 期5）：0=默认 ×2 曲线；N∈{1,3,7,14,30}=每 N 天 */
+    readCurveCadMaterial: number,
+    readCurveCadDigest: number,
+    readCurveCadReadingPoint: number,
+    readCurveCadPlain: number,
+    /** 写作每日目标档（□9 方案 A）：1/2/3 默认 1；达标变绿、无欠债累加 */
+    writingQuota: number,
     initProgFloatBtnsDisable: boolean,
     floatbarMainBtns: string[],
     floatbarFreeMainBtns: string[],
@@ -256,15 +278,20 @@ type TomatoSettings = {
     cmdBlockBoxCheckbox: boolean,
     listBoxCheckbox: boolean,
     noteBoxCheckbox: boolean,
+    noteBoxMobileSync: boolean,
     noteBoxAllKinds: string,
     aiBoxCheckbox: boolean,
     aiBoxPrompts: boolean,
-    cozeSearchBoxCheckbox: boolean,
+    aiPanelCheckbox: boolean,
+    agentMaxTurns: number,
+    agentReviewEdit: boolean,
+    agentReviewRunJs: boolean,
+    agentKnowledgeDocs: string[],
+    agentSkillDocs: string[],
     cozeSearchSpaceID: string,
     cozeSearchKnowledgeID: string,
     cozeSearchOauthTokenID: string,
     cozeSearchAppID: string,
-    cozeSearchDoubaoID: string,
     "daily-note-box-id": string,
     "tomato-clocks": string,
     tomato_clocks_force_dialog: boolean,

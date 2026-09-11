@@ -17,6 +17,7 @@
   "UIRudM9EQoyri2x4okkcjbGZnug",
   "SVELdPHKYoGMj1xkmF3cIPg3nZd",
   "NDgJd64mmo7c0Wxj42RcNv2Tnaf",
+  "AFKRdsQjCo933yxu95tcnXuYnUf",
   "KQOWdXzT8o05LlxPfJCcBHNEnYc",
   "QGx5d437SoArUyxZ6c3cqhmfnnb",
   "HJVDdXzrfo3XgMxAwFTc1gyvnHc",
@@ -36,7 +37,8 @@
   "DNZ1dYORAoHpm7xdPaecyb6Pnrh",
   "IWPcd438yoL3C6xHC0xcOXDKnmh",
   "TYSCdAHHFoZUhrxy7IdcBri6n1c",
-  "RefStyleHelpDoc09x3Q1w2E3"
+  "RefStyleHelpDoc09x3Q1w2E3",
+  "AgentPanelHelpDoc09x3Q1w2E3"
  ],
  "titles": {
   "SpaRefBoxHelpDoc09x3Q1w2E3": "🚀空格转引用",
@@ -75,6 +77,8 @@
   "DNZ1dYORAoHpm7xdPaecyb6Pnrh": "🍅快速笔记",
   "IWPcd438yoL3C6xHC0xcOXDKnmh": "番茄工具箱-帮助",
   "TYSCdAHHFoZUhrxy7IdcBri6n1c": "🍅接力浮条",
-  "RefStyleHelpDoc09x3Q1w2E3": "🍅引用样式"
+  "RefStyleHelpDoc09x3Q1w2E3": "🍅引用样式",
+  "AgentPanelHelpDoc09x3Q1w2E3": "🍅AI 助手",
+  "AFKRdsQjCo933yxu95tcnXuYnUf": "🍅打字标点自动整理"
  }
 }

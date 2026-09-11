@@ -254,7 +254,10 @@
     /* 仅保留渐进特有壳样式；search-bar/settingBox/kbd/conf-group/tomato-settings-nav 等
        通用与双栏样式全部来自 IndexConf.css（.tomato-settings-dialog 作用域），勿在此重复 */
     .container {
-        margin: 2px;
+        /* margin-top 2px 退役（2026-09-10 防抖动配套）：钉住位须=初始位（搜索框 sticky
+           top 10px 相对滚动容器 padding edge，共享 IndexConf.css）——顶距 2px 使头部链
+           初始位+2、滚动头 2px 随流位移；左右/底 2px 与钉住位无关保留 */
+        margin: 0 2px 2px;
         flex: auto;
         display: flex;
         flex-direction: column;

@@ -9,19 +9,26 @@
     import type { FleetActions } from "./fleet";
     import type { Writable } from "svelte/store";
 
+    import { writingQuota } from "../../sy-tomato-plugin/src/libs/stores";
+
     let {
         panel,
         actions,
         onQuota,
         onRefresh,
+        writing,
     }: {
         panel: Writable<FleetSummary | null>;
         actions: FleetActions;
         onQuota: (n: number) => any;
         onRefresh: () => any;
+        /** 写作火苗信号（null=无写作书→写作胶囊行不渲染）；□9 方案 A */
+        writing: Writable<{ today: number } | null>;
     } = $props();
 
     const QUOTAS = [1, 3, 5];
+    // □9 写作档位 1/2/3（默认 1）：达标变绿督促动笔，不封顶无欠债（与阅读侧差异）
+    const WQUOTAS = [1, 2, 3];
 
     const p = $derived($panel);
     const empty = $derived(p != null && p.books.length === 0);
@@ -146,6 +153,7 @@
                 {/each}
             </div>
             <div class="prog-fleet-quota" role="group" aria-label={tomatoI18n.每日目标}>
+                <span class="quota-row-tag">{tomatoI18n.阅读行标签}</span>
                 {#each QUOTAS as q (q)}
                     <button
                         class="quota-pill"
@@ -156,6 +164,22 @@
                     >
                 {/each}
             </div>
+            {#if $writing != null}
+                <!-- □9 写作档位胶囊（仅有写作书时显示）：直写 store 即时生效（火苗订阅同源；
+                     无需刷新——写作档只影响展示层，不像阅读档牵动当日 q 重算） -->
+                <div class="prog-fleet-quota prog-fleet-quota--writing" role="group" aria-label={tomatoI18n.每日写作目标}>
+                    <span class="quota-row-tag">{tomatoI18n.写作行标签}</span>
+                    {#each WQUOTAS as q (q)}
+                        <button
+                            class="quota-pill"
+                            class:selected={q === $writingQuota}
+                            aria-label={tomatoI18n.每日写作目标N片(q)}
+                            onclick={() => q !== $writingQuota && writingQuota.write(q)}
+                        >{tomatoI18n.档位标签(q, 3)}·{q}</button
+                        >
+                    {/each}
+                </div>
+            {/if}
         </div>
 
         <!-- 热力图：近14天横条，右端=今天 -->

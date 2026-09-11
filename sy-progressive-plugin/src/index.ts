@@ -18,7 +18,8 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, readCurveReadingPoint, readCurvePlainDocs,
+    readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
@@ -122,9 +123,21 @@ function loadStore(plugin: BaseTomatoPlugin) {
     hideBtnsInFlashCard.load(plugin);
     pieceTailCard.load(plugin);
     openCardsOnOpenPiece.load(plugin);
-    // 阅读曲线接管（1530 期1）：漏登记=开关/频率档 set 全部静默无效（settings.md 坑）
+    // 阅读曲线接管（1530 期1）：漏登记=开关/频率档 set 全部静默无效（settings.md 坑；
+    // □3 实锤复现：plainDocs 漏 load → store 恒默认 false，开闸收编静默不生效）
     readCurveTakeover.load(plugin);
     readCurveSweepMins.load(plugin);
+    readCurveReadingPoint.load(plugin);
+    readCurvePlainDocs.load(plugin);
+    // 期5 类别开关族+节奏档位（同坑：漏 load=开关静默无效）
+    readCurvePiece.load(plugin);
+    readCurveMaterial.load(plugin);
+    readCurveDigest.load(plugin);
+    readCurveCadMaterial.load(plugin);
+    readCurveCadDigest.load(plugin);
+    readCurveCadReadingPoint.load(plugin);
+    readCurveCadPlain.load(plugin);
+    writingQuota.load(plugin);
     cardUnderPiece.load(plugin);
     cardAppendTime.load(plugin);
     mobileTopBar.load(plugin);

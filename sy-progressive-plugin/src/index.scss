@@ -673,11 +673,11 @@ body.prog-material-border-on .protyle-wysiwyg div[data-node-id].sb[custom-prog-m
    #7cc98f≈8:1），status-ok 本值不动（芯焰是图形不受文字对比度约束；warn/over
    数字未在案不扩期） */
 .prog-flame[data-state="ok"] .prog-flame-num,
-.prog-wflame[data-state="wrote"] .prog-flame-num {
+.prog-wflame[data-state="goal"] .prog-flame-num {
   color: #357742;
 }
 html[data-theme-mode="dark"] .prog-flame[data-state="ok"] .prog-flame-num,
-html[data-theme-mode="dark"] .prog-wflame[data-state="wrote"] .prog-flame-num {
+html[data-theme-mode="dark"] .prog-wflame[data-state="goal"] .prog-flame-num {
   color: #7cc98f;
 }
 /* 状态色注入（默认 ok 由 :root 的 flame-core= status-ok 兜底） */
@@ -703,13 +703,13 @@ html[data-theme-mode="dark"] .prog-wflame[data-state="wrote"] .prog-flame-num {
 // ============================================================
 // □5 写作小火焰：布局全继承 .prog-flame（button 挂两类），只换壳色与芯语义——
 // 壳=恒冷青身份色（亮 #35606e/暗 #85b3bd，不派生 --prog-accent：主题族如 amber
-// 会把 accent 调成琥珀与阅读火苗撞车，身份区分须跨主题恒成立）；芯两态（写过=绿/
-// 未写=熄灭感），写作无欠债概念不设 warn/over 惩罚色；数字=今日已写片数。
+// 会把 accent 调成琥珀与阅读火苗撞车，身份区分须跨主题恒成立）；芯三态（□9：达标=绿/写过未达标=中性/未写=熄灭感），写作无欠债概念不设 warn/over 惩罚色；数字=已写/目标。
 // idle 芯=壳色明暗一档（vision P1-1：透明灰叠壳=1:1 融合芯不可见，改不透明亮度差；
-// 暗档 35% 黑提余量——熄灭态弱于活跃态是语义，不追 3:1）；idle 数字=实色 on-surface
+// 暗档 35% 黑提余量——熄灭态弱于活跃态是语义，不追 3:1）；wrote 芯=满壳青实色
+// （□9 vision 真修 P0-2：与 idle 拉开亮度差）；idle/wrote 数字=实色 on-surface
 // （vision P1-2：数字色绑 --prog-flame-core 会被芯色拖到 2.2:1，数字是数据主体不应
-// 弱于 label）。可辨性分工：芯承担亮度差、数字承担色相/饱和度差（灰 vs 绿），
-// 红绿色盲两通道互补可分 idle/wrote（vision 复评 P2-2 校正后的准确表述）。
+// 弱于 label）。可辨性分工：芯亮度差分 idle/wrote、数字色相分 wrote/goal（灰 vs 绿），
+// goal 绿芯+深绿数字与 wrote 满壳青两通道可分。
 // ============================================================
 .prog-wflame {
   --prog-flame-base: #35606e;
@@ -723,7 +723,12 @@ html[data-theme-mode="dark"] .prog-wflame {
 html[data-theme-mode="dark"] .prog-wflame[data-state="idle"] {
   --prog-flame-core: color-mix(in srgb, #000 35%, var(--prog-flame-base));
 }
-.prog-wflame[data-state="idle"] .prog-flame-num {
+/* wrote 芯=满壳青实色，与 idle 的明暗一档拉开亮度差（□9 vision 真修 P0-2：
+   此前 idle/wrote 共用同条 mix 规则=芯色零区分，三态只剩数字单通道） */
+.prog-wflame[data-state="wrote"] {
+  --prog-flame-core: var(--prog-flame-base);
+}
+.prog-wflame:is([data-state="idle"], [data-state="wrote"]) .prog-flame-num {
   color: var(--b3-theme-on-surface);
 }
 
@@ -923,9 +928,18 @@ html[data-theme-mode="dark"] .prog-wflame[data-state="idle"] {
 }
 
 /* 档位胶囊（轻1/常3/冲5，可点切换=dailyQuota 设置 UI） */
+.prog-fleet-quota--writing {
+  margin-top: 2px;
+}
 .prog-fleet-quota {
   display: flex;
   gap: 4px;
+}
+/* □9 行首身份标签（vision P1-2 真修）：读/写两行胶囊同形，前缀区分防误点 */
+.quota-row-tag {
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--prog-sub);
 }
 .quota-pill {
   height: 20px;
@@ -2155,4 +2169,18 @@ html[data-theme-mode="dark"] .prog-material-tag {
   height: 14px;
   flex: none;
   color: var(--b3-theme-secondary);
+}
+// □4 最后一见强调（5/5 第 5 见）：主色+加重，与常规灰态一望可分；
+// 变色加粗属同一元素的态切换，非删激活孪生规则（css.md 先例不适用）
+.prog-revcard-badge.prog-revcard-last {
+  color: var(--b3-theme-primary);
+  font-weight: 600;
+
+  > svg { color: var(--b3-theme-primary); }
+}
+// □4 下一张即时反馈闪换态（「N 天后再见」）：轻底色示意瞬态，1.2s 还原
+.b3-button.prog-revcard-flashed {
+  color: var(--b3-theme-primary);
+  border-color: var(--b3-theme-primary-light);
+  background: var(--b3-theme-primary-lightest);
 }

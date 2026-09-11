@@ -425,6 +425,10 @@ export const exportWhiteList = settingFactory("exportWhiteList", [], STORAGE_SET
 export const exportBlackList = settingFactory("exportBlackList", [], STORAGE_SETTINGS, null as TSK);
 // 右键菜单逐项隐藏（□4）：存「已隐藏菜单项 key 集合」，空=全显示；key 体系=winHotkey langKey 或 m.<模块>.<语义> 前缀
 export const hiddenMenuItems = settingFactory("hiddenMenuItems", [], STORAGE_SETTINGS, null as TSK);
+// 命令开关（featgate □1 2026-09-10）：命令 langKey→bool 单键 map，缺省=全开（老用户零感知，
+// 与 hiddenMenuItems 单键模式同款）；map 恒只存显式关项（nextCommandToggles 再开清键）。
+// 消费=gatedAddCommand 条件注册（libs/cmdGate.ts）；改后需插件级重载生效
+export const commandToggles = settingFactory("commandToggles", {} as Record<string, boolean>, STORAGE_SETTINGS, null as TSK);
 // 默认开启（2026-08-22 用户拍板：干净路径是默认形态，无需选择）；已存储过旧值的用户不受影响。
 export const exportCleanPath = settingFactory("exportCleanPath", true, STORAGE_SETTINGS, null as TSK);
 export const showDocAttrs = settingFactory("showDocAttrs", false, STORAGE_SETTINGS, null as TSK);
@@ -477,6 +481,16 @@ export const toolbarlocatedoc = settingFactory("toolbarlocatedoc", true, STORAGE
 // 空间零打扰，power-user 自开；独立于 ToolbarBox/MixBox 家族（无 master 门控，维护型工具
 // 与内容类小功能不同类）。开关改后保存→插件级重载生效（顶栏注册在 onload）
 export const bigReloadTopbar = settingFactory("bigReloadTopbar", false, STORAGE_SETTINGS, null as TSK);
+// 打字标点自动整理（2026-09-10 puncttidy 战役 seller 迁入，免费）：普适档=‘’“”配对重排/。。
+// →……/句末+“方向纠正；开=onload 挂 wysiwyg observer（注册门控，改开关保存→插件级重载生效）；
+// 默认关——公开侧新功能零打扰，bear 与老 seller 用户自开。引擎=libs/punctTidy.ts（seller 双消费）
+export const punctTidyEnable = settingFactory("punctTidyEnable", false, STORAGE_SETTINGS, null as TSK);
+// 速记折叠扩展规则（puncttidy）：折叠族（··/成对单引号→『、》》/《《→箭头）+『』【】配对+
+// 扩展方向修正，默认关；observer 回调实时读→改完保存即时生效（非结构性）
+export const punctTidyExtRules = settingFactory("punctTidyExtRules", false, STORAGE_SETTINGS, null as TSK);
+// 自定义标点映射（puncttidy □7）：一行一条「源→目标」（源=单字符，如 '→‘ / .→。），默认空=
+// 零打扰；observer 回调实时读→保存即时生效（非结构性）。解析/守卫语义=libs/punctTidy.ts
+export const punctTidyCustomMap = settingFactory("punctTidyCustomMap", "", STORAGE_SETTINGS, null as TSK);
 export const readingPointBoxCheckbox = settingFactory("readingPointBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const readingTopBar = settingFactory("readingTopBar", true, STORAGE_SETTINGS, null as TSK);
 // 阅读点翻新（2026-09）：状态栏指示钮（有点点亮点击跳回/无点半暗点击设点）；以下五项随老模型退役
@@ -604,6 +618,10 @@ export const imgBoxCheckbox = settingFactory("imgBoxCheckbox", false, STORAGE_SE
 export const imgBoxShowMenu = settingFactory("imgBoxShowMenu", true, STORAGE_SETTINGS, null as TSK);
 export const dbBkBoxCheckbox = settingFactory("dbBkBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const dbBkBoxRefreshMenu = settingFactory("dbBkBoxRefreshMenu", true, STORAGE_SETTINGS, null as TSK);
+// 数据库菜单工具组（featgate □2 死角补口）：管数据库反链右键的 5 项配套操作（移到下边/
+// 清空筛选/按标签过滤/排除标签/聚合勾选）——分组 1 键（逐项太碎，bear 荐分组）；默认开=
+// 现状恒显示零迁移。菜单构建时动态读（右键即生效，非结构键）
+export const dbBkBoxMenuTools = settingFactory("dbBkBoxMenuTools", true, STORAGE_SETTINGS, null as TSK);
 export const dbBkBoxMaxBacklinkSize = settingFactory("dbBkBoxMaxBacklinkSize", 200, STORAGE_SETTINGS, null as TSK);
 export const dbBkBoxHideDatetime = settingFactory("dbBkBoxHideDatetime", false, STORAGE_SETTINGS, null as TSK);
 export const mixBoxCheckbox = settingFactory("mixBoxCheckbox", true, STORAGE_SETTINGS, null as TSK);
@@ -624,6 +642,10 @@ export const spaceRefLinkType = settingFactory("spaceRefLinkType", "ref", STORAG
 export const tag_to_ref_add_card = settingFactory("tag-to-ref-add-card", false, STORAGE_SETTINGS, null as TSK);
 export const tag_to_ref_add_pinyin = settingFactory("tag-to-ref-add-pinyin", false, STORAGE_SETTINGS, null as TSK);
 export const noteBoxCheckbox = settingFactory("noteBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
+// 移动端顶栏「同步数据」钮（featgate □2 死角补口）：NoteBox onload 注册读死——改须插件
+// 重载（STRUCTURAL_KEYS 已登记）；默认开=现状零迁移。与 noteBoxCheckbox 两层叠加
+// （总开关关=整个 NoteBox 不挂，此键只在总开时有意义）
+export const noteBoxMobileSync = settingFactory("noteBoxMobileSync", true, STORAGE_SETTINGS, null as TSK);
 export const noteBoxAllKinds = settingFactory("noteBoxAllKinds", `📌,💡, 🏞️, 💪, 💬, 🍴, 📚, 💼, 锻炼,看书,学习,干活`, STORAGE_SETTINGS, null as TSK);
 export const avoiding_cloud_synchronization_conflicts = settingFactory("avoiding-cloud-synchronization-conflicts", false, STORAGE_SETTINGS, null as TSK);
 export const flash_thoughts_2_top = settingFactory("flash-thoughts-2-top", false, STORAGE_SETTINGS, null as TSK);
@@ -656,6 +678,16 @@ export const dailyNoteReviewTopbar = settingFactory("dailyNoteReviewTopbar", tru
 export const listBoxCheckbox = settingFactory("listBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const dont_break_list = settingFactory("dont-break-list", false, STORAGE_SETTINGS, null as TSK);
 export const aiBoxCheckbox = settingFactory("aiBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
+// ai-agent □5 AI 助手面板（右侧 dock）：默认关对齐 Box 族惯例；桌面 only（移动端不注册）
+export const aiPanelCheckbox = settingFactory("aiPanelCheckbox", false, STORAGE_SETTINGS, null as TSK);
+// agentrev □2 可配置三件（bear ②）：轮数上限（消费端钳 1~12）+人审两开关（默认全开，关=该类动作免确认直接执行）
+export const agentMaxTurns = settingFactory("agentMaxTurns", 4, STORAGE_SETTINGS, null as TSK);
+export const agentReviewEdit = settingFactory("agentReviewEdit", true, STORAGE_SETTINGS, null as TSK);
+export const agentReviewRunJs = settingFactory("agentReviewRunJs", true, STORAGE_SETTINGS, null as TSK);
+// agentrev □4 三件套前两样（bear ③④，□1 拍板：领域知识=直接披露全文常驻/Skill=渐进披露只注简介）：
+// 存思源文档 id 数组；标题运行时反查（改名不断链），消费端=AgentPanel system 注入+skills 工具
+export const agentKnowledgeDocs = settingFactory("agentKnowledgeDocs", [] as string[], STORAGE_SETTINGS, null as TSK);
+export const agentSkillDocs = settingFactory("agentSkillDocs", [] as string[], STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesEnable = settingFactory("prefixArticlesEnable", false, STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesSoftLimit = settingFactory("prefixArticlesSoftLimit", "50", STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesMenu = settingFactory("prefixArticlesMenu", true, STORAGE_SETTINGS, null as TSK);
@@ -681,11 +713,8 @@ export const mindWireStarRefOnly = settingFactory("mindWireStarRefOnly", true, S
 // □2 词级导线（划词连线）总开关（spec §4.8 行 5；设置 UI 行随 □5 ConfMindWire 落地）
 export const mindWireWordWire = settingFactory("mindWireWordWire", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxMenuShow = settingFactory("aiBoxMenuShow", true, STORAGE_SETTINGS, null as TSK);
-export const cozeSearchMenuShow = settingFactory("cozeSearchMenuShow", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxPrompts = settingFactory("aiBoxPrompts", [], STORAGE_SETTINGS, null as TSK);
-export const cozeSearchBoxCheckbox = settingFactory("cozeSearchBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const cozeSearchSpaceID = settingFactory("cozeSearchSpaceID", "", STORAGE_SETTINGS, null as TSK);
-export const cozeSearchDoubaoID = settingFactory("cozeSearchDoubaoID", "", STORAGE_SETTINGS, null as TSK);
 export const cozeSearchKnowledgeID = settingFactory("cozeSearchKnowledgeID", "", STORAGE_SETTINGS, null as TSK);
 export const cozeSearchOauthTokenID = settingFactory("cozeSearchOauthTokenID", "", STORAGE_SETTINGS, null as TSK);
 export const cozeSearchAppID = settingFactory("cozeSearchAppID", "", STORAGE_SETTINGS, null as TSK);
@@ -825,6 +854,26 @@ export const openCardsOnOpenPiece = settingFactory("openCardsOnOpenPiece", false
 export const readCurveTakeover = settingFactory("readCurveTakeover", false, STORAGE_Prog_SETTINGS, null as TSK);
 // 巡查频率档（分钟）：0=关/30/60/360；事件触发（推片/翻卡/设置变更）不受此档影响
 export const readCurveSweepMins = settingFactory("readCurveSweepMins", 30, STORAGE_Prog_SETTINGS, null as TSK);
+// 阅读点接管类开关（1141 期3，默认开）：关=新阅读点卡块不再挂键接管（存量已接管走完曲线）
+export const readCurveReadingPoint = settingFactory("readCurveReadingPoint", true, STORAGE_Prog_SETTINGS, null as TSK);
+// 「我的文档卡」总开关（1141 期3，默认关）：开=自动收编全库无键有卡文档块（分摊 DIGEST_BUILD_CAP/轮）；
+// 关闸不清卡（已收编走完曲线自然毕业）；单卡入口=右键「加入阅读卡」与此开关无关
+export const readCurvePlainDocs = settingFactory("readCurvePlainDocs", false, STORAGE_Prog_SETTINGS, null as TSK);
+// 分片类开关（1141 期5，默认开）：关=不再建新分片卡（存量分片卡走完每日重现自然毕业）
+export const readCurvePiece = settingFactory("readCurvePiece", true, STORAGE_Prog_SETTINGS, null as TSK);
+// 素材类开关（1141 期5，默认开）：关=素材不再首推建卡（存量曲线卡走完自然毕业）
+export const readCurveMaterial = settingFactory("readCurveMaterial", true, STORAGE_Prog_SETTINGS, null as TSK);
+// 摘抄类开关（1141 期5，默认开）：关=不再为无键摘抄建卡（存量走完自然毕业）
+export const readCurveDigest = settingFactory("readCurveDigest", true, STORAGE_Prog_SETTINGS, null as TSK);
+// 重现族节奏档位（1141 期5）：0=默认 ×2 递增曲线；N∈{1,3,7,14,30}=每 N 天永不毕业
+// （只管建卡初始键与首排 due，存量卡不动）
+export const readCurveCadMaterial = settingFactory("readCurveCadMaterial", 0, STORAGE_Prog_SETTINGS, null as TSK);
+export const readCurveCadDigest = settingFactory("readCurveCadDigest", 0, STORAGE_Prog_SETTINGS, null as TSK);
+export const readCurveCadReadingPoint = settingFactory("readCurveCadReadingPoint", 0, STORAGE_Prog_SETTINGS, null as TSK);
+export const readCurveCadPlain = settingFactory("readCurveCadPlain", 0, STORAGE_Prog_SETTINGS, null as TSK);
+// 写作每日目标档（□9：鸟咨询+bear 拍板方案 A）：1/2/3 片默认 1；达标才变绿督促动笔，
+// 不封顶、无惩罚性欠债累加（与阅读侧 dailyQuota 的明确差异——写作无 warn/over 态）
+export const writingQuota = settingFactory("writingQuota", 1, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardUnderPiece = settingFactory("cardUnderPiece", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardAppendTime = settingFactory("cardAppendTime", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const mobileTopBar = settingFactory("mobileTopBar", true, STORAGE_Prog_SETTINGS, null as TSK);

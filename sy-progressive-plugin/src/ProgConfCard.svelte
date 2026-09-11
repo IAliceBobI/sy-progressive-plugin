@@ -14,7 +14,17 @@
         pieceNoBacktraceLink,
         readCurveSweepMins,
         readCurveTakeover,
+        readCurvePiece,
+        readCurveMaterial,
+        readCurveDigest,
+        readCurveReadingPoint,
+        readCurvePlainDocs,
+        readCurveCadMaterial,
+        readCurveCadDigest,
+        readCurveCadReadingPoint,
+        readCurveCadPlain,
     } from "../../sy-tomato-plugin/src/libs/stores";
+    import { SCHED_CHOICES } from "./readCurveCore";
 </script>
 
 <!-- 制卡（□23：术语型开关全部补 hover tip，语义见 tomatoI18n.tip设置* 家族） -->
@@ -121,6 +131,64 @@
                 {/if}
             </select>
             <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip巡查频率}>{tomatoI18n.巡查频率}</span>
+        </div>
+        <!-- □5 类别开关族（一行一类紧凑：开关+名称+重现族节奏档位下拉；关=该类不再
+             新建卡，存量走完自然毕业；档位只管新建卡初始曲线，存量卡不动） -->
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$readCurvePiece} />
+            <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip推送分片}>{tomatoI18n.分片}</span>
+        </div>
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$readCurveMaterial} />
+            <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip推送素材}>{tomatoI18n.素材}</span>
+            <select class="b3-select" style="min-width: 130px" bind:value={$readCurveCadMaterial}>
+                <option value={0}>{tomatoI18n.节奏默认递增}</option>
+                {#each SCHED_CHOICES as n (n)}
+                    <option value={n}>{tomatoI18n.计划每N天(n)}</option>
+                {/each}
+                {#if $readCurveCadMaterial !== 0 && !SCHED_CHOICES.includes($readCurveCadMaterial)}
+                    <option value={$readCurveCadMaterial}>{$readCurveCadMaterial} {tomatoI18n.已失效请重新选择}</option>
+                {/if}
+            </select>
+        </div>
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$readCurveDigest} />
+            <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip推送摘抄}>{tomatoI18n.摘抄}</span>
+            <select class="b3-select" style="min-width: 130px" bind:value={$readCurveCadDigest}>
+                <option value={0}>{tomatoI18n.节奏默认递增}</option>
+                {#each SCHED_CHOICES as n (n)}
+                    <option value={n}>{tomatoI18n.计划每N天(n)}</option>
+                {/each}
+                {#if $readCurveCadDigest !== 0 && !SCHED_CHOICES.includes($readCurveCadDigest)}
+                    <option value={$readCurveCadDigest}>{$readCurveCadDigest} {tomatoI18n.已失效请重新选择}</option>
+                {/if}
+            </select>
+        </div>
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$readCurveReadingPoint} />
+            <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip推送阅读点}>{tomatoI18n.阅读点}</span>
+            <select class="b3-select" style="min-width: 130px" bind:value={$readCurveCadReadingPoint}>
+                <option value={0}>{tomatoI18n.节奏默认递增}</option>
+                {#each SCHED_CHOICES as n (n)}
+                    <option value={n}>{tomatoI18n.计划每N天(n)}</option>
+                {/each}
+                {#if $readCurveCadReadingPoint !== 0 && !SCHED_CHOICES.includes($readCurveCadReadingPoint)}
+                    <option value={$readCurveCadReadingPoint}>{$readCurveCadReadingPoint} {tomatoI18n.已失效请重新选择}</option>
+                {/if}
+            </select>
+        </div>
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$readCurvePlainDocs} />
+            <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip推送文档卡}>{tomatoI18n.我的文档卡}</span>
+            <select class="b3-select" style="min-width: 130px" bind:value={$readCurveCadPlain}>
+                <option value={0}>{tomatoI18n.节奏默认递增}</option>
+                {#each SCHED_CHOICES as n (n)}
+                    <option value={n}>{tomatoI18n.计划每N天(n)}</option>
+                {/each}
+                {#if $readCurveCadPlain !== 0 && !SCHED_CHOICES.includes($readCurveCadPlain)}
+                    <option value={$readCurveCadPlain}>{$readCurveCadPlain} {tomatoI18n.已失效请重新选择}</option>
+                {/if}
+            </select>
         </div>
     {/if}
 </div>

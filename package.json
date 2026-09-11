@@ -1,12 +1,14 @@
 {
   "name": "sy-progressive-plugin",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "description": "思源笔记渐进学习插件：摘抄/分片渐进、闪卡、多行挖空",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build",
+    "dev:kernel": "vite build --watch --config vite.kernel.config.ts",
+    "build:kernel": "vite build --config vite.kernel.config.ts",
+    "build": "npm run build:kernel && vite build",
     "test": "vitest run"
   },
   "keywords": [

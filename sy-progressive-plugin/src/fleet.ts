@@ -205,7 +205,7 @@ export function initFleet(plugin: any, actions: FleetActions) {
             dock.element.innerHTML = `<div class="fn__flex fn__flex-column fn__flex-1 prog-fleet-dock"><div id="${eleID}" class="fn__flex-1"></div></div>`;
             panel = mount(DockPanel, {
                 target: dock.element.querySelector("#" + eleID),
-                props: { panel: panelState, actions, onQuota: setQuota, onRefresh: refreshFleet },
+                props: { panel: panelState, actions, onQuota: setQuota, onRefresh: refreshFleet, writing: writingFlameState },
             }) as any;
         },
         destroy() {

@@ -22,7 +22,9 @@ import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
-import { addToReadingCurve, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, sweepReadCurve } from "./readCurve";
+import { addToReadingCurve, buildReadingCard, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, sweepReadCurve } from "./readCurve";
+import { openReadCardMenu } from "./readCardMenu";
+import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCore";
 import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
 import { HtmlCBType } from "./constants";
 import { lockWithLease, type LockLeaseResult } from "./lockLease";
@@ -30,7 +32,7 @@ import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progDa
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
-import { mobileSelectBtns, readCurveTakeover } from "../../sy-tomato-plugin/src/libs/stores";
+import { mobileSelectBtns, readCurveCadMaterial, readCurveMaterial, readCurveTakeover } from "../../sy-tomato-plugin/src/libs/stores";
 import { addClickEvent, progressiveBtnFloating, yieldFloatbarForMenu, restoreFloatbarAfterMenu } from "./ProgressiveBtn";
 import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
@@ -188,6 +190,30 @@ class Progressive {
                     icon: "iconProgPoolManage",
                     click: () => { this.openManagePoolDialog(poolBookID); },
                 });
+            }
+            // 阅读曲线 □4：右键「阅读推送…」（状态行+全动作集：不再推/每 N 天/再来一轮/
+            // 推迟/转记忆卡/加入推送）。目标块=托管文档内右键时收编到文档卡（片/槽/摘抄
+            // 整卡管理；item 级收编与整卡双计——□3 addToReadingCurve 备案的场景过滤）；
+            // 未托管=右键块本身（单卡 opt-in，□3 语义保留）。菜单体 async 组配（独立
+            // Menu，emitToPlugins 同步窗口只加壳项——await 后 addItem 迟到不进菜单实锤）。
+            if (readCurveTakeover.get()) {
+                const nodeID = (detail.element as HTMLElement | undefined)?.getAttribute?.("data-node-id") ?? "";
+                const rootID = (detail.protyle as any)?.block?.rootID ?? "";
+                const rootKeyed = !!(detail.protyle?.wysiwyg?.element as HTMLElement | undefined)?.getAttribute?.(READCARD_KEY);
+                const target = rootKeyed && rootID ? rootID : nodeID;
+                if (target) {
+                    menu.addItem({
+                        label: tomatoI18n.阅读推送,
+                        icon: "iconRiffCard",
+                        click: (_el: HTMLElement, ev: MouseEvent) => {
+                            debugLog("readcurve.ui", `ctx menu block=${target} rootKeyed=${rootKeyed}`, "progressive");
+                            void openReadCardMenu(target, {
+                                clientX: ev?.clientX ?? 0,
+                                clientY: ev?.clientY ?? 0,
+                            });
+                        },
+                    });
+                }
             }
         });
         // 文档树右键/行内 ⋯「加入渐进阅读」（bear 2026-09-08 拍板：恒显不设开关；多选/笔记本行
@@ -775,10 +801,19 @@ class Progressive {
                 // → false 交 WithLock 重试环重跑分派（已删素材自然消失改推下条），防死开+幻计数
                 const hammer = `🔨#${dispatch.ctime}`;
                 await siyuan.setBlockAttrs(dispatch.id, { [PDIGEST_CTIME]: hammer } as any);
-                const after = ((await siyuan.getBlockAttrs(dispatch.id)) ?? {})[PDIGEST_CTIME] ?? "";
+                const attrsAfter = (await siyuan.getBlockAttrs(dispatch.id)) ?? {};
+                const after = attrsAfter[PDIGEST_CTIME] ?? "";
                 if (after !== hammer) {
                     debugLog("wdispatch", `hammer miss doc=${dispatch.id} after=${after}`, "progressive");
                     return false;
+                }
+                // □2 锤后挂曲线（编辑器读完=第 1 见已消耗）：3 天后 ×2 曲线重现，5 轮毕业。
+                // 已有键（复习链先建了首推卡 x#0 在弹）不动——卡链自管，此处只是预读；
+                // 存量已锤无键（v3.7.0 消费过）不追溯（老数据不动）。键读复用锤复核的
+                // attrs（review P2-3：省一次 getBlockAttrs 往返）
+                if (readCurveTakeover.get() && readCurveMaterial.get() && !String(attrsAfter[READCARD_KEY] ?? "")) {
+                    const cad = readCurveCadMaterial.get();
+                    await buildReadingCard(dispatch.id, plusDays(new Date(), cadenceDays(cad)), cadenceOpts(cad) ?? { mode: "grow", count: 1 });
                 }
                 debugLog("wdispatch", `material book=${bookID} doc=${dispatch.id} ct=${dispatch.ctime}`, "progressive");
                 events.setDocID(dispatch.id);

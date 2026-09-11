@@ -21,6 +21,9 @@ export interface DayLogData {
     /** bookID -> 上次记账时的 point（routemap □1 当日去重锚：新 point 创新高才计，
         防回看-前进循环刷账；跨天新块自然无锚=重读也算读） */
     p?: { [bookID: string]: number };
+    /** 全局重现计数（□2 额度分池：重现族消耗轮次计数，与书池 b 独立——重现=复习
+        不占书额度不计已读；老块无此字段读作 0） */
+    rc?: number;
 }
 
 export interface DebtSummary {
@@ -88,6 +91,11 @@ export function incrementDay(data: DayLogData, bookID: string, quota: number, po
     return next;
 }
 
+/** 全局重现计数 +1（□2 额度分池：b/q/p 全不动——重现族消耗与书池完全独立） */
+export function incrementRevisit(data: DayLogData): DayLogData {
+    return { ...data, rc: (data.rc ?? 0) + 1 };
+}
+
 export function summarizeDebt(
     days: { date: string; q: number; read: number }[],
     today: string,
@@ -109,7 +117,8 @@ export function summarizeDebt(
 export function formatDaySummary(data: DayLogData, bookNames: { [bookID: string]: string }): string {
     const total = Object.values(data.b).reduce((s, n) => s + n, 0);
     const parts = Object.entries(data.b).map(([id, n]) => `${bookNames[id] || id}×${n}`);
-    return `档位 ${data.q} · 已读 ${total}${parts.length ? " —— " + parts.join("、") : ""}`;
+    const rc = data.rc ? ` · 重现 ${data.rc}` : "";
+    return `档位 ${data.q} · 已读 ${total}${parts.length ? " —— " + parts.join("、") : ""}${rc}`;
 }
 
 export function isFinished(point: number, indexLength: number): boolean {
@@ -304,4 +313,33 @@ export async function rollerTodayReads(): Promise<{ [bookID: string]: number }> 
     const blockID = await deps.findDayBlock(todayStr());
     if (!blockID) return {};
     return (await deps.readDayBlockData(blockID)).b;
+}
+
+/** 今日全局重现计数（□2 额度分池闸门判定；无当日块/老块无 rc=0） */
+export async function rollerTodayRevisits(): Promise<number> {
+    const deps = makeRollerDeps();
+    const blockID = await deps.findDayBlock(todayStr());
+    if (!blockID) return 0;
+    return (await deps.readDayBlockData(blockID)).rc ?? 0;
+}
+
+/** 重现计数 +n（□2：sweep 尾部合并一次写——逐卡写会与 markRead 的建块撞「写后
+ *  立读」SQL 索引延迟窗口各建一块，rc/b 分裂两块闸门失效〔6808 实测〕；找不到当日
+ *  块时 800ms 重查一次再兜底新建，压缩与 markRead 同轮建块的竞态面） */
+export async function rollerCountRevisit(n = 1): Promise<void> {
+    const deps = makeRollerDeps();
+    const date = todayStr();
+    let blockID = await deps.findDayBlock(date);
+    if (!blockID) {
+        await new Promise(r => setTimeout(r, 800));
+        blockID = await deps.findDayBlock(date);
+    }
+    const data = blockID ? await deps.readDayBlockData(blockID) : { q: deps.getQuota(), b: {} };
+    let next = data;
+    for (let i = 0; i < n; i++) next = incrementRevisit(next);
+    if (blockID) {
+        await deps.updateDayBlock(blockID, date, next, formatDaySummary(next, {}));
+    } else {
+        await deps.createDayBlock(date, next, formatDaySummary(next, {}));
+    }
 }

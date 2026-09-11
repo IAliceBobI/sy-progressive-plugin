@@ -7,7 +7,7 @@
     import HotkeyCap from "./HotkeyCap.svelte";
     import ConfHelpIcon from "./ConfHelpIcon.svelte";
     import { tomatoI18n } from "./tomatoI18n";
-    import { tomatoSettingsOpenHK, tomatoBigReloadHK } from ".";
+    import { tomatoSettingsOpenHK, tomatoBigReloadHK } from "./libs/entryHotkeys";
     import { ScheduleCopyID } from "./Schedule";
     import { addFoldCmd折叠, addFoldCmd展开 } from "./fold";
     import { SPACE } from "./libs/gconst";
@@ -73,6 +73,8 @@
             <input type="checkbox" class="b3-switch" bind:checked={$toolbarTidy} />
             {ToolBarBox整理assets下的图片视频音频.langText()}<HotkeyCap hk={ToolBarBox整理assets下的图片视频音频} pluginName="sy-tomato-plugin"></HotkeyCap>
         </div>
+        <!-- 打字标点全家（总开关/速记折叠/自定义映射）已迁独立域「打字标点」
+             （2026-09-10 punctcfg，bear 提议独立导航项；结构化规则行编辑器见 ConfPunct.svelte） -->
         <!-- 语言切换六钮（中/英/臺/日/西/法）显隐：无命令热键，纯开关行 -->
         <div>
             <input type="checkbox" class="b3-switch" bind:checked={$toolbarEN2CHBtn} />
