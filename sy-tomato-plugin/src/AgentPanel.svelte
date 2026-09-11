@@ -14,8 +14,8 @@
     import { createFrontendToolEnv } from "./agentToolBridge";
     import { createToolCaller } from "./libs/agentTools";
     import { createPanelOnlyTools, needsHumanReview } from "./libs/agentTools/editTools";
-    import { agentMaxTurns, agentReviewEdit, agentReviewRunJs, agentKnowledgeDocs, agentSkillDocs } from "./libs/stores";
-    import { fetchDocSnapshots, buildKnowledgeSection, buildSkillSection, sqlInList } from "./libs/agentContext";
+    import { agentMaxTurns, agentReviewEdit, agentReviewRunJs, agentKnowledgeDocs, agentSkillDocs, agentHistoryMsgs, agentDocSnapshotLimit } from "./libs/stores";
+    import { fetchDocSnapshots, buildKnowledgeSection, buildSkillSection, sqlInList, clampHistoryMsgs, clampDocSnapshotLimit, pickHistoryMsgs } from "./libs/agentContext";
     import {
         AGENT_SCRIPT_DOC_TITLE,
         buildAgentScriptContent,
@@ -23,13 +23,10 @@
     } from "./libs/agentScriptBlock";
     import { runAgentLoop } from "./agentLoop";
     import AgentConfirm from "./AgentConfirm.svelte";
-    import { panelSession as ps, resetPanelSession, type PanelMsg } from "./agentPanelSession.svelte";
+    import { panelSession as ps, switchPanelThread, appendThreadMsg, savePanelDraft, clearCurrentThread, panelThreadKey, type PanelMsg } from "./agentPanelSession.svelte";
     import { newID } from "stonev5-utils";
     import { mount, unmount } from "svelte";
     import { tomatoI18n } from "./tomatoI18n";
-
-    /** 文档快照截断（字符）：全文超长截尾并告知 AI——防单问撑爆上下文（截断策略项内定） */
-    const DOC_SNAPSHOT_LIMIT = 12000;
 
     let busy = $state(false);
     let controller: AbortController | null = null;
@@ -96,14 +93,32 @@
         const t = document.querySelector(".protyle:not(.fn__none) .protyle-title__input")?.textContent?.trim();
         docTitle = t || curDocID().slice(0, 8) || "";
     }
-    const onSwitchProtyle = (_e: string, _d: any) => refreshDocTitle();
+    const onSwitchProtyle = (_e: string, _d: any) => {
+        refreshDocTitle();
+        // agentqa □3：文档切换=对话线程切换（localStorage 按文档分线程；同 key 幂等）
+        switchPanelThread(curDocID());
+    };
     onMount(() => {
         // Events 单例无反订阅面（Map.set 同名覆盖）；dock 常驻生命周期=插件本体，
         // 卸载即整窗重载单例消亡，与 Box 族同语义——无需（也无法）off
         events.addListener("agentpanel", onSwitchProtyle);
         refreshDocTitle();
+        switchPanelThread(curDocID());
     });
-    onDestroy(() => { stopStreamRender(); /* 订阅生命周期见 onMount 注释：Events 单例 */ });
+    onDestroy(() => {
+        stopStreamRender();
+        clearTimeout(draftTimer);
+        savePanelDraft();
+        /* 订阅生命周期见 onMount 注释：Events 单例 */
+    });
+
+    // 草稿防抖落盘（agentqa □3）：跟线程走，切文档/关窗各自保留；600ms 防按键级写放大
+    let draftTimer: number | undefined;
+    $effect(() => {
+        void ps.draft;
+        clearTimeout(draftTimer);
+        draftTimer = window.setTimeout(() => savePanelDraft(), 600);
+    });
 
     // 新消息/流式增量自动滚底（用户没往上翻时；简单起见恒滚动——对话区短，AnnoChat 同款）
     $effect(() => {
@@ -274,10 +289,12 @@
         try {
             const { kramdown } = await siyuan.getBlockKramdown(id);
             const text = (kramdown ?? "").trim();
-            const truncated = text.length > DOC_SNAPSHOT_LIMIT;
+            // agentqa □4：快照长度可配（钳 2000~50000，默认 12000=旧硬编码等价）
+            const limit = clampDocSnapshotLimit(agentDocSnapshotLimit.get());
+            const truncated = text.length > limit;
             return {
                 title: docTitle || id.slice(0, 8),
-                text: truncated ? text.slice(0, DOC_SNAPSHOT_LIMIT) : text,
+                text: truncated ? text.slice(0, limit) : text,
                 truncated,
             };
         } catch {
@@ -353,8 +370,10 @@
         ]);
         const knowledgeSec = buildKnowledgeSection(knowledgeSnaps);
         const skillSec = buildSkillSection(skillSnaps);
+        // agentqa □3：发送即捕获线程 key——中途切文档，问答对仍落原线程（后台完成，切回可见）
+        const th = panelThreadKey();
         const userMsg: PanelMsg = { role: "user", content: q, docTitle: doc.title };
-        ps.msgs = [...ps.msgs, userMsg];
+        appendThreadMsg(th, userMsg);
         ps.draft = "";
 
         busy = true;
@@ -368,10 +387,8 @@
             let kbContext = "";
             if (kbOn) kbContext = await kbSearch(q);
             // 历史只回灌文本对（工具往返留在循环内部），system 每问重注新快照；
-            // 尾部 8 条含刚 push 的本次提问——去尾 7 条为过往对话
-            const history: ChatCompletionMessageParam[] = ps.msgs
-                .filter(m => !m.status && m.content.trim())
-                .slice(-8, -1)
+            // agentqa □4：滑窗宽度可配（含当问总条数，钳 2~40，默认 8=旧 slice(-8,-1) 等价）
+            const history: ChatCompletionMessageParam[] = pickHistoryMsgs(ps.msgs, clampHistoryMsgs(agentHistoryMsgs.get()))
                 .map(m => ({ role: m.role, content: m.content } as ChatCompletionMessageParam));
             const messages: ChatCompletionMessageParam[] = [
                 { role: "system", content: buildSystem(doc, knowledgeSec, skillSec) + (kbContext ? kbSystemAddon(kbContext) : "") },
@@ -383,8 +400,8 @@
                 caller,
                 tools: caller.tools,
                 messages,
-                // agentrev □2：轮数上限可配（bear ②「短链最多 4 轮可以配置」）；空/坏值回默认 4，钳 1~12
-                maxTurns: Math.min(12, Math.max(1, Number(agentMaxTurns.get()) || 4)),
+                // agentrev □2：轮数上限可配（bear ②「短链最多 4 轮可以配置」）；空/坏值回默认 20，钳 1~30（agentqa □1）
+                maxTurns: Math.min(30, Math.max(1, Number(agentMaxTurns.get()) || 20)),
                 signal: controller.signal,
                 onEvent: e => {
                     if (e.type === "text" || e.type === "reasoning") {
@@ -416,12 +433,12 @@
             });
             if (r.ok) {
                 const finalText = (r.messages?.at(-1)?.content as string) ?? "";
-                ps.msgs = [...ps.msgs, { role: "assistant", content: finalText, tools: ps.active?.tools ?? [], docTitle: doc.title }];
+                appendThreadMsg(th, { role: "assistant", content: finalText, tools: ps.active?.tools ?? [], docTitle: doc.title });
                 ps.active = null;
                 debugLog("agent_panel", `q=${q.length}ch turns=ok tools=${active2count(r.messages)} kb=${knowledgeSnaps.filter(s => s.ok).length} sk=${skillSnaps.filter(s => s.ok).length} ${Date.now() - t0}ms model=${cfg.model}`, "aiagent");
             } else if (controller.signal.aborted) {
                 // 用户主动停止：半截内容保留为一条完成消息
-                ps.msgs = [...ps.msgs, { role: "assistant", content: ps.active?.content ?? "", tools: ps.active?.tools ?? [], docTitle: doc.title }];
+                appendThreadMsg(th, { role: "assistant", content: ps.active?.content ?? "", tools: ps.active?.tools ?? [], docTitle: doc.title });
                 ps.active = null;
             } else if (r.error === "max_turns") {
                 if (ps.active) ps.active = { ...ps.active, status: "error", content: tomatoI18n.工具轮上限 };
@@ -461,7 +478,7 @@
 
     function clearAll() {
         if (busy) stop();
-        resetPanelSession();
+        clearCurrentThread();
     }
 
     function onKeydown(e: KeyboardEvent) {
@@ -478,17 +495,19 @@
         <svg class="agent-panel__docicon"><use xlink:href="#iconFile"></use></svg>
         <span class="agent-panel__doctitle" title={docTitle}>{tomatoI18n.将随当前文档}{docTitle ? `：${docTitle}` : ""}</span>
         <span class="fn__flex-1"></span>
+        {#if kbOn}
+            <!-- agentrev □6 收次要位：开关态平铺徽标（默认关零打扰；开着时范围不藏 hover）。
+                 渲染在 kb 钮左侧=宽度变化由 fn__flex-1 吸收，右侧按钮组零位移——否则开关/切档
+                 徽标宽度变化会推移按钮，鼠标原位点不中第二次（bear 09-11 反馈） -->
+            <span class="agent-panel__kbbadge">{kbScope === "all" ? tomatoI18n.全库 : tomatoI18n.当前笔记本}</span>
+        {/if}
         <span class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" role="button" tabindex="0"
               aria-label={tomatoI18n.知识库检索 + (kbOn ? " · " + (kbScope === "all" ? tomatoI18n.全库 : tomatoI18n.当前笔记本) : "")}
               class:agent-panel__kb--on={kbOn}
-              onclick={() => { if (kbOn && kbScope === "all") { kbScope = "box"; } else if (kbOn) { kbOn = false; kbScope = "all"; } else { kbOn = true; } }}
+              onclick={() => { if (kbOn && kbScope === "all") { kbScope = "box"; } else if (kbOn) { kbOn = false; kbScope = "all"; } else { kbOn = true; } } }
               onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}>
             <svg><use xlink:href="#iconSearch"></use></svg>
         </span>
-        {#if kbOn}
-            <!-- agentrev □6 收次要位：开关态平铺徽标（默认关零打扰；开着时范围不藏 hover） -->
-            <span class="agent-panel__kbbadge">{kbScope === "all" ? tomatoI18n.全库 : tomatoI18n.当前笔记本}</span>
-        {/if}
         {#if ps.canUndo}
             <span class="block__icon block__icon--show b3-tooltips b3-tooltips__sw" role="button" tabindex="0"
                   aria-label={tomatoI18n.撤销修改} onclick={() => void undoLastEdit()}

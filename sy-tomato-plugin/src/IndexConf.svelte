@@ -48,6 +48,8 @@
     import ConfVault from "./ConfVault.svelte";
     import ConfAgent from "./ConfAgent.svelte";
     import ConfCommands from "./ConfCommands.svelte";
+    // AI 接入（MCP）引导卡（mcpcopy 2026-09-11）：UpgradeBar 后一行挂载
+    import McpPromo from "./McpPromo.svelte";
     interface Props {
         dm: DestroyManager;
         plugin: BaseTomatoPlugin;
@@ -233,6 +235,8 @@
         bind:codeValid
         onActivated={() => plugin.saveData(STORAGE_SETTINGS, plugin.settingCfg)}
     ></UpgradeBar>
+    <!-- AI 接入（MCP）引导卡：说明 + 一键复制自接线提示词 + 打开接入指南（三插件同款） -->
+    <McpPromo />
     <!-- search -->
     <div class="settingBox search-bar" data-search>
         <input

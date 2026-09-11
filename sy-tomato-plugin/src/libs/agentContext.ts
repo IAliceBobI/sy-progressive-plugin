@@ -13,10 +13,37 @@ export interface DocSnapshot {
     truncated: boolean;
 }
 
-/** 单篇领域知识注入上限（字符）：与当前文档快照 12000 同款截断策略，上限放宽一档（用户点名挑选的资料） */
+/** 单篇领域知识注入上限（字符）：与当前文档快照（默认 12000、agentqa □4 起可配）同款截断策略，上限放宽一档（用户点名挑选的资料） */
 export const KNOWLEDGE_DOC_LIMIT = 16000;
 /** Skill 简介截断（字符） */
 export const SKILL_BRIEF_LIMIT = 160;
+
+// agentqa □4 上下文治理（bear 拍板 B 参数可配）：历史滑窗+当前文档快照长度的默认值与钳位。
+// 历史值语义=含当问总条数（下限 2=至少当问+1 条过往）；领域知识 16k/每篇不做可配（内部实现细节）。
+export const HISTORY_MSGS_DEFAULT = 8;
+export const HISTORY_MSGS_MIN = 2;
+export const HISTORY_MSGS_MAX = 40;
+export const DOC_SNAPSHOT_DEFAULT = 12000;
+export const DOC_SNAPSHOT_MIN = 2000;
+export const DOC_SNAPSHOT_MAX = 50000;
+
+/** 历史滑窗取值：空/坏值（null/undefined/空串/NaN/0）回默认 8，钳 2~40；number input 的字符串数值也吃 */
+export function clampHistoryMsgs(v: unknown): number {
+    const n = Math.round(Number(v) || HISTORY_MSGS_DEFAULT);
+    return Math.min(HISTORY_MSGS_MAX, Math.max(HISTORY_MSGS_MIN, n));
+}
+
+/** 文档快照长度取值（字符）：空/坏值回默认 12000，钳 2000~50000 */
+export function clampDocSnapshotLimit(v: unknown): number {
+    const n = Math.round(Number(v) || DOC_SNAPSHOT_DEFAULT);
+    return Math.min(DOC_SNAPSHOT_MAX, Math.max(DOC_SNAPSHOT_MIN, n));
+}
+
+/** 历史窗口挑选（纯函数供单测）：过滤进行中/空消息后取尾 n-1 条为过往对话（n=含当问总条数，
+ *  当问由调用侧随后补上）；n=8 与旧内联 filter+slice(-8,-1) 逐字节等价 */
+export function pickHistoryMsgs<T extends { status?: string; content: string }>(msgs: readonly T[], n: number): T[] {
+    return msgs.filter(m => !m.status && m.content.trim()).slice(-n, -1);
+}
 
 export interface DocFetchers {
     /** 批量标题反查（blocks 表文档行 content=标题）；失败抛异常由 fetchDocSnapshots 兜 */

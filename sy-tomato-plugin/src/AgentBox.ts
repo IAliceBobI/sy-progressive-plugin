@@ -12,6 +12,7 @@ import { siyuan } from "./libs/utils";
 import { parseAgentScriptContent, findAgentScriptDocID, parseAgentPromptContent, findAgentPromptDocID, AGENT_PROMPT_FENCE } from "./libs/agentScriptBlock";
 import { createFrontendToolEnv } from "./agentToolBridge";
 import { debugLog } from "./libs/logUtils";
+import { agentIconSymbolID } from "./agentIcon";
 import { tomatoI18n } from "./tomatoI18n";
 import AgentPanel from "./AgentPanel.svelte";
 
@@ -139,14 +140,33 @@ class AgentBox {
         }
     }
 
+    /** agentqa □2 旧图标迁移：思源把插件 dock 配置持久化在 local.json 的
+     *  local-plugin-docks/<插件>/<type>，启动时整体盖掉 addDock 传参（loader.ts addPluginDock），
+     *  老用户升级后 dock 钮会钉死 iconSparkles——在 addDock 之前改内存条目（本轮渲染即新图标）
+     *  + setLocalStorageVal 落盘（app=自身排除广播回声）。仅认 iconSparkles 旧值，其余值视为
+     *  用户态不动；新装用户无条目=天然走新图标，不触发。 */
+    private migrateDockIcon() {
+        const fullType = this.plugin.name + DOCK_TYPE;
+        const all = (window.siyuan as any).storage?.["local-plugin-docks"];
+        const entry = all?.[this.plugin.name]?.[fullType];
+        if (entry?.icon !== "iconSparkles") return;
+        entry.icon = agentIconSymbolID();
+        void siyuan.call("/api/storage/setLocalStorageVal", {
+            key: "local-plugin-docks",
+            val: all,
+            app: (window.siyuan as any).appId,
+        }).catch((e: unknown) => debugLog("agentbox", `dock icon migrate persist failed: ${e}`, "aiagent"));
+    }
+
     private addDock() {
+        this.migrateDockIcon();
         const title = tomatoI18n.AI助手;
         this.plugin.addDock({
             type: DOCK_TYPE,
             config: {
                 position: "RightBottom",
                 size: { width: 400, height: 0 },
-                icon: "iconSparkles",
+                icon: agentIconSymbolID(),
                 title,
                 hotkey: "⌥⌘H",
             },
@@ -161,7 +181,7 @@ class AgentBox {
                 dock.element.innerHTML = `<div class="fn__flex-1 fn__flex-column">
                     <div class="block__icons">
                         <div class="block__logo">
-                            <svg class="block__logoicon"><use xlink:href="#iconSparkles"></use></svg>${title}
+                            <svg class="block__logoicon"><use xlink:href="#${agentIconSymbolID()}"></use></svg>${title}
                         </div>
                         <span class="fn__flex-1 fn__space"></span>
                         <span data-type="min" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="Min"><svg><use xlink:href="#iconMin"></use></svg></span>

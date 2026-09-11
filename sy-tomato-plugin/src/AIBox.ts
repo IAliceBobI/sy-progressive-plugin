@@ -7,13 +7,14 @@ import { DestroyManager } from "./libs/destroyer";
 import { tomatoI18n } from "./tomatoI18n";
 import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { winHotkey } from "./libs/winHotkey";
+import { agentIconSymbolID } from "./agentIcon";
 import { addIfVisible } from "./libs/menuManager";
 import { newID } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import { OpenAIClient, diagnoseAIAsync } from "./libs/openAI";
 
 type TomatoMenu = IEventBusMap["click-blockicon"] & IEventBusMap["open-menu-content"];
-export const AIBoxHotkey = winHotkey("⌥⇧S", "人工智能", "iconSparkles", () => tomatoI18n.人工智能)
+export const AIBoxHotkey = winHotkey("⌥⇧S", "人工智能", agentIconSymbolID(), () => tomatoI18n.人工智能)
 class AIBox {
     private plugin: BaseTomatoPlugin;
     private dm: DestroyManager;

@@ -2,6 +2,7 @@ import { writable, get } from "svelte/store";
 import { Plugin } from "siyuan";
 import { STORAGE_Prog_SETTINGS, STORAGE_SETTINGS } from "../constants";
 import { siyuan } from "./utils";
+import { HISTORY_MSGS_DEFAULT, DOC_SNAPSHOT_DEFAULT } from "./agentContext";
 import { zipNways } from "./functional";
 import { events } from "./Events";
 import { BaseTomatoPlugin } from "./BaseTomatoPlugin";
@@ -680,14 +681,19 @@ export const dont_break_list = settingFactory("dont-break-list", false, STORAGE_
 export const aiBoxCheckbox = settingFactory("aiBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 // ai-agent □5 AI 助手面板（右侧 dock）：默认关对齐 Box 族惯例；桌面 only（移动端不注册）
 export const aiPanelCheckbox = settingFactory("aiPanelCheckbox", false, STORAGE_SETTINGS, null as TSK);
-// agentrev □2 可配置三件（bear ②）：轮数上限（消费端钳 1~12）+人审两开关（默认全开，关=该类动作免确认直接执行）
-export const agentMaxTurns = settingFactory("agentMaxTurns", 4, STORAGE_SETTINGS, null as TSK);
+// agentrev □2 可配置三件（bear ②）：轮数上限（消费端钳 1~30）+人审两开关（默认全开，关=该类动作免确认直接执行）
+// agentqa □1：默认 4→20（bear 撞熔断「没执行完」）；settingFactory 语义=用户显式设置过的值不覆盖
+export const agentMaxTurns = settingFactory("agentMaxTurns", 20, STORAGE_SETTINGS, null as TSK);
 export const agentReviewEdit = settingFactory("agentReviewEdit", true, STORAGE_SETTINGS, null as TSK);
 export const agentReviewRunJs = settingFactory("agentReviewRunJs", true, STORAGE_SETTINGS, null as TSK);
 // agentrev □4 三件套前两样（bear ③④，□1 拍板：领域知识=直接披露全文常驻/Skill=渐进披露只注简介）：
 // 存思源文档 id 数组；标题运行时反查（改名不断链），消费端=AgentPanel system 注入+skills 工具
 export const agentKnowledgeDocs = settingFactory("agentKnowledgeDocs", [] as string[], STORAGE_SETTINGS, null as TSK);
 export const agentSkillDocs = settingFactory("agentSkillDocs", [] as string[], STORAGE_SETTINGS, null as TSK);
+// agentqa □4（bear 拍板 B 可配）：上下文治理两参数——历史滑窗（含当问总条数，消费端钳 2~40）
+// +文档快照长度（字符，消费端钳 2000~50000）；默认值=旧代码常量，老用户零感知
+export const agentHistoryMsgs = settingFactory("agentHistoryMsgs", HISTORY_MSGS_DEFAULT, STORAGE_SETTINGS, null as TSK);
+export const agentDocSnapshotLimit = settingFactory("agentDocSnapshotLimit", DOC_SNAPSHOT_DEFAULT, STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesEnable = settingFactory("prefixArticlesEnable", false, STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesSoftLimit = settingFactory("prefixArticlesSoftLimit", "50", STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesMenu = settingFactory("prefixArticlesMenu", true, STORAGE_SETTINGS, null as TSK);
@@ -910,6 +916,13 @@ export const digSubrankOpen = settingFactory(
 // 上岗即展开不看它（□11 拍板）；移动端 ✕=本会话隐藏、free ✕=下班，均不写它
 export const floatbarExpandPref = settingFactory(
     "floatbarExpandPref", null, STORAGE_Prog_SETTINGS, null as TSK);
+// □2 平铺区二级编排（progtail 2026-09-11，群 650189「二级工具无法拖动排序」）：
+// 按 kind 分份（piece/free/digest/book）× 5 段顺序清单（low+制卡/收集/移动/提取整理，
+// 段名=FLAT_SEG_IDS）——记录「钮归属哪段+段内顺序」的用户显式意志。空对象=全按固有
+// 编排（老用户升级零迁移）；未记录的钮垫尾（applyFlatManifest 滤未知 id+固有段垫尾，
+// 继承 mainIds 族纪律）
+export const floatbarFlatManifest = settingFactory(
+    "floatbarFlatManifest", {} as Record<string, Record<string, string[]>>, STORAGE_Prog_SETTINGS, null as TSK);
 
 // ---------------
 export const navSourceBlock = settingFactory("navSourceBlock", true, STORAGE_SETTINGS, null as TSK);

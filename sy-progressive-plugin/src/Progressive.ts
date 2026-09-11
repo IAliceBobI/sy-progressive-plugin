@@ -1094,7 +1094,8 @@ class Progressive {
         return findDocByIal(getDocIalDigestDir(bookID));
     }
 
-    /** 附属卡（三态公共组）：doc deck 挂 digest-书名 夹 */
+    /** 附属卡（三态公共组）：doc deck 挂 digest-书名 夹。bookcards □2 起为清单浮层
+     *  的兜底快道（整夹一键复习钮）——原直开行为平移于此 */
     async openBookCards(bookID: string) {
         const dirID = await this.findDigestDir(bookID);
         if (!dirID) {
@@ -1102,6 +1103,12 @@ class Progressive {
             return;
         }
         openTab({ app: this.plugin.app, card: { type: "doc", id: dirID } });
+    }
+
+    /** bookcards □2：单篇摘抄复习（清单行点击）——openTab card doc 换 id 即单篇，
+     *  与整夹同通道（官方 tree 复习按文档子树，单篇子树=它自己的卡） */
+    openDocReview(docID: string) {
+        openTab({ app: this.plugin.app, card: { type: "doc", id: docID } });
     }
 
     /** 摘抄汇总（书态/摘抄态）：打开 digest-书名 夹 */
@@ -1455,33 +1462,37 @@ class Progressive {
      *  在 index.scss（surface/6px/point-shadow，覆盖容器/菜单项/子菜单三处自画背景）；
      *  ②遮挡让路（反馈②）：弹前降层、closeCB 还原（ProgressiveBtn yieldFloatbarForMenu）。
      *  onPicked=入槽动作，返回入块数（toast 口径统一：已入槽/该摘抄无内容块）。
-     *  □1 定向喂池：pool 传入时每本书 submenu 首项加池动作（划词直喂「→ 收进素材池」/
-     *  整篇搬运「移入素材池」——label 由调用方给）；无槽空书 submenu=[池项] 唯一目标
-     *  （此前空行）；excludeBookID=digest 搬运时源书不列池项（槽项照常）。池动作 toast
-     *  口径=done(书名)，成功后 notifyFleetChanged（池未读数变化，火苗/舰队即时刷新） */
+     *  □1 定向喂池：poolItems 传入时逐项排进每本书 submenu 首部（划词直喂「→ 收进
+     *  素材池」单项/整篇搬运「移入素材池」+「复制入素材池」双项——progtail □1 从单档
+     *  扩为数组）；无槽空书 submenu=池项序列 唯一目标（此前空行）。excludeBookID=
+     *  digest 侧源书不列池项（移入=自搬 no-op、复制=同书重复，皆无意义；槽项照常——
+     *  同书素材入自己书的槽是正当操作）。池动作 toast 口径=done(书名)，成功后
+     *  notifyFleetChanged（池未读数变化，火苗/舰队即时刷新） */
     openSlotMenuCommon(x: number, y: number, targets: WritingSlotTarget[],
         onPicked: (slot: WritingSlotTarget["slots"][number], target: WritingSlotTarget) => Promise<number>,
-        pool?: {
+        poolItems?: {
             label: string;
+            icon?: string;
             done: (book: string) => string;
-            excludeBookID?: string;
             run: (target: WritingSlotTarget) => Promise<number>;
-        }) {
+        }[],
+        excludeBookID?: string) {
         const yielded = yieldFloatbarForMenu();
         const menu = new (Menu as any)("progSlotMenu", () => restoreFloatbarAfterMenu(yielded), true) as Menu;
         menu.element.classList.add("prog-slot-menu");
         for (const t of targets) {
             // label=用户书名/槽名，Menu label 走 innerHTML 须转义（□12 存量补——
             // openBatchSlotMenu 期D 起已转义，此收口点补齐同款）
-            const poolItem = pool && pool.excludeBookID !== t.bookID ? [{
-                label: escapeHtml(pool.label),
+            const poolMenu = excludeBookID === t.bookID ? [] : (poolItems ?? []).map(p => ({
+                label: escapeHtml(p.label),
+                icon: p.icon,
                 click: async () => {
                     // Menu click 兜底纪律同槽项（内核 Menu.ts 丢弃 async click 的 rejection）
                     try {
-                        const n = await pool.run(t);
+                        const n = await p.run(t);
                         if (n > 0) {
                             notifyFleetChanged();
-                            await siyuan.pushMsg(pool.done(t.name), 2500);
+                            await siyuan.pushMsg(p.done(t.name), 2500);
                         } else {
                             await siyuan.pushMsg(tomatoI18n.该摘抄无内容块, 2500);
                         }
@@ -1490,10 +1501,10 @@ class Progressive {
                         await siyuan.pushMsg(tomatoI18n.插入素材失败请重试, 2500);
                     }
                 },
-            }] : [];
+            }));
             menu.addItem({
                 label: escapeHtml(t.name),
-                submenu: [...poolItem, ...t.slots.map(s => ({
+                submenu: [...poolMenu, ...t.slots.map(s => ({
                     label: escapeHtml(s.title),
                     click: async () => {
                         // 思源 Menu click 既不 catch 也不接 promise——入槽动作自带
@@ -1545,11 +1556,12 @@ class Progressive {
             targets,
             (s, t) => insertBlocksIntoPiece(s.docID, t.bookID, protyle.block?.rootID ?? "", captured),
             // □1 划词直喂：同菜单每本书首项「→ 收进素材池」（选中块建新素材文档进目标书池）
-            {
+            [{
                 label: tomatoI18n.收进素材池,
+                icon: "iconProgMaterial",
                 done: book => tomatoI18n.已收进素材池书名(book),
                 run: t => feedBlocksToPool(t.bookID, protyle.block?.rootID ?? "", captured).then(id => id ? 1 : 0),
-            });
+            }]);
     }
 }
 

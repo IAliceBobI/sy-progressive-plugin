@@ -189,7 +189,8 @@ class DigestProgressiveBox {
                 const docID = detail.protyle?.block?.rootID;
                 menu.addItem({
                     label: tomatoI18n.复访节奏,
-                    icon: "iconHistory",
+                    // □2 家族统一：复访节奏项全仓同图（reviewMenu 同名项=iconProgSched），官方 iconHistory 退出
+                    icon: "iconProgSched",
                     submenu: schedSubmenuItems([docID], parseReview(docReview), docReview, PdigestReviewKey),
                 });
             }

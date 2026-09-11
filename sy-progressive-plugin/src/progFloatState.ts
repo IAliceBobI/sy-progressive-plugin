@@ -258,13 +258,13 @@ const EXTRA_MAIN: FloatButtonSpec[] = [
     { id: "cardHere", icon: "iconProgCardHere", kind: "normal", group: "scene" },
     { id: "cardDailyN", icon: "iconProgCardDailyN", kind: "normal", group: "scene" },
     { id: "multi", icon: "iconProgMulti", kind: "normal", group: "scene" },
-    { id: "collect", icon: "iconProgInbox", kind: "normal", group: "scene" },
+    { id: "collect", icon: "iconProgCollect", kind: "normal", group: "scene" },
     { id: "movePrev", icon: "iconProgMoveUp", kind: "normal", group: "scene" },
     { id: "moveNext", icon: "iconProgMoveDown", kind: "normal", group: "scene" },
     { id: "extractAll", icon: "iconProgExtractAll", kind: "normal", group: "scene" },
     { id: "extractEnd", icon: "iconProgExtractEnd", kind: "normal", group: "scene" },
     { id: "extract", icon: "iconProgExtract", kind: "normal", group: "scene" },
-    { id: "noColor", icon: "iconProgClean", kind: "normal", group: "scene" },
+    { id: "noColor", icon: "iconProgNoColor", kind: "normal", group: "scene" },
     { id: "reColor", icon: "iconProgRecolor", kind: "normal", group: "scene" },
     { id: "merge", icon: "iconProgMerge", kind: "normal", group: "scene" },
 ];
@@ -424,6 +424,78 @@ export function formatDueCount(n: number): string {
     return n > 99 ? "99+" : String(n);
 }
 
+// ============ □2 浮条二级编排（progtail：平铺区活界 manifest，纯函数 TDD 见 floatState.test.ts） ============
+
+/** 平铺区 5 块稳定 id（manifest 键；index 0=低频段，1..4 对应 UI 层 ADV_GROUPS 组序
+ *  制卡/收集/移动/提取整理）。段身份必须稳定——组员可跨段流动、组序不可漂移 */
+export const FLAT_SEG_IDS = ["low", "card", "collect", "move", "extract"] as const;
+export type FlatSegId = typeof FLAT_SEG_IDS[number];
+
+/** 平铺区固有归属（UI 层算好传入）：low=低频段成员（buildFlatCells 产物，已过显隐滤）；
+ *  adv=高级四组各自成员（advVisible 产物，已过 menu()/vip 滤） */
+export interface FlatSegs {
+    low: string[];
+    adv: string[][];
+}
+
+/**
+ * manifest → 各段成员+顺序合成（读侧唯一入口）：
+ * - claim：id 出现在哪段清单=归哪段（跨段指派——A3 活界拍板）；不在任何清单=固有段
+ * - 顺序：清单序在前 + 未记录成员按固有序垫尾（第一天无清单=完全现状，零迁移）
+ * - 清单里的无效 id（退役钮/别态钮/menu() 关）静默忽略；未知段键忽略
+ * - 空段照常产出空数组（UI 层滤空组连段界隐藏，与 advVisible 空组语义一致）
+ */
+export function applyFlatManifest(inherent: FlatSegs, manifest: Record<string, string[]>): FlatSegs {
+    const valid = new Set<string>([...inherent.low, ...inherent.adv.flat()]);
+    const claim = new Map<string, FlatSegId>();
+    for (const seg of FLAT_SEG_IDS) {
+        for (const id of manifest[seg] ?? []) {
+            if (valid.has(id)) claim.set(id, seg);
+        }
+    }
+    const order = (seg: FlatSegId, members: string[], inherentSeq: string[]): string[] => {
+        const listed = (manifest[seg] ?? []).filter(id => members.includes(id));
+        const listedSet = new Set(listed);
+        const tail = inherentSeq.filter(id => members.includes(id) && !listedSet.has(id));
+        return [...listed, ...tail];
+    };
+    // low 成员=固有 low ∪ claim low；固有序垫尾=先 low 固有序再 adv 固有序（稳定序）
+    const advFlat = inherent.adv.flat();
+    const lowMembers = [...inherent.low, ...advFlat].filter(id => claim.get(id) === "low" || (claim.get(id) === undefined && inherent.low.includes(id)));
+    const low = order("low", lowMembers, [...inherent.low, ...advFlat]);
+    // adv 成员池=本组固有 ∪ 其它组固有 ∪ low 固有（活界语义：任何钮可被指派进任何段——
+    // 池漏别组时跨高级组指派（如收集钮进制卡组）的钮会静默蒸发，e2e 实锤）；垫尾序=本组
+    // 固有优先（保持本组现状序），再其它组、再 low（与 low 垫尾序同哲学）
+    const adv = inherent.adv.map((g, gi) => {
+        const seg = FLAT_SEG_IDS[gi + 1];
+        const otherAdv = inherent.adv.filter((_, j) => j !== gi).flat();
+        const members = [...g, ...otherAdv, ...inherent.low]
+            .filter(id => claim.get(id) === seg || (claim.get(id) === undefined && g.includes(id)));
+        return order(seg, members, [...g, ...otherAdv, ...inherent.low]);
+    });
+    return { low, adv };
+}
+
+/**
+ * 落盘写（drop 时调用）：目标段按当前渲染序快照+插入落点位（reorderMainIds 同款
+ * remove+insert+adj 语义），其他段清单移除 id（跨段搬）；搬空的清单不落盘（manifest
+ * 紧凑）；renderedTarget=目标段当前渲染成员（已过显隐滤的有效集——快照天然洗掉无效 id）
+ */
+export function moveToFlatSeg(
+    manifest: Record<string, string[]>, targetSeg: FlatSegId,
+    renderedTarget: readonly string[], id: string, index: number,
+): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    for (const seg of FLAT_SEG_IDS) {
+        if (seg === targetSeg) continue;
+        const rest = (manifest[seg] ?? []).filter(x => x !== id);
+        if (rest.length > 0) out[seg] = rest;
+    }
+    const next = reorderMainIds([...renderedTarget], id, index);
+    if (next.length > 0) out[targetSeg] = next;
+    return out;
+}
+
 /**
  * 摘抄子排 id 联合（□3 review P2-1 编译期收紧）：组件层 DIG_ICONS/DIG_TIPS 须以
  * Record<DigSubrankId, ...> 精确匹配——任一侧增删 id 都是编译错（make check 拦），
@@ -448,6 +520,8 @@ export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
     if (kind === "digest") return ["inbox", "tobook", "tohub", "splitinplace", "think", "card", "word", "wordai"];
     const base: DigSubrankId[] = ["inbox", "tobook", "tohub", "think", "card", "review", "word", "wordai", "write", "sched"];
     if (kind === "book") return base;
-    if (kind === "piece") return [...base, "whole"];
+    // □3 语义清理：piece 态砍 write（与低频段 recite「仿写本片」同调 runPieceRecite 纯重复；
+    // book/free 首行无仿写钮保留不算重复）
+    if (kind === "piece") return [...base.filter(id => id !== "write"), "whole"];
     return ["inbox", "tobook", "tohub", "splitinplace", ...base.slice(3), "whole"];
 }

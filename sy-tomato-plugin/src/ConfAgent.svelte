@@ -13,6 +13,8 @@
         agentReviewRunJs,
         agentKnowledgeDocs,
         agentSkillDocs,
+        agentHistoryMsgs,
+        agentDocSnapshotLimit,
         cozeSearchAppID,
         cozeSearchKnowledgeID,
         cozeSearchOauthTokenID,
@@ -36,8 +38,16 @@
         <div>{tomatoI18n.AI面板说明}</div>
         <div>{tomatoI18n.评分引导}</div>
         <div>
-            <input class="b3-text-field" type="number" min="1" max="12" style="min-width: 64px" bind:value={$agentMaxTurns} />
+            <input class="b3-text-field" type="number" min="1" max="30" style="min-width: 64px" bind:value={$agentMaxTurns} />
             {tomatoI18n.AI轮数上限}
+        </div>
+        <div>
+            <input class="b3-text-field" type="number" min="2" max="40" style="min-width: 64px" bind:value={$agentHistoryMsgs} />
+            {tomatoI18n.AI历史对话条数}
+        </div>
+        <div>
+            <input class="b3-text-field" type="number" min="2000" max="50000" style="min-width: 64px" bind:value={$agentDocSnapshotLimit} />
+            {tomatoI18n.AI文档快照长度}
         </div>
         <div>{tomatoI18n.AI人审说明}</div>
         <div>

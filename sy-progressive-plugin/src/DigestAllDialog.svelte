@@ -4,6 +4,8 @@
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { queryDigestTree, type DigestTreeNode } from "./digestUtils";
+    import { digestBadgeInputsOf } from "./digestBadgeStore";
+    import { digestBadgeOf } from "./digestBadge";
     import { writingPoolUnderBook } from "../../sy-tomato-plugin/src/libs/stores";
     import { poolDirPlacement, movePoolDir } from "./writeBook";
     import type { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -70,7 +72,16 @@
 
     function reload() {
         queryDigestTree(bookID)
-            .then(t => { flat = t.flat; })
+            .then(async t => {
+                flat = t.flat;
+                // □1 行首类型小标（Popover 同款）：失败静默降级保留无标形态
+                try {
+                    const map = await digestBadgeInputsOf(
+                        flat.map(n => n.id), bookID, new Map(flat.map(n => [n.id, n.title])));
+                    const now = Date.now();
+                    flat = flat.map(n => ({ ...n, badge: map.get(n.id) ? digestBadgeOf(map.get(n.id)!, now) : undefined }));
+                } catch { /* 采集失败保留无标形态 */ }
+            })
             .catch(e => { console.error("digest all dialog failed", e); })
             .finally(() => { loading = false; });
         // □4 池夹位置态并行拉（不阻塞清单渲染）；非 manage 态白拉一次无害（fetch 轻查询）
@@ -181,6 +192,11 @@
                         <span class="da-check" class:da-on={selected.includes(n.id)}
                             ><svg><use xlink:href="#iconSelect"></use></svg></span
                         >
+                    {/if}
+                    {#if n.badge}
+                        <span
+                            class="prog-dg-mini st-{n.badge.kind}{n.badge.due ? ' st-due' : ''}"
+                        >{tomatoI18n.胶囊短标(n.badge.kind)}</span>
                     {/if}
                     <span class="da-title">{n.title}</span>
                     <span class="da-date">{fmtDate(n.ctime)}</span>

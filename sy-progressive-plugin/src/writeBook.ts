@@ -116,6 +116,45 @@ function stripMaterialBlock(kramdown: string): string {
         .join("\n");
 }
 
+/** progtail □1 池副本逐块净化（TDD 见 tests/unit/writingBook.test.ts）：与
+ *  stripMaterialBlock 的纪律分野——胶囊素材要「普通块静态内容」（块引用转实+剥
+ *  progref）；池副本仍是摘抄域文档，血缘锚（custom-progref）与块引用活性必须保留
+ *  （回原书链/徽标跳转照常，入槽转实时才走 stripMaterialBlock）。剥的是身份与曲线
+ *  标记：id/updated（md 通道显式 id 被内核认领→与源块同 id 冲突，嵌套 sb 内层同剥）、
+ *  custom-riff-decks（池素材无卡语义，riff 归属不随行）、custom-prog-think（块级问题
+ *  曲线标记——副本进池从零开始，不复读源曲线）。键名带词边界（custom-uuid 不误伤） */
+export function stripDigestCopyBlock(kramdown: string): string {
+    return kramdown
+        .split("\n")
+        .map(line => line.trimStart().startsWith("{:")
+            ? line
+                .replace(/(?<=[\s:{])(?:id|updated|custom-riff-decks|custom-prog-think)="[^"]*"\s*/g, "")
+                .replace(/\}\s*$/, "")
+                .trimEnd() + "}"
+            : line)
+        .filter(line => !/^\s*\{:\}?\s*$/.test(line))
+        .join("\n");
+}
+
+/** progtail □1 池副本 doc IAL 重定向（纯函数，TDD 见 tests/unit/writingBook.test.ts）：
+ *  ctime/index/progmark 换目标书+新鲜 ct——锤态(🔨)刻意剥掉（与 moveDigestToPool 的
+ *  retargetCtime 保锤分野：副本=新素材以**未读**进池，countUnreadMaterial 的
+ *  LIKE `bookID#%` 才命中、滚筒才会推它）；保回原书锚（parent-id/last-id/piece-idx/
+ *  card-priority/off-tomatobacklink）；剥身份与曲线标记（id/updated/riff-decks/
+ *  pdigest-review/prog-for-recite——副本的卡/复访/仿写状态不复读源文档） */
+export function digestCopyAttrs(srcAttrs: Record<string, string>, targetBookID: string, ct: number): AttrType {
+    const a: Record<string, string> = { ...srcAttrs };
+    delete a.id;
+    delete a.updated;
+    delete a["custom-riff-decks"];
+    delete a["custom-pdigest-review"];
+    delete a["custom-prog-for-recite"];
+    a["custom-pdigest-ctime"] = `${targetBookID}#${ct}`;
+    a["custom-pdigest-index"] = `${targetBookID}#0000000000`;
+    a["custom-progmark"] = `${TEMP_CONTENT}#${targetBookID},${ct}`;
+    return a as AttrType;
+}
+
 /** 期B 超级块胶囊（TDD 见 tests/unit/writingBook.test.ts）：整篇素材实质块一次
  *  净化包裹为 row sb——**思源 row=纵向堆叠、col=横向并排**（app scss _wysiwyg
  *  flex-direction 实锤，首版 col 全反）；素材多段纵向阅读序用 row。material
@@ -351,6 +390,45 @@ export async function moveDigestToPool(targetBookID: string, digestDocID: string
         "custom-pdigest-index": `${targetBookID}#0000000000`,
     } as any);
     debugLog("matfeed", `moveToPool done doc=${digestDocID} book=${targetBookID}`);
+    return 1;
+}
+
+/** progtail □1 复制留底：摘抄文档整篇**复制**进目标书的池（移入素材池的留底档——一片
+ *  摘抄可能喂多本书，原文档原地不动）。kramdown 通道建副本文档：块级净化走
+ *  stripDigestCopyBlock（保 progref/块引用=血缘锚完整，回原书链照常；refMap 按 ctime
+ *  归属书圈——副本归目标书，源书原文不多挂痕迹）；doc IAL 走 digestCopyAttrs（未读
+ *  进池+回原书锚随行）。只复制顶层内容块，源文档的子文档支路不带（子树复制是独立
+ *  需求，需者再提）。标题=源标题（同夹重名缀 ct 防默认劫持），尾卡照挂（收束动作在位）。
+ *  返回 1；无实质内容块返回 0（菜单层 toast 无内容） */
+export async function copyDigestToPool(targetBookID: string, digestDocID: string): Promise<number> {
+    const attrs = (await siyuan.getBlockAttrs(digestDocID)) ?? {};
+    const ctime = attrs["custom-pdigest-ctime"] ?? "";
+    if (!parseBookIDFromCtime(ctime)) throw new Error("copyToPool: not a digest doc");
+    const kds: string[] = [];
+    for (const c of (await siyuan.getChildBlocks(digestDocID)) ?? []) {
+        if (!isSubstanceChild(c)) continue;
+        const { kramdown } = (await siyuan.getBlockKramdown(c.id)) ?? {};
+        if (kramdown?.trim() && !kramdown.trimStart().startsWith(PLUGIN_CUSTOM_FENCE)) kds.push(kramdown);
+    }
+    if (kds.length === 0) return 0;
+    // matfeed □4：写作书池夹档跟设置（true=新建挂书下，已有夹按 IAL 原位认回不受影响）
+    const dirID = await progStorage.ensureDigestDir(targetBookID, writingPoolUnderBook.get());
+    if (!dirID) throw new Error("copyToPool: digest dir not ready");
+    const dir = await docBoxPath(dirID);
+    if (!dir.box || !dir.path) throw new Error("copyToPool: digest dir path missing");
+    const dirHPath = await siyuan.getHPathByID(dirID, dir.box);
+    if (!dirHPath) throw new Error("copyToPool: digest dir hpath missing");
+    // 源标题取物理 path 末段（getBlockInfo 无标题字段；SQL content 列有索引延迟）；
+    // 同夹重名预检同 feedBlocksToPool 纪律（createDocWithMd 同名静默认领旧文档）
+    const from = await docBoxPath(digestDocID);
+    let title = decodeURIComponent(from.path.split("/").filter(Boolean).at(-1)?.replace(/\.sy$/, "") || "素材");
+    if (await docIDAtPath(dir.box, `${dirHPath}/${title}`)) title = `${title}-${Date.now()}`;
+    const ct = new Date().getTime();
+    const docID = await siyuan.createDocWithMd(dir.box, `${dirHPath}/${title}`,
+        kds.map(stripDigestCopyBlock).join("\n\n"), "", digestCopyAttrs(attrs, targetBookID, ct));
+    if (!docID) throw new Error("copyToPool: doc not created");
+    await appendTailCard({ v: 1, kind: "digest", bookID: targetBookID, point: 0, docID });
+    debugLog("matfeed", `copyToPool done doc=${digestDocID} → copy=${docID} book=${targetBookID}`);
     return 1;
 }
 

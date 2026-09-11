@@ -1721,6 +1721,45 @@ button.prog-popover-item:hover {
   opacity: 0.4;
   font-size: 11px;
 }
+/* bookcards □2 卡清单行内「已进曲线」标记：muted 小字平铺（信息不藏 hover）；
+   opacity 0.65=vision P2-2 从 0.55 提一档（浅色主题小字可读性贴下限） */
+.prog-bookcards-curve {
+  flex: none;
+  font-size: 10px;
+  opacity: 0.65;
+}
+/* bookcards □2 行内到期徽标：accent 芯片（.prog-fb-cardbadge 是浮条作用域规则，浮层
+   挂 body 拿不到——独立类同观感） */
+.prog-bookcards-due {
+  flex: none;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--b3-theme-surface);
+  background: var(--prog-accent, var(--b3-theme-primary));
+}
+/* bookcards □2 兜底钮：sticky 钉滚动区底（长清单不滚出视野，vision P2-1——
+   prog-popover-more-wrap 同款）；分组语义非列表行 */
+.prog-bookcards-deck-wrap {
+  position: sticky;
+  bottom: -4px;
+  z-index: 1;
+  background: var(--b3-theme-surface);
+  border-top: 1px solid var(--b3-border-color);
+}
+.prog-bookcards-deck {
+  color: var(--b3-theme-primary);
+}
+/* vision P2-3：空清单态 sticky 壳的 border-top 与浮层头部 border 形成双线——去掉 */
+.prog-bookcards-deck--empty {
+  border-top: none;
+}
+.prog-bookcards-deck-wrap:has(.prog-bookcards-deck--empty) {
+  border-top: none;
+}
 /* 🔨 完成态摘抄：读侧保留可见但弱化（写侧已随三 tab Dialog 退役，□11 review P1） */
 .prog-popover-item--done {
   opacity: 0.5;
@@ -1868,6 +1907,109 @@ html[data-theme-mode="dark"] .prog-digest-tag {
   color: var(--b3-theme-primary-light);
   background: transparent;
 }
+
+/* floatbar □1 类型胶囊（来源胶囊右邻同款骨架）：六态类型色固定色板（明暗各一档，
+   白底 4.5:1+ 达标）+ color-mix currentColor 底/描边（material-tag 配方，色随态走）；
+   b3 语义变量仅两处——error（到期红）与 primary（仿写=主题色），跨主题自适应 */
+.prog-digest-state {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  vertical-align: middle;
+  cursor: default;
+  user-select: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: #5b6470;
+}
+.prog-digest-state.st-review {
+  color: #6d28d9; // 紫（复访）
+}
+.prog-digest-state.st-think {
+  color: #a3570d; // 深琥珀（白底小字 4.5:1+）
+}
+.prog-digest-state.st-recite {
+  color: #1a5fa8; // 蓝（背诵）
+}
+.prog-digest-state.st-forRecite {
+  color: var(--b3-theme-primary); // 仿写=主题色
+}
+.prog-digest-state.st-due {
+  color: var(--b3-theme-error, #d23f31); // 到期红（复访「今天」/逾期/思考到期）
+  font-weight: 600;
+}
+.prog-digest-state.st-click {
+  cursor: pointer;
+}
+.prog-digest-state.st-click:hover {
+  filter: brightness(1.05);
+}
+html[data-theme-mode="dark"] .prog-digest-state {
+  background: transparent;
+  color: #98a2ae;
+  &.st-review {
+    color: #a78bfa;
+  }
+  &.st-think {
+    color: #f0a13a;
+  }
+  &.st-recite {
+    color: #6cb0e8;
+  }
+}
+
+/* floatbar □1 清单行首类型微胶囊（两摘抄清单共用，单字标=胶囊短标）：与标题区大胶囊
+   同色系（st-* 类名同源），弱化为贴行小标不抢标题 */
+.prog-dg-mini {
+  flex: none;
+  width: 18px; // 定宽：中文单字/半角 ?✓ 同宽，标题起点不随符号漂移（vision P2-3）
+  height: 16px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: #6d28d9;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent);
+}
+.prog-dg-mini.st-think {
+  color: #a3570d;
+}
+.prog-dg-mini.st-insight,
+.prog-dg-mini.st-archive {
+  color: #5b6470;
+  font-weight: 400;
+}
+.prog-dg-mini.st-recite {
+  color: #1a5fa8;
+}
+.prog-dg-mini.st-forRecite {
+  color: var(--b3-theme-primary);
+}
+.prog-dg-mini.st-due {
+  color: var(--b3-theme-error, #d23f31);
+}
+html[data-theme-mode="dark"] .prog-dg-mini {
+  color: #a78bfa;
+  &.st-think {
+    color: #f0a13a;
+  }
+  &.st-insight,
+  &.st-archive {
+    color: #98a2ae;
+  }
+  &.st-recite {
+    color: #6cb0e8;
+  }
+}
+
 
 /* □2 片尾收束卡（custom 块 tail-card 渲染器产物；aigrade/anno-chat 同构卡形态）：
    整卡 user-select:none——点击卡钮不清编辑器选区（浮条配方同款防线） */

@@ -2,6 +2,8 @@
     import { onMount } from "svelte";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { queryDigestTree, type DigestTreeNode } from "./digestUtils";
+    import { digestBadgeInputsOf } from "./digestBadgeStore";
+    import { digestBadgeOf } from "./digestBadge";
     import { progStorage } from "./ProgressiveStorage";
 
     // □11 原文侧追溯浮层（书态 traceUp 钮，□8 用户点名；□29 片态复用）：与路线图浮层
@@ -67,6 +69,14 @@
                 }
             }
             flat = (await treeP).flat;
+            // □1 行首类型小标：批量采集（缓存 60s TTL）→ flat 整体重赋值触发渲染；
+            // 失败静默降级（badge 缺省=不渲染小标，清单本体不受影响）
+            try {
+                const map = await digestBadgeInputsOf(
+                    flat.map(n => n.id), bookID, new Map(flat.map(n => [n.id, n.title])));
+                const now = Date.now();
+                flat = flat.map(n => ({ ...n, badge: map.get(n.id) ? digestBadgeOf(map.get(n.id)!, now) : undefined }));
+            } catch { /* 采集失败保留无标形态 */ }
         } catch (e) {
             console.error("origin digest popover failed", e);
         } finally {
@@ -101,6 +111,11 @@
         <div class="prog-popover-list">
             {#each preview as n (n.id)}
                 <button class="prog-popover-item" title={n.title} onclick={() => onJumpDoc(n.id)}>
+                    {#if n.badge}
+                        <span
+                            class="prog-dg-mini st-{n.badge.kind}{n.badge.due ? ' st-due' : ''}"
+                        >{tomatoI18n.胶囊短标(n.badge.kind)}</span>
+                    {/if}
                     <span class="prog-popover-item-text">{cut(n.title)}</span>
                 </button>
             {/each}

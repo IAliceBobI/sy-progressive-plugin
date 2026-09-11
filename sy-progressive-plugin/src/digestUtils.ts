@@ -278,13 +278,15 @@ export class DigestBuilder {
 
 // ============ □11 浮层族数据层（trace 文档机制的「拉」版替代，getDigestLnk SQL 链路复用） ============
 
-/** 摘抄树节点：children=本摘抄上再摘抄的支路（支路→主干）；done=🔨 完成态（读侧保留） */
+/** 摘抄树节点：children=本摘抄上再摘抄的支路（支路→主干）；done=🔨 完成态（读侧保留）；
+ *  badge=floatbar □1 类型小标（清单组件用 digestBadgeInputsOf 采集后填充，queryDigestTree 不填） */
 export interface DigestTreeNode {
     id: string;
     title: string;
     ctime: string;
     done: boolean;
     children: DigestTreeNode[];
+    badge?: import("./digestBadge").DigestBadge;
 }
 
 export interface DigestTreeData {

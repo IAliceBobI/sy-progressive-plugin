@@ -10,6 +10,8 @@
     import { floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import UpgradeBar from "../../sy-tomato-plugin/src/UpgradeBar.svelte";
+    // AI 接入（MCP）引导卡（mcpcopy 2026-09-11）：UpgradeBar 后一行挂载（tomato 共享组件）
+    import McpPromo from "../../sy-tomato-plugin/src/McpPromo.svelte";
     import { saveRestorePagePosition } from "../../sy-tomato-plugin/src/libs/utils";
     import { searchSettings } from "../../sy-tomato-plugin/src/libs/ui";
     import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
@@ -163,6 +165,8 @@
         bind:codeValid
         onActivated={() => plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg)}
     ></UpgradeBar>
+    <!-- AI 接入（MCP）引导卡：说明 + 一键复制自接线提示词 + 打开接入指南（三插件同款） -->
+    <McpPromo />
 
     <!-- search：placeholder 化（对齐番茄），输入框宽度由 IndexConf.css 拉满自适应 -->
     <div class="settingBox search-bar" data-search>

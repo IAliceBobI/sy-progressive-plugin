@@ -8,7 +8,7 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { setGlobal } from "stonev5-utils";
 import { mount, unmount } from "svelte";
 import ProgressiveFloatBtns from "./ProgressiveFloatBtns.svelte";
-import { digestLanding, digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, pieceTailCard, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
+import { digSubrankOpen, floatbarExpandPref, hideBtnsInFlashCard, initProgFloatBtnsDisable, pieceTailCard, writableWithGet } from "../../sy-tomato-plugin/src/libs/stores";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue, digestMarkBookID } from "./progFloatState";
 import { progStorage } from "./ProgressiveStorage";
@@ -17,7 +17,7 @@ import { markDigests, markDigestTag, clearDigestMarks } from "./digestMarker";
 import { revTraceOnAppear } from "./revTrace";
 import { markMaterials } from "./materialMarker";
 import { markMaterialTraces, markMaterialTag } from "./materialTrace";
-import { findDocByIal, getDocIalDigestDirUnder, getDocIalDigestDirHub } from "./progData";
+import { fetchBookCardRows } from "./cardList";
 import { ensureDigestTailCard } from "./tailCardAppend";
 
 const Prog_BUTTON = "custom-prog-button";
@@ -159,23 +159,20 @@ export function initProgFloatBtns() {
     }
 }
 
-/** 附属卡到期数：doc deck 挂 digest-书名 夹，getTreeRiffDueCards 按子树查（出场时异步刷新，防抖 bookID） */
+/** 附属卡到期数（出场时异步刷新，防抖 bookID）。bookcards □3 起口径=清单账
+ *  （ctime 归属行 due 求和，fetchBookCardRows 缓存共享）——与「本书卡清单」浮层
+ *  同源同数字（bear 拍板统一）；物理夹位置从方程消失（鸟 09-04「跟标记不跟位置」
+ *  根治）：摘抄搬走徽标照算、且不再触发 ensureDigestDir 建夹副作用 */
 let lastDueKey = "";
-async function refreshDue(dirKey: string) {
-    if (dirKey === lastDueKey) return;
-    lastDueKey = dirKey;
+async function refreshDue(bookID: string) {
+    if (bookID === lastDueKey) return;
+    lastDueKey = bookID;
     try {
-        const dueOf = async (id: string) => (await siyuan.getTreeRiffDueCards(id))?.unreviewedCount ?? 0;
-        const source = digestLanding.get() === "source";
-        const dirID = await progStorage.ensureDigestDir(dirKey, source);
-        if (lastDueKey !== dirKey) return;
-        let due = dirID ? await dueOf(dirID) : 0;
-        // □4 双夹并查：override 摘抄的卡挂在方向夹子树（under/hub），主力档的另一方向
-        // 夹找得到才查（不 ensure 不新建）；主力夹恰在另一方向时它已计入，无重复
-        const other = await findDocByIal(source ? getDocIalDigestDirHub(dirKey) : getDocIalDigestDirUnder(dirKey));
-        if (other && other !== dirID) due += await dueOf(other);
-        if (lastDueKey !== dirKey) return;
+        const rows = await fetchBookCardRows(bookID);
+        if (lastDueKey !== bookID) return;
+        const due = rows.reduce((s, r) => s + (r.due ?? 0), 0);
         dueText.set(formatDueCount(due));
+        debugLog("floatbar", `refreshDue book=${bookID} rows=${rows.length} due=${due}`, "progressive");
     } catch (e) {
         console.error("prog float due refresh failed", e);
     }

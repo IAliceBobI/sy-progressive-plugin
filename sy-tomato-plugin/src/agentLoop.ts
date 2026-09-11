@@ -83,7 +83,7 @@ export interface AgentLoopOptions {
     /** 初始消息（含 system+历史+本次提问） */
     messages: ChatCompletionMessageParam[];
     signal?: AbortSignal;
-    /** 工具轮上限（默认 4）：AI 连续只调工具不收尾时熔断 */
+    /** 工具轮上限（默认 20，agentqa □1 随 stores 默认同抬）：AI 连续只调工具不收尾时熔断 */
     maxTurns?: number;
     onEvent: (e: AgentEvent) => void;
 }
@@ -122,7 +122,7 @@ function stripThink(text: string): string {
 }
 
 export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult> {
-    const maxTurns = opts.maxTurns ?? 4;
+    const maxTurns = opts.maxTurns ?? 20;
     const messages = [...opts.messages];
     // agentrev □6 重试癖治理：qwen-flash 对失败/被拒的工具调用会原样重试（人审弹窗连环弹、
     // 轮数烧穿 max_turns——ai-agent 战役遗留备案）。按 name+args 记失败次数：第 2 次原样

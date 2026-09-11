@@ -14,7 +14,7 @@ import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { PDIGEST_CTIME, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import { PdigestReviewKey, ReviewKey } from "./reviewQueue";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime, escapeHtml } from "./progData";
+import { parseBookIDFromCtime, escapeHtml } from "./progData";
 import { PIECE_IDX_KEY, digestTagKind } from "./originTrace";
 import { progStorage } from "./ProgressiveStorage";
 import { showFloatTip, hideFloatTip } from "./floatTip";
@@ -22,6 +22,8 @@ import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { buildDigestMenuItems, digestJumpOf, groupDigestRows, mergeRefRows, DigestRow } from "./digestList";
 import { digestStateOf, digestStateIcon } from "./digestState";
 import { openDigestReviewMenu } from "./reviewMenu";
+import { digestBadgeInputOf, cardIDSetOf, invalidateDigestBadge } from "./digestBadgeStore";
+import { digestBadgeOf, fmtDueDate, DigestBadge } from "./digestBadge";
 
 const MARK_CLASS = "prog-digest-mark";
 const CACHE_TTL_MS = 60_000;
@@ -125,23 +127,6 @@ export async function markDigests(protyle: any, bookID: string, force = false) {
 }
 
 /**
- * 摘抄文档已入卡的块 ID set（期2 □2 A 背诵态判定数据源，微拍板方案 a）：
- * digest 夹 IAL **只读认回**（findDocByIal 不建——无夹=无卡，非 ensure 的写语义），
- * 卡挂摘抄文档块（setDigestCard(digestID)），card.id 即块 ID。
- * 夹不存在/查询异常 → 空 set 静默降级（四态退三态，不崩列表）。
- */
-async function cardIDSetOf(bookID: string): Promise<Set<string>> {
-    try {
-        const dirID = await findDocByIal(getDocIalDigestDir(bookID));
-        if (!dirID) return new Set();
-        const cards = await siyuan.getTreeRiffCardsAll(dirID);
-        return new Set(cards.map(c => c.id));
-    } catch {
-        return new Set();
-    }
-}
-
-/**
  * 多摘列表（□15 拍板：思源原生 Menu 轻量列表，点击跳；可见性期1 □1 B：按摘抄文档分组
  * （同 root_id 多块合并一行）+ 悬空孤儿剔除（SQL 查无此块不显示）+ 头部「共 N 条摘抄」，
  * N=去重后文档数；最新文档排最上）。期2 □2 A：行首四态活图标（实时 IAL 现查）。
@@ -216,6 +201,7 @@ export function markDigestTag(protyle: any) {
     if (!root) return;
     // 清旧紧贴判定（阴性也清）：切到普通文档/片态时清掉残留旧徽章防串文档
     root.querySelectorAll(".prog-digest-tag").forEach(t => t.remove());
+    root.querySelectorAll(".prog-digest-state").forEach(t => t.remove());
     const wys = protyle?.wysiwyg?.element;
     if (!wys?.getAttribute(PDIGEST_CTIME)) return;
     const title = root.querySelector<HTMLElement>(".protyle-title");
@@ -250,4 +236,70 @@ export function markDigestTag(protyle: any) {
     const input = title.querySelector(".protyle-title__input");
     if (input) title.insertBefore(tag, input.nextSibling);
     else title.append(tag);
+    // □1 类型胶囊（六态）：来源胶囊右邻，异步查询后代际守卫注入。清理已在本函数头部
+    // 与来源胶囊同段做（阴性也清）；此处迟到查询只插不清——插入前按类再清一遍防
+    // 出场链五事件并发双插（同文档同值，后到覆盖先到无害）
+    const ctime = wys.getAttribute(PDIGEST_CTIME) ?? "";
+    const docID = protyle?.block?.rootID ?? "";
+    if (!docID) return;
+    const titleText = (title.querySelector(".protyle-title__input")?.textContent ?? "").trim();
+    const bookID = parseBookIDFromCtime(ctime);
+    digestBadgeInputOf(docID, bookID, titleText)
+        .then((badgeInput) => {
+            // 代际守卫：同 protyle 切文档（ctime 变）/页签关闭（断连）后丢弃迟到结果
+            if (!badgeInput || !wys.isConnected || wys.getAttribute(PDIGEST_CTIME) !== ctime) return;
+            // □1 完成复访后胶囊即时跳下轮：onApplied（setReview 后回调）重挂。复访动作只动
+            // 文档级 pdigest-review——走 getBlockAttrs 内核直读（SQL attributes 有写后立读
+            // 窗口，800ms 延迟仍读到旧值且回填缓存钉死 60s，e2e 实锤）；think/卡组不受复访
+            // 动作影响沿用首查值；invalidate 让下次出场走 SQL 重查拿全量新态。400ms 错峰菜单关闭动画
+            const refreshStateBadge = () => {
+                setTimeout(() => {
+                    siyuan.getBlockAttrs(docID).then((attrs: any) => {
+                        if (!wys.isConnected || wys.getAttribute(PDIGEST_CTIME) !== ctime) return;
+                        invalidateDigestBadge(docID);
+                        attachStateBadge(title, tag, digestBadgeOf({
+                            ...badgeInput, pdigestReview: attrs?.[PdigestReviewKey] ?? "",
+                        }, Date.now()), docID, bookID, refreshStateBadge);
+                    }).catch(() => { });
+                }, 400);
+            };
+            attachStateBadge(title, tag, digestBadgeOf(badgeInput, Date.now()), docID, bookID, refreshStateBadge);
+        })
+        .catch(() => { });
+}
+
+/** 类型胶囊文案（消费层 i18n 拼装，纯函数在 digestBadge）：复访带 ✧ 与日期（到期
+ *  今天/逾期整日显原日期），思考带 ❓ 与日期，心得 ✓ 灰显，背诵/仿写/留档裸词。 */
+function stateBadgeLabel(b: DigestBadge): string {
+    switch (b.kind) {
+        case "review": return `✧ ${tomatoI18n.复访} · ${b.dueToday ? tomatoI18n.今天 : fmtDueDate(b.next)}`;
+        case "think": return `❓ ${tomatoI18n.思考} · ${fmtDueDate(b.next)}`;
+        case "insight": return `✓ ${tomatoI18n.心得}`;
+        case "recite": return tomatoI18n.背诵;
+        case "forRecite": return tomatoI18n.仿写;
+        default: return tomatoI18n.留档;
+    }
+}
+
+/** 类型胶囊 DOM：anchor=来源胶囊（右邻）。复访态可点开 ✧ 复访菜单（完成/推迟高频
+ *  动作的就近入口），其余态静态展示。textContent 组装（title 区无「零 textContent」
+ *  约束，markDigestTag 注释同款）。onApplied=复访动作落盘后重查重挂（跳下轮即时反映）。 */
+function attachStateBadge(
+    title: HTMLElement, anchor: HTMLElement, badge: DigestBadge, docID: string,
+    bookID = "", onApplied?: () => void,
+) {
+    title.querySelectorAll(".prog-digest-state").forEach(t => t.remove());
+    const tag = document.createElement("span");
+    tag.className = `prog-digest-state st-${badge.kind}${badge.due ? " st-due" : ""}`;
+    tag.setAttribute("contenteditable", "false");
+    tag.textContent = stateBadgeLabel(badge);
+    if (badge.kind === "review") {
+        tag.classList.add("st-click");
+        tag.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            ev.preventDefault();
+            openDigestReviewMenu(docID, ev, onApplied, bookID);
+        });
+    }
+    title.insertBefore(tag, anchor.nextSibling);
 }

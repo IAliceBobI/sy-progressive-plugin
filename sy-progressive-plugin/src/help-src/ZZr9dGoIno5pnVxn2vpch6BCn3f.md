@@ -78,3 +78,5 @@
 [**界面与个性化**](https://my.feishu.cn/docx/U23idAY0UorKIkxmcOCc7Iwbnkf)——浮条、火苗、舰队总览、皮肤、移动端——工作台长什么样由你定。
 
 [**收费与附录**](https://my.feishu.cn/docx/XvnUdrBEooOd1LxBdhmcpBWRnwc)——收费与激活、设置面板导览、快捷键、数据存放与 CSS 自定义、常见问题。
+
+[**AI 接入（MCP）**](https://my.feishu.cn/docx/BkRldeWJ7o3T4ExE2fdciZbgnRV)——把 AI 助手接进思源：让 AI 查书单进度、到期队列，替你推迟重访；ZCode / Trae / CodeBuddy / Qoder 三步接入。

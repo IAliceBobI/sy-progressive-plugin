@@ -10,6 +10,7 @@ import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 import { notifyFleetChanged } from "./fleetNotify";
 import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
 import { digestStateOf, digestStateIcon, DigestState } from "./digestState";
+import { invalidateDigestBadge } from "./digestBadgeStore";
 import {
     ReviewKey, ReviewState, SCHED_PRESETS, PdigestReviewKey,
     parseReview, markQuestion, markSched, deferReview, completeReview, completeRevisit,
@@ -22,6 +23,8 @@ type MenuItemOption = Parameters<Menu["addItem"]>[0];
 async function setReview(ids: string[], value: string, tip: string, key: string = ReviewKey) {
     for (const id of ids) {
         await siyuan.setBlockAttrs(id, { [key]: value } as any);
+        // □1 类型胶囊缓存失效：完成/推迟/移除后下次出场重查（跳下轮/灭期即时反映）
+        invalidateDigestBadge(id);
     }
     await siyuan.pushMsg(tip);
     notifyFleetChanged();

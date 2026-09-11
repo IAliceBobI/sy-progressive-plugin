@@ -17,7 +17,10 @@ export const PROG_FLOAT_ICONS = `
 <symbol id="iconProgPiece" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="11" height="13" rx="2"/><path d="M9 20h7a2 2 0 0 0 2-2V8"/></symbol>
 <symbol id="iconProgInbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"/></symbol>
 <symbol id="iconProgThink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
-<symbol id="iconProgRecite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></symbol>
+<!-- floatbar □2 撞车修①：背诵=叠卡+右下循环箭头角标（入复习循环语义）——原 path 与附属卡
+     iconProgCard 逐字节相同（纯复制遗留）；叠卡缩左上让位角标（g 缩放 stroke-width 等比补偿）。
+     vision 复审修：翼改顺切线 V 形（原翼向偏 82° 读作折回钩）+r 内收防出血 -->
+<symbol id="iconProgRecite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(-.6 -.6) scale(.78)" stroke-width="2.3"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></g><path d="M15.8 16.1A3.5 3.5 0 1 1 19.43 21.96"/><path d="m19.43 21.96 1.28-.96"/><path d="m19.43 21.96.6-1.5"/></symbol>
 <symbol id="iconProgWord" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18 12 5l6 13"/><path d="M8.5 13h7"/></symbol>
 <!-- □19 生词 AI：A 形左移避让 + 右上四角星角标（CardAdd/AddBook 的角标家族） -->
 <symbol id="iconProgWordAI" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 19 9.5 6l6 13"/><path d="M6 14.5h7"/><path d="M18 2.4 19.3 3.7 20.6 5 19.3 6.3 18 7.6 16.7 6.3 15.4 5 16.7 3.7Z"/></symbol>
@@ -80,4 +83,15 @@ export const PROG_FLOAT_ICONS = `
 <!-- matfeed □2 管理素材池：inbox 托盘家族变体——右下角开口让位给对勾（勾选/批量语义；
      与「留档」iconProgInbox 同家族可区分，与「插入素材」iconProgMaterial（纯下载箭头）不撞） -->
 <symbol id="iconProgPoolManage" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h6"/><path d="m15 17 2 2 4-4"/></symbol>
+<!-- floatbar □2 撞车修②③④：收集/整篇摘抄/去色三钮原裸复用留档 inbox、跳分片 piece、
+     删原文 clean（同屏一图两义）。收集=托盘+右下笔角标（PoolManage 同款右下开口+对勾家族，
+     角标换笔=收集写作）；整篇=片缩左上+右下剪刀角标（整片剪走，剪刀取 iconProgScissors 缩形）；
+     去色=墨滴（Recolor 同滴形）+右下 r5.5 圆底 ban 角标（delBack/delExit/CardDailyN 家族）。
+     缩放组 stroke-width 等比补偿（1.8/scale）保线稿视觉同粗 -->
+<symbol id="iconProgCollect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h6"/><g transform="translate(12.4 12.4) scale(.48)" stroke-width="3.75"><path d="M12 20h9"/><path d="m16.5 3.5 3 3L8.5 17.5"/></g></symbol>
+<symbol id="iconProgWhole" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(-.4 -.2) scale(.72)" stroke-width="2.5"><rect x="4" y="3" width="11" height="13" rx="2"/><path d="M9 20h7a2 2 0 0 0 2-2V8"/></g><g transform="translate(13.8 13.8) scale(.42)" stroke-width="4.3"><path d="M8.12 8.12 12 12"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88"/><path d="M14.8 14.8 20 20"/></g></symbol>
+<symbol id="iconProgNoColor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(.4 -1.4) scale(.85)" stroke-width="2.1"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0Z"/><path d="M9.5 14h5"/></g><circle cx="17.8" cy="17.8" r="5.2"/><path d="m15.5 15.5 4.6 4.6"/></symbol>
+<!-- floatbar □2 家族统一②：子排复访创建钮=时钟+右上加号角标（CardAdd/WriteAdd 加号家族；
+     官方 iconHistory 退出本家族——✧/调度维持圆时钟 iconProgSched，官方 Clock/History 不再混入） -->
+<symbol id="iconProgSchedAdd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="13" r="7.5"/><path d="M11 8.5V13l3 1.5"/><path d="M18.5 2.3v4.4"/><path d="M16.3 4.5h4.4"/></symbol>
 `;
