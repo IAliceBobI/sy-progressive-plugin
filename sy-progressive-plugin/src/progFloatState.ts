@@ -286,10 +286,13 @@ const PIECE_ALL_MAIN: FloatButtonSpec[] = [
 export const PIECE_ALL_MAIN_IDS = new Set(PIECE_ALL_MAIN.map(b => b.id));
 
 /**
- * 自由态首行全量池（650189 拖动排序反馈，2026-09-09）：6 项 = SCENE.free 两键 + 平铺区
- * 低频四项。icon 与片态全量池同源同值（digest=✂/addBook=📥/contents/map/traceUp/ignore），
- * kind 档按 free 语义：✂ 是本态唯一 primary（子排开合锚点），ignore=ghost（弱化语义）。
- * 片态专属动作（next/prev/origin 等）不入池——free 无片可推进。
+ * 自由态首行全量池（650189 拖动排序反馈，2026-09-09）：8 项 = SCENE.free 两键 + 平铺区
+ * 低频四项 + freepool 扩容两项（09-12 bear 拍板：whole/splitinplace 曝光——能力原先
+ * 只藏 ✂ 子排二层，入池=平铺区兜底可见+可拖上首行，首行默认编排不变）。icon 与子排
+ * DIG_ICONS 同源同值，kind 档按 free 语义：✂ 是本态唯一 primary（子排开合锚点），
+ * ignore=ghost（弱化语义）。片态专属动作（next/prev/origin 等）不入池——free 无片可
+ * 推进；扩容两项只入 free 池（与 digestSubrankIds 态过滤同口径：book 改原书破坏分片
+ * 块引用、piece 重插已是断句入口、digest 态整摘无意义）。
  */
 const FREE_ALL_MAIN: FloatButtonSpec[] = [
     { id: "digest", icon: "iconProgScissors", kind: "primary", group: "scene" },
@@ -298,16 +301,23 @@ const FREE_ALL_MAIN: FloatButtonSpec[] = [
     { id: "traceUp", icon: "iconProgTraceUp", kind: "normal", group: "scene" },
     { id: "map", icon: "iconProgMap", kind: "normal", group: "scene" },
     { id: "ignore", icon: "iconProgIgnore", kind: "ghost", group: "scene" },
+    { id: "whole", icon: "iconProgWhole", kind: "normal", group: "scene" },
+    { id: "splitinplace", icon: "iconSplitTB", kind: "normal", group: "scene" },
 ];
 
 /** 自由态全量池 id 集（mainIds 载入/落盘过滤面，同 PIECE_ALL_MAIN_IDS 语义） */
 export const FREE_ALL_MAIN_IDS = new Set(FREE_ALL_MAIN.map(b => b.id));
 
 /**
- * 摘抄态首行全量池（650189 第二轮反馈，2026-09-10）：10 项 = common 两键 + SCENE.digest
- * 7 键 + 平铺区低频 map。kind/icon 与 SCENE 段同源同值（recite=primary，summary=ghost）；
- * recite 未装的滤除/origin 升 primary 在 buildFloatButtons mainIds 分支处理（与 SCENE
- * 分支同语义）。片/书态专属动作（swap/toPiece/continue 等）不入池。
+ * 摘抄态首行全量池（650189 第二轮反馈，2026-09-10）：18 项 = common 两键 + SCENE.digest
+ * 7 键 + 平铺区低频 map + digestpool 扩容 8 项（09-12 bear 拍板「摘抄和分片基本一样，
+ * 摘抄功能不该这么少」——往多补齐非片瘦身）。扩容 8 项全走平铺区兜底可见+可拖上首行
+ * （freepool 同款语义），默认首行 9 键编排零变化（9×30+8×4≈330px 顶行宽上限）。
+ * kind/icon 与既有各态同源同值（跨态同 id 必同 icon）：swap/continue/archive 沿 book 态
+ * icon、card 族 5 项沿 EXTRA_MAIN；kind 档按 digest 语义——primary 唯一=recite〔未装时
+ * origin〕故 continue/swap 均 normal，archive 退出语义 ghost，card 族 normal（本是 UI 层
+ * ADV_GROUPS 高级组成员）。❌ 不补（bear 认过）：whole/contents/traceUp/移片提取重插翻片族。
+ * 片/书态专属动作（toPiece 等）不入池。
  */
 const DIGEST_ALL_MAIN: FloatButtonSpec[] = [
     { id: "digest", icon: "iconProgScissors", kind: "common", group: "common" },
@@ -320,10 +330,32 @@ const DIGEST_ALL_MAIN: FloatButtonSpec[] = [
     { id: "tree", icon: "iconProgTree", kind: "normal", group: "scene" },
     { id: "summary", icon: "iconProgQuill", kind: "ghost", group: "scene" },
     { id: "map", icon: "iconProgMap", kind: "normal", group: "scene" },
+    // digestpool 扩容垫尾（09-12）：kind=normal 除 archive ghost
+    { id: "swap", icon: "iconProgSwap", kind: "normal", group: "scene" },      // 🔄换书（滚筒轮转；book/piece 态在 common 组，digest 态无公共组语义故 scene）
+    { id: "continue", icon: "iconProgPlay", kind: "normal", group: "scene" },  // ▶继续读（源书断点；primary 唯一=recite 故 normal）
+    { id: "archive", icon: "iconProgArchive", kind: "ghost", group: "scene" }, // 📦归档（源书；退出语义 ghost 同 book 态）
+    { id: "card", icon: "iconProgCardAdd", kind: "normal", group: "scene" },       // 高级组同 id 同 icon（渲染/分发走 UI 层 ADV_ITEM_MAP）
+    { id: "cardHere", icon: "iconProgCardHere", kind: "normal", group: "scene" },
+    { id: "cardDailyN", icon: "iconProgCardDailyN", kind: "normal", group: "scene" },
+    { id: "multi", icon: "iconProgMulti", kind: "normal", group: "scene" },
+    { id: "collect", icon: "iconProgCollect", kind: "normal", group: "scene" },
 ];
 
 /** 摘抄态全量池 id 集（mainIds 载入/落盘过滤面，同 PIECE_ALL_MAIN_IDS 语义） */
 export const DIGEST_ALL_MAIN_IDS = new Set(DIGEST_ALL_MAIN.map(b => b.id));
+
+/**
+ * 平铺格 ghost 档判定（digestpool vision P1-1）：按态查池 spec 的 kind——退出/弱化语义
+ * 钮（archive/summary/ignore/clean 等）落平铺区时与首行 ghost 同源弱化（var(--prog-muted)），
+ * 平铺区此前无 ghost 通道是四态既有缺口，digestpool 扩容让 archive 默认落平铺放大了它。
+ * 非池成员（ADV 族，渲染源在 UI 层 ADV_ITEM_MAP）与未知 id 恒 false。
+ */
+export function isFlatGhost(kind: FloatDocKind, id: string): boolean {
+    const pool = kind === "piece" ? PIECE_ALL_MAIN
+        : kind === "book" ? BOOK_ALL_MAIN
+            : kind === "digest" ? DIGEST_ALL_MAIN : FREE_ALL_MAIN;
+    return pool.find(b => b.id === id)?.kind === "ghost";
+}
 
 /**
  * 书态首行全量池（650189 第二轮反馈，2026-09-10）：12 项 = common 三键 + SCENE.book
@@ -404,7 +436,9 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[]; 
             return DIGEST_ALL_MAIN.map(b => b.id)
                 .filter(id => !inMain.has(id) && !(id === "recite" && opts.reciteInstalled === false));
         }
-        return ["map"];
+        // digestpool 扩容 8 项垫尾（09-12）：固有分支=池-出厂首行 同构（freepool/book 态
+        // 先例），出厂平铺区从 1 格变 9 格（默认首行编排不变）
+        return ["map", "swap", "continue", "archive", "card", "cardHere", "cardDailyN", "multi", "collect"];
     }
     // free（群反馈 650189）：书态基础入口——contents/traceUp 复用书态浮层（free 摘抄
     // ctime 自指 docID，清单浮层按 noteID 即查）；期2 ignore=不再推送（该源文档全部
@@ -415,7 +449,9 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[]; 
         const inMain = new Set(opts.mainIds);
         return FREE_ALL_MAIN.map(b => b.id).filter(id => !inMain.has(id));
     }
-    return ["contents", "traceUp", "map", "ignore"];
+    // freepool 扩容两项垫尾（09-12）：固有分支=池-出厂首行 同构（book 态先例），
+    // 出厂平铺区从 4 格变 6 格（首行默认编排不变）
+    return ["contents", "traceUp", "map", "ignore", "whole", "splitinplace"];
 }
 
 /** 附属卡到期胶囊文案：无到期零占位（不渲染）、>99 截断 */

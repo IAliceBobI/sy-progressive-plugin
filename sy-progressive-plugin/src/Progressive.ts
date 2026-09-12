@@ -679,6 +679,9 @@ class Progressive {
     }
 
     async startToLearnWithLock(bookID = "", isRand = false): Promise<void> {
+        // digestpool：continue/swap 池钮点击链留痕（e2e 断言查 Loki：digest 态 continue 的
+        // bookID 应=源书；空=滚筒轮转）
+        debugLog("floatbar", `startToLearn book=${bookID || "(滚筒)"} rand=${isRand}`, "progressive");
         await this.startToLearnLeased(bookID, isRand);
         // 阅读曲线：推片后该书投影即时刷新（锁已释放，巡查避让判定不撞自己持有的
         // StartToLearnLock——这是它必须放在锁外 fire 的原因）

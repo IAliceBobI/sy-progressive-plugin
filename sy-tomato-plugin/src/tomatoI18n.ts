@@ -7064,6 +7064,16 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "⛔ This book is already a writing book: it cannot be added to progressive reading; re-splitting in reading mode would destroy its slot structure (material and finalization progress)";
         }
     }
+    /** 巨块知情警告（2026-09-12 有偈品战役极限调研）：分片原子=块，超大块切不开，
+        整本书会集中在少数几片里——知情 + 引导拆块/断句，不拦截 */
+    public get 加书警告超大块() {
+        switch (this.lang) {
+            case "zh_CN": return "⚠ 本书有超大段落块（常见于 Word/PDF 导入未断段）：分片按块切分，超大块不会被拆开，整本书可能集中在少数几片里。建议先在文档里把大段落拆开再加书；片内阅读可配合下方「断句」改善";
+            case "zh_CHT": return "⚠ 本書有超大段落塊（常見於 Word/PDF 導入未斷段）：分片按塊切分，超大塊不會被拆開，整本書可能集中在少數幾片裡。建議先在文檔裡把大段落拆開再加書；片內閱讀可配合下方「斷句」改善";
+            case "en_US":
+            default: return "⚠ This book has oversized paragraph blocks (common with Word/PDF imports): pieces are split by block and oversized blocks are never broken up, so the whole book may land in just a few pieces. Consider splitting large paragraphs before adding; the sentence-split option below can improve in-piece reading";
+        }
+    }
     public get 路线书加书() {
         switch (this.lang) {
             case "zh_CN": return "加书：把其他文档加入渐进阅读（对本书确认会重置进度）";
@@ -7078,6 +7088,107 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "加書：把本片文檔註冊為獨立書籍繼續深讀";
             case "en_US":
             default: return "Add book: register this piece as an independent book to read deeper";
+        }
+    }
+
+    // ---- digestpool □2 路线指引静态清单翻新（A 方案）：四态 +11 条，补 freepool/附属卡/□1
+    // 池扩容后的能力面；沿路线族三语档（zh_CN/zh_CHT/en_US），其余语种落英文兜底 ----
+    public get 路线摘抄继续读() {
+        switch (this.lang) {
+            case "zh_CN": return "继续读：回源书断点继续读";
+            case "zh_CHT": return "繼續讀：回源書斷點繼續讀";
+            case "en_US":
+            default: return "Continue: resume reading at the source book's breakpoint";
+        }
+    }
+    public get 路线摘抄复访() {
+        switch (this.lang) {
+            case "zh_CN": return "复访：安排这条摘抄的定期回看";
+            case "zh_CHT": return "復訪：安排這條摘抄的定期回看";
+            case "en_US":
+            default: return "Revisit: schedule periodic reviews for this digest";
+        }
+    }
+    public get 路线摘抄附属卡() {
+        switch (this.lang) {
+            case "zh_CN": return "附属卡：复习源书摘抄产生的闪卡";
+            case "zh_CHT": return "附屬卡：複習源書摘抄產生的閃卡";
+            case "en_US":
+            default: return "Attached cards: review the source book's flashcards";
+        }
+    }
+    public get 路线摘抄换书() {
+        switch (this.lang) {
+            case "zh_CN": return "换书：切换到滚筒里的下一本书";
+            case "zh_CHT": return "換書：切換到滾筒裡的下一本書";
+            case "en_US":
+            default: return "Swap: rotation moves on to the next book";
+        }
+    }
+    public get 路线摘抄制卡与收集() {
+        switch (this.lang) {
+            case "zh_CN": return "制卡与收集：把这条摘抄制成闪卡或复制进收集文件";
+            case "zh_CHT": return "制卡與收集：把這條摘抄製成閃卡或複製進收集文件";
+            case "en_US":
+            default: return "Cards & collect: turn this digest into flashcards or copy it into the collection file";
+        }
+    }
+    public get 路线自由整摘() {
+        switch (this.lang) {
+            case "zh_CN": return "整篇摘抄：整篇收进摘抄库";
+            case "zh_CHT": return "整篇摘抄：整篇收進摘抄庫";
+            case "en_US":
+            default: return "Whole digest: save the whole doc into the digest library";
+        }
+    }
+    public get 路线自由断句() {
+        switch (this.lang) {
+            case "zh_CN": return "就地断句：把这篇切成小片就地学";
+            case "zh_CHT": return "就地斷句：把這篇切成小片就地學";
+            case "en_US":
+            default: return "Split in place: cut this doc into small pieces to learn here";
+        }
+    }
+    public get 路线自由关联摘抄() {
+        switch (this.lang) {
+            case "zh_CN": return "关联摘抄：看这篇被摘过哪些";
+            case "zh_CHT": return "關聯摘抄：看這篇被摘過哪些";
+            case "en_US":
+            default: return "Linked digests: see what has been digested from this doc";
+        }
+    }
+    public get 路线自由目录() {
+        switch (this.lang) {
+            case "zh_CN": return "打开目录：弹这篇的目录浮层";
+            case "zh_CHT": return "打開目錄：彈這篇的目錄浮層";
+            case "en_US":
+            default: return "Contents: open this doc's table of contents";
+        }
+    }
+    public get 路线片仿写() {
+        switch (this.lang) {
+            case "zh_CN": return "仿写本片：拿这片开练仿写";
+            case "zh_CHT": return "仿寫本片：拿這片開練仿寫";
+            case "en_US":
+            default: return "Recite: practice writing with this piece";
+        }
+    }
+    public get 路线书换书() {
+        switch (this.lang) {
+            case "zh_CN": return "换书：切换到滚筒里的下一本书";
+            case "zh_CHT": return "換書：切換到滾筒裡的下一本書";
+            case "en_US":
+            default: return "Swap: rotation moves on to the next book";
+        }
+    }
+    /** digestpool □2 顺带项：平铺区「继续读」格内短标签（□10 规格 2-6 字）；
+        长说明保留在 FLAT_TIPS 全名层与首行 tooltip（两处仍用 继续读 getter） */
+    public get 继续读短() {
+        switch (this.lang) {
+            case "zh_CN": return "继续读";
+            case "zh_CHT": return "繼續讀";
+            case "en_US":
+            default: return "Continue";
         }
     }
 
@@ -12126,7 +12237,16 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Mobile top bar sync button";
         }
     }
-    // ── AI 接入（MCP）引导卡（mcpcopy 战役 2026-09-11，三插件设置面板共用，McpPromo.svelte）──
+    // ── AI 接入（MCP）引导卡（mcpcopy 战役 2026-09-11，三插件设置面板共用，McpPromo.svelte；
+    //     2026-09-12 二期=迁入设置导航独立域，AI接入=导航短标签、MCP接入=卡内全名标题）──
+    public get AI接入() {
+        switch (this.lang) {
+            case "zh_CN": return "AI 接入";
+            case "zh_CHT": return "AI 接入";
+            case "en_US":
+            default: return "AI access";
+        }
+    }
     public get MCP接入() {
         switch (this.lang) {
             case "zh_CN": return "AI 接入（MCP）";

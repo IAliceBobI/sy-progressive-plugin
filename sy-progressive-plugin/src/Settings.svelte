@@ -10,7 +10,7 @@
     import { floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import UpgradeBar from "../../sy-tomato-plugin/src/UpgradeBar.svelte";
-    // AI 接入（MCP）引导卡（mcpcopy 2026-09-11）：UpgradeBar 后一行挂载（tomato 共享组件）
+    // AI 接入（MCP）引导卡（mcpcopy 2026-09-11；09-12 二期迁入导航「AI 接入」独立域渲染）
     import McpPromo from "../../sy-tomato-plugin/src/McpPromo.svelte";
     import { saveRestorePagePosition } from "../../sy-tomato-plugin/src/libs/utils";
     import { searchSettings } from "../../sy-tomato-plugin/src/libs/ui";
@@ -65,6 +65,9 @@
         { id: "menus", label: () => tomatoI18n.菜单入口 },
         { id: "hotkeys", label: () => tomatoI18n.快捷键 },
         { id: "data", label: () => tomatoI18n.数据管理 },
+        // mcpcopy 二期（2026-09-12）：MCP 引导卡自顶部通栏迁入导航独立域（bear：通栏占空间），
+        // 垫底；卡本体 McpPromo.svelte（tomato 共享组件）不变
+        { id: "mcp", label: () => tomatoI18n.AI接入 },
     ];
     let navActive = $state("digest");
     const NavKeyItemKey = "progressive_settings_NavKeyItemKey_Kw9VtQeXr4TnZb7hLsYdA2g";
@@ -165,8 +168,6 @@
         bind:codeValid
         onActivated={() => plugin.saveData(STORAGE_Prog_SETTINGS, plugin.settingCfg)}
     ></UpgradeBar>
-    <!-- AI 接入（MCP）引导卡：说明 + 一键复制自接线提示词 + 打开接入指南（三插件同款） -->
-    <McpPromo />
 
     <!-- search：placeholder 化（对齐番茄），输入框宽度由 IndexConf.css 拉满自适应 -->
     <div class="settingBox search-bar" data-search>
@@ -223,8 +224,10 @@
                     <ProgConfMenus></ProgConfMenus>
                 {:else if id === "hotkeys"}
                     <ProgConfHotkeys></ProgConfHotkeys>
-                {:else}
+                {:else if id === "data"}
                     <ProgConfData></ProgConfData>
+                {:else if id === "mcp"}
+                    <McpPromo></McpPromo>
                 {/if}
             {/snippet}
             {#if searchKey}

@@ -391,7 +391,7 @@ body.prog-unpaid .prog-fb-pro:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 6px 4px; /* digestpool vision P1-2：行距 6 对齐容器层「行距 6 多行扫读」节奏（原单值 4 偏弱），列距 4 不变 */
 }
 /* 段间分隔（低频|制卡|收集|移动|提取整理，段界=组界统一挂段头）：
    折行后线落新行行首=续行信号，永不孤悬行尾（dig 组头线同哲学）。
@@ -438,6 +438,26 @@ body.prog-unpaid .prog-fb-pro:hover {
    文字同提）。暗轨勿动：dark 的 strong(ds) 比 accent(da) 更深，全局换会反向压低对比 */
 html:not([data-theme-mode="dark"]) .prog-fb-flat .prog-fb-flat-btn {
   color: var(--prog-accent-strong);
+}
+/* digestpool vision P1-1：池钮落平铺区的 ghost 弱化档（archive/summary/ignore/clean 等
+   退出/弱化语义，kind 源=池 spec 经 isFlatGhost）——同首行 ghost 的 muted 哲学；透明格
+   不搬 inset 描边（那是带底钮方案）。hover 退出族转 error 红（首行同款），addBook 正向
+   钮转 accent（□18 先例同款，book 态 addBook 拖出首行落平铺区） */
+.prog-fb-flat .prog-fb-flat-btn--ghost {
+  color: var(--prog-muted);
+}
+.prog-fb-flat .prog-fb-flat-btn--ghost:hover {
+  color: var(--b3-theme-error);
+}
+.prog-fb-flat .prog-fb-flat-btn--ghost[data-fb-flat-id="addBook"]:hover {
+  color: var(--prog-accent);
+}
+/* 亮轨对比提档（同上 439 行哲学）：muted 44% 在米白底不足 4.5:1 文字线（12px 正文级
+   标签），深一档 62% 混表面色过线；暗轨维持 46%（09-12 dark 终审实测实渲染≈2.3:1，
+   低于 3:1 UI 线但与首行 ghost 同构、无投诉史，判可用档；4.5:1 在暗轨对此基色数学
+   不可达（基色全开才 5.5:1）；提档配方=62% 混表面≈3.04:1，存 next-version backlog） */
+html:not([data-theme-mode="dark"]) .prog-fb-flat .prog-fb-flat-btn--ghost {
+  color: color-mix(in srgb, var(--b3-theme-on-surface) 62%, var(--b3-theme-surface));
 }
 .prog-fb-flat .prog-fb-flat-lbl {
   font-size: 12px;

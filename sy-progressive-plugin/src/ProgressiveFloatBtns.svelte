@@ -15,7 +15,7 @@
     } from "./Progressive";
     import { HtmlCBType } from "./constants";
     import { CARD_RECITE } from "./digestCardMode";
-    import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, moveToFlatSeg, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, type FloatDocKind } from "./progFloatState";
+    import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, moveToFlatSeg, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, isFlatGhost, type FloatDocKind } from "./progFloatState";
     import { progStorage } from "./ProgressiveStorage";
     import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, fetchWritingPieces, mergePieceIntoNeighbor, feedBlocksToPool, moveDigestToPool, copyDigestToPool } from "./writeBook";
     import { PROG_DONE_KEY } from "../../sy-tomato-plugin/src/libs/gconst";
@@ -375,6 +375,10 @@
             $kind === "digest" ? tomatoI18n.tip送进仿写 : tomatoI18n.tip仿写本片),
         // □2 写作书系文档专属（isWritingDoc 一级格；大界面=批量复制/移动入槽）
         managePool: () => tip3(tomatoI18n.管理素材池, tomatoI18n.tip管理素材池),
+        // freepool 扩容（09-12）：free 态池钮/平铺格——文案与子排 DIG_TIPS 同源（whole/
+        // splitinplace 原先只藏 ✂ 子排二层，入池=平铺区兜底可见+可拖上首行）
+        whole: () => tip3(tomatoI18n.整篇摘抄, tomatoI18n.tip整篇摘抄),
+        splitinplace: () => tip3(tomatoI18n.就地断句 + " Pro", tomatoI18n.tip就地断句),
     };
     const FLAT_ICONS: Record<string, string> = {
         digest: "iconProgScissors",
@@ -402,6 +406,8 @@
         traceUp: "iconProgTraceUp",
         recite: "iconProgSend",
         managePool: "iconProgPoolManage",
+        whole: "iconProgWhole",
+        splitinplace: "iconSplitTB",
     };
     // 平铺区图标取值（reasoning review P1-1）：next 跨态异义——digest=纯浏览下一条
     //（iconProgFFast，SCENE.digest 同款；iconProgNext 是「删后前进」形会误导「会删」）
@@ -421,7 +427,7 @@
         revisit: () => tomatoI18n.复访,
         tree: () => tomatoI18n.路线图,
         summary: () => tomatoI18n.摘抄汇总,
-        continue: () => tomatoI18n.继续读,
+        continue: () => tomatoI18n.继续读短, // □2 拆短版（2-6 字规格）；全名在 FLAT_TIPS 层
         toPiece: () => tomatoI18n.跳到分片,
         archive: () => tomatoI18n.归档本书,
         nextPure: () => tomatoI18n.下一个分片,
@@ -436,6 +442,8 @@
         traceUp: () => $kind === "free" ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
         recite: () => $kind === "digest" ? tomatoI18n.送进仿写 : tomatoI18n.仿写本片,
         managePool: () => tomatoI18n.管理素材池,
+        whole: () => tomatoI18n.整篇摘抄,
+        splitinplace: () => tomatoI18n.就地断句,
     };
     // □11 三行制：子排名沿用单字短名，用法句补齐（card 与高级组同 id 不同义，各自 getter；
     // multi/dialog 随三 tab Dialog 退役摘除）。key 走 DigSubrankId 精确匹配（□3 review
@@ -979,6 +987,10 @@
                 // 期2 □2 A：bookID 传 ✧ 菜单四态标题（卡组判定按书夹查）
                 await openDigestReviewMenu($noteID, ev ?? { clientX: 0, clientY: 0 }, () => probeRevisitDue(), $bookID);
                 break;
+            case "whole": // freepool 扩容（09-12）：free 态池钮/平铺格——与子排点击同链复用
+            case "splitinplace": // onDig（whole=浮条身份整摘；splitinplace=选中块就地断句，Pro 门禁在执行层）
+                await onDig(id);
+                break;
             case "nextPure": // 托盘动作勾上首行后走首行入口，同平铺区低频通道
             case "delBack":
             case "quit":
@@ -1109,9 +1121,10 @@
      *  recite（□27）在 EXTRA_MAIN 池但不在 PIECE_MAIN_POOL——不并入则落进
      *  onLowFreq 的 switch 静默吞掉（e2e 实锤：无 toast 无副本零报错），须并入池分流。
      *  revisit/tree/summary/continue/toPiece/archive（2026-09-10 digest/book 态池钮）
-     *  同理并入——池钮落平铺区一律走首行动作（onBtn 有全量 case） */
+     *  与 whole/splitinplace（09-12 freepool 扩容，free 态池钮）同理并入——池钮落
+     *  平铺区一律走首行动作（onBtn 有全量 case） */
     const FLAT_POOL_IDS = new Set([...PIECE_MAIN_POOL, ...PIECE_TRAY_POOL, "recite",
-        "revisit", "tree", "summary", "continue", "toPiece", "archive"]);
+        "revisit", "tree", "summary", "continue", "toPiece", "archive", "whole", "splitinplace"]);
     function onFlat(id: string, ev?: MouseEvent) {
         if (FLAT_POOL_IDS.has(id)) {
             void onBtn(id, ev);
@@ -1182,14 +1195,16 @@
 
     /** □2 统一平铺格钮 resolver：活界拖拽后 adv id 可落低频段、池钮可落高级组——按
      *  ADV_ITEM_MAP 有无分派渲染源（icon/label/tip/click 两族各自完整），模板不再两处
-     *  各写一套。digest 池钮的「收起」特判在 tip 内保留（aria-label 与展开态同口径） */
-    function flatCell(id: string): { icon: string; label: string; tip: string; pro: boolean; onclick: (e: MouseEvent) => void } {
+     * 各写一套。digest 池钮的「收起」特判在 tip 内保留（aria-label 与展开态同口径）；
+     *  ghost=池 spec 退出/弱化语义（isFlatGhost，vision P1-1）模板挂弱化档 */
+    function flatCell(id: string): { icon: string; label: string; tip: string; pro: boolean; ghost: boolean; onclick: (e: MouseEvent) => void } {
         const it = ADV_ITEM_MAP.get(id);
         if (it) return {
             icon: it.icon,
             label: it.label(),
             tip: tip3(it.label(), ADV_USAGE[id]?.() ?? it.label(), it.spec.w()) + proNote(it.spec.vip === true),
             pro: it.spec.vip === true,
+            ghost: false,
             onclick: () => void runAdv(it),
         };
         return {
@@ -1197,6 +1212,7 @@
             label: FLAT_LABELS[id]?.() ?? id,
             tip: (($digOpen && id === "digest") ? tomatoI18n.收起 : (FLAT_TIPS[id]?.() ?? id)) + proNote(isAdvPro(id)),
             pro: isAdvPro(id),
+            ghost: isFlatGhost($kind ?? "free", id),
             onclick: (e) => onFlat(id, e),
         };
     }
@@ -1224,6 +1240,9 @@
             return;
         }
         const protyle = resolveFloatDocProtyle();
+        // digestpool：digest 态 card 族入池后 runAdv 的操作对象=浮条身份文档（摘抄文档本身），
+        // 时间线留痕（e2e 断言查 Loki：protyle 漂到别文档=操作错对象）
+        debugLog("floatbar", `runAdv id=${it.id} kind=${$kind ?? "?"} protyle=${protyle?.block?.rootID ?? "null"}`);
         if (!protyle) {
             // □10 常驻化后失去旧 toggleAdv 的「解析不出编辑器不展开」守卫——格可见但点了
             // 没反应违反直觉，toast 兜底（reasoning review P2）
@@ -1581,6 +1600,7 @@
                         class="prog-fb-flat-btn prog-fbtip {$digOpen && id === "digest" ? "prog-fb-flat-btn--on" : ""}"
                         class:prog-fb-btn--dragging={dragId === id}
                         class:prog-fb-pro={cell.pro}
+                        class:prog-fb-flat-btn--ghost={cell.ghost}
                         aria-label={cell.tip}
                         onclick={cell.onclick}
                         ondragstart={(e) => onDragStart(id, e)}
@@ -1602,6 +1622,7 @@
                                 class="prog-fb-flat-btn prog-fbtip"
                                 class:prog-fb-btn--dragging={dragId === id}
                                 class:prog-fb-pro={cell.pro}
+                                class:prog-fb-flat-btn--ghost={cell.ghost}
                                 aria-label={cell.tip}
                                 onclick={cell.onclick}
                                 ondragstart={(e) => onDragStart(id, e)}

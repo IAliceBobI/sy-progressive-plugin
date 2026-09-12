@@ -29,6 +29,7 @@
                     { icon: "iconProgCard", text: () => tomatoI18n.路线书附属卡 },
                     { icon: "iconProgContents", text: () => tomatoI18n.路线书目录 },
                     { icon: "iconProgTraceUp", text: () => tomatoI18n.路线书追溯 },
+                    { icon: "iconProgSwap", text: () => tomatoI18n.路线书换书 }, // □2 common 组既有能力补列
                     { icon: "iconProgAddBook", text: () => tomatoI18n.路线书加书 }, // □18 各态常驻
                     { icon: "iconProgArchive", text: () => tomatoI18n.路线书归档 },
                 ],
@@ -50,6 +51,7 @@
                         { icon: "iconProgScissors", text: () => tomatoI18n.路线片摘抄 },
                         { icon: "iconProgCardAdd", text: () => tomatoI18n.路线片制卡 },
                         { icon: "iconProgInbox", text: () => tomatoI18n.路线片收集提取 },
+                        { icon: "iconProgSend", text: () => tomatoI18n.路线片仿写 }, // □2 低频提示组尾
                     ],
                 },
                 {
@@ -66,20 +68,33 @@
         digest: {
             title: () => tomatoI18n.路线指引摘抄,
             groups: [{
+                // □2 翻新 5→10：补 □1 池扩容后的能力面。排序=去源书（继续读/回原书）→
+                // 卡与记忆（附属卡/复访/制卡与收集）→ 转化产出（送仿写/再摘抄）→ 总览 → 离开。
+                // 归档有意不列（bear 定稿「不进」：退出语义，路指引进场用户还不需要）
                 items: [
-                    { icon: "iconProgSend", text: () => tomatoI18n.路线摘抄送仿写 },
+                    { icon: "iconProgPlay", text: () => tomatoI18n.路线摘抄继续读 },
                     { icon: "iconProgBook", text: () => tomatoI18n.路线摘抄回原书 },
+                    { icon: "iconProgCard", text: () => tomatoI18n.路线摘抄附属卡 },
+                    { icon: "iconProgSched", text: () => tomatoI18n.路线摘抄复访 },
+                    { icon: "iconProgCardAdd", text: () => tomatoI18n.路线摘抄制卡与收集 },
+                    { icon: "iconProgSend", text: () => tomatoI18n.路线摘抄送仿写 },
+                    { icon: "iconProgScissors", text: () => tomatoI18n.路线摘抄再摘抄 },
                     { icon: "iconProgTree", text: () => tomatoI18n.路线摘抄路线图 },
                     { icon: "iconProgQuill", text: () => tomatoI18n.路线摘抄汇总 },
-                    { icon: "iconProgScissors", text: () => tomatoI18n.路线摘抄再摘抄 },
+                    { icon: "iconProgSwap", text: () => tomatoI18n.路线摘抄换书 },
                 ],
             }],
         },
         free: {
             title: () => tomatoI18n.路线指引自由,
             groups: [{
+                // □2 翻新 2→6：freepool 后真实能力面（整摘/断句/关联摘抄/目录）
                 items: [
                     { icon: "iconProgScissors", text: () => tomatoI18n.路线自由摘抄 },
+                    { icon: "iconProgWhole", text: () => tomatoI18n.路线自由整摘 },
+                    { icon: "iconSplitTB", text: () => tomatoI18n.路线自由断句 },
+                    { icon: "iconProgTraceUp", text: () => tomatoI18n.路线自由关联摘抄 },
+                    { icon: "iconProgContents", text: () => tomatoI18n.路线自由目录 },
                     { icon: "iconProgAddBook", text: () => tomatoI18n.路线自由加书 },
                 ],
             }],

@@ -56,6 +56,9 @@
     let paid = $state(false);
     // □18 知情警告文案（onMount 检测填充；空串=全新文档不渲染）
     let warnText = $state("");
+    // 巨块知情警告（doCount 后填充；空串=无超大块不渲染）。阈值 5000 字符=中文一块
+    // 5000 字已远超正常段落（数百字），Word/PDF 导入未断段的典型形态
+    let bigBlockWarn = $state("");
     // slotmerge □1 写作书硬拦：表单照常显示（警示须可见，骨架屏开关 disabled 复用不得）
     // 但提交钮锁死——与 □18 知情警告（可继续）分层的禁止态
     let writingBlocked = $state(false);
@@ -154,6 +157,7 @@
         const { blocks, textLen: totalLen, rawCount } = await buildContentBlocks(bookID);
         contentBlocks = blocks;
         rawBlockCount = rawCount;
+        bigBlockWarn = blocks.some(b => b.count > 5000) ? tomatoI18n.加书警告超大块 : "";
         // headCount 是 UI 派生状态，副作用留在组件（不放纯函数里）。
         // 纯标题数用于「各级标题数」展示（vision P1-1：+1 兜底会与 chips 计数同屏矛盾）；
         // 「平均每标题块数」除数另用 +1 兜底（无标题书按 1 组防除零）。
@@ -369,6 +373,12 @@
              slotmerge □1 写作书硬拦态换 error 红（禁止 ≠ 知情） -->
         {#if warnText}
             <div class="prog-addbook-warn" class:prog-addbook-blocked={writingBlocked} role="alert">{warnText}</div>
+        {/if}
+        <!-- 巨块知情警告（2026-09-12）：分片原子=块，单块超 5000 字符的书整本会集中在
+             少数几片里（8 万字巨块实测=1 片）。知情不拦截：引导拆块/断句。manualSplit
+             模式无分片概念，不显示 -->
+        {#if bigBlockWarn && !manualSplit}
+            <div class="prog-addbook-warn" role="alert">{bigBlockWarn}</div>
         {/if}
         <!-- 卡1 文档统计 -->
         <section class="prog-card">
