@@ -42,16 +42,19 @@ import { initMaterialMarker } from "./materialMarker";
 import { initMaterialTrace } from "./materialTrace";
 import { applyRevTraceEnabled, lastRevTraceScope, rememberRevTraceScope } from "./revTrace";
 import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
+import { setBookVisitFreq } from "./readCurve";
 import { reloadSelfPlugin } from "../../sy-tomato-plugin/src/libs/pluginReload";
 import { syncSettingsFromDisk } from "../../sy-tomato-plugin/src/libs/storageHotReload";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { notifyFleetChanged } from "./fleetNotify";
 import { closeFloatPopover } from "./overlays";
 import { openDueReviewList } from "./reviewMenu";
-import { buildContentBlocks, computePieceIndex, runSplit } from "./Split2Pieces";
+import { buildContentBlocks, buildContentBlocksVols, computePieceIndex, computePieceIndexVols, listVolIDs, runSplit } from "./Split2Pieces";
 import { createPiece, deleteAllPieces, fullfilContent } from "./helper";
+import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
 import { invalidateBookStatusCache } from "./bookStatus";
 import { registerTailCardRender } from "./tailCardRender";
+import { registerVisitNoteRender } from "./visitNoteRender";
 
 // 更新日志按年拆分存储（src/changelog/<年>.json，当年文件追加、往年冻结），此处组装倒序全集
 const changelog = [...changelog2026, ...changelog2025];
@@ -207,6 +210,15 @@ export default class ThePlugin extends BaseTomatoPlugin {
                     deleteAllPieces,
                     fullfilContent,
                     runSplit,
+                };
+                // □1 目录成书：卷表/逐卷切窗/新鲜度校验（e2e 与 agent 调试通道）
+                window.prog_zZmqus5PtYRi.volbook = {
+                    listVolIDs,
+                    buildContentBlocksVols,
+                    computePieceIndexVols,
+                    saveVolTable: (bookID: string, vols: { d: string; n: number }[]) => progStorage.saveVolTable(bookID, vols),
+                    loadVolTable: (bookID: string) => progStorage.loadVolTable(bookID),
+                    ensureFresh: (bookID: string) => ensureVolTableFresh(bookID, volRebuildDeps()),
                 };
             }
             loadStore(this);
@@ -389,6 +401,8 @@ export default class ThePlugin extends BaseTomatoPlugin {
         // □2 片尾收束卡渲染器（3.8.3+；旧内核 customBlockRenders 缺省=注册即无操作，
         // 建卡链 supportsTailCardBlock 同判 false 整体不触发）
         registerTailCardRender(this);
+        // □4 回访留言卡渲染器（同注册面；旧内核=不注册，留言块降级 <pre> 数据仍在）
+        registerVisitNoteRender(this);
 
         // v5 □5：浮条系统总开关命令（与设置项 initProgFloatBtnsDisable 同一状态）
         this.addCommand({
@@ -517,6 +531,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 notifyFleetChanged();
             },
             archiveBook: (bookID) => prog.archiveBookWithConfirm(bookID),
+            // □3 回访频率：书级改档（书 IAL+在册卡批量跟随+toast 均在 setBookVisitFreq 内）
+            setVisitFreq: async (bookID, f) => {
+                await setBookVisitFreq(bookID, f);
+            },
         };
         initFleet(this, fleetActions);
     }

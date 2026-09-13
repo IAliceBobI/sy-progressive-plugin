@@ -12,6 +12,7 @@ import {
     PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_PARENT_ID, PROG_PIECE_PREVIOUS, RefIDKey
 } from "../../sy-tomato-plugin/src/libs/gconst";
 import AddBookSvelte from "./AddBook.svelte";
+import SplitVolsDialogSvelte from "./SplitVolsDialog.svelte";
 import AddWritingBookSvelte from "./AddWritingBook.svelte";
 import MaterialPickerSvelte from "./MaterialPicker.svelte";
 import SplitPieceDialogSvelte from "./SplitPieceDialog.svelte";
@@ -19,6 +20,7 @@ import AppendSlotDialogSvelte from "./AppendSlotDialog.svelte";
 import DigestAllDialogSvelte from "./DigestAllDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
+import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
 import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
@@ -149,6 +151,15 @@ class Progressive {
                 void this.directSlotCommand();
             }
         });
+        // □2 物理分卷：低频工具（一本书用一次）不占默认键，命令面板可触达
+        this.plugin.addCommand({
+            langKey: "progSplitVolsCurrent",
+            langText: tomatoI18n.物理分卷,
+            hotkey: "",
+            callback: () => {
+                void this.splitVolsDialogFromActive();
+            }
+        });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
             if (piecesmenu.get()) {
@@ -230,6 +241,15 @@ class Progressive {
                 click: () => {
                     debugLog("prog.doctree", `add-book via doctree menu doc=${docID}`, "progressive");
                     void this.addProgressiveReadingWithLock(docID);
+                },
+            });
+            // □2 物理分卷：巨文档粗切工具（低频，刀 icon=剪刀）；切完自动拉起 AddBook
+            detail.menu?.addItem({
+                icon: "iconProgScissors",
+                label: tomatoI18n.物理分卷,
+                click: () => {
+                    debugLog("prog.doctree", `split-vols via doctree menu doc=${docID}`, "progressive");
+                    void this.splitVolsDialog(docID);
                 },
             });
         });
@@ -461,14 +481,14 @@ class Progressive {
         menu.fullscreen();
     }
 
-    async addProgressiveReadingWithLock(bookID?: string): Promise<void> {
+    async addProgressiveReadingWithLock(bookID?: string, preselectDir = false): Promise<void> {
         await this.withProgLock(constants.AddProgressiveReadingLock, async () => {
-            await this.addProgressiveReading(bookID);
+            await this.addProgressiveReading(bookID, preselectDir);
             await utils.sleep(constants.IndexTime2Wait);
         });
     }
 
-    private async addProgressiveReading(bookID: string = "") {
+    private async addProgressiveReading(bookID: string = "", preselectDir = false) {
         if (!bookID) {
             // events.docID 只在点击编辑器内容后更新——从文档树点开文档还没点内容时
             // 取不到，先取当前激活页签的文档（用户眼前的文档）
@@ -491,15 +511,15 @@ class Progressive {
             siyuan.pushMsg(tomatoI18n.似乎书本已被删除.replace("{bookID}", bookID));
             return;
         }
-        await this.addProgressiveReadingDialog(bookID, row["content"]);
+        await this.addProgressiveReadingDialog(bookID, row["content"], preselectDir);
     }
 
-    private async addProgressiveReadingDialog(bookID: string, bookName: string,) {
+    private async addProgressiveReadingDialog(bookID: string, bookName: string, preselectDir = false) {
         showDialog((target, dm) => {
             return mount(AddBookSvelte, {
                 target,
                 props: {
-                    bookID, bookName, dm,
+                    bookID, bookName, dm, preselectDir,
                 }
             });
         }, {
@@ -507,8 +527,34 @@ class Progressive {
             width: events.isMobile ? "90vw" : undefined,
             // 矮视口自适应（vision P1，tomato 设置战役同款先例）：桌面默认高 700px 在
             // <700px 视口下 footer 溢出画面，min() 钳回视口内、弹窗体内部滚动
-            height: events.isMobile ? "180vw" : "min(700px, 92vh)",
+            // vision P1：700px 初始视口截断切分设置卡（spark/stat 已紧凑化，760 补齐）
+            height: events.isMobile ? "180vw" : "min(760px, 92vh)",
         });
+    }
+
+    // □2 物理分卷 Dialog（文档树右键/命令面板/AddBook 巨书建议条三入口共用）
+    async splitVolsDialog(docID: string) {
+        const row = await siyuan.sqlOne(`select content from blocks where type='d' and id='${docID}'`);
+        const docName = row?.["content"] ?? "";
+        showDialog((target, dm) => {
+            return mount(SplitVolsDialogSvelte, {
+                target,
+                props: { docID, dm },
+            });
+        }, {
+            title: `${tomatoI18n.物理分卷}·${docName}`,
+            width: events.isMobile ? "90vw" : undefined,
+            height: events.isMobile ? "180vw" : "min(620px, 92vh)",
+        });
+    }
+
+    async splitVolsDialogFromActive() {
+        const docID = getActiveDocID() || events.docID;
+        if (!docID) {
+            await siyuan.pushMsg(tomatoI18n.请先打开一个文档);
+            return;
+        }
+        await this.splitVolsDialog(docID);
     }
 
     async readThisPiece(blockID?: string) {
@@ -832,6 +878,18 @@ class Progressive {
             // 互斥零双计，同日重复开同 slot 不再重复计（旧语义与阅读书不对称，顺手修正）
             await this.markReadSafe(bookID, dispatch.point);
             return true;
+        }
+        // □1 目录书：出场前校验卷表新鲜度（卷增删/重排→按卷 id 重组索引+point 映射；
+        // 一次一发 listDocsByPath 磁盘直查。重组会改 point，须在下面读 point 之前完成；
+        // review P0-1：也必须在 loadBookIndexIfNeeded 之前——重组换掉缓存数组，先取的
+        // 局部引用持旧序=createPiece 内容与 point 张冠李戴；ensure 内部 deps.loadIndex
+        // 自会加载，未重组零额外开销。校验失败不阻断出场（按盘上索引继续，review P2-5）
+        if (bookInfo.dirMode) {
+            try {
+                await ensureVolTableFresh(bookID, volRebuildDeps());
+            } catch (e) {
+                debugLog("volbook", `ensure failed book=${bookID}: ${e}`, "progressive");
+            }
         }
         const bookIndex = await progStorage.loadBookIndexIfNeeded(bookInfo.bookID);
         let point = (await progStorage.booksInfo(bookInfo.bookID)).point;

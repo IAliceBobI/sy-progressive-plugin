@@ -7,6 +7,8 @@
 //   完成一轮 +N 进下轮（周期性），推迟顺延 1 天。
 // IAL 名沿用 custom-prog-think（旧 q 态值零迁移直接兼容）。
 // 值格式：`q#<下次重访毫秒时间戳>#<已重访次数>` | `s#<下次重访毫秒时间戳>#<每N天>` | `done`
+import { dayStartOf } from "./readCurveCore";
+
 export const ReviewKey = "custom-prog-think";
 
 /** 期2 复访通道（□4 滚动复习摘抄文档）：摘抄文档级 IAL，值格式与 ReviewKey 同构
@@ -112,17 +114,23 @@ export function scheduleSQLFor(key: string): string {
         + `a.value like "q#%" or a.value like "s#%") order by a.value limit 10000000`;
 }
 
-/** □9 三段排期分桶：已到期（next≤now，isDue 同判据）/ 未来 7 天（≤now+7d）/ 更远。
- *  done/垃圾值跳过（SQL 已滤，纯函数不依赖该假设）；段内保持传入序。 */
+/** □9 三段排期分桶：已到期（next≤now，isDue 同判据）/ 未来 7 天 / 更远。
+ *  「未来 7 天」=**日历 7 日窗**（今天 00:00 起第 7 天 00:00 止，dayStartOf 锚）——□5
+ *  review P2-4 与复习计划条带统一口径（原滚动 now+7d 窗会在早晚与条带差出数小时，
+ *  两面同叫「未来 7 天」数字对不上）。done/垃圾值跳过（SQL 已滤，纯函数不依赖该
+ *  假设）；段内保持传入序 */
 export interface ScheduleBuckets<T> { due: T[]; week: T[]; later: T[]; }
 
 export function splitSchedule<T extends { v: string }>(rows: T[], now: number): ScheduleBuckets<T> {
     const buckets: ScheduleBuckets<T> = { due: [], week: [], later: [] };
+    // 对「时刻」取日界（dayStartOf(now+7d)）而非对日界加法（dayStartOf(now)+7*DAY）——
+    // DST 切换周后者偏真午夜 ±1h 与条带分叉（复评 P2-A）
+    const weekEnd = dayStartOf(now + 7 * DAY);
     for (const r of rows) {
         const s = parseReview(r.v);
         if (!s || s.mode === "done") continue;
         if (s.next <= now) buckets.due.push(r);
-        else if (s.next <= now + 7 * DAY) buckets.week.push(r);
+        else if (s.next < weekEnd) buckets.week.push(r);
         else buckets.later.push(r);
     }
     return buckets;

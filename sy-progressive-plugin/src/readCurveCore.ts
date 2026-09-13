@@ -1,10 +1,11 @@
 // 阅读曲线接管·纯函数核（1530 期1；设计事实源=memory reading-curve-takeover-design §2.3/§2.4）。
 // 本文件零 siyuan import（单测直入；生产侧在 readCurve.ts——helper 链拉 .svelte 进不了单测，
-// vitest-svelte-import-chain 坑的分层对策）。tomatoI18n=纯 TS 零 DOM 可入（期5 文案键族；
-// vitest 无 conf → lang=en_US，单测断言同走 tomatoI18n 调用=语种无关）。
+// vitest-svelte-import-chain 坑的分层对策）。本文件恒零 i18n：文案函数
+// （badgeSpec/statusLineOf/nextSeeHint 等）在 readCurveText.ts——kernel bundle 摇树对
+// tomatoI18n 模块内容变更不稳，readCurveCore 一引即可能整条 i18n 类链+Lute.New 顶层
+// 进 kernel.js 在 goja 崩（09-13 □7 实锤）。
 // 核心不变式：「每本在读书的下一片恒在列」——下一片 due=now（额度闸门开）/明天 00:00（关），
 // 其余未评分卡 +99 天沉底，已评分卡即摘（阅读卡=待读提示卡，评完即摘，非记忆卡）。
-import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 
 /** 片文档 IAL 身份键。值两代：
  *  一期=建卡时刻 YYYYMMDDHHmmss（14 位纯数字，兼容读作 daily/count=0）；
@@ -60,29 +61,40 @@ export interface ReadCardState {
     count: number;
     /** 毕业终态（g 前缀；riff 卡已摘，键值仅供期4 面板毕业分组/右键状态行读） */
     graduated: boolean;
+    /** 回访频率档位（□3）：仅 grow/毕业态有效（sched 用户直控每 N 天、daily 分片不走
+     *  曲线）；解析侧缺省/中档=字段不存在（旧值与一期逐字段零漂移），写入侧可传 "m"
+     *  =formatReadCard 落无尾段 */
+    freq?: VisitFreq;
 }
 
 const MODE_TAG: Record<CurveMode, string> = { daily: "d", grow: "x", sched: "e" };
 
-/** 身份键值 → 状态（旧 14 位一期值兼容读作 daily/count=0；垃圾值/撞形值返 null） */
+/** 身份键值 → 状态（旧 14 位一期值兼容读作 daily/count=0；垃圾值/撞形值返 null。
+ *  □3：x#/g# 可带第四段频率尾段 #l/#h（缺省=中档）；d#/e# 不带——带尾段判垃圾） */
 export function parseReadCard(value: string): ReadCardState | null {
     if (!value) return null;
     if (/^\d{14}$/.test(value)) {
         const ms = parseStamp(value);
         return Number.isNaN(ms) ? null : { mode: "daily", waterlineMs: ms, count: 0, graduated: false };
     }
-    let m = value.match(/^g#(\d{13})#(\d+)$/);
-    if (m) return { mode: "grow", waterlineMs: +m[1], count: +m[2], graduated: true };
-    m = value.match(/^([dxe])#(\d{13})#(\d+)$/);
+    const freqOf = (t: string | undefined) => (t === "l" || t === "h" ? t : undefined);
+    let m = value.match(/^g#(\d{13})#(\d+)(?:#([lmh]))?$/);
+    if (m) return { mode: "grow", waterlineMs: +m[1], count: +m[2], graduated: true, freq: freqOf(m[3]) };
+    m = value.match(/^x#(\d{13})#(\d+)(?:#([lmh]))?$/);
+    if (m) return { mode: "grow", waterlineMs: +m[1], count: +m[2], graduated: false, freq: freqOf(m[3]) };
+    m = value.match(/^([de])#(\d{13})#(\d+)$/);
     if (!m) return null;
-    const mode: CurveMode = m[1] === "d" ? "daily" : m[1] === "x" ? "grow" : "sched";
+    const mode: CurveMode = m[1] === "d" ? "daily" : "sched";
     return { mode, waterlineMs: +m[2], count: +m[3], graduated: false };
 }
 
-/** 状态 → 身份键值（毕业态落 g；与 parseReadCard 互逆） */
+/** 状态 → 身份键值（毕业态落 g；与 parseReadCard 互逆。□3：频率尾段只落 grow/毕业态
+ *  且仅非中档——中档省略=旧格式字节不变，默认零感知） */
 export function formatReadCard(s: ReadCardState): string {
     const tag = s.graduated ? "g" : MODE_TAG[s.mode];
-    return `${tag}#${s.waterlineMs}#${s.count}`;
+    const f = s.freq === "l" || s.freq === "h" ? s.freq : "";
+    const tail = (s.graduated || s.mode === "grow") && f ? `#${f}` : "";
+    return `${tag}#${s.waterlineMs}#${s.count}${tail}`;
 }
 
 /** ×2 递增档（天；与 reviewQueue BASE_DAYS ×2 同源，3 起步）。count=已消耗轮次，
@@ -91,6 +103,63 @@ export function formatReadCard(s: ReadCardState): string {
 export const GROW_INTERVALS = [3, 6, 12, 24, 48];
 /** 毕业轮数上限（daily=连续未完成天数上限，grow=消耗轮次上限，同值 5） */
 export const GRADUATE_ROUNDS = 5;
+
+/** 素材进度感知间隔参数（□4 kja140 行为级）：base=剩 1 个素材的间隔天数；slope=剩余量
+ *  每减半收多少天；min/max=clamp。数值表=剩 64→4 天 … 剩 1→16 天（剩得多回访密、快锤完
+ *  稀疏），期首可调，勿扩散多处 */
+export const MAT_BASE_DAYS = 16;
+export const MAT_SLOPE_DAYS = 2;
+export const MAT_MIN_DAYS = 3;
+/** 素材间隔（□4）：天数=f(该书未锤素材数) 纯函数（非 kja140 乘子形态——间隔不依赖
+ *  prev interval，同剩余量同间隔=「两次回访未消耗→间隔冻结」零进度守卫天然成立）；
+ *  回访频率档乘子同乘（与 □3 grow 档一致口径） */
+export function materialInterval(remaining: number, freq: VisitFreq = "m"): number {
+    const r = Math.max(1, Math.floor(remaining));
+    const raw = MAT_BASE_DAYS - MAT_SLOPE_DAYS * Math.log2(r);
+    return Math.max(1, Math.round(Math.min(MAT_BASE_DAYS, Math.max(MAT_MIN_DAYS, raw)) * FREQ_MULT[freq]));
+}
+
+/** 回访频率档位（□3）：低=回访更少（间隔 ×1.5）/中=默认 ×2 曲线原样（缺省零感知）/
+ *  高=回访更多（间隔 ×0.7）。只乘间隔不动 ×2 骨架与五轮毕业 */
+export type VisitFreq = "l" | "m" | "h";
+export const FREQ_MULT: Record<VisitFreq, number> = { l: 1.5, m: 1, h: 0.7 };
+/** 第 i 档见间等待天数（乘频率系数取整；中档=骨架原值） */
+export function growInterval(i: number, freq: VisitFreq = "m"): number {
+    return Math.round(GROW_INTERVALS[i] * FREQ_MULT[freq]);
+}
+
+/** 改档 due 重排间隔（□4 review P1-1）：素材卡（kind=material 且剩余量已知）走素材
+ *  曲线间隔——改档前用 ×2 表重排=间隔系统性偏短（素材消耗间隔自 □4 起已是
+ *  materialInterval 体系）；剩余量查询失败（undefined）返 null=跳过重排（保守：due
+ *  留给下次消耗自然按新档）。count=当前轮次（×2 表索引=count-1） */
+export function rescheduleDays(kind: string, matRemaining: number | undefined, count: number, f: VisitFreq): number | null {
+    if (kind === "material") return matRemaining == null ? null : materialInterval(matRemaining, f);
+    return growInterval(count - 1, f);
+}
+
+/** □6 自动放宽标记 IAL：值=放宽时刻 14 位。在场=当前 l 档来自巡查自动放宽（与手动选 l
+ *  同值不同源）；手动改档（任意档）清除——显式意图接管。恢复=一键回 m+清标记 */
+export const AUTORELAX_KEY = "custom-prog-autorelax";
+/** □6 零产出观察窗（日历日；书龄同判据） */
+export const RELAX_WINDOW_DAYS = 30;
+/** □6 单轮巡查自动放宽书数上限（DIGEST_BUILD_CAP 同款：防一次写风暴） */
+export const AUTO_RELAX_CAP = 10;
+
+/** □6 窗口界（日历日锚−30 天；□5 dayStartOf 共用锚，勿引入滚动 24h） */
+export function relaxWindowStart(nowMs: number): number {
+    return dayStartOf(nowMs) - RELAX_WINDOW_DAYS * 86_400_000;
+}
+
+/** □6 判定矩阵（期首收拢定案）：窗口内摘抄+制卡双零 且 档位=m（手动选过 l/h=显式
+ *  意图优先）且 无 autorelax 标记（幂等防重入）且 书龄≥窗口（刚加的书没来得及产出）
+ *  → true。单向：放宽后标记在场恒 false；收回只走一键恢复（「不受 AI 调度摆布」） */
+export function relaxVerdict(p: { digestN: number; cardN: number; freq: string; autorelaxAt: number | null; bookAddedMs: number | undefined; nowMs: number }): boolean {
+    if (p.digestN > 0 || p.cardN > 0) return false;
+    if (p.freq !== "m") return false;
+    if (p.autorelaxAt != null) return false;
+    if (p.bookAddedMs == null) return false;
+    return p.bookAddedMs <= relaxWindowStart(p.nowMs);
+}
 /** 全局重现每日限额（□2 额度分池：重现族到期待弹卡的日闸门；期5 接设置档 1/3/5/10） */
 export const REVISIT_DAILY_LIMIT = 5;
 /** digest 建卡每轮巡查上限（review P2-4：takeover 首开对全库无键摘抄分摊建卡，
@@ -109,13 +178,23 @@ export interface ConsumeResult {
  *  sched +every 进下轮永不毕业。atMs=消耗锚时刻（生产侧传评分 lastReviewMs 作新
  *  水位线——下次巡查该评分被水位线吸收，不重复消耗；契约：必须>0）。due 锚=atMs
  *  非巡查 now（review P2-2：见时刻随评分走不随巡查漂移——评分 20:00 巡查 23:00，
- *  下次 due=20:00+n 天）。daily/毕业/垃圾输入 → null（分片完成走评分对账链，不经此函数） */
-export function consumeRound(value: string, atMs: number, now: Date): ConsumeResult | null {
+ *  下次 due=20:00+n 天）。daily/毕业/垃圾输入 → null（分片完成走评分对账链，不经此函数）。
+ *  □4：matRemaining 由生产侧仅对 kind=material 传——走素材曲线分支（间隔=
+ *  materialInterval(剩余量)，永不毕业：写完出池=消耗驱动，由 planSweep 在 remaining=0
+ *  时摘卡出池），count 照加（轮次记录供面板显示），freq 档位同乘 */
+export function consumeRound(value: string, atMs: number, now: Date, matRemaining?: number): ConsumeResult | null {
     const st = parseReadCard(value);
     if (!st || !atMs || st.graduated || st.mode === "daily") return null;
     const at = new Date(atMs);
     if (st.mode === "sched") {
         return { value: formatReadCard({ ...st, waterlineMs: atMs }), due: plusDays(at, st.count), graduated: false };
+    }
+    if (matRemaining != null) {
+        return {
+            value: formatReadCard({ ...st, waterlineMs: atMs, count: st.count + 1 }),
+            due: plusDays(at, materialInterval(matRemaining, st.freq ?? "m")),
+            graduated: false,
+        };
     }
     const next = st.count + 1;
     if (next >= GRADUATE_ROUNDS) {
@@ -123,7 +202,7 @@ export function consumeRound(value: string, atMs: number, now: Date): ConsumeRes
     }
     return {
         value: formatReadCard({ ...st, waterlineMs: atMs, count: next }),
-        due: plusDays(at, GROW_INTERVALS[next - 1]),
+        due: plusDays(at, growInterval(next - 1, st.freq ?? "m")),
         graduated: false,
     };
 }
@@ -164,6 +243,11 @@ export const READOUT_KEY = "custom-prog-readout";
 /** 「每 N 天」档位（设计共识 N∈{1,3,7,14,30}） */
 export const SCHED_CHOICES = [1, 3, 7, 14, 30];
 
+/** 回访频率档位 IAL（□3）：挂书文档，值 l/m/h（缺省/m=中档零感知）。消费面=建卡默认
+ *  （digest/material 建卡时烙进 readcard 键值尾段）+书级批量跟随（改档时重写该书在册
+ *  grow 卡的频率尾段，setBookVisitFreq）；卡上键值才是执行事实源（位置无关随文档走） */
+export const VISITRATE_KEY = "custom-prog-visitrate";
+
 /** 类别节奏档位（□5 设置）：0=默认（×2 递增曲线）；N>0=每 N 天永不毕业。
  *  → buildReadingCard/adoptReadingCard 参数（undefined=调用方自身缺省 grow） */
 export function cadenceOpts(cadence: number): { mode: "sched"; count: number } | undefined {
@@ -181,45 +265,6 @@ export function cadenceDays(cadence: number): number {
 export function isMaterialFirstPush(kind: ReadCardKind, st: ReadCardState, ctime: string): boolean {
     if (kind !== "material") return false;
     return st.mode === "sched" ? !ctime.startsWith("🔨") : st.count === 0;
-}
-
-/** 复习卡徽标进度文案：daily=第 N/5 天 / grow=N/5（count+1=当前第几见）/ sched=每 N 天；
- *  count=4（第 5 见）=最后一见。毕业/垃圾/空 → null（徽标不挂） */
-export function badgeSpec(readcard: string): { text: string; lastSee: boolean } | null {
-    const st = parseReadCard(readcard);
-    if (!st || st.graduated) return null;
-    if (st.mode === "sched") return { text: tomatoI18n.计划每N天(st.count), lastSee: false };
-    const n = Math.min(st.count + 1, GRADUATE_ROUNDS);
-    return {
-        text: st.mode === "daily" ? tomatoI18n.阅读卡第N天(n, GRADUATE_ROUNDS) : tomatoI18n.阅读卡进度N(n, GRADUATE_ROUNDS),
-        lastSee: st.count + 1 >= GRADUATE_ROUNDS,
-    };
-}
-
-const pad2 = (n: number) => String(n).padStart(2, "0");
-
-/** 到期距离尾巴：due≤now=已到期 / <24h=今天 / 否则 N 天后；null=无 due 无尾巴 */
-function dueRelOf(dueMs: number | null, nowMs: number): string {
-    if (dueMs == null) return "";
-    const diff = dueMs - nowMs;
-    const rel = diff <= 0 ? tomatoI18n.已到期 : diff < 86_400_000 ? tomatoI18n.计划今天 : tomatoI18n.计划N天后(Math.ceil(diff / 86_400_000));
-    return " · " + rel;
-}
-
-/** 右键/面板只读状态行：✦ 曲线·第 N/5 次 / 每 N 天 / 分片·第 N/5 天 / 已毕业（推完 N 轮）·日期。
- *  垃圾值 → null（调用方落无键分支） */
-export function statusLineOf(readcard: string, dueMs: number | null, nowMs: number): string | null {
-    const st = parseReadCard(readcard);
-    if (!st) return null;
-    if (st.graduated) {
-        const d = new Date(st.waterlineMs);
-        const date = d.getFullYear() === new Date(nowMs).getFullYear()
-            ? `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-        return `✦ ${tomatoI18n.已毕业推完N轮(st.count)} · ${date}`;
-    }
-    if (st.mode === "sched") return `✦ ${tomatoI18n.计划每N天(st.count)}${dueRelOf(dueMs, nowMs)}`;
-    if (st.mode === "daily") return `✦ ${tomatoI18n.阅读卡分片} · ${tomatoI18n.阅读卡第N天(Math.min(st.count + 1, GRADUATE_ROUNDS), GRADUATE_ROUNDS)}${dueRelOf(dueMs, nowMs)}`;
-    return `✦ ${tomatoI18n.阅读卡曲线} · ${tomatoI18n.阅读卡第N次(Math.min(st.count + 1, GRADUATE_ROUNDS), GRADUATE_ROUNDS)}${dueRelOf(dueMs, nowMs)}`;
 }
 
 /** 转「每 N 天」新键值（e#now#every；水位线重置=转档时刻，此后评分才是真消耗） */
@@ -247,18 +292,6 @@ export function cardActionSet(readcard: string): CardAction[] {
     if (st.graduated) return ["again", "sched"];
     if (st.mode === "daily") return ["stop", "sched", "repush", "memory"];
     return ["stop", "sched", "defer", "repush", "memory"];
-}
-
-/** 点「下一张」评分即时反馈文案（同构官方 nextDues 预览）：grow=count 推进档 / sched=every；
- *  count=4=最后一见 → null（毕业 toast 接管）；daily 分片=完成翻篇即时续推 → null */
-export function nextSeeHint(readcard: string, _nowMs: number): string | null {
-    const st = parseReadCard(readcard);
-    if (!st || st.graduated) return null;
-    if (st.mode === "sched") return tomatoI18n.天后再见(st.count);
-    if (st.mode !== "grow") return null;
-    const next = st.count + 1;
-    if (next >= GRADUATE_ROUNDS) return null;
-    return tomatoI18n.天后再见(GROW_INTERVALS[next - 1]);
 }
 
 /** 巡查输入卡（身份键 SQL × riff 现状合并后的活卡；孤儿键在生产侧已滤） */
@@ -316,6 +349,13 @@ export function tomorrowStart(now: Date): string {
     return dueStamp(d);
 }
 
+/** 当日 00:00（本地，毫秒）——日历日分桶唯一锚（□5 条带 stripDayIdx/行文案 planDueLabel/
+ *  待办段 splitSchedule 共用，滚动 24h 与日历日两种「天」口径在此统一） */
+export function dayStartOf(now: number): number {
+    const d = new Date(now);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
 /** due 归一（diff 比对用，分钟粒度——秒级精度差不误判漂移）：
  *  接受 riff RFC3339 与 YYYYMMDDHHmmss 双格式；空/坏串返 null */
 export function normalizeDue(due: string | null | undefined): string | null {
@@ -365,6 +405,8 @@ export function planSweep(args: {
     readable?: Set<string>;
     /** 全局重现额度闸门（今日 rc<上限；默认 true=老调用不闸） */
     rcGateOpen?: boolean;
+    /** 书→未锤素材数（□4：确证 0=该书素材写完→出池摘卡；缺省/缺书=未知保守不动） */
+    matRemaining?: Map<string, number>;
 }): SweepPlan {
     const plan: SweepPlan = { setDue: [], remove: [], reconcile: [], setKey: [], graduate: [] };
     const nowDue = normalizeDue(dueStamp(args.now))!;
@@ -382,6 +424,16 @@ export function planSweep(args: {
         // 毕业即终态，无卡可摘无片可推，零写静默出局
         if (parseReadCard(c.readcard)?.graduated) {
             if (c.kind !== "plain") plan.graduate.push(c);
+            continue;
+        }
+        // □4 素材写完出池：该书未锤素材确证归零 → 摘卡出池（复用毕业链，无 5 轮
+        // 语义——素材终态=消耗驱动）。Map 缺书=未知（如关开关的旧巡查）保守不动。
+        // g 终态键随出池自带（5 轮毕业的 g 是 consumeRound 经 setKey 落的，出池不过
+        // 消耗路径；不落=下轮巡查见 x#+无卡判孤儿清键丢档案——e2e 09-12 实锤）
+        if (c.kind === "material" && (args.matRemaining?.get(c.bookID) ?? -1) === 0) {
+            plan.graduate.push(c);
+            const stPool = parseReadCard(c.readcard);
+            if (stPool) plan.setKey.push({ id: c.blockID, value: formatReadCard({ ...stPool, graduated: true }) });
             continue;
         }
         // 曲线族（□2）：grow/sched 键任意 kind（含转档金句片）+ material/digest 的

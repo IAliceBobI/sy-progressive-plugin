@@ -38,6 +38,9 @@ type BookInfo = {
     pinned?: boolean,
     /** 舰队管理 □2：从总览隐匿（纯视觉：舰队面板不显示，滚筒照常推送照常计数） */
     hidden?: boolean,
+    /** □1 目录成书：书=文档集（卷=直接子文档，目录序=读序）；片挂来源卷下、
+     *  卷表旁挂 petal <bookID>.vols.json。缺省=单篇书走现状路径（存量零迁移） */
+    dirMode?: boolean,
 };
 
 type BookInfos = { [key: string]: BookInfo };

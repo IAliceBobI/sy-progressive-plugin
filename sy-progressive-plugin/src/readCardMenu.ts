@@ -8,15 +8,18 @@ import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import {
-    cardActionSet, SCHED_CHOICES, statusLineOf,
+    cardActionSet, SCHED_CHOICES, VisitFreq,
 } from "./readCurveCore";
-import { applyReadCardAction, inspectReadCard } from "./readCurve";
+import { statusLineOf } from "./readCurveText";
+import { applyReadCardAction, inspectReadCard, setCardVisitFreq } from "./readCurve";
 import type { ReadCardActionId } from "./readCurve";
+import { openVisitNoteInput } from "./visitNoteInput";
 
 type MenuItemOption = Parameters<Menu["addItem"]>[0];
 
-/** 动作定义（label 惰性取 i18n；kind 特化在 applyReadCardAction 内） */
-const ACTION_DEFS: Record<Exclude<ReadCardActionId, "sched">, { icon: string; label: () => string }> = {
+/** 动作定义（label 惰性取 i18n；kind 特化在 applyReadCardAction 内。freq 不走本表=
+ *  readCardMenu 直调 setCardVisitFreq 的子菜单项，非矩阵动作） */
+const ACTION_DEFS: Record<Exclude<ReadCardActionId, "sched" | "freq">, { icon: string; label: () => string }> = {
     stop: { icon: "iconTrashcan", label: () => tomatoI18n.不再推 },
     again: { icon: "iconRefresh", label: () => tomatoI18n.再来一轮 },
     defer: { icon: "iconClock", label: () => tomatoI18n.推迟到明天 },
@@ -39,9 +42,9 @@ export async function openReadCardMenu(
     if (!blockID) return;
     const ctx = await inspectReadCard(blockID);
     const items: MenuItemOption[] = [];
-    // 顶部只读状态行（无 click）；无键带退推标记 → 「已退出」提示行
+    // 顶部只读状态行（无 click）；无键带退推标记 → 「已退出」提示行（□6 relaxedAt=书放宽尾句）
     const status = ctx.readcard
-        ? statusLineOf(ctx.readcard, ctx.dueMs, Date.now())
+        ? statusLineOf(ctx.readcard, ctx.dueMs, Date.now(), ctx.relaxedAt)
         : ctx.optout ? tomatoI18n.已退出阅读推送 : null;
     if (status) {
         items.push({ icon: "iconInfo", label: status });
@@ -68,6 +71,29 @@ export async function openReadCardMenu(
             click: () => void runAction(blockID, a, 0, onApplied),
         });
     }
+    // □3 回访频率（grow 在册卡）：低/中/高三档斜率乘子，✓ 当前档；改档不重置进度
+    // （sched 用户直控每 N 天、daily 分片、毕业档案不适用——grow 守卫滤）
+    if (ctx.st && !ctx.st.graduated && ctx.st.mode === "grow") {
+        const cur: VisitFreq = ctx.st.freq ?? "m";
+        items.push({
+            icon: "iconClock",
+            label: tomatoI18n.回访频率(),
+            submenu: (["l", "m", "h"] as const).map(f => ({
+                icon: "iconClock",
+                label: (cur === f ? "✓ " : "") + tomatoI18n.回访频率档名(f),
+                click: () => void runFreq(blockID, f, onApplied),
+            })),
+        });
+    }
+    // □4 写留言：宿主=文档级的 kind（piece/slot/material/digest/plain——readcard 键挂
+    // 文档头块，blockID 即留言落点；rpcard=tomato 块级卡非渐进对象不给）
+    if (ctx.kind && ctx.kind !== "rpcard") {
+        items.push({
+            icon: "iconInfo",
+            label: tomatoI18n.写留言(),
+            click: () => openVisitNoteInput(blockID),
+        });
+    }
     if (!items.length) return;
     const menu = new (Menu as any)("progReadCardMenu", undefined, true) as Menu;
     for (const it of items) menu.addItem(it);
@@ -76,13 +102,27 @@ export async function openReadCardMenu(
 }
 
 async function runAction(
-    blockID: string, action: ReadCardActionId, every: number, onApplied?: (action: ReadCardActionId) => void,
+    blockID: string, action: ReadCardActionId, every: number, onApplied?: (action: ReadCardActionId) => Promise<void> | void,
 ): Promise<void> {
     const tip = await applyReadCardAction(blockID, action, every);
     if (tip) {
         onApplied?.(action);
     } else {
         // 静默失败兜底（review P2-7）：动作内部 catch 吞错时用户零反馈
+        try { await siyuan.pushMsg(tomatoI18n.操作未生效, 2500); } catch { /* noop */ }
+    }
+}
+
+/** □3 改档（readCardMenu 专属）：频率变化无卡面即时反馈，toast 文案透出（runAction
+ *  不 toast 的差异=彼处动作自带卡面状态变化）+onApplied 重载面板/卡面 */
+async function runFreq(
+    blockID: string, f: VisitFreq, onApplied?: (action: ReadCardActionId) => Promise<void> | void,
+): Promise<void> {
+    const tip = await setCardVisitFreq(blockID, f);
+    if (tip) {
+        try { await siyuan.pushMsg(tip, 2500); } catch { /* noop */ }
+        onApplied?.("freq");
+    } else {
         try { await siyuan.pushMsg(tomatoI18n.操作未生效, 2500); } catch { /* noop */ }
     }
 }

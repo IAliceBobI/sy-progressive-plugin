@@ -17,6 +17,7 @@ import {
     revisitDaysOf, scheduleSQLFor, splitSchedule,
     mergeDueRows, DueRow, isDue, DAY,
 } from "./reviewQueue";
+import { dayStartOf } from "./readCurveCore";
 
 type MenuItemOption = Parameters<Menu["addItem"]>[0];
 
@@ -331,7 +332,8 @@ function reviewRowItem(
     const pd = r.src === "pdigest";
     const key = pd ? PdigestReviewKey : ReviewKey;
     const label = clip(r.content ?? r.id, 40);
-    const days = tomatoI18n.N天后(Math.ceil((s.next - now) / DAY));
+    // 日历日差（□5 review P2-B：滚动 ceil 是全仓最后一处旧口径——面板 rel/条带/段界均日历化）
+    const days = tomatoI18n.N天后(Math.round((dayStartOf(s.next) - dayStartOf(now)) / DAY));
     return {
         icon: pd ? "iconProgQuill" : curve ? "iconProgThink" : "iconCalendar",
         label: future ? `${label} <span style="${DAYS_TAG}">· ${days}</span>` : label,

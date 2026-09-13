@@ -11,6 +11,7 @@ import { isMultiLineElement } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { SplitSentence } from "./SplitSentence";
 import { prog } from "./Progressive";
 import { pieceDocName, pieceAlias, getDocIalWords, getDocIalPieces } from "./progData";
+import { locatePiece } from "./volIndex";
 import { appendTailCard } from "./tailCardAppend";
 
 // getDocIalWords 定义已挪 progData.ts（v5 words 进 prog-data，ProgressiveStorage 也要用，避免循环 import）
@@ -248,7 +249,16 @@ export async function createPiece(bookInfo: BookInfo, index: string[][], point: 
     // 过滤后全部悬空则跳过该 point，否则会创建只有标题没有内容的空分片。
     const piece = (await siyuan.getRows(index.at(point) ?? [], "id")).map(r => r.id);
     if (piece.length === 0) return "";
-    noteID = await createNote(bookInfo.bookID, piece, point);
+    // □1 目录书：片挂来源卷下（定位先算在哪卷）。卷表越界（索引与卷表失配窗口）
+    // → 挂书壳兜底 + Loki 痕迹（下次出场 ensureVolTableFresh 重组校正）
+    let volDocID = "";
+    if (bookInfo.dirMode) {
+        const vols = await progStorage.loadVolTable(bookInfo.bookID);
+        const loc = locatePiece(vols, point);
+        if (loc) volDocID = vols[loc.volIndex].d;
+        else debugLog("volbook", `createPiece vol-locate miss book=${bookInfo.bookID} point=${point} vols=${vols.length}`, "progressive");
+    }
+    noteID = await createNote(bookInfo.bookID, piece, point, volDocID);
     if (!noteID) return "";
 
     await fullfilContent(point, bookInfo.bookID, piecePre, piece, noteID, null);
@@ -454,12 +464,25 @@ function allListItemlnk2self(div: HTMLDivElement, attrs?: AttrType) {
     });
 }
 
-async function createNote(bookID: string, piece: string[], point: number) {
-    // boxID 实时取（不信任 BookInfo 缓存）：书移到别的笔记本后缓存会 stale，往旧 box 建片必错
-    const row = await siyuan.sqlOne(`select box,hpath,content from blocks where type='d' and id='${bookID}'`);
-    const boxID = row?.box ?? "";
-    let dir = row?.hpath ?? "";
-    const bookName = row?.content ?? "";
+async function createNote(bookID: string, piece: string[], point: number, volDocID = "") {
+    // boxID/hpath 实时取（不信任 BookInfo 缓存）：书移到别的笔记本后缓存会 stale，往旧 box 建片必错。
+    // □1 目录书：挂载点=卷（片挂来源文章下），书名恒取书壳（alias 归书语义）；
+    // 卷行查空（刚删卷的窗口）回退书壳挂载防断链
+    const targetID = volDocID || bookID;
+    const mountRow = await siyuan.sqlOne(`select box,hpath,content from blocks where type='d' and id='${targetID}'`);
+    let boxID = mountRow?.box ?? "";
+    let dir = mountRow?.hpath ?? "";
+    let bookName = mountRow?.content ?? "";
+    if (volDocID) {
+        const shell = await siyuan.sqlOne(`select content from blocks where type='d' and id='${bookID}'`);
+        bookName = shell?.content ?? "";
+        if (!boxID || !dir) {
+            const fallback = await siyuan.sqlOne(`select box,hpath from blocks where type='d' and id='${bookID}'`);
+            boxID = fallback?.box ?? "";
+            dir = fallback?.hpath ?? "";
+            debugLog("volbook", `createNote mount miss vol=${volDocID} fallback book=${bookID} box=${!!boxID} dir=${!!dir}`, "progressive");
+        }
+    }
     if (!boxID || !dir || !bookName) return "";
 
     let content: string;

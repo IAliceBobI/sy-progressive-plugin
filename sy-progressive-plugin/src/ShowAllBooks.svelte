@@ -5,7 +5,7 @@
     // ⏸ 闭笔记本=虚线灰卡无操作；⚠ 疑似失效=warn 色警示+清理记录；未分片=正常卡+引导文案。
     // 排序：活书按 reading-order 滚筒序在前，⚠→⏸ 沉底。
     import { onDestroy, onMount } from "svelte";
-    import { confirm } from "siyuan";
+    import { confirm, Menu } from "siyuan";
     import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
     import { prog } from "./Progressive";
@@ -18,6 +18,8 @@
     import { notifyFleetChanged, onFleetChanged } from "./fleetNotify";
     import { fetchWritingPieces } from "./writeBook";
     import { writingCompareBox } from "./WritingCompareBox";
+    import { AUTORELAX_KEY, parseStamp, VISITRATE_KEY, type VisitFreq } from "./readCurveCore";
+    import { setBookVisitFreq } from "./readCurve";
 
     interface Props {
         dm: DestroyManager;
@@ -43,6 +45,11 @@
     let books: TaskType[] = $state([]);
     let statuses = $state(new Map<string, BookStatusInfo>());
     let orderIdx = $state(new Map<string, number>());
+    /** □3 书回访频率档位（bookID→l/h；无行=中档零感知），批查一次全量 */
+    let freqs = $state(new Map<string, string>());
+    /** □6 自动放宽标记（bookID→放宽时刻 ms）：在场=当前 l 档来自巡查自动放宽，
+     *  徽标+一键恢复的显示条件（与 freqs 同一次 attrs 顺手读） */
+    let autoRelaxs = $state(new Map<string, number>());
     let loaded = $state(false);
     let loadGen = 0; // 代际计数（非渲染态）：并发 load 交错时旧完成者丢弃
     let expanded = $state<Record<string, boolean>>({});
@@ -108,11 +115,63 @@
         statuses = st;
         orderIdx = oIdx;
         books = list;
+        // □3 回访频率档位：逐书 getBlockAttrs 直读（勿走 SQL attributes——改档触发
+        // fleetChanged→本 load 重查，SQL 吃索引延迟会把钮面打回旧档，getBlockAttrs
+        // 直读无窗口；缺行/中档清键均不进 Map=显示中）。□6 同一次 attrs 顺手读
+        // autorelax 标记（零新请求）
+        const fmap = new Map<string, string>();
+        const amap = new Map<string, number>();
+        for (const b of list) {
+            const a = ((await siyuan.getBlockAttrs(b.bookID)) ?? {}) as any;
+            const v = String(a?.[VISITRATE_KEY] ?? "");
+            if (v === "l" || v === "h") fmap.set(b.bookID, v);
+            const ar = String(a?.[AUTORELAX_KEY] ?? "");
+            if (/^\d{14}$/.test(ar)) amap.set(b.bookID, parseStamp(ar));
+        }
+        freqs = fmap;
+        autoRelaxs = amap;
         loaded = true;
     }
 
     function stOf(id: string): BookStatusInfo["status"] {
         return statuses.get(id)?.status ?? "ok";
+    }
+
+    /** □6 放宽时刻 → MM-DD（同年级显示完整日期，与状态行毕业日期同款式） */
+    function relaxDateOf(ms: number): string {
+        const d = new Date(ms);
+        const pad2 = (n: number) => String(n).padStart(2, "0");
+        return d.getFullYear() === new Date().getFullYear()
+            ? `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+            : `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    }
+
+    /** □3 回访频率（书级，三入口之一=管理卡可见钮）：改档=书 IAL+在册卡批量跟随
+     *  （setBookVisitFreq 内含 toast）；本地 Map 重赋值即时刷新钮面档位显示 */
+    function openFreqMenu(e: MouseEvent, b: TaskType) {
+        const cur: VisitFreq = (freqs.get(b.bookID) as VisitFreq) ?? "m";
+        const menu = new (Menu as any)("progBookFreqMenu", undefined, true) as Menu;
+        for (const f of ["l", "m", "h"] as const) {
+            menu.addItem({
+                icon: "iconClock",
+                label: (cur === f ? "✓ " : "") + tomatoI18n.回访频率档名(f),
+                click: () => void applyFreq(b, f),
+            });
+        }
+        setTimeout(() => menu.open({ x: e.clientX, y: e.clientY }), 0);
+    }
+
+    async function applyFreq(b: TaskType, f: VisitFreq) {
+        // review P2：失败（lost 书/写失败）勿乐观更新本地 Map——UI 停旧值与服务端一致
+        if (!(await setBookVisitFreq(b.bookID, f))) return;
+        const nm = new Map(freqs);
+        if (f === "m") nm.delete(b.bookID);
+        else nm.set(b.bookID, f);
+        freqs = nm;
+        // □6 手动改档（含恢复 m）=服务端清标记，本地 Map 同步消徽标
+        const am = new Map(autoRelaxs);
+        am.delete(b.bookID);
+        autoRelaxs = am;
     }
 
     /** 活书在前（滚筒序），⚠ → ⏸ 沉底；不在 order 的书排后，同 key 靠 sort 稳定性保原序 */
@@ -366,6 +425,29 @@
                                         btnAddProgressiveReading(b.bookID)}
                                 >{tomatoI18n.重新分片}</button
                                 >
+                            {/if}
+                            <!-- □3 回访频率：当前档直显（信息平铺），点开三档菜单；vision P2-2：
+                                 非默认档挂 emph 强调（用户主动偏离默认的信号，扫描多卡一眼可辨） -->
+                            <button
+                                class="btn ghost"
+                                class:emph={(freqs.get(b.bookID) ?? "m") !== "m"}
+                                aria-label={`${tomatoI18n.回访频率()}《${b.name}》`}
+                                onclick={(e) => {
+                                    e.stopPropagation();
+                                    openFreqMenu(e, b);
+                                }}
+                            >{tomatoI18n.回访频率()}·{tomatoI18n.回访频率档名(freqs.get(b.bookID) ?? "m")}</button
+                            >
+                            {#if autoRelaxs.get(b.bookID)}
+                                <!-- □6 透明面：自动放宽徽标（含放宽时刻）+一键恢复（信息平铺不藏 hover） -->
+                                <span class="autorelax-badge">{tomatoI18n.已自动放宽()}·{relaxDateOf(autoRelaxs.get(b.bookID)!)}<button
+                                    class="autorelax-restore"
+                                    aria-label={`${tomatoI18n.恢复默认回访()}《${b.name}》`}
+                                    onclick={(e) => {
+                                        e.stopPropagation();
+                                        void applyFreq(b, "m");
+                                    }}
+                                >{tomatoI18n.恢复默认()}</button></span>
                             {/if}
                             <button
                                 class="switch"
@@ -686,12 +768,12 @@
             &:hover {
                 color: var(--prog-accent);
             }
-            &.emph {
-                font-weight: 600;
-                color: var(--prog-accent-strong);
-                box-shadow: inset 0 0 0 1px
-                    color-mix(in srgb, var(--prog-accent) 55%, var(--prog-card-border));
-            }
+        &.emph {
+            font-weight: 600;
+            color: var(--prog-accent-strong);
+            box-shadow: inset 0 0 0 1px
+                color-mix(in srgb, var(--prog-accent) 55%, var(--prog-card-border));
+        }
         }
         &.clean {
             font-weight: 600;
@@ -699,6 +781,38 @@
             color: var(--prog-status-warn);
             &:hover {
                 background: color-mix(in srgb, var(--prog-status-warn) 24%, transparent);
+            }
+        }
+    }
+    /* □6 自动放宽徽标：温和提示底（非危险语义）+内嵌恢复钮（信息平铺不藏 hover）；
+     *  文字 --prog-sub（vision P2-3：muted 叠 warn 轻底约 3:1 低于 12px AA 线） */
+    .autorelax-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: color-mix(in srgb, var(--prog-status-warn) 12%, transparent);
+        color: var(--prog-sub);
+        .autorelax-restore {
+            border: none;
+            background: none;
+            cursor: pointer;
+            /* vision P2-1/P2-2：默认点状下划线（12px 小字在 warn 底内需独立可点暗示）+
+             *  负 margin 扩命中区（视觉不变，命中区高约 17px→23px） */
+            padding: 3px 4px;
+            margin: -3px -2px;
+            font-size: 12px;
+            color: var(--prog-accent-strong);
+            text-decoration: underline dotted;
+            text-underline-offset: 2px;
+            &:hover {
+                text-decoration-style: solid;
+            }
+            &:focus-visible {
+                outline: 1px solid var(--prog-accent);
+                border-radius: 3px;
             }
         }
     }

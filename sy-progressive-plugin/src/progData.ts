@@ -2,6 +2,7 @@
 // 原则：插件内部一切引用走 ID/IAL，永不走路径；hpath 只在创建瞬间用作落点。
 import { TEMP_CONTENT, MarkKey, PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { parseStamp } from "./readCurveCore";
 
 export function getDocIalProgData(): string {
     return `progdata#${TEMP_CONTENT}`;
@@ -244,11 +245,50 @@ export function parseBookIDFromCtime(value: string): string {
     return v.split("#")[0] ?? "";
 }
 
+/** □4 书→未锤素材数聚合（computeTargets 的 ctRows 全量 ctime 行纯内存版）：已锤行落
+ *  0 条目=书在池确证——全锤书得 0 是 planSweep 出池判据，缺条目=缺书未知（?? -1 保守
+ *  不动）。与 fleetData.materialUnread 同判据面（🔨 前缀=已锤）；digest 锚行落无消费方
+ *  的条目无妨。旧实现把 🔨 行整个 continue 掉 → Map 恒无 0 值 → 出池永不触发（e2e
+ *  09-12 实锤）。 */
+export function matUnreadOfRows(rows: { value?: unknown }[]): Map<string, number> {
+    const m = new Map<string, number>();
+    for (const r of rows ?? []) {
+        const v = String(r?.value ?? "");
+        const bid = parseBookIDFromCtime(v);
+        if (!bid) continue;
+        m.set(bid, (m.get(bid) ?? 0) + (v.startsWith("🔨") ? 0 : 1));
+    }
+    return m;
+}
+
 /** ctime 值剥 🔨 完成态前缀（期A 素材推过即锤），返回干净「bookID#ct」；非完成态 null。
  *  从 digestUtils 迁来（vitest 链禁 .svelte，纯函数落纯模块可单测）。⚠ slice 按
  *  「🔨#」整串长度——slice(2) 只剥 emoji 残留前导 #（期A review P2-4 地雷，单测锁形态） */
 export function doneCtime(v: string): string | null {
     return v.startsWith("🔨#") ? v.slice("🔨#".length) : null;
+}
+
+/** □6 ctime 值末段 14 位→ms（🔨 锤前缀保留原 ts=摘抄时刻）；坏值/空值 null */
+export function tsMsOfCtimeValue(v: string): number | null {
+    const s = String(v ?? "");
+    const clean = s.startsWith("🔨#") ? s.slice("🔨#".length) : s;
+    const seg = clean.split("#")[1] ?? "";
+    return /^\d{14}$/.test(seg) ? parseStamp(seg) : null;
+}
+
+/** □6 窗口内摘抄计数：PDIGEST_CTIME 全量行→按书 Map（锤行同计——锤=消耗非产出撤销；
+ *  digestCountsFrom 的带窗版，autoRelaxSweep 判定「30 天零摘抄」消费） */
+export function digestCountsInWindow(rows: { value: string }[], windowStartMs: number): Map<string, number> {
+    const m = new Map<string, number>();
+    for (const r of rows ?? []) {
+        const v = String(r?.value ?? "");
+        const bid = parseBookIDFromCtime(v);
+        if (!bid) continue;
+        const ts = tsMsOfCtimeValue(v);
+        if (ts == null || ts < windowStartMs) continue;
+        m.set(bid, (m.get(bid) ?? 0) + 1);
+    }
+    return m;
 }
 
 /** 思源文档 path 形如 /父ID/.../本ID.sy——文档级 parent 不在 blocks.parent_id（恒空），取 path 倒数第二段 */

@@ -2170,6 +2170,81 @@ html[data-theme-mode="dark"] .prog-tailcard--off {
     border-color: color-mix(in srgb, var(--b3-theme-on-surface-light) 75%, var(--b3-border-color));
 }
 
+/* □4 回访留言卡（custom 块 visit-note 渲染器产物）：内容卡非动作卡——左强调边做引用感，
+   正文保持可选中（留言是用户写的内容，复制合法——与尾卡 user-select:none 相反） */
+.prog-vnote {
+    margin: 6px 0 2px;
+    padding: 7px 10px;
+    box-sizing: border-box;
+    border: 1px solid var(--b3-border-color);
+    border-left: 3px solid var(--b3-theme-primary-light);
+    border-radius: var(--b3-border-radius);
+    background: var(--b3-theme-surface);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.prog-vnote--broken {
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--b3-theme-on-surface-light, #999);
+    border-left-width: 1px;
+}
+.prog-vnote__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+.prog-vnote__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--b3-theme-on-surface-light, #999);
+    white-space: nowrap;
+}
+.prog-vnote__label > svg { width: 12px; height: 12px; flex: none; }
+.prog-vnote__date {
+    font-size: 11px;
+    color: var(--b3-theme-on-surface-light, #999);
+    white-space: nowrap;
+}
+.prog-vnote__text {
+    white-space: pre-wrap; /* build 时保留的换行原样呈现（信息平铺） */
+    word-break: break-word;
+    color: var(--b3-theme-on-surface);
+}
+
+/* □4 留言输入小窗（Dialog content 内布局；body 挂 .b3-dialog__body padding 0 已知坑——
+   自带内边距补齐） */
+.prog-vnote-input {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+}
+.prog-vnote-input textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 72px;
+    resize: vertical;
+    font-size: 13px;
+    line-height: 1.6;
+    font-family: inherit;
+}
+.prog-vnote-input__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.prog-vnote-input__hint {
+    margin-right: auto;
+    font-size: 11px;
+    color: var(--b3-theme-on-surface-light, #999);
+}
+
+
 /* vision P2-2：可点胶囊 hover=字色+底色双反馈（可发现性）；关态 opacity .65 见 --off 段 */
 button.prog-tailcard__chip:hover {
     color: var(--b3-theme-on-surface);

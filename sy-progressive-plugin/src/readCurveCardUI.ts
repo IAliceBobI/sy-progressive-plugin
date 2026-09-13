@@ -14,7 +14,8 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { sweepReadCurve } from "./readCurve";
 import { openReadCardMenu } from "./readCardMenu";
-import { badgeSpec, nextSeeHint, READCARD_KEY } from "./readCurveCore";
+import { READCARD_KEY } from "./readCurveCore";
+import { badgeSpec, nextSeeHint } from "./readCurveText";
 
 const MARK_CLS = "prog-revcard-mark-el";
 const NEXT_CLS = "prog-revcard-next-el";

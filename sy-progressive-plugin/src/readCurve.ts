@@ -23,16 +23,17 @@ import { notifyFleetChanged } from "./fleetNotify";
 import { queryDigestTree } from "./digestUtils";
 import { fetchWritingPieces, pickWritingDispatch } from "./writeBook";
 import { PdigestReviewKey } from "./reviewQueue";
-import { parseBookIDFromCtime } from "./progData";
-import { createPiece, findPieceDoc } from "./helper";
+import { matUnreadOfRows, parseBookIDFromCtime, digestCountsInWindow } from "./progData";
+import { createPiece, findPieceDoc, findCards } from "./helper";
 import { loadBookStatuses } from "./bookStatus";
 import {
-    CurveMode, CurvePlanCard, parseReadCard, RATING_GRACE_MS, READCARD_KEY, READOUT_KEY, ReadCardKind,
+    AUTORELAX_KEY, AUTO_RELAX_CAP, CurveMode, CurvePlanCard, parseReadCard, RATING_GRACE_MS, READCARD_KEY, READOUT_KEY, ReadCardKind,
     cadenceDays, cadenceOpts, consumeRound, DIGEST_BUILD_CAP, dueStamp, formatReadCard, GROW_INTERVALS,
-    isConsumedCurve, isMaterialFirstPush, isRPCardMarkdown, isRated, normalizeDue, parseStamp, planSweep, plusDays,
-    REVISIT_DAILY_LIMIT, SCHED_CHOICES, shouldReconcilePiece, sortForReconcile, statusLineOf,
-    toSchedValue, tomorrowStart,
+    growInterval, isConsumedCurve, isMaterialFirstPush, isRPCardMarkdown, isRated, normalizeDue, parseStamp, planSweep, plusDays,
+    RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, sortForReconcile,
+    toSchedValue, tomorrowStart, VisitFreq, VISITRATE_KEY,
 } from "./readCurveCore";
+import { statusLineOf } from "./readCurveText";
 
 // ============ 3.9.0 迁移层（riff 读写唯一收口） ============
 
@@ -202,6 +203,9 @@ async function computeTargets(noCreate: boolean, readcards?: Map<string, string>
     rpcardTargets: string[];
     /** 「我的文档卡」收编候选头 2*CAP（□3：无键无锚文档块，riff 批查在 ④） */
     plainCandidates: string[];
+    /** 书→未锤素材数（□4：ctRows 纯内存聚合——planSweep 出池判据+曲线传参，
+     *  与 fleetData.materialUnread 同判据面：🔨 前缀=已锤剔除） */
+    matUnread: Map<string, number>;
 }> {
     const infos = progStorage.booksInfos();
     const ro = await progStorage.loadReadingOrder();
@@ -303,7 +307,10 @@ async function computeTargets(noCreate: boolean, readcards?: Map<string, string>
             plainCandidates.push(id);
         }
     }
-    return { targets, gateOpen, readable, materialTargets, digestTargets, rpcardTargets, plainCandidates };
+    // □4 书→未锤素材数（与 fleetData.materialUnread 同判据面：🔨 前缀=已锤剔除；
+    // 全量行在手纯内存聚合，零新查询）。已锤行落 0 条目=全锤书确证出池（matUnreadOfRows）
+    const matUnread = matUnreadOfRows((ctRows ?? []) as { value?: unknown }[]);
+    return { targets, gateOpen, readable, materialTargets, digestTargets, rpcardTargets, plainCandidates, matUnread };
 }
 
 // ============ 对账回写（官方评分 → 滚筒状态；双分支） ============
@@ -325,6 +332,20 @@ async function saveLastServed(bookID: string) {
     if (!bookID) return;
     const ro = await progStorage.loadReadingOrder();
     await progStorage.saveReadingOrder({ order: ro.order, lastServed: bookID });
+}
+
+/** 单书未锤素材数（□4 评分现场单查：ctRows 全量快照在 computeTargets 内不外露，
+ *  cardflip 频率低一次单书 SQL 可接受；与 fleetData/ctRows 聚合同判据面） */
+async function materialUnreadOfBook(bookID: string): Promise<number | undefined> {
+    if (!bookID) return undefined;
+    try {
+        const rows = (await siyuan.sql(
+            `select value from attributes where name='${PDIGEST_CTIME}' and (value like '${bookID}#%' or value like '🔨#${bookID}#%') limit 10000000`)) as any[] ?? [];
+        return (rows ?? []).filter(r => !String(r.value ?? "").startsWith("🔨")).length;
+    } catch (e) {
+        debugLog("readcurve", `mat unread fail ${bookID}: ${e}`, "progressive");
+        return undefined; // 查询失败=未知：走旧 ×2 骨架（保守方向），下轮自愈
+    }
 }
 
 /** 重现族消耗一轮（□2 分流面）：material 首推（未消耗）=锤+计已读+saveLastServed
@@ -353,8 +374,14 @@ async function reconcileCurveRound(c: CurvePlanCard, st: NonNullable<ReturnType<
         }
     }
     const value = st.mode === "daily"
-        ? formatReadCard({ ...st, mode: "grow", count: 0 }) : c.readcard;
-    const cr = consumeRound(value, c.lastReviewMs, new Date());
+        // 存量 daily 素材卡评分升级转 grow 烙书档（review P2-2：不烙则此后整条曲线恒中档，
+        // 与「书 IAL=建卡默认」漏一格；仅存量升级走到，热路径零成本）
+        ? formatReadCard({ ...st, mode: "grow", count: 0, freq: c.bookID ? await bookVisitFreq(c.bookID) : undefined })
+        : c.readcard;
+    // □4 素材曲线：仅 material 传剩余量（锤已在上文先行落盘→计数天然剔除刚锤的这一个；
+    // undefined=查询失败走旧 ×2 骨架保守自愈；首推剩余量=锤后全书余量，间隔语义一致）
+    const matRemaining = c.kind === "material" ? await materialUnreadOfBook(c.bookID) : undefined;
+    const cr = consumeRound(value, c.lastReviewMs, new Date(), matRemaining);
     if (!cr) {
         // 防御：分流条件已滤 graduated/daily，到这=状态异常，摘卡清键止蚀（孤儿链兜底）
         await removeReadingCards([c.blockID]);
@@ -469,9 +496,9 @@ async function reconcileGraduated(graduated: CurvePlanCard[]) {
  *  尾链收尾回读 lastReview 反写身份键（水位线校准，review P1-2）：setTimeout 只保
  *  证至少 1s，主线程长任务可把 review 拖过「建卡+5s」余量 → isRated 误判真评分幽灵
  *  推进；校准后水位线恒=自家 review 实际时刻，晚于它的必为用户评分 */
-export async function buildReadingCard(docID: string, due: string, opts?: { mode?: CurveMode; count?: number }): Promise<void> {
+export async function buildReadingCard(docID: string, due: string, opts?: { mode?: CurveMode; count?: number; freq?: VisitFreq }): Promise<void> {
     const keyOf = (ms: number) => formatReadCard({
-        mode: opts?.mode ?? "daily", waterlineMs: ms, count: opts?.count ?? 0, graduated: false,
+        mode: opts?.mode ?? "daily", waterlineMs: ms, count: opts?.count ?? 0, graduated: false, freq: opts?.freq,
     });
     await siyuan.setBlockAttrs(docID, { [READCARD_KEY]: keyOf(Date.now()) } as any);
     const added = await siyuan.addRiffCards([docID]);
@@ -548,12 +575,13 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
             //    （素材首推池过滤+digest 建卡排除——含 g 毕业档案，review P0-1）；
             //    rcGateOpen=全局重现额度闸门（□2）
             const readcards = keyed;
-            const { targets, gateOpen, readable, materialTargets, digestTargets, rpcardTargets, plainCandidates } = await computeTargets(!!opts.noCreate, readcards);
+            const { targets, gateOpen, readable, materialTargets, digestTargets, rpcardTargets, plainCandidates, matUnread } = await computeTargets(!!opts.noCreate, readcards);
             const rcGateOpen = (await rollerTodayRevisits()) < REVISIT_DAILY_LIMIT;
             const ratedIDs = new Set(rated.map(c => c.blockID));
             const plan = planSweep({
                 cards: cards0.filter(c => !ratedIDs.has(c.blockID)),
                 targets, gateOpen, now, readable, rcGateOpen,
+                matRemaining: matUnread, // □4：素材写完出池+间隔传参的剩余量快照
             });
             if (plan.setDue.length) await setReadingDues(plan.setDue);
             // setKey 先于 graduate 落键（g 终态先行，摘卡中断有 planSweep 毕业分支兜底）
@@ -597,7 +625,7 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
                 if (liveMat.has(pieceID)) {
                     if (!matOn) continue; // □5 素材关：目标位素材不建卡（下轮自然重选）
                     await buildReadingCard(pieceID, liveGate.get(bookID) ? dueStamp(now) : tomorrowStart(now),
-                        cadenceOpts(cadMat) ?? { mode: "grow", count: 0 });
+                        cadenceOpts(cadMat) ?? { mode: "grow", count: 0, freq: await bookVisitFreq(bookID) });
                 } else {
                     if (!pieceOn) continue; // □5 分片关：不再建分片卡（存量每日重现走完毕业）
                     await buildReadingCard(pieceID, liveGate.get(bookID) ? dueStamp(now) : tomorrowStart(now));
@@ -609,16 +637,30 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
                 // 重复 add 是 no-op 但 review(2) 尾链会污染用户卡——先查后建；
                 // 占位条目须滤 riffCard 空值再判「有卡」）
                 const states = await getReadingCardStates(liveDigests);
+                // □3 书回访频率（digest 建卡烙书档）：digestTargets 平铺无书——ctime 批查
+                // 反解归属书，一书一档批量缓存（一轮最多 CAP 张建卡，一次 SQL 摊销）
+                const dgCt = (await siyuan.sql(
+                    `select block_id, value from attributes where name='${PDIGEST_CTIME}' and block_id in (${liveDigests.map(i => `"${i}"`).join(",")}) limit 10000000`)) as any[] ?? [];
+                const bookOf = new Map((dgCt ?? []).map(r => [String(r.block_id), parseBookIDFromCtime(String(r.value ?? ""))]));
+                const freqCache = new Map<string, VisitFreq>();
+                const freqOfBook = async (bid: string | null): Promise<VisitFreq> => {
+                    if (!bid) return "m";
+                    if (!freqCache.has(bid)) freqCache.set(bid, await bookVisitFreq(bid));
+                    return freqCache.get(bid)!;
+                };
                 let built = 0;
                 for (const dg of liveDigests) {
                     // 每轮建卡上限（review P2-4）：takeover 首开对全库无键摘抄一次性建卡，
-                    // 千级=写入风暴+持锁数分钟——分摊到后续巡查轮（30min/轮自然节奏）
+                    // 千级=写入风暴+持锁数分钟——分摊到后续巡查轮（30min/轮自然节奏摊完）
                     if (built >= DIGEST_BUILD_CAP) break;
                     if (known.has(dg) || (states.get(dg) ?? []).some(s => s.riffCard)) continue;
                     // per-item 兜底（review P1-3）：digest 候选=任意用户文档，死 ctime 行
                     // 单点抛错会让每轮巡查在同一行中断、其后候选饿死
                     try {
-                        await buildReadingCard(dg, plusDays(now, cadenceDays(cadDg)), cadenceOpts(cadDg) ?? { mode: "grow", count: 1 });
+                        const schedDg = cadenceOpts(cadDg);
+                        const dgFreq = await freqOfBook(bookOf.get(dg) ?? null);
+                        await buildReadingCard(dg, plusDays(now, schedDg ? cadenceDays(cadDg) : growInterval(0, dgFreq)),
+                            schedDg ?? { mode: "grow", count: 1, freq: dgFreq });
                         built++;
                     } catch (e) {
                         debugLog("readcurve", `digest build fail ${dg}: ${e}`, "progressive");
@@ -669,6 +711,8 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
             debugLog("readcurve",
                 `sweep(${reason}) cards=${cards0.length} rated=${rated.length} due=${plan.setDue.length} key=${plan.setKey.length} grad=${plan.graduate.length} build=${builtN} rc=${rcGateOpen ? "open" : "shut"}`,
                 "progressive");
+            // □6 产出率反哺顺带算（锁内直调无锁核；自带 30min 限流，cardflip 高频无感）
+            await autoRelaxSweep();
         } catch (e) {
             debugLog("readcurve", `sweep fail (${reason}): ${e}`, "progressive");
         }
@@ -721,9 +765,9 @@ export async function clearReadCurve(): Promise<void> {
  *  review(2)+setDue）交错——review 被主线程拖过 5s 余量→下轮 isRated 误判提前消耗；
  *  其 setDue(ts≈now) 晚到→+3d 被回写成即期。6s 后回读：lastReview 越线则校准水位线、
  *  due 被覆则重排（两效应均自限一次性，此处兜底） */
-export async function adoptReadingCard(blockID: string, due: string, opts?: { mode?: CurveMode; count?: number }): Promise<void> {
+export async function adoptReadingCard(blockID: string, due: string, opts?: { mode?: CurveMode; count?: number; freq?: VisitFreq }): Promise<void> {
     const value = formatReadCard({
-        mode: opts?.mode ?? "grow", waterlineMs: Date.now(), count: opts?.count ?? 1, graduated: false,
+        mode: opts?.mode ?? "grow", waterlineMs: Date.now(), count: opts?.count ?? 1, graduated: false, freq: opts?.freq,
     });
     await siyuan.setBlockAttrs(blockID, { [READCARD_KEY]: value } as any);
     await setReadingDues([{ id: blockID, due }]);
@@ -761,11 +805,13 @@ export async function adoptReadingCard(blockID: string, due: string, opts?: { mo
  *  P2-3 兑现）：锁外挂键→addRiffCards 完成前的窗口，并发巡查见「键行有、riff 无卡」判
  *  孤儿清键→卡在键丢永久弃管。已有键幂等跳过（右键重复点不重置水位线）。⚠ 片内 item
  *  块与片卡同 root 双卡并存会双计，调用方自担（期4 子菜单收编时补场景过滤） */
-export async function addToReadingCurve(blockID: string): Promise<void> {
+/** 返回=首见间隔天数（0=未建：takeover 关/已有键/失败——调用方 toast 兜底用骨架首档） */
+export async function addToReadingCurve(blockID: string): Promise<number> {
     if (!readCurveTakeover.get()) {
         debugLog("readcurve", `channel add skip: takeover off`, "progressive");
-        return;
+        return 0;
     }
+    let firstDays = 0;
     await lockWithLease(ReadCurveSweepLock, async () => {
         try {
             const attrs = await siyuan.getBlockAttrs(blockID);
@@ -779,19 +825,245 @@ export async function addToReadingCurve(blockID: string): Promise<void> {
             }
             const states = await getReadingCardStates([blockID]);
             const hasCard = (states.get(blockID) ?? []).some(s => s.riffCard);
-            const due = plusDays(new Date(), GROW_INTERVALS[0]);
-            if (hasCard) await adoptReadingCard(blockID, due, { mode: "grow", count: 1 });
-            else await buildReadingCard(blockID, due, { mode: "grow", count: 1 });
+            // □3 建卡烙书档：ctime 反解归属书取回访频率（全局对象无书=中档）
+            const bid = parseBookIDFromCtime(String((attrs as any)?.[PDIGEST_CTIME] ?? ""));
+            const f = bid ? await bookVisitFreq(bid) : "m";
+            const due = plusDays(new Date(), growInterval(0, f));
+            if (hasCard) await adoptReadingCard(blockID, due, { mode: "grow", count: 1, freq: f });
+            else await buildReadingCard(blockID, due, { mode: "grow", count: 1, freq: f });
+            firstDays = growInterval(0, f);
         } catch (e) {
             debugLog("readcurve", `channel add fail ${blockID}: ${e}`, "progressive");
         }
     }, { queued: true });
+    return firstDays;
 }
 
 /** 出：退出阅读曲线管理（摘卡+清键；块已删的孤儿卡内核拒删=无害滞留） */
 export async function removeFromReadingCurve(blockID: string): Promise<void> {
     await removeReadingCards([blockID]);
     await clearKeysSafe([blockID]);
+}
+
+// ============ □3 回访频率：书 IAL 默认+批量跟随 / 卡级改档 ============
+
+/** 书回访频率档位（书文档 IAL 读；空/坏值=中档零感知） */
+export async function bookVisitFreq(bookID: string): Promise<VisitFreq> {
+    if (!bookID) return "m";
+    try {
+        const attrs = ((await siyuan.getBlockAttrs(bookID)) ?? {}) as any;
+        const v = String(attrs[VISITRATE_KEY] ?? "");
+        return v === "l" || v === "h" ? v : "m";
+    } catch {
+        return "m";
+    }
+}
+
+async function toastFreqSet(f: VisitFreq) {
+    try { await siyuan.pushMsg(tomatoI18n.已设回访频率(tomatoI18n.回访频率档名(f)), 2500); } catch { /* noop */ }
+}
+
+/** 卡级改档（grow 在册卡）：改频率尾段（count/水位线不动=进度不重置）+在轮卡（count≥1）
+ *  due 按新档重排——due=水位线+新间隔（consumeRound 同口径锚）；count0 首推位由书闸门
+ *  管不动；sched 用户直控/daily 分片/毕业档案不适用（菜单层已滤）。返回 toast 文案（空=失败） */
+export async function setCardVisitFreq(blockID: string, f: VisitFreq): Promise<string> {
+    if (!blockID) return "";
+    if (!readCurveTakeover.get()) return tomatoI18n.接管未开启;
+    let tip = "";
+    // queued 等锁（review P2-1）：cardflip 巡查持锁数秒窗口内改档静默失败=「操作未生效」
+    // 泛化兜底；操作幂等等锁无害（applyReadCardAction 同族同款）
+    await lockWithLease(ReadCurveSweepLock, async () => {
+        try {
+            // 重分片/出片进行中不改（幽灵片防线，applyReadCardAction 同款避让）
+            if (await mainSweepLocksHeld()) {
+                tip = tomatoI18n.正在整理书籍;
+                return;
+            }
+            const ctx = await inspectReadCard(blockID);
+            if (!ctx.st || ctx.st.graduated || ctx.st.mode !== "grow") return;
+            await siyuan.setBlockAttrs(blockID, { [READCARD_KEY]: formatReadCard({ ...ctx.st, freq: f }) } as any);
+            if (ctx.st.count >= 1 && ctx.hasCard) {
+                // 素材卡重排走素材曲线间隔（□4 review P1-1）：剩余量现查，查询失败=null 跳过重排
+                const matRemaining = ctx.kind === "material" ? await materialUnreadOfBook(ctx.bookID) : undefined;
+                const days = rescheduleDays(ctx.kind, matRemaining, ctx.st.count, f);
+                if (days != null) {
+                    await setReadingDues([{ id: blockID, due: plusDays(new Date(ctx.st.waterlineMs), days) }]);
+                }
+            }
+            notifyFleetChanged();
+            tip = tomatoI18n.已设回访频率(tomatoI18n.回访频率档名(f));
+            debugLog("readcurve", `freq card ${blockID} → ${f}`, "progressive");
+        } catch (e) {
+            debugLog("readcurve", `freq card fail ${blockID}: ${e}`, "progressive");
+        }
+    }, { queued: true });
+    return tip;
+}
+
+/** 书级改档：书 IAL 落默认（此后 digest/material 建卡烙印跟随）+该书在册 grow 卡批量
+ *  重写频率尾段（ctime 通道=摘抄/素材含已锤 🔨 前缀；sched/daily 不跟随）。转档金句片
+ *  （MarkKey 通道）与全局对象（rpcard/plain 无书）不走批量=卡级菜单覆盖，口径记档。
+ *  在轮卡 due 同 setCardVisitFreq 口径重排（无 riff 卡的毕业档案只改键不写 due）。
+ *  卡批量段持巡查锁+batch 收拢（review P1-1）：无锁时「cardflip 对账落 g 毕业键→本处
+ *  陈旧快照覆写复活→孤儿判定清键」=毕业档案不可逆丢失；串行 setBlockAttrs 收拢为批量
+ *  压并发窗口。书档无 takeover 守卫=偏好预置语义（接管关时改档只落 IAL，重开后建卡跟随）。
+ *  □6 opts.auto=巡查自动放宽路径（落 AUTORELAX 标记+免 toast）；手动路径（含一键恢复）
+ *  清标记=显式意图接管。返 false=失败（review P2：UI 侧勿乐观更新本地 Map） */
+export async function setBookVisitFreq(bookID: string, f: VisitFreq, opts?: { auto?: boolean }): Promise<boolean> {
+    if (!bookID) return false;
+    try {
+        let ok = true;
+        await lockWithLease(ReadCurveSweepLock, async () => {
+            ok = await applyBookVisitFreq(bookID, f, opts);
+        }, { queued: true });
+        if (!ok) return false;
+        notifyFleetChanged();
+        await toastFreqSet(f);
+        return true;
+    } catch (e) {
+        debugLog("readcurve", `freq book fail ${bookID}: ${e}`, "progressive");
+        return false;
+    }
+}
+
+/** □6 无锁核（setBookVisitFreq 的锁内主体，autoRelaxSweep 持锁直调——公开壳的 queued
+ *  锁在 sweep 锁内嵌套=排队互等死锁到租约爆，故抽核）：书 IAL+AUTORELAX 标记管理+
+ *  在册卡批量跟随。auto=落放宽时刻（与手动选 l 同值不同源）；非 auto=清标记。
+ *  返 false=书 IAL 写失败（缺块/lost 书——call 对 code!=0 返 null 不抛，写后验真
+ *  =返值判别，review P1-1：静默假成功会让调用侧计 applied+虚日志+标记永不落死循环） */
+async function applyBookVisitFreq(bookID: string, f: VisitFreq, opts?: { auto?: boolean }): Promise<boolean> {
+    await siyuan.setBlockAttrs(bookID, {
+        [VISITRATE_KEY]: f === "m" ? "" : f,
+        [AUTORELAX_KEY]: opts?.auto ? dueStamp(new Date()) : "",
+    } as any);
+    // 写后验真=复核读（⚠写类端点 data 恒 null，返值判 null=100% 误判——踩坑索引明文，
+    // review P1-1 修法初版即踩：恒 false 短路批量跟随段；lost/缺块书复核读返空 map 判失败）
+    const back = ((await siyuan.getBlockAttrs(bookID)) ?? {}) as any;
+    if (String(back[VISITRATE_KEY] ?? "") !== (f === "m" ? "" : f)) {
+        debugLog("readcurve", `freq book write fail ${bookID} (block missing?)`, "progressive");
+        return false;
+    }
+    let followed = 0;
+    const rows = (await siyuan.sql(
+        `select block_id from attributes where name='${PDIGEST_CTIME}' and (value like '${bookID}#%' or value like '🔨#${bookID}#%') limit 10000000`)) as any[] ?? [];
+    const ids = (rows ?? []).map(r => String(r.block_id));
+    const dueWrites: { id: string; due: string }[] = [];
+    // 写作书→其锚卡=素材卡，重排走素材曲线间隔（□4 review P1-1）：剩余量一书一查全批共用
+    const matBook = !!progStorage.booksInfos()[bookID]?.writing;
+    const matRemaining = matBook ? await materialUnreadOfBook(bookID) : undefined;
+    if (ids.length) {
+        const cards = (await siyuan.sql(
+            `select block_id, value from attributes where name='${READCARD_KEY}' and block_id in (${ids.map(i => `"${i}"`).join(",")}) limit 10000000`)) as any[] ?? [];
+        const writes: { id: string; attrs: any }[] = [];
+        for (const c of cards ?? []) {
+            const st = parseReadCard(String(c.value ?? ""));
+            if (!st || (st.mode !== "grow" && !st.graduated)) continue;
+            writes.push({ id: String(c.block_id), attrs: { [READCARD_KEY]: formatReadCard({ ...st, freq: f }) } });
+            followed++;
+            if (!st.graduated && st.count >= 1) {
+                const days = rescheduleDays(matBook ? "material" : "digest", matRemaining, st.count, f);
+                if (days != null) dueWrites.push({
+                    id: String(c.block_id),
+                    due: plusDays(new Date(st.waterlineMs), days),
+                });
+            }
+        }
+        for (let i = 0; i < writes.length; i += 200) {
+            await siyuan.batchSetBlockAttrs(writes.slice(i, i + 200));
+        }
+        if (dueWrites.length) {
+            // 无 riff 卡的行写不进（摘卡残留/毕业档案）——批查在册才写，防无效请求
+            const states = await getReadingCardStates(dueWrites.map(d => d.id));
+            await setReadingDues(dueWrites.filter(d => (states.get(d.id) ?? []).some(s => s.riffCard)));
+        }
+    }
+    debugLog("readcurve", `freq book ${bookID} → ${f}${opts?.auto ? " (auto)" : ""} followed=${followed} dueRewritten=${dueWrites.length}`, "progressive");
+    return true;
+}
+
+// ============ □6 产出率反哺：零产出自动放宽（巡查顺带算，pull 红线=纯幂等补算） ============
+
+/** 限流锚（cardflip 触发的巡查高频，30 分钟一算够用——观察窗本身 30 天）。
+ *  review P2：成功路径才置位（中途抛错下轮重试，不白等 30min） */
+let lastAutoRelaxMs = 0;
+const AUTO_RELAX_INTERVAL_MS = 30 * 60_000;
+
+/** □6 巡查顺带算：30 天窗口零摘抄零制卡的中档在册书自动放宽到 l（×1.5）。持
+ *  ReadCurveSweepLock 态由 sweepReadCurve 锁内直调（内部 applyBookVisitFreq=无锁核，
+ *  勿走 setBookVisitFreq——queued 嵌套死锁）。档位/标记判读 getBlockAttrs 直读（SQL
+ *  attributes 索引延迟窗内会把刚改的 h 判回 m→误放宽覆写显式意图，ShowAllBooks 同款
+ *  理由）。单向：标记在场不再动；收回只走一键恢复。制卡计数=书盒文档（cards# 锚）子块
+ *  窗口内新建（blocks 表 created 列——⚠无 ctime 列，review P0-1 实锤「no such column」
+ *  静默恒 0；每日/现场卡落点无书锚漏计，方向=放宽少误不误已产出书，记档）。全程
+ *  debugLog=变更理由留 Loki 时间线（Weave priorityLog 行为级） */
+export async function autoRelaxSweep(): Promise<void> {
+    const now = Date.now();
+    if (now - lastAutoRelaxMs < AUTO_RELAX_INTERVAL_MS) {
+        debugLog("readcurve", `autorelax skip (throttled ${Math.round((now - lastAutoRelaxMs) / 60_000)}min)`, "progressive");
+        return;
+    }
+    await doAutoRelaxSweep(now);
+    lastAutoRelaxMs = now;
+}
+
+async function doAutoRelaxSweep(now: number): Promise<void> {
+    const winMs = relaxWindowStart(now);
+    const infos = progStorage.booksInfos();
+    // 书集（review P1-1/P2）：lost/closed 书进集=写静默失败→标记永不落→每轮重试吃光
+    // CAP 活书饿死——对齐 computeTargets 的 status!=="ok" 排除；manualMode 书无调度面
+    // （曲线不为手动书建卡），放宽+徽标对它是纯噪音
+    const statuses = await loadBookStatuses();
+    const bookIDs = Object.entries(infos)
+        .filter(([id, info]) => progStorage.isRegisteredBook(id) && !info.ignored && !info.archived
+            && !info.manualMode && statuses.get(id)?.status === "ok")
+        .map(([id]) => id);
+    if (!bookIDs.length) return;
+    const rows = (await siyuan.sql(
+        `select block_id, value from attributes where name='${PDIGEST_CTIME}' limit 10000000`)) as any[] ?? [];
+    const digests = digestCountsInWindow(rows ?? [], winMs);
+    // 制卡计数（短路：摘抄非零已判不放宽，不查制卡省请求）。查询失败不落条目=「未知」，
+    // 判定处 skip 下轮重查（review R2 P2：勿当 0 参与——瞬时 SQL 失败会假零产出误放宽；
+    // findCards 返 null 的无盒/失败二义无法区分，按无盒=零制卡处理记档）
+    const cardN = new Map<string, number>();
+    const winStamp = dueStamp(new Date(winMs));
+    for (const b of bookIDs.filter(b => !(digests.get(b) > 0))) {
+        const doc = await findCards(b).catch(() => null);
+        if (!doc) { cardN.set(b, 0); continue; }
+        const r = (await siyuan.sqlOne(
+            `select count(*) as n from blocks where root_id='${doc}' and id != root_id and created > '${winStamp}'`).catch(() => null)) as any;
+        if (r != null) cardN.set(b, Number(r?.n ?? 0));
+    }
+    let applied = 0;
+    for (const b of bookIDs) {
+        if (applied >= AUTO_RELAX_CAP) break;
+        // per-book 兜底（review P1-1c，digest 建卡同款）：单书抛错饿死迭代序其后所有书
+        try {
+            const dg = digests.get(b) ?? 0;
+            if (dg === 0 && !cardN.has(b)) {
+                debugLog("readcurve", `autorelax skip ${b} (card count unknown this round)`, "progressive");
+                continue;
+            }
+            const ar = String((((await siyuan.getBlockAttrs(b)) ?? {}) as any)[AUTORELAX_KEY] ?? "");
+            const verdict = relaxVerdict({
+                digestN: dg, cardN: cardN.get(b) ?? 0,
+                freq: await bookVisitFreq(b),
+                autorelaxAt: /^\d{14}$/.test(ar) ? parseStamp(ar) : null,
+                bookAddedMs: infos[b]?.time, nowMs: now,
+            });
+            debugLog("readcurve", `autorelax check ${b} digest=${dg} card=${cardN.get(b) ?? 0} age=${infos[b]?.time ? Math.floor((now - infos[b].time!) / 86_400_000) : "?"}d → ${verdict}`, "progressive");
+            if (!verdict) continue;
+            const ok = await applyBookVisitFreq(b, "l", { auto: true });
+            if (!ok) {
+                debugLog("readcurve", `autorelax apply fail ${b} (skipped, next round retries)`, "progressive");
+                continue;
+            }
+            applied++;
+            debugLog("readcurve", `autorelax applied ${b} → l (${RELAX_WINDOW_DAYS}d zero output)`, "progressive");
+        } catch (e) {
+            debugLog("readcurve", `autorelax per-book fail ${b}: ${e}`, "progressive");
+        }
+    }
+    if (applied) notifyFleetChanged();
 }
 
 // ============ □4 操作面：单块上下文 + 动作函数族（卡菜单/右键/面板三入口共用） ============
@@ -810,6 +1082,8 @@ export interface ReadCardCtx {
     hasCard: boolean;
     /** 现卡 due 毫秒（状态行「X 天后再见」尾） */
     dueMs: number | null;
+    /** □6 书 autorelax 标记时刻（ms；在场=状态行挂「30 天零摘抄，回访间隔已放宽」尾句） */
+    relaxedAt: number | null;
 }
 
 export async function inspectReadCard(blockID: string): Promise<ReadCardCtx> {
@@ -845,7 +1119,13 @@ export async function inspectReadCard(blockID: string): Promise<ReadCardCtx> {
     const live = (states.get(blockID) ?? []).filter(s => s.riffCard);
     const nd = live.length ? normalizeDue(live[live.length - 1].riffCard!.due as string) : null;
     const dueMs = nd ? parseStamp(`${nd}00`) : null; // 分钟粒度补秒
-    return { blockID, readcard, st, optout: !!attrs[READOUT_KEY], kind, bookID, point, hasCard: live.length > 0, dueMs };
+    // □6 书放宽标记（菜单低频场景一书一查；无书对象=全局 rpcard/plain 无此面）
+    let relaxedAt: number | null = null;
+    if (bookID) {
+        const ar = String((((await siyuan.getBlockAttrs(bookID)) ?? {}) as any)[AUTORELAX_KEY] ?? "");
+        if (/^\d{14}$/.test(ar)) relaxedAt = parseStamp(ar);
+    }
+    return { blockID, readcard, st, optout: !!attrs[READOUT_KEY], kind, bookID, point, hasCard: live.length > 0, dueMs, relaxedAt };
 }
 
 /** 分片转档/退推时的书推进（reconcileGraduated 同守卫：只进不退+忽略/归档/手动不推） */
@@ -870,14 +1150,14 @@ async function hammerMaterial(blockID: string, bookID: string): Promise<void> {
 /** 操作面六动作（□4）：不再推/每 N 天/再来一轮/推迟/转记忆卡/加入推送。
  *  锁内执行（与巡查互斥——改键/摘卡/建卡的中途态会被 getReadingCards 孤儿判定打断）；
  *  add 委托 addToReadingCurve（自带锁，勿嵌套死锁）。返回 toast 文案（空=静默失败） */
-export type ReadCardActionId = "stop" | "sched" | "again" | "defer" | "repush" | "memory" | "add";
+export type ReadCardActionId = "stop" | "sched" | "again" | "defer" | "repush" | "memory" | "add" | "freq";
 
 export async function applyReadCardAction(blockID: string, action: ReadCardActionId, every = 0, opts?: { silent?: boolean }): Promise<string> {
     if (!blockID) return "";
     if (!readCurveTakeover.get()) return tomatoI18n.接管未开启;
     if (action === "add") {
-        await addToReadingCurve(blockID);
-        return tomatoI18n.已加入阅读推送(GROW_INTERVALS[0]);
+        const d = await addToReadingCurve(blockID);
+        return tomatoI18n.已加入阅读推送(d > 0 ? d : GROW_INTERVALS[0]);
     }
     let tip = "";
     await lockWithLease(ReadCurveSweepLock, async () => {
@@ -915,9 +1195,11 @@ export async function applyReadCardAction(blockID: string, action: ReadCardActio
                 tip = tomatoI18n.已改为每N天推送(n);
             } else if (action === "again") {
                 if (ctx.optout) await siyuan.setBlockAttrs(blockID, { [READOUT_KEY]: "" } as any);
-                const due = plusDays(now, GROW_INTERVALS[0]);
-                if (ctx.hasCard) await adoptReadingCard(blockID, due, { mode: "grow", count: 1 });
-                else await buildReadingCard(blockID, due, { mode: "grow", count: 1 });
+                // □3 再来一轮继承卡上频率档（毕业档案 g# 尾段同保；无尾段=中档）
+                const f = ctx.st?.freq ?? "m";
+                const due = plusDays(now, growInterval(0, f));
+                if (ctx.hasCard) await adoptReadingCard(blockID, due, { mode: "grow", count: 1, freq: f });
+                else await buildReadingCard(blockID, due, { mode: "grow", count: 1, freq: f });
                 tip = tomatoI18n.已再来一轮;
             } else if (action === "defer") {
                 await setReadingDues([{ id: blockID, due: tomorrowStart(now) }]);
@@ -969,12 +1251,18 @@ export async function getReadCurvePlanRows(): Promise<{ active: ReadCurvePlanRow
         for (const r of rows) contentOf.set(String(r.id), String(r.content ?? ""));
     }
     const nowMs = Date.now();
+    // □6 书放宽标记批查（书 ID 去重一书一查，面板打开一次；statusLineOf 尾句消费）
+    const relaxedOf = new Map<string, number>();
+    for (const bid of [...new Set(cards.map(c => c.bookID).filter(Boolean))]) {
+        const ar = String((((await siyuan.getBlockAttrs(bid)) ?? {}) as any)[AUTORELAX_KEY] ?? "");
+        if (/^\d{14}$/.test(ar)) relaxedOf.set(bid, parseStamp(ar));
+    }
     const active: ReadCurvePlanRow[] = cards.map(c => ({
         blockID: c.blockID,
         content: contentOf.get(c.blockID) ?? c.blockID,
         kind: c.kind,
         bookID: c.bookID,
-        status: statusLineOf(c.readcard, dueMsOf(c.due), nowMs) ?? `✦ ${tomatoI18n.阅读卡}`,
+        status: statusLineOf(c.readcard, dueMsOf(c.due), nowMs, relaxedOf.get(c.bookID)) ?? `✦ ${tomatoI18n.阅读卡}`,
         dueMs: dueMsOf(c.due),
     }));
     // 死块行滤除（contentOf 查不到=块已删：面板不再示人，批量恢复对死块发事务=内核

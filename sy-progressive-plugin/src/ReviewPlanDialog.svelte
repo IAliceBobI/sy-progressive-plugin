@@ -15,11 +15,12 @@
     import { scheduleSQLFor, mergeDueRows, parseReview, ReviewKey, PdigestReviewKey } from "./reviewQueue";
     import { schedSubmenuItems, applyReviewAction } from "./reviewMenu";
     import { bookOfDocFrom } from "./fleetData";
-    import { reviewPlanGroups } from "./reviewPlan";
+    import { reviewPlanGroups, weekStrip, stripDayIdx } from "./reviewPlan";
     import type { PlanGroup, PlanRow } from "./reviewPlan";
     import { getReadCurvePlanRows, applyReadCardAction } from "./readCurve";
     import type { ReadCurvePlanRow } from "./readCurve";
     import { openReadCardMenu } from "./readCardMenu";
+    import { latestVisitNotePreviews } from "./visitNoteQuery";
     import { progStorage } from "./ProgressiveStorage";
 
     let { plugin }: { plugin: any } = $props();
@@ -31,6 +32,12 @@
     let rcGraduated = $state<ReadCurvePlanRow[]>([]);
     let query = $state("");
     let gradOpen = $state(false);
+    // □4 回访留言前半句（对象文档→预览；整体重赋值触发更新——Svelte 5 Map 深代理忌讳）
+    let notePrev = $state<Map<string, string>>(new Map());
+    // □5 日历投影：条带与过滤共用 now 锚（load 时定格，格界不随渲染时刻漂移）
+    let nowMs = $state(0);
+    // 选中格（null=全部；再点同格取消）。0=今天格含逾期（「今日清单」口径）
+    let stripDay = $state<number | null>(null);
 
     function rowKey(r: PlanRow): string {
         return r.src === "think" ? ReviewKey : PdigestReviewKey;
@@ -40,6 +47,7 @@
         loading = true;
         try {
             const now = Date.now();
+            nowMs = now;
             const [thinkRows, pdigestRows, ctimeRows, rcRows] = await Promise.all([
                 siyuan.sql(scheduleSQLFor(ReviewKey)) as Promise<any[]>,
                 siyuan.sql(scheduleSQLFor(PdigestReviewKey)) as Promise<any[]>,
@@ -55,6 +63,13 @@
             groups = reviewPlanGroups(mergeDueRows(thinkRows ?? [], pdigestRows ?? []), bookOfDoc, names, now);
             rcActive = rcRows.active;
             rcGraduated = rcRows.graduated;
+            // □4 留言前半句批查（sched 行按 root_id、阅读卡行按 blockID=宿主文档）
+            const docIDs = [
+                ...(groups ?? []).flatMap(g => g.rows.map(r => r.root_id)),
+                ...rcActive.map(r => r.blockID),
+                ...rcGraduated.map(r => r.blockID),
+            ];
+            notePrev = await latestVisitNotePreviews(docIDs);
         } catch { /* 装饰层静默：查询失败维持空态 */ }
         loading = false;
     }
@@ -94,16 +109,25 @@
         await load();
     }
 
-    // 搜索过滤（跨全部段：复访/阅读推送/毕业）
+    // 搜索过滤（跨全部段：复访/阅读推送/毕业）；□5 叠加条带选格过滤（同 stripDayIdx 口径=条带数字与列表一致）
     const q = $derived(query.trim().toLowerCase());
     const match = (content: string | undefined) => !q || String(content ?? "").toLowerCase().includes(q);
+    const dueAtOf = (v: string): number | null => {
+        const s = parseReview(v);
+        return s && s.mode !== "done" ? s.next : null;
+    };
+    const dayMatch = (t: number | null | undefined) => stripDay == null || stripDayIdx(t, nowMs) === stripDay;
+    const strip = $derived(nowMs ? weekStrip([
+        ...groups.flatMap(g => g.rows.map(r => dueAtOf(r.v))),
+        ...rcActive.map(r => r.dueMs),
+    ], nowMs) : []);
     const shownGroups = $derived(groups
-        .map(g => ({ ...g, rows: g.rows.filter(r => match(r.content)) }))
+        .map(g => ({ ...g, rows: g.rows.filter(r => match(r.content) && dayMatch(dueAtOf(r.v))) }))
         .filter(g => g.rows.length > 0));
     const rcGroups = $derived.by(() => {
         const infos = progStorage.booksInfos();
         const map = new Map<string, ReadCurvePlanRow[]>();
-        for (const r of rcActive.filter(r => match(r.content))) {
+        for (const r of rcActive.filter(r => match(r.content) && dayMatch(r.dueMs))) {
             const k = r.bookID || "";
             if (!map.has(k)) map.set(k, []);
             map.get(k)!.push(r);
@@ -114,7 +138,8 @@
             rows,
         }));
     });
-    const gradFiltered = $derived(rcGraduated.filter(r => match(r.content)));
+    // 毕业档案无调度不落任何一格：选格期间隐藏（搜索态照常显示）
+    const gradFiltered = $derived(stripDay == null ? rcGraduated.filter(r => match(r.content)) : []);
     const hasAny = $derived(shownGroups.length > 0 || rcGroups.length > 0 || gradFiltered.length > 0);
 
     onMount(() => { void load(); });
@@ -125,6 +150,19 @@
         <svg class="toolbar-icon" aria-hidden="true"><use xlink:href="#iconSearch" /></svg>
         <input class="b3-text-field" type="text" placeholder={tomatoI18n.计划搜索占位} bind:value={query} />
     </div>
+    {#if !loading && (groups.length > 0 || rcActive.length > 0)}
+        <div class="plan-strip" role="group" aria-label={tomatoI18n.未来N天复习量(strip.length || 7)}>
+            {#each strip as c, i}
+                <button class="strip-cell ol{c.overload}" class:sel={stripDay === i}
+                    aria-pressed={stripDay === i}
+                    onclick={() => { stripDay = stripDay === i ? null : i; }}>
+                    <span class="c-top"><span class="c-label">{c.label}</span><span class="c-sub">{c.sub}</span></span>
+                    <span class="c-count">{c.count}</span>
+                    <span class="c-min">{c.count ? tomatoI18n.约N分钟(c.minutes) : "—"}</span>
+                </button>
+            {/each}
+        </div>
+    {/if}
     {#if loading}
         <div class="plan-empty"><span class="empty-sub">…</span></div>
     {:else if !hasAny}
@@ -132,6 +170,11 @@
             {#if q}
                 <div class="empty-icon">✧</div>
                 <div class="empty-title">{tomatoI18n.没有匹配的条目(query.trim())}</div>
+            {:else if stripDay != null}
+                <!-- 选格后空≠没有计划（review P1-2）：点 0 计数格/当天行清空都到这——
+                     明示该日无到期，勿走「还没有任何复习计划」事实错误文案 -->
+                <div class="empty-icon">✧</div>
+                <div class="empty-title">{tomatoI18n.该日无到期}</div>
             {:else}
                 <div class="empty-icon">✧</div>
                 <div class="empty-title">{tomatoI18n.计划空态标题}</div>
@@ -151,6 +194,7 @@
                         onkeydown={(e) => e.key === "Enter" && jump(r)}>
                         <svg class="row-icon" aria-hidden="true"><use xlink:href="#{r.icon}" /></svg>
                         <span class="row-content" title={r.content}>{r.content || r.root_id}</span>
+                        {#if notePrev.get(r.root_id)}<span class="row-note" title={notePrev.get(r.root_id)}>{tomatoI18n.留言()}·{notePrev.get(r.root_id)}</span>{/if}
                         <span class="row-mode">{r.mode}</span>
                         <span class="row-date" class:overdue={r.due}>{r.date} · {r.rel}</span>
                         {#if r.due}
@@ -174,6 +218,7 @@
                         onkeydown={(e) => e.key === "Enter" && jumpRC(r)}>
                         <svg class="row-icon" aria-hidden="true"><use xlink:href="#iconRiffCard" /></svg>
                         <span class="row-content" title={r.content}>{r.content || r.blockID}</span>
+                        {#if notePrev.get(r.blockID)}<span class="row-note" title={notePrev.get(r.blockID)}>{tomatoI18n.留言()}·{notePrev.get(r.blockID)}</span>{/if}
                         <span class="row-mode">{r.status}</span>
                         <button class="row-more" aria-label="阅读推送"
                             onclick={(e) => openRCRowMenu(e, r)}>…</button>
@@ -253,6 +298,57 @@
     .empty-title { font-size: 15px; font-weight: 600; }
     .empty-sub { font-size: 12px; opacity: 0.62; max-width: 300px; line-height: 1.6; }
 }
+/* □5 日历投影条带：7 格等宽平铺，超载三档标色（ol0 空/ol1 正常/ol2 轻/ol3 重）。
+   warning 无官方文档保证（AddBook 同款先例）=带 hex fallback */
+.plan-strip {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+
+    .strip-cell {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden; /* 窄面板 nowrap 文案渗格兜底（宽屏无副作用） */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 7px 2px 6px;
+        border-radius: 6px;
+        border: 1px solid var(--b3-border-color, rgba(128, 128, 128, 0.2));
+        background: var(--b3-theme-background);
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+
+        &:hover { background: var(--b3-list-hover); }
+        &:focus-visible { outline: 2px solid var(--b3-theme-primary); outline-offset: 1px; }
+        &.sel {
+            border-color: var(--b3-theme-primary);
+            background: var(--b3-theme-primary-lightest);
+            /* 轮廓加重：选中与 ol1 共用 primary 色系时靠边框+内描边双重编码（vision R1） */
+            box-shadow: 0 0 0 1px var(--b3-theme-primary) inset;
+        }
+
+        .c-top {
+            display: flex;
+            gap: 4px;
+            align-items: baseline;
+            justify-content: center;
+            min-width: 0;
+            white-space: nowrap;
+        }
+        .c-label { font-size: 11px; font-weight: 600; opacity: 0.75; }
+        .c-sub { font-size: 11px; opacity: 0.62; font-variant-numeric: tabular-nums; }
+        .c-count { font-size: 18px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        .c-min { font-size: 11px; opacity: 0.55; white-space: nowrap; }
+
+        &.ol0 .c-count { opacity: 0.38; font-weight: 500; }
+        &.ol1 .c-count { color: var(--b3-theme-primary); }
+        &.ol2 .c-count { color: var(--b3-theme-warning, #d25f00); }
+        &.ol3 .c-count { color: var(--b3-theme-error); }
+    }
+}
 .plan-group { margin-bottom: 14px; }
 .plan-group.grad {
     .grad-toggle {
@@ -307,7 +403,23 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    .row-mode { flex-shrink: 0; font-size: 11px; opacity: 0.62; }
+    /* white-space:nowrap（□6 vision P2-4）：状态行尾句含空格软换行点，极窄容器内
+       折行会撑高行——收缩继续由 row-content（flex:1+ellipsis）承担 */
+    .row-mode { flex-shrink: 0; font-size: 11px; opacity: 0.62; white-space: nowrap; }
+    /* □4 留言前半句：内容列后次级信息（青色弱化与 row-mode 区分层级）。
+        max-width 防 P1（vision R1）：row-content 基份 0 不参与收缩，超长留言会把
+        标题列挤到 0 宽——留言列封顶 40%，截断仍走 ellipsis+title 全文 */
+    .row-note {
+        flex-shrink: 1;
+        max-width: 40%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+        color: var(--b3-theme-primary);
+        opacity: 0.78;
+    }
     .row-date {
         flex-shrink: 0;
         font-size: 11px;

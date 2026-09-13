@@ -3,6 +3,7 @@
 // 行文案（模式/到期日/距离）与四态图标映射。无 DOM/SiYuan 依赖（digestList 同款约定），
 // 数据采集在 ReviewPlanDialog.svelte 消费层。
 import { DueRow, parseReview, isDue, DAY } from "./reviewQueue";
+import { REVISIT_DAILY_LIMIT, dayStartOf } from "./readCurveCore";
 import { digestStateIcon } from "./digestState";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 
@@ -32,15 +33,17 @@ export interface PlanGroup {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** 到期日与距离文案：同年 MM-DD、跨年带年；diff≤0 逾期（至少 1 天）、<24h 今天、否则 N 天后 */
+/** 到期日与距离文案：同年 MM-DD、跨年带年。rel 距离=**日历日差**（与条带 stripDayIdx
+ *  同 dayStartOf 锚——滚动 24h 的「今天」会把明晨到期显成今天、与条带分桶打架，review
+ *  P1-1 统一）：0=今天（已过时刻=逾期 1 天）、n>0=N 天后、n<0=逾期 |n| 天 */
 export function planDueLabel(next: number, now: number): { date: string; rel: string } {
     const d = new Date(next);
     const sameYear = d.getFullYear() === new Date(now).getFullYear();
     const date = sameYear ? `${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const diff = next - now;
-    const rel = diff <= 0 ? tomatoI18n.计划逾期N(Math.max(1, Math.ceil(-diff / DAY)))
-        : diff < DAY ? tomatoI18n.计划今天
-        : tomatoI18n.计划N天后(Math.ceil(diff / DAY));
+    const days = Math.round((dayStartOf(next) - dayStartOf(now)) / DAY);
+    const rel = days > 0 ? tomatoI18n.计划N天后(days)
+        : days === 0 && next > now ? tomatoI18n.计划今天
+        : tomatoI18n.计划逾期N(Math.max(1, -days));
     return { date, rel };
 }
 
@@ -92,4 +95,73 @@ export function reviewPlanGroups(
         if ((a.dueCount > 0) !== (b.dueCount > 0)) return a.dueCount > 0 ? -1 : 1;
         return a.bookName.localeCompare(b.bookName);
     });
+}
+
+// ============ □5 今日清单日历投影：未来 7 天条带（纯函数层） ============
+
+/** 单卡预估分钟（期首从简=固定均值；条带「约 N 分钟」口径，勿扩散多处） */
+export const STRIP_MIN_PER_CARD = 2;
+
+/** 行落格：dueAt 落未来 7 天哪一格（0=今天格含逾期；null=无调度/NaN/第 7 天外）。
+ *  双源共用：sched 行 parseReview(v).next / 阅读卡行 dueMs——过滤与条带同口径，
+ *  保证「条带数字与列表一致」（点击过滤=同函数重放，非另一套判定）。
+ *  双日界差+round（review P2-1）：DST 时区每天 23/25h，floor(Δms/DAY) 会错格；
+ *  两侧都取本地午夜后差恒为 24k±1h，round 精确切格 */
+export function stripDayIdx(dueAt: number | null | undefined, now: number): number | null {
+    if (dueAt == null || !Number.isFinite(dueAt)) return null;
+    const diff = Math.round((dayStartOf(dueAt) - dayStartOf(now)) / DAY);
+    if (diff < 0) return 0;
+    return diff > 6 ? null : diff;
+}
+
+/** 超载三档（Weave IRPlannedDay 行为级，轻量勿过度设计）：锚 REVISIT_DAILY_LIMIT=5
+ *  （全局重现每日限额既有语义）——≤5 正常 / 6~10 轻 / >10 重 / 0 空。
+ *  ⚠期5 该限额接设置档（1/3/5/10）时此档阈值会随设置漂移——届时回看：换固定常数或
+ *  文档写明「随每日限额联动」（review P2-5 记档） */
+export function overloadOf(count: number): 0 | 1 | 2 | 3 {
+    if (count <= 0) return 0;
+    if (count <= REVISIT_DAILY_LIMIT) return 1;
+    if (count <= REVISIT_DAILY_LIMIT * 2) return 2;
+    return 3;
+}
+
+/** 条带一格 */
+export interface StripCell {
+    /** 当日 00:00 毫秒（第 i 格=今天+i 天） */
+    dayStart: number;
+    /** 今天 / 明天 / 周X（i≥2） */
+    label: string;
+    /** MM-DD 副行 */
+    sub: string;
+    count: number;
+    minutes: number;
+    /** 0 空 / 1 正常 / 2 轻 / 3 重（标色依据） */
+    overload: 0 | 1 | 2 | 3;
+}
+
+/** 到期时间戳集合 → 7 格条带（null/undefined 不计=阅读卡无调度行/毕业档案）。
+ *  第一格=逾期+今天合计（「今日清单」口径：今天要清的含欠账） */
+export function weekStrip(dueAt: (number | null | undefined)[], now: number): StripCell[] {
+    const start = dayStartOf(now);
+    const cells: StripCell[] = [];
+    const d0 = new Date(start);
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + i);
+        const wd = d.getDay();
+        cells.push({
+            dayStart: d.getTime(),
+            label: i === 0 ? tomatoI18n.计划今天 : i === 1 ? tomatoI18n.条带明天 : tomatoI18n.周N(wd === 0 ? 7 : wd),
+            sub: `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+            count: 0, minutes: 0, overload: 0,
+        });
+    }
+    for (const t of dueAt) {
+        const idx = stripDayIdx(t, now);
+        if (idx != null) cells[idx].count++;
+    }
+    for (const c of cells) {
+        c.minutes = c.count * STRIP_MIN_PER_CARD;
+        c.overload = overloadOf(c.count);
+    }
+    return cells;
 }

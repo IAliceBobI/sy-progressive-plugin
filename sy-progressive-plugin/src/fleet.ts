@@ -11,6 +11,7 @@ import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
 import { rollerDebtSummary, rollerTodayReads, type DebtSummary } from "./roller";
 import { pickWritingFlameBook } from "./writeBook";
+import { latestVisitNoteOfBook } from "./visitNoteQuery";
 import { progStorage } from "./ProgressiveStorage";
 import { PdigestReviewKey, ReviewKey, dueReviewSQLFor } from "./reviewQueue";
 import { onFleetChanged } from "./fleetNotify";
@@ -50,6 +51,9 @@ export interface FleetActions {
     toggleHideBook(bookID: string, v: boolean): any;
     ignoreBook(bookID: string): any;
     archiveBook(bookID: string): any;
+    /** □3 回访频率：书级档位（书 IAL+在册 grow 卡批量跟随，readCurve setBookVisitFreq；
+     *  f="l"|"m"|"h"=VisitFreq 字面联合——fleet 基座层不反向依赖曲线模块，形状同源维护） */
+    setVisitFreq(bookID: string, f: "l" | "m" | "h"): any;
 }
 
 export const FLEET_DOCK_TYPE = "prog-fleet-dock";
@@ -64,13 +68,15 @@ export const panelState = writable<FleetSummary | null>(null);
 /** □5 写作火苗数据（WritingFlame 消费）：null=无写作书不渲染。
  *  today=今日已写片数（写作书在 DayLogData.b 里的计数拆出独立显示，滚筒计数同权）；
  *  slotTitle=pickWritingTarget 命中槽的文档标题（null=无未定稿槽，tooltip 换素材/完稿
- *  口径）；materialUnread=期B 槽空态的未读素材数（tooltip 素材态分叉依赖） */
+ *  口径）；materialUnread=期B 槽空态的未读素材数（tooltip 素材态分叉依赖）；
+ *  notePreview=□4 该书最新回访留言前半句（null=无留言，tooltip 不加行） */
 export interface WritingFlameData {
     bookID: string;
     bookName: string;
     today: number;
     slotTitle: string | null;
     materialUnread: number;
+    notePreview?: string | null;
 }
 export const writingFlameState = writable<WritingFlameData | null>(null);
 
@@ -135,7 +141,9 @@ export async function refreshWritingFlame() {
             const row = await siyuan.sqlOne(`select content from blocks where type='d' and id='${hit.target.docID}'`);
             slotTitle = row?.content ?? `[${hit.target.point}]`;
         }
-        writingFlameState.set({ bookID: hit.bookID, bookName: hit.bookName, today, slotTitle, materialUnread: hit.materialUnread });
+        // □4 该书最新回访留言前半句（null=无留言不加行；查询失败静默不阻塞火苗）
+        const notePreview = await latestVisitNoteOfBook(hit.bookID).catch(() => null);
+        writingFlameState.set({ bookID: hit.bookID, bookName: hit.bookName, today, slotTitle, materialUnread: hit.materialUnread, notePreview });
     } catch (e) {
         console.error("fleet refreshWritingFlame failed", e);
     } finally {

@@ -7,6 +7,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalDigestDirUnder, getDocIalDigestDirHub, getDocIalDigestHub, getDocIalFreeDigestDir, getDocIalNoteBox, getDocIalNoteDir, getDocIalReadLog, getDocIalWords } from "./progData";
 import { MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import type { ReadingOrder } from "./roller";
+import type { VolEntry } from "./volIndex";
 import { osFs } from "../../sy-tomato-plugin/src/libs/globals";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 
@@ -180,6 +181,9 @@ export class ProgressiveStorage {
                 const info = ProgressiveStorage.defaultBookInfo();
                 info.bookID = id;
                 info.time = await siyuan.currentTimeMs();
+                // review P2-4：petal 存在卷表文件=目录书（写库先表后索引的半注册态也
+                // 带表）——补 dirMode 防 heal 后退化单篇语义（locatePiece 失效挂书壳兜底）
+                if (files.includes(ProgressiveStorage.volTableFileKey(id))) info.dirMode = true;
                 await this.resetBookInfo(id, info);
                 healed.push(id);
             }
@@ -217,6 +221,7 @@ export class ProgressiveStorage {
         if (typeof opt.autoSplitSentenceI === "boolean") info.autoSplitSentenceI = opt.autoSplitSentenceI;
         if (typeof opt.pinned === "boolean") info.pinned = opt.pinned;
         if (typeof opt.hidden === "boolean") info.hidden = opt.hidden;
+        if (typeof opt.dirMode === "boolean") info.dirMode = opt.dirMode;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
         if (utils.isValidNumber(opt.activePoint)) info.activePoint = opt.activePoint;
 
@@ -532,6 +537,46 @@ export class ProgressiveStorage {
         return this.plugin.saveData(constants.STORAGE_BOOKS, this.booksInfos());
     }
 
+    // ============ □1 目录成书：卷表（petal <bookID>.vols.json） ============
+    // 索引文件格式不动（一维 point 全局连续，kernel/滚筒/舰队消费面零改动），卷结构
+    // 旁挂本文件：与索引同点写同点删。键含 "." 不匹配 BLOCK_ID_RE——booksInfos()/
+    // halfRegisteredIDs 的书键谓词天然不认它（无脏键风险，storageVolTable.test 锁死）。
+
+    static volTableFileKey(bookID: string) {
+        return bookID + ".vols.json";
+    }
+
+    async saveVolTable(bookID: string, vols: VolEntry[]) {
+        const table = { v: 1 as const, vols };
+        this.plugin.data[ProgressiveStorage.volTableFileKey(bookID)] = table;
+        await this.plugin.saveData(ProgressiveStorage.volTableFileKey(bookID), table);
+    }
+
+    /** 清卷表（盘+内存缓存）。复审 P2：loadVolTable 回写缓存后，删表不清缓存=同
+     *  session 残留 stale；dir 书重加为 single 也走此清残留（防 heal 误补 dirMode） */
+    async clearVolTable(bookID: string) {
+        delete this.plugin.data[ProgressiveStorage.volTableFileKey(bookID)];
+        await this.plugin.removeData(ProgressiveStorage.volTableFileKey(bookID));
+    }
+
+    /** 读卷表；缺省/损坏/非目录书=[]（空表=按单篇书处理，调用方须先判 dirMode） */
+    async loadVolTable(bookID: string): Promise<VolEntry[]> {
+        const key = ProgressiveStorage.volTableFileKey(bookID);
+        let raw = this.plugin.data[key];
+        if (raw == null) {
+            raw = await this.plugin.loadData(key);
+            // review P2-3：命中后回写缓存——session 内未写过卷表时每次出场免一发
+            // loadData HTTP（loadBookIndexIfNeeded 同款缓存语义；null=无文件不缓存）
+            if (raw != null) this.plugin.data[key] = raw;
+        }
+        try {
+            const t = typeof raw === "string" ? JSON.parse(raw) : raw;
+            return Array.isArray(t?.vols) ? t.vols : [];
+        } catch {
+            return [];
+        }
+    }
+
     async removeIndex(bookID: string) {
         // □2 删书同步清理：文档还在则解除只读+清书标（空串删 IAL 键；lost 书文档已删，
         // siyuan.call 吞错容错）。放在删条目前——此时 books.json 还有键，与 heal 的
@@ -551,6 +596,9 @@ export class ProgressiveStorage {
                 lastServed: ro.lastServed === bookID ? "" : ro.lastServed,
             });
         }
+        // □1 目录书删书顺删卷表（键形状不过书键谓词，残留无害但清理干净；
+        // 复审 P2：内存缓存同步清——loadVolTable 回写缓存后删盘不清缓存=同 session stale）
+        await this.clearVolTable(bookID);
         return this.plugin.removeData(bookID);
     }
 

@@ -17,6 +17,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openRefillMenu } from "./refillMenu";
 import { openFloatPopover, closeFloatPopover } from "./overlays";
 import { showFloatTip, hideFloatTip } from "./floatTip";
+import { openVisitNoteInput } from "./visitNoteInput";
 import DigestTreePopover from "./DigestTreePopover.svelte";
 import { formatDueCount } from "./progFloatState";
 import { capsuleTodayText, capsuleBookDue } from "./tailCardAppend";
@@ -108,6 +109,12 @@ const pieceActions = (): TailAction[] => [
         label: () => tomatoI18n.加书,
         run: d => prog.addProgressiveReadingWithLock(d.docID),
     },
+    {
+        // □4 回访留言：写到本文档尾部（片=给回访这片自己；读入口=复习计划行/火苗 tooltip）
+        act: "vnote", icon: "iconInfo",
+        label: () => tomatoI18n.写留言(),
+        run: d => openVisitNoteInput(d.docID),
+    },
 ];
 
 /** digest 尾卡 tree/summary 的归属书实时解析（matfeed □1 reasoning P1-1）：尾卡内容
@@ -162,6 +169,12 @@ const digestActions = (): TailAction[] => [
         act: "redigest", icon: "iconProgScissors",
         label: () => tomatoI18n.再摘抄, tip: () => tomatoI18n.路线摘抄再摘抄,
         run: () => digestProgressiveBox.digestModeToggle(),
+    },
+    {
+        // □4 回访留言（digest 卡同款：落摘抄文档尾）
+        act: "vnote", icon: "iconInfo",
+        label: () => tomatoI18n.写留言(),
+        run: d => openVisitNoteInput(d.docID),
     },
 ];
 

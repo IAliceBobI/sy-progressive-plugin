@@ -21,6 +21,15 @@ declare global {
                 fullfilContent: (point: number, bookID: string, piecePre: string[], piece: string[], noteID: string, stype: AsList | "no" | null) => Promise<void>;
                 runSplit: (bookID: string, point: number, bookName?: string) => Promise<string>;
             };
+            // □1 目录成书调试通道（e2e/agent；同 split 门禁）
+            volbook?: {
+                listVolIDs: (bookID: string) => Promise<string[]>;
+                buildContentBlocksVols: (volIDs: string[]) => Promise<{ blocks: WordCountType[]; textLen: number; rawCount: number; spans: { volID: string; start: number; end: number }[] }>;
+                computePieceIndexVols: (content: { blocks: WordCountType[]; textLen: number; rawCount: number; spans: { volID: string; start: number; end: number }[] }, headings: string[], splitWordNum: number) => Promise<{ groups: WordCountType[][]; perVol: number[] }>;
+                saveVolTable: (bookID: string, vols: { d: string; n: number }[]) => Promise<void>;
+                loadVolTable: (bookID: string) => Promise<{ d: string; n: number }[]>;
+                ensureFresh: (bookID: string) => Promise<boolean>;
+            };
         };
     }
 }

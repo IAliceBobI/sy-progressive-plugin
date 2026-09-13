@@ -4,7 +4,8 @@
 // - 顶层块平铺有序（heading 容器化书也平铺），与 getBlockDOM 的 DOM 顶层逐位一致
 // - content 是纯文本全文、无截断；空段落 content 为 null（markdown 键同缺）
 // - subType 仅 h 块有值（"h1"~"h6"），其余 null
-type ChildBlockRow = {
+// □2 起供 splitVols.ts 复用（卷块映射同口径）
+export type ChildBlockRow = {
     id: string;
     type?: string | null;
     subType?: string | null;

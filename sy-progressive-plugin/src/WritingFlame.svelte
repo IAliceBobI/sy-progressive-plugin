@@ -16,7 +16,8 @@
     const state = $derived(($flame?.today ?? 0) >= ($writingQuota || 1) && ($flame?.today ?? 0) > 0 ? "goal"
         : ($flame?.today ?? 0) > 0 ? "wrote" : "idle");
     const tooltip = $derived(
-        $flame == null ? "" : tomatoI18n.写作火苗提示($flame.today, $flame.bookName, $flame.slotTitle, $flame.materialUnread, $writingQuota || 1),
+        $flame == null ? "" : tomatoI18n.写作火苗提示($flame.today, $flame.bookName, $flame.slotTitle, $flame.materialUnread, $writingQuota || 1)
+            + ($flame.notePreview ? ` · ${tomatoI18n.最近留言()}·${$flame.notePreview}` : ""),
     );
     const skin = $derived(
         PROG_FLAMES.find(s => s.slug === $progFlameSkin)
