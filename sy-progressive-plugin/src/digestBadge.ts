@@ -17,7 +17,7 @@ export interface DigestBadgeInput {
     thinkReview: string;
     /** 文档内存在 done 思考块（采集层保证：thinkReview 活跃时此值不参与判定） */
     thinkDone: boolean;
-    /** 该摘抄文档已入书 digest 夹卡组 */
+    /** 该摘抄文档块自身已入卡组（getRiffCardsByBlockIDs 块口径，与书归属/落点夹无关） */
     cardInSet: boolean;
     /** 仿写副本机读标记 custom-prog-for-recite */
     forRecite: boolean;

@@ -7,7 +7,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { ensureAnchoredDoc, findDocByIal, getDocIalProgData, getDocIalDigestDir, getDocIalDigestDirUnder, getDocIalDigestDirHub, getDocIalDigestHub, getDocIalFreeDigestDir, getDocIalNoteBox, getDocIalNoteDir, getDocIalReadLog, getDocIalWords } from "./progData";
 import { MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import type { ReadingOrder } from "./roller";
-import type { VolEntry } from "./volIndex";
+import { volOwnerMap, type VolEntry } from "./volIndex";
 import { osFs } from "../../sy-tomato-plugin/src/libs/globals";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 
@@ -43,6 +43,9 @@ export class ProgressiveStorage {
         // □1 半注册自愈（治历史存量）：断在 saveIndex 与 resetBookInfo 之间的加书在此补注册；
         // 移动端/浏览器端读不到 fs 时内部静默跳过
         await this.healHalfRegistered();
+        // dirbook □1：卷→书根映射预热（出场链 book 态识别依赖卷文档反查书根；heal 补
+        // dirMode 之后跑才全）。await=完成即可查，出场链负缓存同步翻转防误钉
+        await this.warmVolOwner();
     }
 
     async updateBookInfoTime(docID: string) {
@@ -546,17 +549,91 @@ export class ProgressiveStorage {
         return bookID + ".vols.json";
     }
 
+    // dirbook □1：卷文档 id → 书根 id 映射（出场链 book 态识别的反查原语）。null=未构建
+    // （区别空 Map=已扫全但无目录书）；出场链是高频面，识别只做同步内存查——构建走
+    // warmVolOwner 预热，写路径（save/clearVolTable）同步维护防 stale。
+    private volOwner: Map<string, string> | null = null;
+    private volOwnerTask: Promise<void> | null = null;
+    private volOwnerFails = 0;
+
+    /** 映射是否已构建（出场链负缓存 verifiedNormalDoc 的 gate：未就绪不把识别落空
+     *  钉成普通文档——卷文档可能只是映射还没好） */
+    volOwnerReady(): boolean {
+        return this.volOwner != null;
+    }
+
+    /** 卷文档 id → 所属书根（同步内存查；未预热/不在册=undefined，读盘走 warmVolOwner） */
+    volDocToBookID(volDocID: string): string | undefined {
+        return this.volOwner?.get(volDocID);
+    }
+
+    /** 出场识别组合谓词：注册书返回自身、卷文档返回书根、其余 undefined——detectFloatDoc
+     *  的 bookOfDoc 回调生产注入点（旧 isRegisteredBook 回调=返回值语义的特例） */
+    docBookID(docID: string): string | undefined {
+        if (this.isRegisteredBook(docID)) return docID;
+        return this.volOwner?.get(docID);
+    }
+
+    /** 全量构建卷→书根映射：遍历在册 dirMode 书读卷表（loadVolTable 自带 plugin.data
+     *  缓存，同 session 二次构建零 IO）。幂等：已构建直回、进行中复用同一 task。review
+     *  P1-1 门闩：books.json 未载（storageReady=false）禁止构建——空数据会建成空 Map
+     *  被永久缓存（onLayoutReady 末尾预热撞幂等早退=空映射钉死全 session；窗口期可达
+     *  入口=⌥Z 命令注册先于 onLayoutReady）。review P2-3：失败打点+预算（3 败后不再
+     *  重建换稳定降级——防出场链高频 kick 变重试风暴）。构建到局部变量收尾原子替换
+     *  ——出场链的同步查询永不读到半成品 Map。 */
+    async warmVolOwner(): Promise<void> {
+        if (!this.storageReady) return; // 门闩：books.json 未载前禁止构建（空映射会被永久缓存）
+        if (this.volOwner) return;
+        if (this.volOwnerFails >= 3) return;
+        if (!this.volOwnerTask) {
+            this.volOwnerTask = (async () => {
+                const books = Object.keys(this.booksInfos())
+                    .filter(id => this.isRegisteredBook(id) && this.booksInfos()[id]?.dirMode === true);
+                // review P2-4：并行读盘（volOwnerMap 无序容忍撞车脏数据），不挂串行链在
+                // 启动关键路径上
+                const entries = await Promise.all(books.map(async bookID =>
+                    ({ bookID, vols: await this.loadVolTable(bookID) })));
+                this.volOwner = volOwnerMap(entries);
+                this.volOwnerFails = 0;
+            })().catch(() => {
+                this.volOwnerTask = null; // 失败重置供下次重建
+                this.volOwnerFails++;
+                debugLog("storage", `warmVolOwner failed fails=${this.volOwnerFails}（出场链 kick 将${this.volOwnerFails >= 3 ? "停止" : "重试"}）`, "progressive");
+            });
+        }
+        await this.volOwnerTask;
+    }
+
+    /** 写路径同步维护一书段：先摘该书旧卷再无条件放入新卷（review P2-1 夺主语义——
+     *  save 即所有权断言：跨书搬卷时 ensureVolTableFresh 逐书刷新无论 A/B 何序，终态
+     *  都归最后写表的书；与 volOwnerMap 先者胜的分歧只在脏撞车场景，任一答案可接受）。
+     *  映射未构建时 no-op——后置 warm 读盘上卷表自然含新值。 */
+    private replaceVolOwnerSeg(bookID: string, vols: VolEntry[]): void {
+        if (!this.volOwner) return;
+        for (const [k, v] of this.volOwner) {
+            if (v === bookID) this.volOwner.delete(k);
+        }
+        for (const vol of vols) {
+            if (vol.d) this.volOwner.set(vol.d, bookID);
+        }
+    }
+
     async saveVolTable(bookID: string, vols: VolEntry[]) {
         const table = { v: 1 as const, vols };
         this.plugin.data[ProgressiveStorage.volTableFileKey(bookID)] = table;
         await this.plugin.saveData(ProgressiveStorage.volTableFileKey(bookID), table);
+        // 映射正在构建时先等收尾再维护（构建快照读的是旧表，此处用新 vols 修正）
+        if (this.volOwnerTask) await this.volOwnerTask;
+        this.replaceVolOwnerSeg(bookID, vols);
     }
 
-    /** 清卷表（盘+内存缓存）。复审 P2：loadVolTable 回写缓存后，删表不清缓存=同
+    /** 清卷表（盘+内存缓存+映射段）。复审 P2：loadVolTable 回写缓存后，删表不清缓存=同
      *  session 残留 stale；dir 书重加为 single 也走此清残留（防 heal 误补 dirMode） */
     async clearVolTable(bookID: string) {
         delete this.plugin.data[ProgressiveStorage.volTableFileKey(bookID)];
         await this.plugin.removeData(ProgressiveStorage.volTableFileKey(bookID));
+        if (this.volOwnerTask) await this.volOwnerTask;
+        this.replaceVolOwnerSeg(bookID, []);
     }
 
     /** 读卷表；缺省/损坏/非目录书=[]（空表=按单篇书处理，调用方须先判 dirMode） */

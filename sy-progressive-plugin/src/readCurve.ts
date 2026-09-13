@@ -30,7 +30,7 @@ import {
     AUTORELAX_KEY, AUTO_RELAX_CAP, CurveMode, CurvePlanCard, parseReadCard, RATING_GRACE_MS, READCARD_KEY, READOUT_KEY, ReadCardKind,
     cadenceDays, cadenceOpts, consumeRound, DIGEST_BUILD_CAP, dueStamp, formatReadCard, GROW_INTERVALS,
     growInterval, isConsumedCurve, isMaterialFirstPush, isRPCardMarkdown, isRated, normalizeDue, parseStamp, planSweep, plusDays,
-    RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, sortForReconcile,
+    RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, sortForReconcile, tailFollowState,
     toSchedValue, tomorrowStart, VisitFreq, VISITRATE_KEY,
 } from "./readCurveCore";
 import { statusLineOf } from "./readCurveText";
@@ -43,7 +43,9 @@ export async function setReadingDues(dues: { id: string; due: string }[]): Promi
     await siyuan.batchSetRiffCardsDueTimeByBlockID(dues);
 }
 
-/** 查块集 riff 卡现状（块→末张卡；无卡块不在返回 Map——孤儿判定靠它） */
+/** 查块集 riff 卡现状（块→卡列表。⚠内核对无卡块也补占位条目（riffCardID 零值 ""，
+ *  flashcard.go GetFlashcardsByBlockIDs）——Map 必含全部请求 id，孤儿判定只能按
+ *  riffCard/riffCardID 过滤（本文件 .some(s => s.riffCard) 范式），keys() 语义恒错） */
 async function getReadingCardStates(blockIDs: string[]): Promise<Map<string, GetCardRetBlock[]>> {
     if (!blockIDs.length) return new Map<string, GetCardRetBlock[]>();
     return siyuan.getRiffCardsByBlockIDs(blockIDs);
@@ -511,12 +513,28 @@ export async function buildReadingCard(docID: string, due: string, opts?: { mode
         void (async () => {
             try {
                 await siyuan.reviewRiffCardByBlockID(docID, 2);
-                await setReadingDues([{ id: docID, due }]);
+                // 打磨批（□3 备案项→□2 守卫）：1s 尾链窗内书级改档批已按新档重排过键
+                // freq 段（count≥1 还重排了 due），按建卡期快照覆写=改档丢单卡（自愈要等
+                // 下次事件）。正解=以当下键态重导出：改档已落的 freq/count 沿用，due 按
+                // rescheduleDays 同公式重排（material 分流同源）；未介入路径输出逐字节不变
+                const attrs = ((await siyuan.getBlockAttrs(docID)) ?? {}) as any;
+                const st = tailFollowState(String(attrs[READCARD_KEY] ?? ""), opts?.freq);
+                let dueFinal = due;
+                if (st && st.count >= 1) {
+                    const bookID = parseBookIDFromCtime(String(attrs[PDIGEST_CTIME] ?? ""));
+                    const matBook = !!(bookID && progStorage.booksInfos()[bookID]?.writing);
+                    const matRemaining = matBook ? await materialUnreadOfBook(bookID) : undefined;
+                    const days = rescheduleDays(matBook ? "material" : "digest", matRemaining, st.count, st.freq ?? "m");
+                    if (days != null) dueFinal = plusDays(new Date(st.waterlineMs), days);
+                }
+                await setReadingDues([{ id: docID, due: dueFinal }]);
                 const states = await getReadingCardStates([docID]);
                 const lr = states.get(docID)?.at(-1)?.riffCard?.lastReview as unknown;
                 const ms = typeof lr === "number" ? lr : lr ? Date.parse(String(lr)) || 0 : 0;
-                if (ms > 0) await siyuan.setBlockAttrs(docID, { [READCARD_KEY]: keyOf(ms) } as any);
-                debugLog("readcurve", `card built ${docID} due=${due}`, "progressive");
+                if (ms > 0) await siyuan.setBlockAttrs(docID, {
+                    [READCARD_KEY]: st ? formatReadCard({ ...st, waterlineMs: ms }) : keyOf(ms),
+                } as any);
+                debugLog("readcurve", `card built ${docID} due=${dueFinal}${st ? " (freq-follow)" : ""}`, "progressive");
             } catch (e) {
                 debugLog("readcurve", `build tail fail ${docID}: ${e}`, "progressive");
             }

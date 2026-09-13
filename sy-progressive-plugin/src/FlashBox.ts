@@ -7,12 +7,15 @@ import { getCardsDoc, getHPathByDocID } from "./helper";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { domNewLine, DomSuperBlockBuilder, getSpans } from "../../sy-tomato-plugin/src/libs/sydom";
 import { getDocTracer, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { cardLanding, cardContextMenu, flashcardAddRefs, flashcardNotebook, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { cardLanding, cardContextMenu, flashcardAddOriginRef, flashcardAddRefs, flashcardNotebook, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
+import { cardBlocksForMake } from "./flashCardChannel";
+import { shouldAddOriginRef } from "./flashCardRef";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { lockWithLease } from "./lockLease";
 
 export enum CardType {
@@ -145,8 +148,9 @@ class FlashBox {
     async makeCardFromBlocks(protyle: IProtyle, blocks: HTMLElement[], t: CardType = CardType.None) {
         const divs: HTMLElement[] = [];
         const ids: string[] = [];
+        const setRef = shouldAddOriginRef(undefined, flashcardAddOriginRef.get());
         for (const b of blocks) {
-            const { id, div } = await this.cloneDiv(b as HTMLDivElement, true);
+            const { id, div } = await this.cloneDiv(b as HTMLDivElement, setRef);
             ids.push(id);
             divs.push(div);
         }
@@ -200,16 +204,27 @@ class FlashBox {
      *  @param landing 落点单次覆盖（B③ 三直发命令用）；缺省回落 cardLanding 默认档 */
     async makeCard(protyle: IProtyle, t: CardType, path?: string, noRef?: boolean, landing?: CardLanding) {
         if (!protyle) return;
-        const { ids, divs } = await this.cloneSelectedLineMarkdowns(protyle, noRef);
-        if (ids.length > 0) { // multilines
-            await this.insertCard(protyle, divs, t, ids[ids.length - 1], path, landing);
-        } else {
-            const blockID = events.lastBlockID; // getCursorElement
-            const range = document.getSelection()?.getRangeAt(0);
-            const blank = range?.cloneContents()?.textContent ?? "";
-            if (blockID) {
-                this.blankSpaceCard(blockID, blank, range, protyle, t, path, noRef, landing);
+        // 块级通道取块（2026-09-13 跨块修复，bear 拍板「直接使用这几个块」）：统一三级链
+        // ——块多照旧 + 跨块拖蓝整块进卡不挖空。旧版只查块选类，思源 3.8 起拖蓝不再转
+        // 块选（issue 8554）漏检 → 退挖空分支只抓 endContainer 末块=前块蒸发
+        const wysiwyg = protyle?.wysiwyg?.element;
+        const sel = document.getSelection();
+        const live = sel?.rangeCount ? sel.getRangeAt(0) : undefined;
+        const chain = wysiwyg ? collectSelectedBlocks(wysiwyg, { range: live, cursorEl: utils.getCursorElement() }) : null;
+        debugLog("flashcard", `makeCard t=${t} doc=${protyle.block?.rootID ?? "-"} level=${chain?.level} blocks=${chain?.blocks?.length} multi=${cardBlocksForMake(chain)?.length} lastBlock=${events.lastBlockID} blank=${(live?.cloneContents?.()?.textContent ?? "").length}`, "prog");
+        const multi = cardBlocksForMake(chain);
+        if (multi?.length) {
+            const { ids, divs } = await this.cloneBlocksForCard(multi, noRef);
+            if (ids.length > 0) { // multilines
+                await this.insertCard(protyle, divs, t, ids[ids.length - 1], path, landing);
+                return;
             }
+        }
+        const blockID = events.lastBlockID; // getCursorElement
+        const range = document.getSelection()?.getRangeAt(0);
+        const blank = range?.cloneContents()?.textContent ?? "";
+        if (blockID) {
+            this.blankSpaceCard(blockID, blank, range, protyle, t, path, noRef, landing);
         }
     }
 
@@ -306,6 +321,7 @@ class FlashBox {
             div.removeAttribute(gconst.PROG_KEY_NOTE)
             div.removeAttribute(gconst.PROG_PIECE_PREVIOUS)
             div.removeAttribute("custom-prog-words")
+            div.removeAttribute("custom-ai-response")
         }
 
         const builder = new DomSuperBlockBuilder();
@@ -349,13 +365,15 @@ class FlashBox {
         return { cardID: builder.id, div, domStr: div.outerHTML, text: div.textContent };
     }
 
-    private async cloneSelectedLineMarkdowns(protyle: IProtyle, noRef?: boolean) {
-        const multiLine = protyle?.element?.querySelectorAll(`.${gconst.PROTYLE_WYSIWYG_SELECT}`);
-        const divs = [];
-        let setRef = !noRef;
+    /** 块级制卡克隆（2026-09-13 跨块修复重构）：块源由调用方注入（三级链块多选/跨块
+     *  拖蓝）；引用 span 只加首块、来源路径只取首块（setTheRef/setPath 传递，原块选类
+     *  查询随「拖蓝不转块选」的漏检退役） */
+    private async cloneBlocksForCard(blocks: Element[], noRef?: boolean) {
+        let setRef = shouldAddOriginRef(noRef, flashcardAddOriginRef.get());
         let doSetPath = true;
-        const ids = [];
-        for (const div of multiLine) {
+        const ids: string[] = [];
+        const divs: HTMLElement[] = [];
+        for (const div of blocks) {
             const { id, div: elem, setTheRef, setPath } = await this.cloneDiv(div as any, setRef, doSetPath);
             if (setTheRef) setRef = false;
             if (setPath) doSetPath = false;
@@ -380,18 +398,19 @@ class FlashBox {
         const { dom } = getBlockDOM(range.endContainer.parentElement);
         if (!dom) return;
         const ro = await events.isDocReadonly(protyle);
+        const setRef = shouldAddOriginRef(noRef, flashcardAddOriginRef.get());
         if (selected) {
             if (ro) dom.querySelectorAll(`div[${gconst.CONTENT_EDITABLE}="false"]`).forEach(e => e.setAttribute(gconst.CONTENT_EDITABLE, "true"));
 
             protyle.toolbar.setInlineMark(protyle, "mark", "range");
-            const { div } = await this.cloneDiv(dom as HTMLDivElement, !noRef);
+            const { div } = await this.cloneDiv(dom as HTMLDivElement, setRef);
             protyle.toolbar.setInlineMark(protyle, "mark", "range");
 
             if (ro) dom.querySelectorAll(`div[${gconst.CONTENT_EDITABLE}="true"]`).forEach(e => e.setAttribute(gconst.CONTENT_EDITABLE, "false"));
 
             tmpDiv = div;
         } else {
-            const { div } = await this.cloneDiv(dom as HTMLDivElement, !noRef);
+            const { div } = await this.cloneDiv(dom as HTMLDivElement, setRef);
             tmpDiv = div;
         }
         await this.insertCard(protyle, [tmpDiv], cardType, blockID, path, landing);

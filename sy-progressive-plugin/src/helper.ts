@@ -11,7 +11,7 @@ import { isMultiLineElement } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { SplitSentence } from "./SplitSentence";
 import { prog } from "./Progressive";
 import { pieceDocName, pieceAlias, getDocIalWords, getDocIalPieces } from "./progData";
-import { locatePiece } from "./volIndex";
+import { locatePiece, pieceTreeLookup } from "./volIndex";
 import { appendTailCard } from "./tailCardAppend";
 
 // getDocIalWords 定义已挪 progData.ts（v5 words 进 prog-data，ProgressiveStorage 也要用，避免循环 import）
@@ -139,7 +139,38 @@ export async function cleanNote(noteID: string) {
 }
 
 export async function findPieceDoc(bookID: string, point: number) {
-    return doFindDoc(bookID, getDocIalPieces, point);
+    const id = await doFindDoc(bookID, getDocIalPieces, point);
+    if (id) return id;
+    // □10 竞态防线①：SQL ial 索引窗 miss（刚建片 24s+ 不可见——顺序模式出场新 point
+    // 时 SQL miss 是常态）→ 文件树直查兜底，否则 sweep 对同 point 再跑 createPiece
+    // 会建出第二张同内容片
+    const info = await progStorage.booksInfo(bookID).catch(() => null);
+    return info ? findPieceDocByTree(info, point) : "";
+}
+
+/** 文件树直查：片名 [NNNNN] 前缀+卷/书壳目录决策（纯逻辑核=pieceTreeLookup）。
+ *  候选逐个 IAL 复核（getBlockAttrs 直读不吃索引窗；review P2-1：同目录用户复制的
+ *  同名前缀文档不算片，存量双片时取真正在册的那张）。listDocsByPath 走 siyuan.call
+ *  直调传 maxListCount:0（tomato 封装无此参；默认 512 用户可改小=巨书越窗静默 miss）。 */
+async function findPieceDocByTree(info: BookInfo, point: number): Promise<string> {
+    try {
+        const shell = await siyuan.getBlockInfo(info.bookID).catch(() => null);
+        if (!shell?.box) return "";
+        const shellPath = String((shell as any).path ?? "").replace(/\.sy$/, "");
+        const vols = info.dirMode ? await progStorage.loadVolTable(info.bookID) : null;
+        const cands = await pieceTreeLookup(shell.box, shellPath, vols, point,
+            (box, path) => siyuan.call("/api/filetree/listDocsByPath", { notebook: box, path, maxListCount: 0 })
+                .then(r => (((r as any)?.files ?? r) as { id: string; name: string }[] | null))
+                .catch(() => null));
+        const want = getDocIalPieces(info.bookID, point);
+        for (const id of cands) {
+            const attrs = await siyuan.getBlockAttrs(id).catch(() => null);
+            if (attrs && attrs[MarkKey] === want) return id;
+        }
+        return "";
+    } catch {
+        return ""; // 兜底链任何失败=原语义（空=未命中）
+    }
 }
 
 /** 片文档过滤 SQL：originTrace 纯函数实现（digest 误删防线，TDD 见 tests/unit/pieceCleanupSQL.test.ts） */
@@ -234,35 +265,69 @@ export async function createAllPieces(bookID: string) {
     return ids;
 }
 
+/** □10 竞态防线②：同 key 的 in-flight Promise 去重 + 60s TTL 复用表（review P1-1：
+ *  check-then-act 登记挡不住「同刻双飞」——两个 createPiece 都在对方 createNote 返回
+ *  前进场=双双走查双双建；in-flight 共享同一次建片 Promise 才真覆盖。TTL 复用防
+ *  「60s 内复跑」，命中后存在性校验防「读完即删/重划分在窗内删片→幽灵 id」
+ *  〔review P1-2：deleteAndBack 自带触发器——gotoBlock 上一 point→建片→删当前片〕） */
+const pieceBuilds = new Map<string, Promise<string> | { id: string; ts: number }>();
+const RECENT_PIECE_TTL = 60_000;
+const PIECE_BUILDS_CAP = 256;
+
 export async function createPiece(bookInfo: BookInfo, index: string[][], point: number) {
     if (bookInfo == null || index == null || point == null) return "";
     if (point > index.length - 1) return ""
     if (point < 0) return ""
 
-    let noteID = await findPieceDoc(bookInfo.bookID, point);
-    if (noteID) return noteID;
-
-    const piecePre = index.at(point - 1) ?? []
-    // 修复根因 2：piece 为空说明索引未就绪（或 point 越界），不创建空文档，
-    // 返回 "" 让 startToLearn 的重试循环（Progressive.ts:431）能感知失败并重试。
-    // 块存在性校验：书被编辑后索引会残留已删除块的 ID（悬空 ID），
-    // 过滤后全部悬空则跳过该 point，否则会创建只有标题没有内容的空分片。
-    const piece = (await siyuan.getRows(index.at(point) ?? [], "id")).map(r => r.id);
-    if (piece.length === 0) return "";
-    // □1 目录书：片挂来源卷下（定位先算在哪卷）。卷表越界（索引与卷表失配窗口）
-    // → 挂书壳兜底 + Loki 痕迹（下次出场 ensureVolTableFresh 重组校正）
-    let volDocID = "";
-    if (bookInfo.dirMode) {
-        const vols = await progStorage.loadVolTable(bookInfo.bookID);
-        const loc = locatePiece(vols, point);
-        if (loc) volDocID = vols[loc.volIndex].d;
-        else debugLog("volbook", `createPiece vol-locate miss book=${bookInfo.bookID} point=${point} vols=${vols.length}`, "progressive");
+    const key = `${bookInfo.bookID}#${point}`;
+    const existing = pieceBuilds.get(key);
+    if (existing && !(existing instanceof Promise)) {
+        if (Date.now() - existing.ts < RECENT_PIECE_TTL) {
+            const alive = await siyuan.getBlockInfo(existing.id).catch(() => null);
+            // double-check（review 复评残余窗）：校验挂起期间先醒者可能已 delete 本条目
+            // 并登记新 run——后醒者再 delete 会把 run 孤儿化→双建复发；重入走共享分支
+            if (pieceBuilds.get(key) !== existing) return createPiece(bookInfo, index, point);
+            if (alive) return existing.id;
+        }
+        pieceBuilds.delete(key); // 过期或片已删（幽灵 id）→ 走正常链
     }
-    noteID = await createNote(bookInfo.bookID, piece, point, volDocID);
-    if (!noteID) return "";
+    const run = existing instanceof Promise ? existing : (async () => {
+        let noteID = await findPieceDoc(bookInfo.bookID, point);
+        if (noteID) return noteID;
 
-    await fullfilContent(point, bookInfo.bookID, piecePre, piece, noteID, null);
-    return noteID;
+        const piecePre = index.at(point - 1) ?? []
+        // 修复根因 2：piece 为空说明索引未就绪（或 point 越界），不创建空文档，
+        // 返回 "" 让 startToLearn 的重试循环（Progressive.ts:431）能感知失败并重试。
+        // 块存在性校验：书被编辑后索引会残留已删除块的 ID（悬空 ID），
+        // 过滤后全部悬空则跳过该 point，否则会创建只有标题没有内容的空分片。
+        const piece = (await siyuan.getRows(index.at(point) ?? [], "id")).map(r => r.id);
+        if (piece.length === 0) return "";
+        // □1 目录书：片挂来源卷下（定位先算在哪卷）。卷表越界（索引与卷表失配窗口）
+        // → 挂书壳兜底 + Loki 痕迹（下次出场 ensureVolTableFresh 重组校正）
+        let volDocID = "";
+        if (bookInfo.dirMode) {
+            const vols = await progStorage.loadVolTable(bookInfo.bookID);
+            const loc = locatePiece(vols, point);
+            if (loc) volDocID = vols[loc.volIndex].d;
+            else debugLog("volbook", `createPiece vol-locate miss book=${bookInfo.bookID} point=${point} vols=${vols.length}`, "progressive");
+        }
+        noteID = await createNote(bookInfo.bookID, piece, point, volDocID);
+        if (!noteID) return "";
+        await fullfilContent(point, bookInfo.bookID, piecePre, piece, noteID, null);
+        return noteID;
+    })();
+    if (!(existing instanceof Promise)) pieceBuilds.set(key, run);
+    const id = await run.catch(() => "");
+    // settle 置换：成功留 TTL 条目（共享者重复置换同值无害）；失败/异常清位
+    if (id) pieceBuilds.set(key, { id, ts: Date.now() });
+    else pieceBuilds.delete(key);
+    if (pieceBuilds.size > PIECE_BUILDS_CAP) {
+        const now = Date.now();
+        for (const [k, v] of pieceBuilds) {
+            if (!(v instanceof Promise) && now - v.ts >= RECENT_PIECE_TTL) pieceBuilds.delete(k);
+        }
+    }
+    return id;
 }
 
 export async function fullfilContent(point: number, bookID: string, piecePre: string[], piece: string[], noteID: string, stype: AsList | "no" | null) {

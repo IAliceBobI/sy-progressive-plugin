@@ -15,7 +15,7 @@
     } from "./Progressive";
     import { HtmlCBType } from "./constants";
     import { CARD_RECITE } from "./digestCardMode";
-    import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, moveToFlatSeg, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, isFlatGhost, type FloatDocKind } from "./progFloatState";
+    import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, moveToFlatSeg, advGroupIndexesForKind, dedupFlatSegs, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, isFlatGhost, type FloatDocKind } from "./progFloatState";
     import { progStorage } from "./ProgressiveStorage";
     import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, fetchWritingPieces, mergePieceIntoNeighbor, feedBlocksToPool, moveDigestToPool, copyDigestToPool } from "./writeBook";
     import { PROG_DONE_KEY } from "../../sy-tomato-plugin/src/libs/gconst";
@@ -132,15 +132,18 @@
         ($kind === "book" || $kind === "piece") && !!$bookID && !!(progStorage.peekBookInfo($bookID)?.writing),
     );
     // □2 一级格拼接：managePool 挂「本书摘抄」（traceUp）之后——同区并列、语义相邻
-    // （原四层链=traceUp→浮层→底部入口，新格=旧链终点的直通电梯）。不进 PIECE_LOW_POOL
-    // 配置池（设置面板复用池=跨态通用动作，写作书专用同「插入素材」条件钮先例）；
-    // piece 态 traceUp 被拖上首行时落尾部（buildFlatCells 滤除后 indexOf 落空兜底）。
-    // □2 活界编排（progtail）：inherent low 不含 managePool（钉位格不进 manifest 词汇），
-    // flatSegs 合成后由它钉回 traceUp 后固有位——flatSegs/flatCells 定义在 advVisible 之后
-    // （$derived 直接表达式前向引用过不了 svelte-check 的 TS2448；消费方全在函数体/模板层）
+    // （原四层链=traceUp→浮层→底部入口，新格=旧链终点的直通电梯）。□4④ 增 slotList
+    // （本书槽列表）同区钉位。均不进 PIECE_LOW_POOL 配置池（设置面板复用池=跨态通用
+    // 动作，写作书专用同「插入素材」条件钮先例）；piece 态 traceUp 被拖上首行时落尾部
+    // （buildFlatCells 滤除后 indexOf 落空兜底）。
+    // □2 活界编排（progtail）：inherent low 不含 managePool/slotList（钉位格不进 manifest
+    // 词汇），flatSegs 合成后由它钉回 traceUp 后固有位——flatSegs/flatCells 定义在
+    // advVisible 之后（$derived 直接表达式前向引用过不了 svelte-check 的 TS2448；消费方
+    // 全在函数体/模板层）。WRITING_PINNED=钉位格词汇（拖拽/池守卫三处共用）
+    const WRITING_PINNED = ["managePool", "slotList"];
     function withManagePool(cells: string[]): string[] {
         const i = cells.indexOf("traceUp");
-        return i >= 0 ? [...cells.slice(0, i + 1), "managePool", ...cells.slice(i + 1)] : [...cells, "managePool"];
+        return i >= 0 ? [...cells.slice(0, i + 1), "managePool", "slotList", ...cells.slice(i + 1)] : [...cells, "managePool", "slotList"];
     }
     // □3 子排 id 序收单一事实源（digestSubrankIds）：whole（整摘）限片+自由态，自由态
     // 是右键退役后任意文档的整摘兜底；kind 空窗视同 digest 不渲染
@@ -237,7 +240,7 @@
         ev.stopPropagation();
         ev.dataTransfer.dropEffect = "move";
         const btns = [...(ev.currentTarget as HTMLElement).querySelectorAll<HTMLElement>("button[data-fb-flat-id]")]
-            .filter(el => el.dataset.fbFlatId !== "managePool");
+            .filter(el => !WRITING_PINNED.includes(el.dataset.fbFlatId ?? ""));
         flatDrop = { seg, index: segDropIndex(btns, ev.clientX, ev.clientY) };
         dropIndex = null;
     }
@@ -284,10 +287,10 @@
         if (dragId == null || flatDrop == null || flatDrop.seg !== seg) { onDragEnd(); return; }
         const id = dragId;
         // 钉位格守卫（与首行 onRowDrop 池守卫同款）：不拦会写垃圾进 manifest 且当场无变化
-        if (id === "managePool") { onDragEnd(); return; }
+        if (WRITING_PINNED.includes(id)) { onDragEnd(); return; }
         if (mainIds.includes(id)) commitMainIds(mainIds.filter(x => x !== id));
         const rendered = seg === "low"
-            ? flatCells.filter(x => x !== "managePool")
+            ? flatCells.filter(x => !WRITING_PINNED.includes(x))
             : flatSegs.adv[FLAT_SEG_IDS.indexOf(seg) - 1];
         const next = moveToFlatSeg($floatbarFlatManifest[$kind] ?? {}, seg, rendered, id, flatDrop.index);
         floatbarFlatManifest.set({ ...$floatbarFlatManifest, [$kind]: next });
@@ -311,12 +314,18 @@
     const TIPS: Record<string, () => string> = {
         digest: () => tip3(tomatoI18n.摘抄, tomatoI18n.tip摘抄),
         cards: () => tip3(tomatoI18n.附属卡, tomatoI18n.tip本书附属卡), // 名用无占位 getter（本书附属卡带「·到期 {N}」尾巴）
-        swap: () => tip3(tomatoI18n.换书, tomatoI18n.tip换书),
-        next: () => tip3($kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
-            $kind === "digest" ? tomatoI18n.tip下一条摘抄 : tomatoI18n.tip下片删),
-        prev: () => tip3($kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
-            $kind === "digest" ? tomatoI18n.tip上一条摘抄 : tomatoI18n.tip回看,
-            $kind === "digest" ? undefined : Progressive上一页.w()),
+        swap: () => tip3(tomatoI18n.换书, isWritingDoc ? tomatoI18n.tip换写作书 : tomatoI18n.tip换书), // □4③ 写作语境=下一本写作书
+        // □4② 写作书片（槽）语境：next 绝无删片语义（槽=用户定稿文档）、prev/next=槽间
+        // 纯导航；与「上一页/下一页」命令同链（gotoPage 已分叉槽导航），快捷键行照挂
+        next: () => isWritingPiece
+            ? tip3(tomatoI18n.下一槽, tomatoI18n.tip下一槽, Progressive下一页.w())
+            : tip3($kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
+                $kind === "digest" ? tomatoI18n.tip下一条摘抄 : tomatoI18n.tip下片删),
+        prev: () => isWritingPiece
+            ? tip3(tomatoI18n.上一槽, tomatoI18n.tip上一槽, Progressive上一页.w())
+            : tip3($kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
+                $kind === "digest" ? tomatoI18n.tip上一条摘抄 : tomatoI18n.tip回看,
+                $kind === "digest" ? undefined : Progressive上一页.w()),
         // origin 主排只有片/摘抄两态在用：片态=回原书带块级定位（2026-08-31 升级），
         // 摘抄态文案（回原书·定位摘抄原文）在渲染处特判覆盖
         origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书, $kind === "piece" ? Progressive跳到分片或回到原文.w() : undefined), // 摘抄态文案在渲染处特判
@@ -341,12 +350,16 @@
     const FLAT_TIPS: Record<string, () => string> = {
         digest: () => tip3(tomatoI18n.摘抄, tomatoI18n.tip摘抄), // 「…」暗示弹子排的旧单行态退役，三行制统一
         cards: () => tip3(tomatoI18n.附属卡, tomatoI18n.tip本书附属卡),
-        swap: () => tip3(tomatoI18n.换书, tomatoI18n.tip换书),
-        next: () => tip3($kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
-            $kind === "digest" ? tomatoI18n.tip下一条摘抄 : tomatoI18n.tip下片删),
-        prev: () => tip3($kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
-            $kind === "digest" ? tomatoI18n.tip上一条摘抄 : tomatoI18n.tip回看,
-            $kind === "digest" ? undefined : Progressive上一页.w()),
+        swap: () => tip3(tomatoI18n.换书, isWritingDoc ? tomatoI18n.tip换写作书 : tomatoI18n.tip换书), // □4③ 写作语境=下一本写作书
+        next: () => isWritingPiece
+            ? tip3(tomatoI18n.下一槽, tomatoI18n.tip下一槽, Progressive下一页.w())
+            : tip3($kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
+                $kind === "digest" ? tomatoI18n.tip下一条摘抄 : tomatoI18n.tip下片删),
+        prev: () => isWritingPiece
+            ? tip3(tomatoI18n.上一槽, tomatoI18n.tip上一槽, Progressive上一页.w())
+            : tip3($kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
+                $kind === "digest" ? tomatoI18n.tip上一条摘抄 : tomatoI18n.tip回看,
+                $kind === "digest" ? undefined : Progressive上一页.w()),
         // digest 态 origin=回分片（定位摘抄原文，与首行 aria-label 特判同口径）；片态带快捷键行
         origin: () => $kind === "digest" ? tip3(tomatoI18n.回分片, tomatoI18n.tip回分片)
             : tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书, $kind === "piece" ? Progressive跳到分片或回到原文.w() : undefined),
@@ -375,6 +388,8 @@
             $kind === "digest" ? tomatoI18n.tip送进仿写 : tomatoI18n.tip仿写本片),
         // □2 写作书系文档专属（isWritingDoc 一级格；大界面=批量复制/移动入槽）
         managePool: () => tip3(tomatoI18n.管理素材池, tomatoI18n.tip管理素材池),
+        // □4④ 本书槽列表（写作书系文档钉位格）：弹本书全槽菜单直达
+        slotList: () => tip3(tomatoI18n.本书槽, tomatoI18n.tip本书槽),
         // freepool 扩容（09-12）：free 态池钮/平铺格——文案与子排 DIG_TIPS 同源（whole/
         // splitinplace 原先只藏 ✂ 子排二层，入池=平铺区兜底可见+可拖上首行）
         whole: () => tip3(tomatoI18n.整篇摘抄, tomatoI18n.tip整篇摘抄),
@@ -406,6 +421,7 @@
         traceUp: "iconProgTraceUp",
         recite: "iconProgSend",
         managePool: "iconProgPoolManage",
+        slotList: "iconProgPiece",
         whole: "iconProgWhole",
         splitinplace: "iconSplitTB",
     };
@@ -420,8 +436,8 @@
         digest: () => tomatoI18n.摘抄,
         cards: () => tomatoI18n.附属卡,
         swap: () => tomatoI18n.换书,
-        next: () => $kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
-        prev: () => $kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
+        next: () => isWritingPiece ? tomatoI18n.下一槽 : $kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
+        prev: () => isWritingPiece ? tomatoI18n.上一槽 : $kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
         origin: () => $kind === "digest" ? tomatoI18n.回分片 : tomatoI18n.回原书,
         addBook: () => tomatoI18n.加书,
         revisit: () => tomatoI18n.复访,
@@ -430,7 +446,7 @@
         continue: () => tomatoI18n.继续读短, // □2 拆短版（2-6 字规格）；全名在 FLAT_TIPS 层
         toPiece: () => tomatoI18n.跳到分片,
         archive: () => tomatoI18n.归档本书,
-        nextPure: () => tomatoI18n.下一个分片,
+        nextPure: () => isWritingPiece ? tomatoI18n.下一槽 : tomatoI18n.下一个分片, // □4② 槽语境同形
         delBack: () => tomatoI18n.上片删,
         quit: () => tomatoI18n.关闭分片,
         contents: () => tomatoI18n.打开目录,
@@ -442,6 +458,7 @@
         traceUp: () => $kind === "free" ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
         recite: () => $kind === "digest" ? tomatoI18n.送进仿写 : tomatoI18n.仿写本片,
         managePool: () => tomatoI18n.管理素材池,
+        slotList: () => tomatoI18n.本书槽,
         whole: () => tomatoI18n.整篇摘抄,
         splitinplace: () => tomatoI18n.就地断句,
     };
@@ -743,6 +760,12 @@
                     if (isPiece || isFree) void prog.openOriginBook(bid, blockID);
                     else void prog.readThisPiece(blockID);
                 },
+                // □8 地图入口（目录↔地图同族：目录答顺序/地图答关系）。free 态无书池
+                // 不给入口（bid 自指非真书）；bid 打开时快照同防串台纪律
+                onOpenMap: isFree ? undefined : () => {
+                    closeFloatPopover();
+                    prog.openBookMapDialog(bid);
+                },
             },
         });
     }
@@ -903,11 +926,18 @@
                 openBookCardsPopover(ev);
                 break;
             case "swap":
-                await floatSwapBook();
+                // □4③ 写作书系文档（原书/槽片）：换书限定写作书集（noCount 导航）；
+                // 阅读书语境=滚筒出下一本（原行为）
+                await floatSwapBook(isWritingDoc ? $bookID : undefined);
                 break;
             case "next":
                 if ($kind === "digest") {
                     await jumpDigestNeighbor(1);
+                    break;
+                }
+                // □4② 写作书片=槽：槽是用户定稿文档绝无删片语义，改槽导航（不删不计数）
+                if (isWritingPiece) {
+                    await prog.gotoWritingSlotPage($bookID, $noteID, 1);
                     break;
                 }
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.deleteAndNext, $point);
@@ -915,6 +945,10 @@
             case "prev":
                 if ($kind === "digest") {
                     await jumpDigestNeighbor(-1);
+                    break;
+                }
+                if (isWritingPiece) {
+                    await prog.gotoWritingSlotPage($bookID, $noteID, -1);
                     break;
                 }
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.previous, $point);
@@ -1070,6 +1104,13 @@
 
     /** 平铺区低频段旧动作（HtmlCBType 单入口）+ □11 浮层族改道 */
     async function onLowFreq(id: string, ev?: MouseEvent) {
+        // □4 review P1-2：删除/清空/重插族面向阅读分片（一次性餐具），写作槽=用户定稿
+        // 文档绝无删片语义（本包原则）——refill/clean/delBack/delExit 四口统一前置拦截
+        //（onBtn 首行 default 分支也汇入此处，单点守卫覆盖首行+平铺两面）
+        if (isWritingPiece && (id === "refill" || id === "clean" || id === "delBack" || id === "delExit")) {
+            await siyuan.pushMsg(tomatoI18n.写作槽不支持删除类操作, 2500);
+            return;
+        }
         switch (id) {
             case "contents": // □11：contents 文档机制退役，改弹目录浮层
                 openContentsPopover(ev);
@@ -1083,6 +1124,9 @@
             case "managePool": // □2 入口前移：写作书系文档（原书/槽片/片副本）一级直开素材池管理大界面
                 void prog.openManagePoolDialog($bookID);
                 break;
+            case "slotList": // □4④ 本书槽列表菜单：全槽（含定稿）+当前标记，点击直达
+                await prog.openWritingSlotList(ev ?? { clientX: 0, clientY: 0 }, $bookID, $noteID);
+                break;
             case "refill": // □22 重插翻新：断句选档菜单 → confirm 清空警告 → refillPiece
                 openRefillMenu(ev ?? { clientX: 0, clientY: 0 },
                     stype => prog.refillPiece($bookID, $noteID, $point, stype));
@@ -1090,7 +1134,11 @@
             case "clean":
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.cleanOriginText, $point);
                 break;
-            case "nextPure": // 纯前进不删（旧浮条「下一个分片」，v5 曾丢入口、平铺区找回）
+            case "nextPure": // 纯前进不删（旧浮条「下一个分片」，v5 曾丢入口、平铺区找回）；□4② 写作书=槽导航（HtmlCBType.next 带计数不适用）
+                if (isWritingPiece) {
+                    await prog.gotoWritingSlotPage($bookID, $noteID, 1);
+                    break;
+                }
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.next, $point);
                 break;
             case "delBack":
@@ -1257,16 +1305,21 @@
      * 菜单/命令通道的门禁仍在 winHotkey.menu/cmd 生效；store 门（menu 的另一半）只对
      * 非 vip 项照旧过滤——七个 vip 项目前均无 store 参数，未来给 vip 项挂 store 开关时
      * 须改此条件（否则 store 关闭仍渲染，review P2 备案）。空组由模板层滤（□2 活界：
-     * 此处滤空组会让组序与 FLAT_SEG_IDS 漂移——manifest 段名错位）；高级四组只在片态
-     * 渲染（片态门）。menu() 内的门是普通模块读取（非响应式）追踪不到——借 $noteID
-     * 做换代信号：翻片必换 noteID，至少保证每片重求值一次（如今激活主路径必 reload +
-     * $progPaid 响应式即生效，换代信号只服务 store 门项显隐）。
-     * □14c：已进首行清单的高级项从组里滤除（拖上首行的钮不在平铺区重复出现） */
+     * 此处滤空组会让组序与 FLAT_SEG_IDS 漂移——manifest 段名错位）。□2 制卡族全态
+     * 放开（09-13）：组开放面按态走 advGroupIndexesForKind 单一事实源（片态全四组、
+     * 非片态桌面仅制卡组、移动端维持片态门）。menu() 内的门是普通模块读取（非响应式）
+     * 追踪不到——借 $noteID 做换代信号：翻片必换 noteID，至少保证每片重求值一次（如今
+     * 激活主路径必 reload + $progPaid 响应式即生效，换代信号只服务 store 门项显隐）。
+     * □14c：已进首行清单的高级项从组里滤除（拖上首行的钮不在平铺区重复出现）。
+     * 双源重叠（digest 态 low 池已含制卡族=digestpool）由段合成入口去重兜底（□1 根因：
+     * keyed each 重复 key 静默崩），见 progFloatState.dedupFlatSegs */
     const inherentAdv = $derived.by(() => {
         void $noteID;
-        if ($kind !== "piece") return [];
+        const open = new Set(advGroupIndexesForKind($kind, isMobile));
         const inMain = new Set(mainIds);
-        return ADV_GROUPS.map(g => g.filter(it => (it.spec.menu() || it.spec.vip) && !inMain.has(it.id)));
+        return ADV_GROUPS.map((g, gi) => open.has(gi)
+            ? g.filter(it => (it.spec.menu() || it.spec.vip) && !inMain.has(it.id))
+            : []);
     });
 
     // □2 平铺区二级编排（progtail，群 650189「二级工具无法拖动排序」）：固有段位 × 用户
@@ -1278,10 +1331,10 @@
     const flatSegs = $derived(
         $kind == null ? { low: [], adv: [] }
             : isMobile
-                ? {
+                ? dedupFlatSegs({
                     low: buildFlatCells($kind, { mainIds, reciteInstalled: prog.isReciteInstalled() }),
                     adv: inherentAdv.map(g => g.map(it => it.id)),
-                }
+                })
             : applyFlatManifest(
                 {
                     low: buildFlatCells($kind, { mainIds, reciteInstalled: prog.isReciteInstalled() }),
@@ -1595,7 +1648,7 @@
                     {#if flatDrop?.seg === "low" && flatDrop.index === i}<span class="prog-fb-dropmark"></span>{/if}
                     {@const cell = flatCell(id)}
                     <button
-                        draggable={canDrag && id !== "managePool"}
+                        draggable={canDrag && !WRITING_PINNED.includes(id)}
                         data-fb-flat-id={id}
                         class="prog-fb-flat-btn prog-fbtip {$digOpen && id === "digest" ? "prog-fb-flat-btn--on" : ""}"
                         class:prog-fb-btn--dragging={dragId === id}

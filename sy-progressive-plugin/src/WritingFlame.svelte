@@ -8,6 +8,10 @@
     import { PROG_FLAMES, DEFAULT_FLAME_SLUG, FLAME_CORE_D, progFlameSkin, progPaid, PROG_GATE_OPEN } from "./theme";
     import type { WritingFlameData } from "./fleet";
     import { writingQuota } from "../../sy-tomato-plugin/src/libs/stores";
+    import { showFloatTip, hideFloatTip, destroyFloatTip } from "./floatTip";
+    import { onDestroy } from "svelte";
+
+    onDestroy(destroyFloatTip); // 自建 tip 单例收尾（与浮条同款纪律）
 
     let { flame, onOpen }: { flame: Writable<WritingFlameData | null>; onOpen: () => any } = $props();
 
@@ -31,7 +35,9 @@
 {#if $flame}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <button
-        class="prog-flame prog-wflame b3-tooltips b3-tooltips__n"
+        class="prog-flame prog-wflame"
+        onmouseenter={(e) => showFloatTip(e.currentTarget)}
+        onmouseleave={hideFloatTip}
         data-state={state}
         aria-label={tooltip}
         onclick={() => onOpen()}

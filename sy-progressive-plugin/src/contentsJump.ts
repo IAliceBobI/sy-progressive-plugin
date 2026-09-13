@@ -27,6 +27,16 @@ export function findPieceByCandidates(
 }
 
 /**
+ * dirbook □2：readThisPiece 的书根解析——dirMode 卷文档上爬到的 root=卷 id（非书根，
+ * 索引/注册都在书根）。bookOf=docBookID 组合谓词注入（注册书返自身/卷返书根/其余
+ * undefined）；undefined 回退 rootID 原值——普通文档走原落空链（加书提示语义不变），
+ * 映射未就绪的卷文档也安全降级（调用方可 kick warmVolOwner 后重查一次）。
+ */
+export function resolveBookID(rootID: string, bookOf: (id: string) => string | undefined): string {
+    return bookOf(rootID) ?? rootID;
+}
+
+/**
  * 片态目录当前位置高亮行：当前片（index[point]）包含的大纲标题全部高亮；片内无
  * 大纲标题（纯内容片）时回落「起点之前最近的大纲标题」（大纲序=文档序，取最后一
  * 个位于更早分片的标题行）。point 无效（越界/NaN——书编辑后索引漂移）返回空集不亮。

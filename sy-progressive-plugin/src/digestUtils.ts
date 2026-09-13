@@ -3,7 +3,7 @@ import { BlockNodeEnum, DATA_NODE_ID, DATA_NODE_INDEX, DATA_TYPE, IN_BOOK_INDEX,
 import { cleanDiv, get_siyuan_lnk_md, parseIAL, replaceAll, addCardSetDueTime, siyuan, getAllContentEditableText, getAllText } from "../../sy-tomato-plugin/src/libs/utils";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
-import { invalidateDigestMarker, markDigests } from "./digestMarker";
+import { invalidateDigestMarker, markDigests, refreshDigestTagBadgeFor } from "./digestMarker";
 import { splitLines } from "./SplitSentence";
 import { appendTailCard } from "./tailCardAppend";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
@@ -148,6 +148,8 @@ export class DigestBuilder {
                 if (dirID) {
                     const cards = await siyuan.getTreeRiffCardsAll(dirID);
                     await siyuan.removeRiffCards(cards.map(card => card.id));
+                    // 清卡即时反映：被清卡的旧摘抄若开着，胶囊同步退「留档」（review P2-2）
+                    cards.forEach(card => refreshDigestTagBadgeFor(card.id));
                 }
             }
             addCardSetDueTime(digestID)
@@ -237,6 +239,8 @@ export class DigestBuilder {
         if (!isDigestHostDoc(this.ctime)) markDigests(this.protyle, this.bookID).catch(() => { });
         await this.otab.open(digestID, windowOpenStyle.get() as any, this.ids.at(0));
         await this.setDigestCard(digestID);
+        // 卡落库后重挂胶囊：open 触发的首次挂先于 1s 延迟加卡，误显「留档」无事件纠正（盲区③）
+        refreshDigestTagBadgeFor(digestID);
         if (digestAddReadingpoint.get()) {
             readingPointBox.addReadPointLock(this.ids[this.ids.length - 1], this.selected[this.selected.length - 1])
         }
@@ -272,6 +276,9 @@ export class DigestBuilder {
         if (!isDigestHostDoc(this.ctime)) markDigests(this.protyle, this.bookID).catch(() => { });
         await this.otab.open(digestID, (forRecite ? "front" : windowOpenStyle.get()) as any, this.ids.at(0));
         await this.setDigestCard(digestID);
+        // digest() 同款：卡落库后重挂胶囊治误显「留档」（盲区③；forRecite 副本 cardMode=0
+        // 不入卡，重挂按事实显示留档态，无碍）
+        refreshDigestTagBadgeFor(digestID);
         return digestID;
     }
 }

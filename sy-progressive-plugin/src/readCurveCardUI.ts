@@ -12,10 +12,14 @@
 import { readCurveTakeover } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
+import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 import { sweepReadCurve } from "./readCurve";
 import { openReadCardMenu } from "./readCardMenu";
 import { READCARD_KEY } from "./readCurveCore";
-import { badgeSpec, nextSeeHint } from "./readCurveText";
+import { badgeSpec, nextSeeHint, MaterialHint } from "./readCurveText";
+import { parseBookIDFromCtime } from "./progData";
+import { progStorage } from "./ProgressiveStorage";
 
 const MARK_CLS = "prog-revcard-mark-el";
 const NEXT_CLS = "prog-revcard-next-el";
@@ -29,6 +33,43 @@ let keyHandler: ((e: KeyboardEvent) => void) | null = null;
 let keySweepTimer: ReturnType<typeof setTimeout> | null = null;
 let sweepPending = false;
 let recheckTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 打磨批·素材卡剩余量上下文：key=当前卡 readcard 值（翻卡即换——stale 查询按键丢弃）。
+ *  素材态本身同步判（DOM custom 属性直读 isMaterialCard）；剩余量=异步预算（refreshBadge
+ *  每次翻卡重发一书一查，含 🔨 前缀 like 过滤=未锤行天然排除） */
+let matCard: { key: string; remaining: number | null } | null = null;
+
+/** 素材卡判定（同步）：键元素上的 custom-pdigest-ctime（文档级 IAL 实时渲染进 DOM，
+ *  digestMarker 同通道）→ bookID 落写作书位即素材。rpcard/片卡无此属性恒 false */
+function isMaterialCard(el: HTMLElement | null): boolean {
+    const bookID = el ? parseBookIDFromCtime(el.getAttribute(PDIGEST_CTIME) ?? "") : "";
+    return !!(bookID && progStorage.booksInfos()[bookID]?.writing);
+}
+
+/** 翻卡预算当前素材书未锤数（点「下一张」预告用——素材间隔=materialInterval(剩余量)，
+ *  非曲线上 count 推进档）。best-effort：查失败/未及返回=null（预告宁缺毋错不出数） */
+function prefetchMatRemaining(key: string, el: HTMLElement | null): void {
+    const bookID = el ? parseBookIDFromCtime(el.getAttribute(PDIGEST_CTIME) ?? "") : "";
+    if (!bookID || !progStorage.booksInfos()[bookID]?.writing) {
+        matCard = null;
+        return;
+    }
+    matCard = { key, remaining: null };
+    void siyuan.sql(
+        `select value from attributes where name='${PDIGEST_CTIME}' and value like '${bookID}#%' limit 10000000`)
+        .then(rows => {
+            if (matCard?.key === key) matCard = { key, remaining: (rows as any[] ?? []).length };
+        })
+        .catch(() => {
+            if (matCard?.key === key) matCard = null;
+        });
+}
+
+/** 素材预告参（点击时刻现判）：素材态同步可得；剩余量取预算值（未及=null→不出预告） */
+function materialHintOf(el: HTMLElement | null, key: string): MaterialHint | undefined {
+    if (!isMaterialCard(el)) return undefined;
+    return { material: true, matRemaining: matCard?.key === key ? (matCard.remaining ?? undefined) : undefined };
+}
 
 /** 当前复习容器是否渐进阅读卡：卡内容里任何带身份键的元素（6808 实测键挂点三态：
  *  文档卡=.protyle-wysiwyg 根〔doc 级 IAL 渲染位〕/ rpcard=custom 块元素本身 /
@@ -74,18 +115,17 @@ function teardown() {
     }
 }
 
-/** □4 徽标文案：进度平铺常显（N/5·第 N/5 天·每 N 天）；5/5=最后一见强调；
- *  无键/毕业（理论不达）回落静态「渐进阅读」 */
-function badgeLabelOf(cardMain: HTMLElement): { text: string; lastSee: boolean } {
-    const spec = badgeSpec(findReadCard(cardMain)?.getAttribute(READCARD_KEY) ?? "");
-    if (!spec) return { text: tomatoI18n.渐进阅读, lastSee: false };
-    return { text: `${tomatoI18n.渐进阅读} · ${spec.lastSee ? `${spec.text} · ${tomatoI18n.最后一见}` : spec.text}`, lastSee: spec.lastSee };
-}
-
 /** □4 徽标进度刷新（翻页换卡：评分行 DOM 持存，徽标文本不刷会是旧卡的 N/5）——
- *  两套评分行的徽标全刷（class 选择器天然覆盖） */
+ *  两套评分行的徽标全刷（class 选择器天然覆盖）。打磨批：翻卡顺带预算素材剩余量
+ *  （点「下一张」的素材间隔预告用——见 prefetchMatRemaining） */
 function refreshBadge(cardMain: HTMLElement) {
-    const { text, lastSee } = badgeLabelOf(cardMain);
+    const keyEl = findReadCard(cardMain);
+    const key = keyEl?.getAttribute(READCARD_KEY) ?? "";
+    prefetchMatRemaining(key, keyEl);
+    const spec = badgeSpec(key, isMaterialCard(keyEl));
+    const text = !spec ? tomatoI18n.渐进阅读
+        : `${tomatoI18n.渐进阅读} · ${spec.lastSee ? `${spec.text} · ${tomatoI18n.最后一见}` : spec.text}`;
+    const lastSee = !!spec?.lastSee;
     document.querySelectorAll<HTMLElement>(`.${MARK_CLS}`).forEach(b => {
         const t = b.querySelector(`.${BADGE_TEXT_CLS}`);
         // ⚠同值也必须跳过：Element.textContent 赋值是 replace-all 语义（同值也替换
@@ -127,8 +167,11 @@ function mountIntoAction(action: HTMLElement, good: HTMLButtonElement, cardMain:
         // 内核原生链：评分+翻页+计数；对账由下方 sweep 补。isConnected 防御：
         // 持引用的 good 若已随评分行重写而游离，打空即可勿再评分（review P2-3）
         if (!good.isConnected) return;
-        // □4 评分即时反馈：曲线族消耗轮次→闪「N 天后再见」（分片=完成翻篇、毕业=toast，均不出）
-        const hint = nextSeeHint(findReadCard(cardMain)?.getAttribute(READCARD_KEY) ?? "", Date.now());
+        // □4 评分即时反馈：曲线族消耗轮次→闪「N 天后再见」（分片=完成翻篇、毕业=toast，均不出）。
+        // 打磨批：素材卡间隔=materialInterval(剩余量)（预算值未及/查询失败=不出预告宁缺毋错）
+        const keyEl = findReadCard(cardMain);
+        const key = keyEl?.getAttribute(READCARD_KEY) ?? "";
+        const hint = nextSeeHint(key, Date.now(), materialHintOf(keyEl, key));
         good.click();
         void sweepReadCurve("cardflip-btn");
         if (hint) flashNextLabel(next, hint);

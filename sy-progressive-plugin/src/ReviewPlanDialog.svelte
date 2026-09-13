@@ -406,7 +406,9 @@
     /* white-space:nowrap（□6 vision P2-4）：状态行尾句含空格软换行点，极窄容器内
        折行会撑高行——收缩继续由 row-content（flex:1+ellipsis）承担 */
     .row-mode { flex-shrink: 0; font-size: 11px; opacity: 0.62; white-space: nowrap; }
-    /* □4 留言前半句：内容列后次级信息（青色弱化与 row-mode 区分层级）。
+    /* □4 留言前半句：内容列后次级信息。打磨批（P2 主题色耦合+3.5:1）：原 primary
+       0.78=青色跟主题主色耦合且对比不足——改 on-surface .92/12px（□12 date 同款
+       AA 结论），层级由字号+完整度区分（留言=用户内容比 row-mode 状态尾句重一级）。
         max-width 防 P1（vision R1）：row-content 基份 0 不参与收缩，超长留言会把
         标题列挤到 0 宽——留言列封顶 40%，截断仍走 ellipsis+title 全文 */
     .row-note {
@@ -416,9 +418,9 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 11px;
-        color: var(--b3-theme-primary);
-        opacity: 0.78;
+        font-size: 12px;
+        color: var(--b3-theme-on-surface);
+        opacity: .92;
     }
     .row-date {
         flex-shrink: 0;

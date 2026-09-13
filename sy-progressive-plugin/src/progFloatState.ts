@@ -18,9 +18,13 @@ export interface FloatDocIdentity {
 
 /**
  * 识别当前文档属于哪态并提取载荷（浮条出场链唯一识别入口，ProgressiveBtn 旧内联已收编）：
- * - digest：文档 IAL custom-pdigest-ctime（兼容已完成的 🔨#bookID#ct 形态，书 ID 取首段）
+ * - digest：文档 IAL custom-pdigest-ctime（兼容已完成的 🔨#bookID#done 形态，书 ID 取首段）
  * - 片：文档 IAL custom-progmark（TEMP#bookID,point）
- * - 书：docID 命中注册书（isRegisteredBook 回调，生产侧注入 progStorage.isRegisteredBook）
+ * - 书：bookOfDoc 回调返回所属书根——注册书命中返回自身 id、dirMode 目录书的卷文档
+ *   返回书根（dirbook □1：卷文档出场 book 态，载荷 bookID=书根，生产侧注入
+ *   progStorage.docBookID——卷→书根映射由出场链外的内存缓存承担，本函数保持纯函数）。
+ *   旧调用方需从 isRegisteredBook boolean 谓词迁移成「命中返自身 id」形态（返回
+ *   boolean 字面量的谓词在此签名下不成立，类型系统已挡）
  * 判据优先级 pdigest > mark > book：真实 digest 文档自带片形状 custom-progmark
  * （2024 起防删护栏 TEMP_CONTENT#bookID,ctime），mark 优先会把摘抄误判成片（□16 e2e 实锤）。
  * 载荷不完整（mark 缺书 ID/片号、ctime 解析空书 ID）= 该态不成立——出场按钮动作
@@ -31,7 +35,7 @@ export interface FloatDocIdentity {
 export function detectFloatDoc(
     attrs: Record<string, string> | undefined,
     docID: string,
-    isRegisteredBook: (id: string) => boolean,
+    bookOfDoc: (docID: string) => string | undefined,
 ): FloatDocIdentity | null {
     const ctime = attrs?.[PDIGEST_CTIME];
     if (ctime) {
@@ -41,7 +45,8 @@ export function detectFloatDoc(
     const mark = attrs?.[MarkKey]?.split("#")?.at(1)?.split(",") ?? [];
     const point = parseInt(mark[1]);
     if (mark[0] && Number.isInteger(point)) return { kind: "piece", bookID: mark[0], point };
-    if (docID && isRegisteredBook(docID)) return { kind: "book", bookID: docID, point: 0 };
+    const bookID = docID ? bookOfDoc(docID) : undefined;
+    if (bookID) return { kind: "book", bookID, point: 0 };
     return null;
 }
 
@@ -475,13 +480,45 @@ export interface FlatSegs {
 }
 
 /**
+ * □2 制卡族全态放开（09-13 bear 点名「摘抄的悬浮条上加制卡按钮」）：按态决定开放的高级组
+ * 序（0=制卡 card / 1=收集 collect / 2=移动 move / 3=提取整理 extract，组序对齐
+ * FLAT_SEG_IDS）。片态=全四组（现状）；非片态桌面=仅组 0（bear 只点名制卡族——收集/
+ * 移动/提取是片语义动作，free 去门实测会全冒出来须收掉）；非片态移动端=空（顶栏宽度
+ * 维持片态门，待移动端诉求另审）。FLAT_SEG_IDS 增段（加组）须同步此序。
+ */
+export function advGroupIndexesForKind(kind: FloatDocKind | null, isMobile: boolean): number[] {
+    if (kind === "piece") return [0, 1, 2, 3];
+    if (kind == null || isMobile) return [];
+    return [0];
+}
+
+/**
+ * 段输入归一（□1 根因防线，09-13）：全局去重（先占者留=low 段优先）。固有输入双源
+ * id 池重叠（digestpool 把制卡族收进 digest 态 low 池 vs inherentAdv 整组进 adv）会让
+ * spread 拼接把段内同 id 展开成重复项——keyed each 吃到重复 key=each_key_duplicate
+ * 静默崩（球/条全不出场、console.error 零痕迹）。applyFlatManifest 入口先过此关；
+ * 移动端分支（不走 manifest 合成）也直呼。
+ */
+export function dedupFlatSegs(segs: FlatSegs): FlatSegs {
+    const seen = new Set<string>();
+    const first = (ids: string[]) => ids.filter(id => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+    });
+    return { low: first(segs.low), adv: segs.adv.map(first) };
+}
+
+/**
  * manifest → 各段成员+顺序合成（读侧唯一入口）：
  * - claim：id 出现在哪段清单=归哪段（跨段指派——A3 活界拍板）；不在任何清单=固有段
  * - 顺序：清单序在前 + 未记录成员按固有序垫尾（第一天无清单=完全现状，零迁移）
  * - 清单里的无效 id（退役钮/别态钮/menu() 关）静默忽略；未知段键忽略
  * - 空段照常产出空数组（UI 层滤空组连段界隐藏，与 advVisible 空组语义一致）
+ * - 入口先 dedupFlatSegs（□1 根因防线：双源重叠输入免疫）
  */
 export function applyFlatManifest(inherent: FlatSegs, manifest: Record<string, string[]>): FlatSegs {
+    inherent = dedupFlatSegs(inherent);
     const valid = new Set<string>([...inherent.low, ...inherent.adv.flat()]);
     const claim = new Map<string, FlatSegId>();
     for (const seg of FLAT_SEG_IDS) {

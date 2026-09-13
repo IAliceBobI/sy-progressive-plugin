@@ -39,9 +39,9 @@ import { addClickEvent, progressiveBtnFloating, yieldFloatbarForMenu, restoreFlo
 import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
-import { findPieceByCandidates } from "./contentsJump";
+import { findPieceByCandidates, resolveBookID } from "./contentsJump";
 import { queryDigestTree } from "./digestUtils";
-import { fetchWritingPieces, pickWritingDispatch, listWritingSlotTargets, insertBlocksIntoPiece, insertDigestIntoPiece, moveDigestIntoPiece, pickWritingFlameBook, feedBlocksToPool, type WritingSlotTarget } from "./writeBook";
+import { fetchWritingPieces, pickWritingDispatch, listWritingSlotTargets, insertBlocksIntoPiece, insertDigestIntoPiece, moveDigestIntoPiece, pickWritingFlameBook, feedBlocksToPool, neighborWritingSlot, orderedWritingBooks, nextOfOrderedIDs, type WritingSlotTarget } from "./writeBook";
 import { escapeHtml } from "./progData";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
@@ -387,9 +387,42 @@ class Progressive {
     private async gotoPage(step: number) {
         const docID = events.docID
         const { bookID, pieceNum } = await getBookID(docID)
+        // □4② 写作书：阅读索引恒空（滚筒 pieceCount=0 同口径），gotoBlock 设的 point
+        // 无人消费、startToLearn 走槽分派不认它——上下页命令恒空转。分叉按槽序列导航
+        if (progStorage.peekBookInfo(bookID)?.writing) {
+            await this.gotoWritingSlotPage(bookID, docID, step);
+            return;
+        }
         await progStorage.gotoBlock(bookID, pieceNum + step);
         await this.startToLearnWithLock(bookID);
         this.closePeices(bookID);
+    }
+
+    /** □4② 写作书槽导航（命令「上一页/下一页」与浮条回看/下一槽共用）：当前文档在
+     *  槽序列里前后移动，setActivePoint 续转指针跟走（指向已定稿槽时轮转自回落首个
+     *  未定稿，同阅读书 gotoBlock 拨 point 语义）；边界/非槽文档给对症提示。纯导航：
+     *  不计数（①同语义）、不删槽（写作书 next 绝不携带阅读书的删片语义） */
+    async gotoWritingSlotPage(bookID: string, currentDocID: string, step: number) {
+        const pieces = await fetchWritingPieces(bookID);
+        // review P2：0 槽写作书（命令链从原书可达）指点出路；非槽文档（如原书上按
+        // 上下页命令）≠ 首尾越界——两类成因各给对症文案
+        if (pieces.length === 0) {
+            await siyuan.pushMsg(tomatoI18n.本书还没有槽, 2500);
+            return;
+        }
+        if (!pieces.some(p => p.docID === currentDocID)) {
+            await siyuan.pushMsg(tomatoI18n.当前后文档不是写作槽, 2500);
+            return;
+        }
+        const target = neighborWritingSlot(pieces, currentDocID, step);
+        if (!target) {
+            await siyuan.pushMsg(step < 0 ? tomatoI18n.已是第一个槽 : tomatoI18n.已是最后一个槽, 2500);
+            return;
+        }
+        debugLog("wnav", `slot book=${bookID} step=${step} -> point#${target.point} doc=${target.docID}`, "progressive");
+        await progStorage.setActivePoint(bookID, target.point);
+        events.setDocID(target.docID);
+        await OpenSyFile2(this.plugin, target.docID);
     }
 
     private async tryAddRefAttr(elements: HTMLElement[]) {
@@ -604,7 +637,14 @@ class Progressive {
             candidates.push(cur);
         }
         if (rootID) {
-            const bookID = rootID;
+            // dirbook □2：dirMode 卷文档的 root=卷 id（非书根，索引在书根）——docBookID
+            // 反查兜底（注册书返自身/卷返书根）。未就绪回退原值时 kick 一次重建再重查
+            // （readThisPiece 是用户按键/点钮的低频动作，同步等待读盘可接受；warm 幂等）
+            let bookID = resolveBookID(rootID, id => progStorage.docBookID(id));
+            if (bookID === rootID && !progStorage.isRegisteredBook(rootID)) {
+                await progStorage.warmVolOwner();
+                bookID = resolveBookID(rootID, id => progStorage.docBookID(id));
+            }
             const idx = await progStorage.loadBookIndexIfNeeded(bookID);
             if (idx?.length <= 0) {
                 // not a book
@@ -695,8 +735,10 @@ class Progressive {
     }
 
     /** 内层结果版：InLock 各分支据此决定关页签/闪卡结算——租约孤儿窗口里内层没跑完
-     *  就不关用户当前页签（review P2-1）。对外签名仍是 void 的 startToLearnWithLock */
-    private async startToLearnLeased(bookID = "", isRand = false): Promise<LockLeaseResult> {
+     *  就不关用户当前页签（review P2-1）。对外签名仍是 void 的 startToLearnWithLock。
+     *  noCount（□4①）：导航入口（写作火苗/写作换书）回到写作现场不计数——slot 分派
+     *  跳过 markReadSafe；material 分派恒计数（消化素材=读，设计共识不受导航语义影响） */
+    private async startToLearnLeased(bookID = "", isRand = false, noCount = false): Promise<LockLeaseResult> {
         return this.withProgLock(constants.StartToLearnLock, async () => {
             // □2 文案梳理：删「正在为您打开文档片段」——每次出片必弹但结果自可见（片
             // 页签即开），异常慢路径已由重试首轮的「分片索引建立中」覆盖
@@ -710,7 +752,7 @@ class Progressive {
             // 每 500ms 刷 books.json（触发内核 dataChanges 广播风暴，事故实锤 3 分钟每秒 2 条）
             let ok: boolean | undefined | "skipped" = false;
             let i = 0;
-            while ((ok = await this.startToLearn(bookID, isRand)) === false || ok === "skipped") {
+            while ((ok = await this.startToLearn(bookID, isRand, noCount)) === false || ok === "skipped") {
                 if (ok === "skipped") {
                     i = 0;
                 } else if (i === 0) {
@@ -724,11 +766,11 @@ class Progressive {
         });
     }
 
-    async startToLearnWithLock(bookID = "", isRand = false): Promise<void> {
+    async startToLearnWithLock(bookID = "", isRand = false, noCount = false): Promise<void> {
         // digestpool：continue/swap 池钮点击链留痕（e2e 断言查 Loki：digest 态 continue 的
         // bookID 应=源书；空=滚筒轮转）
-        debugLog("floatbar", `startToLearn book=${bookID || "(滚筒)"} rand=${isRand}`, "progressive");
-        await this.startToLearnLeased(bookID, isRand);
+        debugLog("floatbar", `startToLearn book=${bookID || "(滚筒)"} rand=${isRand} noCount=${noCount}`, "progressive");
+        await this.startToLearnLeased(bookID, isRand, noCount);
         // 阅读曲线：推片后该书投影即时刷新（锁已释放，巡查避让判定不撞自己持有的
         // StartToLearnLock——这是它必须放在锁外 fire 的原因）
         void sweepReadCurve("dispatch");
@@ -737,7 +779,9 @@ class Progressive {
     /** □5 写作火苗点击=直达当前写作书的写作现场。书的选择与火苗数据同源
      *  （pickWritingFlameBook：滚筒序第一本有未定稿槽的写作书，全完稿回落序首），
      *  打开走 startToLearnWithLock 指定书路径——与滚筒轮转/书卡续读同一条调度链
-     *  （片选择/状态判定/计数同权），写作侧只多一步「限定写作书集」。 */
+     *  （片选择/状态判定），写作侧只多一步「限定写作书集」。□4① 计数分家：点击
+     *  火苗=导航回现场（tooltip「点击回到写作现场」），slot 分派不计数；material
+     *  态 tooltip 明示「点击去消化素材」，消化=读，计数保持（设计共识）。 */
     async openWritingFlameTarget() {
         try {
             const hit = await pickWritingFlameBook();
@@ -749,12 +793,72 @@ class Progressive {
                 return;
             }
             debugLog("wflame", `open book=${hit.bookName}(${hit.bookID}) target=${hit.target ? `point#${hit.target.point}` : "none"}`, "progressive");
-            await this.startToLearnWithLock(hit.bookID);
+            await this.startToLearnWithLock(hit.bookID, false, true);
         } catch (e) {
             // SQL 抖动等异常兜底：onclick 的 promise 无人接，不包=unhandled rejection
             console.error("openWritingFlameTarget failed", e);
             await siyuan.pushMsg(tomatoI18n.请稍后再试, 2500);
         }
+    }
+
+    /** □4③ 写作语境换一本：换到滚筒序的下一本写作书（环形），打开走 noCount 导航链
+     *  （同写作火苗——换书=换写作现场非读片）；仅一本=对症提示。书选择与火苗同源
+     *  （orderedWritingBooks：过滤+滚筒序），防两处漂移 */
+    async swapWritingBook(currentBookID: string) {
+        try {
+            const writing = await orderedWritingBooks();
+            const nextID = nextOfOrderedIDs(writing.map(([id]) => id), currentBookID);
+            if (!nextID || nextID === currentBookID) {
+                debugLog("wflame", `swap skipped: ${writing.length} writing book(s)`, "progressive");
+                await siyuan.pushMsg(tomatoI18n.没有其他写作书, 2500);
+                return;
+            }
+            const info = writing.find(([id]) => id === nextID)?.[1];
+            debugLog("wflame", `swap book=${info?.bookName || nextID}(${nextID})`, "progressive");
+            await this.startToLearnWithLock(nextID, false, true);
+        } catch (e) {
+            // onclick 链无人接（同 openWritingFlameTarget 纪律）：SQL/storage 抖动不裸奔
+            console.error("swapWritingBook failed", e);
+            await siyuan.pushMsg(tomatoI18n.请稍后再试, 2500);
+        }
+    }
+
+    /** □4④ 本书槽列表（浮条「本书槽」格）：fetchWritingPieces 全槽（含定稿）+标题 →
+     *  Menu 行点击直达（同 gotoWritingSlotPage 语义：setActivePoint+开文档，纯导航
+     *  不计数）。openSlotMenu（materialTrace）同款形态；槽名=用户文档标题须转义 */
+    async openWritingSlotList(ev: { clientX: number; clientY: number }, bookID: string, currentDocID?: string) {
+        const pieces = await fetchWritingPieces(bookID);
+        if (pieces.length === 0) {
+            await siyuan.pushMsg(tomatoI18n.本书还没有槽, 2500);
+            return;
+        }
+        const rows = (await siyuan.sql(
+            `select id, content from blocks where type='d' and id in (${pieces.map(p => `"${p.docID}"`).join(",")}) limit 1000`)) ?? [];
+        const titleOf = new Map((rows as any[]).map(r => [r.id, r.content || ""]));
+        const menu = new Menu("progWritingSlotList");
+        const done = pieces.filter(p => p.done).length;
+        menu.addItem({ label: `<span style="font-weight:600">${escapeHtml(tomatoI18n.本书N槽M定稿(pieces.length, done))}</span>` });
+        menu.addSeparator();
+        for (const p of pieces) {
+            const cur = p.docID === currentDocID;
+            menu.addItem({
+                label: escapeHtml(titleOf.get(p.docID) || `[${String(p.point).padStart(5, "0")}]`)
+                    + (p.done ? ` · ${tomatoI18n.已定稿槽}` : "")
+                    + (cur ? ` · ${tomatoI18n.当前槽}` : ""),
+                click: () => {
+                    void (async () => {
+                        debugLog("wnav", `slotlist book=${bookID} -> point#${p.point} doc=${p.docID}`, "progressive");
+                        await progStorage.setActivePoint(bookID, p.point);
+                        events.setDocID(p.docID);
+                        await OpenSyFile2(this.plugin, p.docID);
+                    })();
+                },
+            });
+        }
+        setTimeout(() => menu.open({
+            x: ev.clientX > 0 ? ev.clientX : innerWidth / 2,
+            y: ev.clientY > 0 ? ev.clientY : innerHeight / 2,
+        }), 0);
     }
 
     /** ⏸/⚠ 书的统一处理：闭笔记本=提示开箱恢复（书可能只是暂不可见，绝不清理）；
@@ -777,7 +881,7 @@ class Progressive {
         });
     }
 
-    private async startToLearn(bookID = "", isRand = false) {
+    private async startToLearn(bookID = "", isRand = false, noCount = false) {
         let noteID = "";
         if (!bookID) {
             // 滚筒出片：order 中 lastServed 之后第一个可读书（跳过忽略/归档/读完），出片即轮转
@@ -875,8 +979,10 @@ class Progressive {
             await OpenSyFile2(this.plugin, dispatch.docID);
             // 计数同权：轮到写作书开片=今日阅读 +1（与阅读书翻片同 quota 池）。补传
             // slotPoint 锚（1530 期1 配套修正）：官方复习评分回写走同锚——双入口同锚
-            // 互斥零双计，同日重复开同 slot 不再重复计（旧语义与阅读书不对称，顺手修正）
-            await this.markReadSafe(bookID, dispatch.point);
+            // 互斥零双计，同日重复开同 slot 不再重复计（旧语义与阅读书不对称，顺手修正）。
+            // □4①：noCount=导航入口（写作火苗「点击回到写作现场」/写作换书）——回现场
+            // 非「读了一片」，跳过计数；锚不更新无碍（滚筒/书卡路径计入时自会写锚）
+            if (!noCount) await this.markReadSafe(bookID, dispatch.point);
             return true;
         }
         // □1 目录书：出场前校验卷表新鲜度（卷增删/重排→按卷 id 重组索引+point 映射；
@@ -1170,6 +1276,12 @@ class Progressive {
      *  与整夹同通道（官方 tree 复习按文档子树，单篇子树=它自己的卡） */
     openDocReview(docID: string) {
         openTab({ app: this.plugin.app, card: { type: "doc", id: docID } });
+    }
+
+    /** □8 知识地图：桥 index 插件类的 Dialog 挂法（浮条 prog 通道；reviewMenu
+     *  getProgressivePluginInstance as any 同款桥惯例——Progressive 类不反向依赖视图层） */
+    openBookMapDialog(bookID: string) {
+        (this.plugin as any).openBookMapDialog?.(bookID);
     }
 
     /** 摘抄汇总（书态/摘抄态）：打开 digest-书名 夹 */

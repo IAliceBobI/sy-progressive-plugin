@@ -40,3 +40,23 @@ export function parseVisitNoteMarkdown(md: string): VisitNoteData | null {
     }
     return null;
 }
+
+// ============ □12 倒排（最新在上，bear 09-13 点名） ============
+
+/** 留言区序判定：ts 严格递减=feed 目标态（倒排）。空/单条平凡 true；正排（老→新，
+ *  存量 append 形态）、混乱（迁移中断残骸/用户手排）、等 ts 都 false=需重排。
+ *  判定取「非降序即重排」而非「仅正排才迁」：中断自愈（部分迁移态下轮继续）；
+ *  手排不被保护——留言=feed 语义（产品定位原话「留言应该倒着排」） */
+export function isDescendingNotes<T extends { ts: number }>(notes: T[]): boolean {
+    for (let i = 1; i < notes.length; i++) {
+        if (notes[i - 1].ts <= notes[i].ts) return false;
+    }
+    return true;
+}
+
+/** 迁移目标序：ts 降序稳定排序（等 ts 保持原相对序）。泛型带 id 供 IO 层直用 */
+export function sortNotesDescending<T extends { ts: number }>(notes: T[]): T[] {
+    return notes.map((n, i) => ({ n, i }))
+        .sort((a, b) => b.n.ts - a.n.ts || a.i - b.i)
+        .map(x => x.n);
+}

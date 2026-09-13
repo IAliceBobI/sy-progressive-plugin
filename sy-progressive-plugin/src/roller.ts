@@ -31,6 +31,12 @@ export interface DebtSummary {
     quotaToday: number;
     /** 累积欠债 = Σ max(0, 当日q − 当日已读)，无清零日、超额不抵扣 */
     debt: number;
+    /** 今日缺口 = max(0, 实时档位 − 今日已读)——实时分量（□4⑤ 来源拆分：tooltip 标注
+     *  「今日缺 N」vs「历史欠债 N」，治「读满还欠」的困惑）。今日无日志块时=全档位，
+     *  但不入 debt（记账口径：无行不入债，块由首笔 markRead 落） */
+    todayGap: number;
+    /** 历史欠债 = Σ 历史天 max(0, q−read)（当日结算恒定）。同日异常双块时取末行口径 */
+    histDebt: number;
     state: "ok" | "warn" | "over";
 }
 
@@ -101,17 +107,23 @@ export function summarizeDebt(
     today: string,
     quotaToday: number,
 ): DebtSummary {
-    let debt = 0;
+    let histDebt = 0;
     let readToday = 0;
+    let todayGapInDebt = 0;
     for (const d of days) {
-        // 今天 q 以实时档位覆盖（改档位立即生效）；历史天按当日记录（不追溯）
-        const q = d.date === today ? quotaToday : d.q;
-        if (d.date === today) readToday = d.read;
-        debt += Math.max(0, q - d.read);
+        // 今天 q 以实时档位覆盖（改档位立即生效）；历史天按当日记录（不追溯）。
+        // 同日双块（数据异常，□5 防撞修因）：今日分量取末行（与 findDayBlock 更新行同源）
+        if (d.date === today) {
+            readToday = d.read;
+            todayGapInDebt = Math.max(0, quotaToday - d.read);
+        } else {
+            histDebt += Math.max(0, d.q - d.read);
+        }
     }
+    const debt = histDebt + todayGapInDebt;
     // 绿=无欠债；红=欠债≥2×今日档位（连续两天颗粒未收即双倍欠债）；中间为黄
     const state = debt === 0 ? "ok" : debt >= 2 * quotaToday ? "over" : "warn";
-    return { readToday, quotaToday, debt, state };
+    return { readToday, quotaToday, debt, todayGap: Math.max(0, quotaToday - readToday), histDebt, state };
 }
 
 export function formatDaySummary(data: DayLogData, bookNames: { [bookID: string]: string }): string {
@@ -145,7 +157,15 @@ export async function nextBook(deps: RollerDeps): Promise<string | null> {
 export async function markRead(deps: RollerDeps, bookID: string, point?: number): Promise<void> {
     const date = deps.getTodayStr();
     const quota = deps.getQuota();
-    const blockID = await deps.findDayBlock(date);
+    let blockID = await deps.findDayBlock(date);
+    if (!blockID) {
+        // □5 同日双块防撞（08-31 实锤：五秒内同书双写两块）：并发 markRead/revisit 链
+        // 刚建块、SQL 索引未入的窗口内 findDayBlock 恒 miss——直接建=双块（更新链只碰
+        // 其中一块，另一块 data 冻结、loadAllDays 双行分账）。与 rollerCountRevisit 同款
+        // 800ms 重查压缩竞态面（根除需内核事务级串行，插件不可及）
+        await new Promise(r => setTimeout(r, 800));
+        blockID = await deps.findDayBlock(date);
+    }
     const data = blockID ? await deps.readDayBlockData(blockID) : { q: quota, b: {} };
     if (point != null && data.p && point <= (data.p[bookID] ?? -1)) return;
     const next = incrementDay(data, bookID, quota, point);

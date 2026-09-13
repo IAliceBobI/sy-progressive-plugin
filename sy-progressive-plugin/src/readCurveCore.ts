@@ -277,6 +277,17 @@ export function reviveValue(nowMs: number): string {
     return formatReadCard({ mode: "grow", waterlineMs: nowMs, count: 1, graduated: false });
 }
 
+/** 建卡 1s 尾链守卫（打磨批·□2 备案项）：尾链窗内书级改档批会重写新卡键的 freq 段
+ *  （批写保 count/mode/waterline 只换 freq）；尾链按建卡期快照覆写=改档丢单卡（自愈
+ *  要等下次事件）。本函数=介入判据：当前键与建卡期 freq 不一致的活曲线态 → 返回该
+ *  态（尾链以它重导出 due/键，保留改档意图）；其余（未改/daily/sched——改档批本就
+ *  跳过这两族/毕业/垃圾）→ null=尾链走建卡期输出逐字节不变 */
+export function tailFollowState(curKey: string, buildFreq?: VisitFreq): ReadCardState | null {
+    const cur = parseReadCard(curKey);
+    if (!cur || cur.graduated || cur.mode !== "grow") return null;
+    return (cur.freq ?? "m") === (buildFreq ?? "m") ? null : cur;
+}
+
 /** 操作面动作 id（菜单组配序即数组序） */
 export type CardAction = "stop" | "sched" | "again" | "defer" | "repush" | "memory" | "add";
 

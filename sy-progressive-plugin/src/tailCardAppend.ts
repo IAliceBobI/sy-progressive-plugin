@@ -38,12 +38,15 @@ export async function appendTailCard(data: TailCardBlockData): Promise<void> {
  *  仿写副本（review P1-2）跳过——机读标记 custom-prog-for-recite，存量副本无标记按
  *  「仿写」标题前缀兜底（newDigestDoc □28 的稳定命名）。走内核真值（getBlockAttrs）
  *  不走出场链快照——flag 是我们写的，快照可能早于落盘。 */
-export async function ensureDigestTailCard(docID: string, bookID: string): Promise<void> {
+export async function ensureDigestTailCard(docID: string, bookID: string, isWritingBook?: () => boolean): Promise<void> {
     if (!docID || !tailCardOn()) return;
     try {
         const attrs = await siyuan.getBlockAttrs(docID);
         if (attrs?.[TAIL_CARD_DOC_FLAG]) return;
         if (attrs?.["custom-prog-for-recite"] === "1" || (attrs?.title ?? "").startsWith("仿写")) return;
+        // □11 P2-1 冷启动窗加固：守卫读 storage 的窗内（booksInfos 见 "" 自愈 {}）首击
+        // 可旁路——此刻（一个 getBlockAttrs RTT 后）复查，storage 大概率已载入
+        if (isWritingBook?.()) return;
         await appendTailCard({ v: 1, kind: "digest", bookID, point: 0, docID });
         debugLog("prog.tailcard", `retrofit doc=${docID}`, "progressive");
     } catch (e) {

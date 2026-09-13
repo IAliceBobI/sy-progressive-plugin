@@ -8,6 +8,7 @@ Finally finish what you read — and what you write: progressive reading digests
 - 📖 **Two progressive modes** — excerpt-based (pick the essence) and piece-based (slice the whole doc), so long reads get digested day by day
 - ✂️ **Text-splitting toolkit** — sentence splitting, Enter-to-split, block merging, double-tap multi-select on mobile
 - 🎴 **Card-making pipeline** — multi-line cloze, multi-line cards, word flashcards and Daily Card — make cards where you read
+- 🗺 **AI-drawn knowledge maps** — let AI read the book and draw the relationship graph: people, concepts, events, evidence-anchored and jump-to-source; pan it, save your own views, export as image
 
 ## Features
 
@@ -23,10 +24,12 @@ Finally finish what you read — and what you write: progressive reading digests
 
 - **Excerpt-based progressive learning** — select to excerpt; the essence goes into a day-by-day queue
 - **Piece-based progressive learning** — the whole document is auto-sliced; read one piece a day
+- **Books from doc folders** — turn a folder of articles into one book: reading order follows the file tree, pieces attach to their source article, reorder any time and progress self-corrects
+- **Volume splitting for giant docs** — a 3-million-word tome? Split it into volume sub-docs first (right-click in the doc tree), then add as a folder book — daily portions stay fine-grained either way
 
 ### ✂️ Reading & Editing Helpers
 
-- **Sentence splitting** — split long paragraphs into blocks automatically
+- **Sentence splitting (Pro)** — split long paragraphs into blocks automatically
 - **Split block by pressing Enter** — Enter splits, staying out of your way
 - **Merge blocks** — combine multiple blocks into one
 - **Multi-line selection via double-tap on mobile** — select paragraphs fast on phones
@@ -39,6 +42,24 @@ Finally finish what you read — and what you write: progressive reading digests
 - **Multi-line card creation** — batch-create Q&A cards
 - **Daily Card** — one card a day, steady accumulation
 - **Display pinyin** — annotate Chinese characters with pinyin
+- **Visit frequency** — revisits too dense or too sparse? Three gears stretch or tighten the revisit curve (3→6→12→24→48 days by default) without resetting progress
+- **Notes to your future self** — leave a note on anything you revisit; newest on top, and the latest note rides along with each review reminder
+- **7-day calendar strip** — the review plan panel shows the coming week: due counts, estimated minutes, overload colors; click a day to filter
+- **Zero-output auto-relax** — a book with no excerpts and no cards for 30 days gets its revisit interval gently stretched, with a badge and one-click restore — transparent, never silent
+
+## Free vs Pro
+
+One rule of thumb: **the whole reading & writing loop is free — unlimited books, pieces, excerpts and views**. Pro adds the automation layer: letting the machine do the repetitive splitting, converting and comparing, plus decorating your workspace.
+
+| Domain | Free | Pro adds |
+|---|---|---|
+| 📚 Reading | Add books, daily piece rolling, fleet & flame progress, floating bar, excerpts, all views, physical volume split for huge books | Auto sentence splitting |
+| ✍️ Writing | Writing books, three ways to feed slots, piece management, moving pieces across books | Compile pieces to draft; the writing-compare family |
+| 🎴 Cards | Word flashcards, cloze deletion, multi-line card creation, Daily Card, turning excerpts into review cards | Word lookup by AI |
+| 📥 Collection | — | Collect selected content to a file (Shift+Alt+O), merging as you go |
+| 🎨 Appearance | Native look — clean and distraction-free | Skin sets |
+
+**Pro is ¥72, one-time** — and it gifts [Recite Practice](https://github.com/IAliceBobI/sy-recite-plugin) **Pro** (¥10, yours for free): activate once, own both. Purchase & activation: plugin settings → order → paste the redemption code back in settings — it binds to your SiYuan account automatically.
 
 ## Getting Started
 

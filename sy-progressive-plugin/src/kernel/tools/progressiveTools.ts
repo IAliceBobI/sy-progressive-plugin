@@ -3,7 +3,7 @@
 // （ISO 时间戳/书 ID+书名/布尔/计数），不做渲染文案；AI 面向 bear 转述自己会说话。
 // 语义函数单一事实源=src/reviewQueue.ts（零依赖纯模块直 import）；petal/SQL 数据面
 // 见 ../progData.ts（前端模块依赖链进不了 goja，复刻处已逐个标注）。
-import { objectSchema, successResponse, errorResponse, wrapHandler, type ToolDefinition } from "./common";
+import { objectSchema, successResponse, errorResponse, wrapHandler, type ToolDefinition, type ToolResponse } from "./common";
 import * as api from "../api";
 import {
   PDIGEST_CTIME, DEFAULT_QUOTA, DAY_MS,
@@ -16,6 +16,15 @@ import {
   ReviewKey, PdigestReviewKey, parseReview, isDue, scheduleSQLFor, mergeDueRows,
   deferReview, type DueRow,
 } from "../../reviewQueue";
+import {
+  readPool, readPoolExisting, writePool, collectMapContext, readPieceCount, runExclusive,
+} from "../bookMapIo";
+import { convertPlan, convertApply, DEFAULT_MAX_CHARS, DEFAULT_SPLIT_WORDS } from "../bookConvertIo";
+import {
+  mergeIntoPool, neighborhood, deleteFromPool, updateNodes, viewsDigest, tidyViews,
+  buildBookMapMD,
+  type IncomingNode, type IncomingEdge, type BookMapView, type EdgeRef, type NodeUpdate,
+} from "../../bookMapCore";
 
 // ============ 公共件 ============
 
@@ -314,6 +323,268 @@ async function deferAction(input: Record<string, any>) {
   });
 }
 
+// ============ 知识地图三 action（□7：建图素材/对齐合并落盘/读图邻域） ============
+
+/** map_save 入参上限（防一次性巨 payload 写盘风暴；建图分批是常态） */
+const MAP_SAVE_NODE_LIMIT = 200;
+const MAP_SAVE_EDGE_LIMIT = 400;
+
+/** 思源块 id 形状（同 kernel/progData BLOCK_ID_RE；兼收 SQL 元字符防注入——review P1-2） */
+const BLOCK_ID_RE = /^\d{14}-[a-z0-9]{7}$/;
+
+/** map_* 三入口共用守卫：bookID 形态 + 书在册（review P1-2/P2-8：裸拼 SQL 注入面 +
+ * 任意块 id 可过 getBlockInfo 在无辜文档下建「知识地图」） */
+async function mapBookGuard(bookID: string): Promise<KBookInfo | string> {
+  if (!BLOCK_ID_RE.test(bookID)) return `bookID 形态非法：${bookID.slice(0, 40)}（list_books 返回的书壳文档 id）`;
+  const infos = await readBooksInfos();
+  const info = infos[bookID];
+  if (!info) return `书未注册（bookID=${bookID}，先 list_books 拿在册书）`;
+  return info;
+}
+
+async function mapContext(input: Record<string, any>) {
+  const bookID = String(input.bookID ?? "").trim();
+  const guard = await mapBookGuard(bookID);
+  if (typeof guard === "string") return errorResponse(guard);
+  const scope = {
+    vols: Array.isArray(input.vols) ? input.vols.map(String).filter(Boolean) : undefined,
+    points: Array.isArray(input.points) ? input.points.map(Number).filter(Number.isInteger) : undefined,
+  };
+  const data = await collectMapContext(bookID, scope);
+  return successResponse({
+    ...data,
+    hint: "建图素材=卷结构+片标题+片首段摘录。工作流：本工具拿素材与现有池子→你分析产出节点/边→map_save 提交（对齐规则见 alignment）→map_read 验收。anchors=片 point（pieces 里出现过的数字）。",
+  });
+}
+
+async function mapSave(input: Record<string, any>) {
+  const bookID = String(input.bookID ?? "").trim();
+  const guard = await mapBookGuard(bookID);
+  if (typeof guard === "string") return errorResponse(guard);
+  const nodes: IncomingNode[] = Array.isArray(input.nodes) ? input.nodes : null;
+  const edges: IncomingEdge[] = Array.isArray(input.edges) ? input.edges : [];
+  if (!nodes || !nodes.length) return errorResponse("nodes 必填：节点数组 [{name, aliases?, type?, summary?, anchors?, id?}]（type=person/concept/event/place/theme）");
+  if (nodes.length > MAP_SAVE_NODE_LIMIT) return errorResponse(`nodes 上限 ${MAP_SAVE_NODE_LIMIT}（收到 ${nodes.length}）——分批提交`);
+  if (edges.length > MAP_SAVE_EDGE_LIMIT) return errorResponse(`edges 上限 ${MAP_SAVE_EDGE_LIMIT}（收到 ${edges.length}）——分批提交`);
+  const pieceCount = await readPieceCount(bookID);
+  // review P0-1：卷表缺失/损坏时 pieceCount=0，washAnchors 上界 0 会把存量节点 anchors
+  // 一并洗空落盘且零回执——拒绝合并防误清（与 map_context「无卷表暂不支持」语义对齐）
+  if (pieceCount <= 0) return errorResponse(`卷表为空或不可读（pieceCount=0），拒绝合并防证据锚误清（bookID=${bookID}）`);
+  const report = await runExclusive(bookID, async () => {
+    const existing = await readPool(bookID);
+    const merged = mergeIntoPool(existing, nodes, edges, pieceCount);
+    if (!merged.map.nodes.length) return merged;
+    const ok = await writePool(bookID, merged.map);
+    if (!ok) throw new Error("落盘失败（写后回读不一致，可重试）");
+    return merged;
+  });
+  if (!report.map.nodes.length) {
+    return errorResponse(`有效节点为零（invalid=${JSON.stringify(report.invalid)}）`);
+  }
+  return successResponse({
+    saved: true,
+    poolSize: { nodes: report.map.nodes.length, edges: report.map.edges.length },
+    // 打磨批（□7 P2「大池子单行 JSON 块大小监控」）：池子单行块字符量随写透出（巨池
+    // 趋势可观测——超 ~256KB 进内核单块性能危险区，该分书/整理）
+    poolBytes: buildBookMapMD(report.map).length,
+    created: report.created,
+    reused: report.reused,
+    forcedReuses: report.forcedReuses,
+    droppedAnchors: report.droppedAnchors,
+    droppedEdges: report.droppedEdges,
+    invalid: report.invalid,
+    hint: "created=新建 id/reused=对齐重用/forcedReuses=撞名强制合并进现有节点（池内名优先，AI 名入别名）/dropped*=被剔除项及原因。map_read 验收全图。",
+  });
+}
+
+async function mapRead(input: Record<string, any>) {
+  const bookID = String(input.bookID ?? "").trim();
+  const guard = await mapBookGuard(bookID);
+  if (typeof guard === "string") return errorResponse(guard);
+  const nameOrId = input.nameOrId != null ? String(input.nameOrId).trim() : "";
+  const pool = await readPoolExisting(bookID);
+  if (!pool) return successResponse({ bookID, nodes: [], edges: [], views: [], hint: "池子未建——先 map_context 拿素材建图" });
+  const sub = nameOrId ? neighborhood(pool, nameOrId) : { nodes: pool.nodes, edges: pool.edges };
+  return successResponse({
+    bookID,
+    full: !nameOrId,
+    ...(nameOrId && !sub.nodes.length ? { miss: nameOrId } : {}),
+    nodes: sub.nodes,
+    edges: sub.edges,
+    views: pool.views,
+    hint: nameOrId ? "邻域子图=命中节点+1 跳邻居（nameOrId 支持 id/name/别名）" : "池子全集；anchors=证据锚（片 point，docID 见 map_context.pieces 可跳原文）",
+  });
+}
+
+// ============ 知识地图整理域四 action（□9：删点删边/节点纠错/整理素材/视图归并） ============
+
+/** 整理域写操作批量上限（防一次性巨 payload；对齐 MAP_SAVE_* 量级） */
+const MAP_DELETE_NODE_LIMIT = 100;
+const MAP_DELETE_EDGE_LIMIT = 200;
+const MAP_UPDATE_LIMIT = 100;
+const MAP_TIDY_VIEW_LIMIT = 50;
+const MAP_TIDY_NODE_PER_VIEW = 500;
+
+/** 写池子的公共骨架：守卫→串行闸内读改写验真；池子未建明确报错（整理域前提=已有图） */
+async function mutatePool(
+  bookID: string,
+  fn: (pool: NonNullable<Awaited<ReturnType<typeof readPoolExisting>>>) => Promise<{ ok: boolean; data?: Record<string, any> }>,
+): Promise<ToolResponse> {
+  const guard = await mapBookGuard(bookID);
+  if (typeof guard === "string") return errorResponse(guard);
+  const pool = await readPoolExisting(bookID);
+  if (!pool) return errorResponse(`池子未建（bookID=${bookID}）——整理域先 map_context/map_save 建图`);
+    return await runExclusive(bookID, async () => {
+    const fresh = await readPoolExisting(bookID);
+    if (!fresh) throw new Error("池子在整理期间被清空（重试）");
+    const r = await fn(fresh);
+    if (!r.ok) throw new Error("落盘失败（写后回读不一致，可重试）");
+    return successResponse(r.data ?? { saved: true });
+  });
+}
+
+async function mapDelete(input: Record<string, any>) {
+  const bookID = String(input.bookID ?? "").trim();
+  const nodeIDs: string[] = Array.isArray(input.nodeIDs) ? input.nodeIDs.map(String).filter(Boolean) : [];
+  const edges: EdgeRef[] = Array.isArray(input.edges)
+    ? input.edges.filter((e: any) => e && typeof e === "object")
+        .map((e: any) => ({ from: String(e.from ?? ""), to: String(e.to ?? ""), relation: String(e.relation ?? "") }))
+        .filter(e => e.from && e.to && e.relation)
+    : [];
+  if (!nodeIDs.length && !edges.length) return errorResponse("nodeIDs/edges 至少给一个：nodeIDs=要删的节点 id 数组，edges=要删的边 [{from,to,relation}]（端点支持 id/name/别名）");
+  if (nodeIDs.length > MAP_DELETE_NODE_LIMIT) return errorResponse(`nodeIDs 上限 ${MAP_DELETE_NODE_LIMIT}（收到 ${nodeIDs.length}）——分多批调用`);
+  if (edges.length > MAP_DELETE_EDGE_LIMIT) return errorResponse(`edges 上限 ${MAP_DELETE_EDGE_LIMIT}（收到 ${edges.length}）——分多批调用`);
+  return await mutatePool(bookID, async fresh => {
+    const r = deleteFromPool(fresh, nodeIDs, edges);
+    const ok = await writePool(bookID, r.map);
+    return { ok, data: {
+      deletedNodes: r.deletedNodes,
+      cascadeEdges: r.cascadeEdges,
+      deletedEdges: r.deletedEdges,
+      removedFromViews: r.removedFromViews,
+      removedEmptyViews: r.removedEmptyViews,
+      missedNodes: r.missedNodes,
+      missedEdges: r.missedEdges,
+      poolSize: { nodes: r.map.nodes.length, edges: r.map.edges.length, views: r.map.views.length },
+      hint: "deletedNodes=删掉的节点/cascadeEdges=端点被删级联的边/deletedEdges=显式删掉的边/removedEmptyViews=剔空一并移除的视图/missed*=未命中项。删除节点前若想保留其关系，可先把边改挂别的节点。",
+    } };
+  });
+}
+
+async function mapUpdate(input: Record<string, any>) {
+  const bookID = String(input.bookID ?? "").trim();
+  const updates: NodeUpdate[] = Array.isArray(input.updates)
+    ? input.updates.filter((u: any) => u && typeof u === "object")
+        .map((u: any) => ({ id: String(u.id ?? ""), type: u.type, summary: u.summary }))
+    : [];
+  // review P2-3：空 id 静默丢弃违背「回执全量」纪律——进 missed（纯函数层持 id="" 未命中语义）
+  if (!updates.filter(u => u.id).length) return errorResponse("updates 必填：[{id, type?, summary?}]（id 支持 id/name/别名；type=person/concept/event/place/theme）");
+  if (updates.length > MAP_UPDATE_LIMIT) return errorResponse(`updates 上限 ${MAP_UPDATE_LIMIT}（收到 ${updates.length}）——分多批调用`);
+  return await mutatePool(bookID, async fresh => {
+    const r = updateNodes(fresh, updates);
+    const ok = await writePool(bookID, r.map);
+    return { ok, data: {
+      updated: r.updated,
+      missed: r.missed,
+      hint: "updated=改到的节点及字段/missed=拒收项及原因（type 只收五枚举；纠错通道不静默兜底）。",
+    } };
+  });
+}
+
+/** 整理契约（pull 红线：AI 只给建议，执行=用户确认后走 map_tidy_apply） */
+const TIDY_TEXT = [
+  "整理工作流：下方 views 是该书全部视图的清单（含每张的节点名），nodes 是池子名册。",
+  "你分析视图级冗余（节点集高度重叠/切法过时），给用户归并建议：哪几张可合成、合成后的视图形态。",
+  "用户确认后，用 map_tidy_apply 提交归并后的视图全集（views 全量替换——未合并的视图原样带上，别丢）。",
+  "绝不自动整理：建议只在用户点头后执行。节点级冗余已被池子对齐解决，这里只整视图级。",
+].join("");
+
+async function mapTidy(input: Record<string, any>) {
+  const bookID = String(input.bookID ?? "").trim();
+  const guard = await mapBookGuard(bookID);
+  if (typeof guard === "string") return errorResponse(guard);
+  const pool = await readPoolExisting(bookID);
+  if (!pool) return successResponse({ bookID, views: [], nodes: [], hint: "池子未建——先 map_context 建图再谈整理" });
+  return successResponse({
+    bookID,
+    views: viewsDigest(pool),
+    nodes: pool.nodes.map(n => ({ id: n.id, name: n.name, type: n.type })),
+    tidy: TIDY_TEXT,
+    hint: "views.name=视图名/nodeNames=成员节点名/missing=悬空引用数。少于 2 张视图通常无需整理。",
+  });
+}
+
+async function mapTidyApply(input: Record<string, any>) {
+  const bookID = String(input.bookID ?? "").trim();
+  const views: BookMapView[] = Array.isArray(input.views)
+    ? input.views.filter((v: any) => v && typeof v === "object")
+        .map((v: any) => ({ name: String(v.name ?? ""), nodeIDs: Array.isArray(v.nodeIDs) ? v.nodeIDs.map(String) : [], ...(v.layout && typeof v.layout === "object" ? { layout: v.layout } : {}) }))
+    : [];
+  if (!views.length) return errorResponse("views 必填：归并后的视图全集 [{name, nodeIDs, layout?}]（全量替换——未合并的视图原样带上；清空全部视图是危险操作，本工具不做，删节点用 map_delete）");
+  if (views.length > MAP_TIDY_VIEW_LIMIT) return errorResponse(`views 上限 ${MAP_TIDY_VIEW_LIMIT}（收到 ${views.length}）`);
+  const oversize = views.filter(v => v.nodeIDs.length > MAP_TIDY_NODE_PER_VIEW).map(v => v.name);
+  if (oversize.length) return errorResponse(`单视图 nodeIDs 上限 ${MAP_TIDY_NODE_PER_VIEW}（超限：${oversize.join("、")}）`);
+  return await mutatePool(bookID, async fresh => {
+    const r = tidyViews(fresh, views);
+    // review P1-1：全无效名入参（AI 字段名写错高频面）会静默落盘空视图集——穿透
+    // 「清空全部视图不做」红线；存量非空且产物为空=全拒收，拒绝落盘（同 mapSave 拒
+    // pieceCount=0 的 handler 层守卫位）
+    if (fresh.views.length > 0 && r.map.views.length === 0) {
+      throw new Error(`提交视图全部被拒（invalid=${JSON.stringify(r.invalid).slice(0, 120)}）——拒绝落盘防视图全清；检查 name 字段，未合并的视图须原样带上`);
+    }
+    const ok = await writePool(bookID, r.map);
+    return { ok, data: {
+      applied: r.applied,
+      droppedDupNames: r.droppedDupNames,
+      droppedNodeRefs: r.droppedNodeRefs,
+      droppedLayouts: r.droppedLayouts,
+      invalid: r.invalid,
+      poolSize: { nodes: r.map.nodes.length, edges: r.map.edges.length, views: r.map.views.length },
+      hint: "applied=采纳的视图名（重名保首）/droppedDupNames=重名被丢的/droppedNodeRefs=悬空节点引用剔除/droppedLayouts=layout 超限剔除/invalid=空名拒收。map_read 验收 views。",
+    } };
+  });
+}
+
+// ============ 老书转目录成书（convert_plan/convert_apply） ============
+
+/** 标题级参数清洗："1"~"6" 数字串；越界/非数字静默丢弃。allowEmpty=false（切卷级）
+ *  丢弃后为空=报错；true（分片段级）允许空=纯字数切分（AddBook 同语义） */
+function levelList(v: any, field: string, allowEmpty = false): string[] {
+  const arr = Array.isArray(v) ? v.map(String) : [];
+  const ok = arr.filter(s => /^[1-6]$/.test(s));
+  if (!ok.length && !allowEmpty) {
+    throw new Error(`${field} 须为 "1"~"6" 标题级数组（如 ["1"] 切卷用 h1、["1","2"] 分片按 h1+h2）`);
+  }
+  return [...new Set(ok)];
+}
+
+async function convertPlanAction(input: Record<string, any>): Promise<ToolResponse> {
+  const bookID = String(input.bookID ?? "").trim();
+  if (!bookID) return errorResponse("bookID 必填：书壳文档 id（list_books 返回的 bookID）");
+  return successResponse(await convertPlan(bookID));
+}
+
+async function convertApplyAction(input: Record<string, any>): Promise<ToolResponse> {
+  const bookID = String(input.bookID ?? "").trim();
+  if (!bookID) return errorResponse("bookID 必填：书壳文档 id");
+  let levels: string[], headings: string[];
+  try {
+    levels = levelList(input.levels, "levels");
+    headings = levelList(input.headings, "headings", true);
+  } catch (e: any) {
+    return errorResponse(String(e?.message ?? e));
+  }
+  const maxChars = Number(input.maxChars ?? DEFAULT_MAX_CHARS);
+  const splitWordNum = Number(input.splitWordNum ?? DEFAULT_SPLIT_WORDS);
+  if (!(maxChars >= 1_000 && maxChars <= 10_000_000)) {
+    return errorResponse(`maxChars 每卷字数上限须在 1 千~1000 万（默认 ${DEFAULT_MAX_CHARS}；convert_plan.suggestion 有建议值）`);
+  }
+  if (!(splitWordNum >= 0 && splitWordNum <= 100_000)) {
+    return errorResponse(`splitWordNum 每片字数须在 0~10 万（0=不按字数切；默认 ${DEFAULT_SPLIT_WORDS}）`);
+  }
+  return successResponse(await convertApply(bookID, { levels, maxChars, headings, splitWordNum }));
+}
+
 // ============ 工具定义 ============
 
 const progressiveDescription = [
@@ -321,8 +592,18 @@ const progressiveDescription = [
     "查询：list_books=书单+进度+状态；get_due(date)=某日到期重访+今日片队列（欠债/档位/滚筒接下来推什么书）；",
     "get_schedule(days)=未来排期三段分桶（已到期/N 天内/更远，按书聚合）。",
     "写操作：defer(ids, to)=重访调度推迟（③层实验品）——「这周赶稿，复习挪周末」就批量 defer 到周六。",
+    "知识地图（□7）：map_context(bookID)=拿建图素材（卷结构+片摘录+现有节点池+对齐契约）→",
+    "AI 分析产出节点/边→map_save(bookID,nodes,edges) 对齐合并落盘（确定性校验回执全量）→",
+    "map_read(bookID[,nameOrId]) 读全图或邻域子图。",
+    "地图整理（□9）：map_tidy(bookID)=视图整理素材（视图清单+池子名册+归并建议契约）→",
+    "你给用户归并建议、用户确认后 map_tidy_apply(bookID,views) 落盘（全量替换）；",
+    "map_delete(bookID,nodeIDs,edges)=删节点/删边（级联悬空边+视图剔引用）；",
+    "map_update(bookID,updates)=节点纠错（type/summary）。",
+    "老书转目录成书：convert_plan(bookID)=现状盘点+建议参数（纯读）→用户确认后",
+    "convert_apply(bookID,levels,maxChars,headings,splitWordNum)=清旧片+按标题切卷+重分片+注册",
+    "（写操作：书壳正文清空前自动建备份快照；转完知识地图即可用——片文档读书出场时逐片生成）。",
     "给 AI 当学习管家的数据底座：先 list_books 看书单，get_due 看今天该复习什么/该读什么，",
-    "get_schedule 看未来节奏，defer 执行推迟。日期参数支持 'today'/'tomorrow' 语义值与 'YYYY-MM-DD'。",
+    "get_schedule 看未来节奏，defer 执行推迟；读书理解面走知识地图三 action。日期参数支持 'today'/'tomorrow' 语义值与 'YYYY-MM-DD'。",
 ].join("");
 
 export function createProgressiveTool(): ToolDefinition {
@@ -331,8 +612,51 @@ export function createProgressiveTool(): ToolDefinition {
         config: objectSchema(progressiveDescription, {
             action: {
                 type: "string",
-                enum: ["list_books", "get_due", "get_schedule", "defer", "echo"],
-                description: "list_books=书单+进度+状态；get_due=到期重访+片队列；get_schedule=未来排期分桶；defer=重访调度推迟（写）；echo=通道自检",
+                enum: ["list_books", "get_due", "get_schedule", "defer", "map_context", "map_save", "map_read", "map_delete", "map_update", "map_tidy", "map_tidy_apply", "convert_plan", "convert_apply", "echo"],
+                description: "list_books=书单+进度+状态；get_due=到期重访+片队列；get_schedule=未来排期分桶；defer=重访调度推迟（写）；map_context=知识地图建图素材；map_save=建图落盘（对齐合并）；map_read=读图/邻域；map_delete=删节点/删边（级联）；map_update=节点纠错（type/summary）；map_tidy=视图整理素材（给归并建议）；map_tidy_apply=视图归并落盘（用户确认后）；convert_plan=老书转目录成书盘点（纯读+建议参数）；convert_apply=执行转书（写：清旧片+切卷+重分片+注册）；echo=通道自检",
+            },
+            bookID: {
+                type: "string",
+                description: "map_* 用：书壳文档 id（list_books 返回的 bookID）",
+            },
+            vols: {
+                type: "array",
+                description: "map_context 用：只收这些卷的素材（卷 id 数组；大书分批省 token）",
+                items: { type: "string" },
+            },
+            points: {
+                type: "array",
+                description: "map_context 用：只收这些 point 的片（片序号数组）",
+                items: { type: "number" },
+            },
+            nodes: {
+                type: "array",
+                description: "map_save 用：节点数组 ≤200 [{name(必填), aliases?: string[], type?: person|concept|event|place|theme, summary?: string, anchors?: number[]（片 point）, id?: string（能对上现有池子就重用）}]",
+                items: { type: "object" },
+            },
+            edges: {
+                type: "array",
+                description: "map_save 用：边数组 ≤400 [{from, to（节点 id 或 name）, relation, anchors?: number[]}]；map_delete 用：要删的边 ≤200 [{from, to, relation}]（relation 精确匹配、方向敏感）",
+                items: { type: "object" },
+            },
+            nameOrId: {
+                type: "string",
+                description: "map_read 用：给=该节点的邻域子图（支持 id/name/别名）；省略=池子全集",
+            },
+            nodeIDs: {
+                type: "array",
+                description: "map_delete 用：要删的节点数组 ≤100（元素支持 id/name/别名；级联删悬挂边+视图剔引用）",
+                items: { type: "string" },
+            },
+            updates: {
+                type: "array",
+                description: "map_update 用：节点纠错数组 ≤100 [{id(必填，支持 id/name/别名), type?: person|concept|event|place|theme, summary?: string}]",
+                items: { type: "object" },
+            },
+            views: {
+                type: "array",
+                description: "map_tidy_apply 用：归并后的视图全集 ≤50 [{name, nodeIDs(池内节点 id), layout?}]（全量替换，未合并的视图原样带上）",
+                items: { type: "object" },
             },
             ids: {
                 type: "array",
@@ -355,6 +679,24 @@ export function createProgressiveTool(): ToolDefinition {
                 type: "string",
                 description: "echo 用：回显文本，可省略",
             },
+            levels: {
+                type: "array",
+                description: `convert_apply 用：切卷标题级 ["1"~"6"]（默认 ["1"]；convert_plan.suggestion.levels 有建议值——超限卷自动下切更深级）`,
+                items: { type: "string" },
+            },
+            maxChars: {
+                type: "number",
+                description: `convert_apply 用：每卷字数上限（默认 ${DEFAULT_MAX_CHARS}）`,
+            },
+            headings: {
+                type: "array",
+                description: `convert_apply 用：片内分块标题级 ["1"~"6"]（缺省=空=纯按字数切；按标题分片从 convert_plan.suggestion.headings 拿建议值）`,
+                items: { type: "string" },
+            },
+            splitWordNum: {
+                type: "number",
+                description: `convert_apply 用：每片字数（默认 ${DEFAULT_SPLIT_WORDS}；0=只按标题切不按字数）`,
+            },
         }, ["action"]),
         handler: wrapHandler(async input => {
             switch (String(input.action ?? "")) {
@@ -364,8 +706,17 @@ export function createProgressiveTool(): ToolDefinition {
                 case "get_due": return await getDue(input);
                 case "get_schedule": return await getSchedule(input);
                 case "defer": return await deferAction(input);
+                case "map_context": return await mapContext(input);
+                case "map_save": return await mapSave(input);
+                case "map_read": return await mapRead(input);
+                case "map_delete": return await mapDelete(input);
+                case "map_update": return await mapUpdate(input);
+                case "map_tidy": return await mapTidy(input);
+                case "map_tidy_apply": return await mapTidyApply(input);
+                case "convert_plan": return await convertPlanAction(input);
+                case "convert_apply": return await convertApplyAction(input);
                 default:
-                    return errorResponse(`未知 action：${input.action}（可用：list_books/get_due/get_schedule/defer/echo）`);
+                    return errorResponse(`未知 action：${input.action}（可用：list_books/get_due/get_schedule/defer/map_context/map_save/map_read/map_delete/map_update/map_tidy/map_tidy_apply/convert_plan/convert_apply/echo）`);
             }
         }),
     };

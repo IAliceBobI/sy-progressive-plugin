@@ -18,7 +18,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, readCurveReadingPoint, readCurvePlainDocs,
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, readCurveReadingPoint, readCurvePlainDocs,
     readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
@@ -26,6 +26,7 @@ import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlug
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import SettingsSvelte from "./Settings.svelte"
 import ReviewPlanDialog from "./ReviewPlanDialog.svelte"
+import BookMapDialog from "./BookMapDialog.svelte"
 import { resetKey, verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { neighborCode } from "../../sy-tomato-plugin/src/libs/neighbor";
 import { applyProgSkins, refreshProgGate } from "./theme";
@@ -55,6 +56,7 @@ import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
 import { invalidateBookStatusCache } from "./bookStatus";
 import { registerTailCardRender } from "./tailCardRender";
 import { registerVisitNoteRender } from "./visitNoteRender";
+import { copyDigestsToPool } from "./writeBook";
 
 // 更新日志按年拆分存储（src/changelog/<年>.json，当年文件追加、往年冻结），此处组装倒序全集
 const changelog = [...changelog2026, ...changelog2025];
@@ -93,6 +95,7 @@ function loadStore(plugin: BaseTomatoPlugin) {
         cardLanding.set("cards");
     }
     flashcardAddRefs.load(plugin);
+    flashcardAddOriginRef.load(plugin);
     flashcardMultipleLnks.load(plugin);
     windowOpenStyle.load(plugin);
     flashcardNotebook.load(plugin);
@@ -188,6 +191,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
         } else {
             delete window.prog_zZmqus5PtYRi // 清前次调试残留（window 跨插件 reload 存活，不清则关闸后旧通道仍带废引用常驻）
         }
+        // □3 正式 JS API（群反馈 650189 批量入素材池）：window.syProgressive——用户控制台
+        // 调用通道，不受 PROG_DEBUG 门禁。reload 重跑模块顶层=整对象重赋值（旧引用指向
+        // 旧模块闭包仍可跑完当次调用，新调用拿新实例；prog_zZmqus5PtYRi 同款容忍语义）
+        window.syProgressive = { copyDigestsToPool };
 
         this.taskCfg = this.loadData(STORAGE_Prog_SETTINGS).then(cfg => {
             this.settingCfg = cfg;
@@ -387,7 +394,33 @@ export default class ThePlugin extends BaseTomatoPlugin {
             props: { plugin: this },
         });
         dm.add("1", () => { dialog.destroy() });
-        dm.add("2", () => { unmount(app); });
+        dm.add("2", () => { unmount(app) });
+    }
+
+    // □8 知识地图：书级地图 Dialog（入口=书卡右键 bookMenu + 目录浮层顶栏钮）。
+    // e2e 通道=window 挂点（渐进全局键盐前缀纪律——只读不写，globalThis 注册表
+    // 容忍重注册；进入函数体才挂，不占启动期）
+    private bookMapDm: DestroyManager | null = null;
+
+    openBookMapDialog(bookID: string) {
+        (window as any).__progOpenBookMap = (id: string) => this.openBookMapDialog(id);
+        const dm = new DestroyManager();
+        this.bookMapDm?.destroyBy();
+        this.bookMapDm = dm;
+        const id = newID();
+        const dialog = new Dialog({
+            title: tomatoI18n.知识地图(),
+            content: `<div id="${id}" style="height:100%"></div>`,
+            width: events.isMobile ? "94vw" : "min(1100px, 94vw)",
+            height: events.isMobile ? "120svw" : "680px",
+            destroyCallback: () => dm.destroyBy("1"),
+        });
+        const app = mount(BookMapDialog, {
+            target: dialog.element.querySelector("#" + id),
+            props: { plugin: this, bookID, onClose: () => this.bookMapDm?.destroyBy() },
+        });
+        dm.add("1", () => { dialog.destroy() });
+        dm.add("2", () => { unmount(app) });
     }
 
     async onload() {
@@ -516,6 +549,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             isReciteInstalled: () => prog.isReciteInstalled(),
             openDueList: (ev, bookID) => openDueReviewList(ev, bookID),
             openReviewPlan: () => this.openReviewPlanDialog(),
+            openBookMap: (bookID) => this.openBookMapDialog(bookID),
             // 舰队管理 □2：书卡菜单动作（数据侧动作后 notifyFleetChanged 驱动面板即时刷新；
             // 归档走 confirm 确认链，书摘出调度后由 30s 刷新兜底，不抢 confirm 时序）
             togglePinBook: async (bookID, v) => {

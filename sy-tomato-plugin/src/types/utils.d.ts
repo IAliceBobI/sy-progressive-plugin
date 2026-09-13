@@ -36,6 +36,8 @@ type TomatoSettings = {
     card_refresh_visible_only: boolean,
     cardBoxSettingsShow: boolean,
     cardBoxDeleteNoConfirm: boolean,
+    cardBoxReviewDocMenu: boolean,
+    refCleanMenu: boolean,
     prefixArticlesTagsShow: boolean,
     fastNoteBoxDocPrefix: boolean,
     foldTypesNODE_listITEM: boolean,
@@ -183,6 +185,7 @@ type TomatoSettings = {
     windowOpenStyle: string,
     flashcardMultipleLnks: boolean,
     flashcardAddRefs: boolean,
+    flashcardAddOriginRef: boolean,
     //------------------
     graphHideStructEdges: boolean,
     graphMaxAllBlocks: string,
@@ -389,6 +392,7 @@ type AttrType = {
     "custom-block-editor"?: string,
     "custom-ref-id"?: string,
     "custom-ref-snapshot-"?: string,
+    "custom-ai-response"?: string,
     title?: string,
     alias?: string, // comma separated
     memo?: string,

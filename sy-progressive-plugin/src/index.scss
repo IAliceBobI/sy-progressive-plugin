@@ -202,6 +202,10 @@ html[data-theme-mode="dark"] {
 // removeAttribute("style") 清定位不误伤。
 #prog-float-tip {
   pointer-events: none;
+  /* □4⑤ review P1：盖过 prog-popover 浮窗族（z 1000）——写作现场分片浮窗常驻时
+     hover 底栏火苗，欠债来源拆分等增量文案不再被浮窗截断（内核 .tooltip 同档 z
+     恰被压住，自建单例提一档；Dialog 模态层更高但模态时火苗不可 hover 无冲突） */
+  z-index: 1001;
 }
 
 .prog-fb .prog-fb-btn {
@@ -2173,7 +2177,8 @@ html[data-theme-mode="dark"] .prog-tailcard--off {
 /* □4 回访留言卡（custom 块 visit-note 渲染器产物）：内容卡非动作卡——左强调边做引用感，
    正文保持可选中（留言是用户写的内容，复制合法——与尾卡 user-select:none 相反） */
 .prog-vnote {
-    margin: 6px 0 2px;
+    /* 打磨批（□4 P2 margin 6/2 不对称）：对称 4px——连排卡间距恒 8、首尾 4 */
+    margin: 4px 0;
     padding: 7px 10px;
     box-sizing: border-box;
     border: 1px solid var(--b3-border-color);
@@ -2190,7 +2195,9 @@ html[data-theme-mode="dark"] .prog-tailcard--off {
     border-left-width: 1px;
 }
 .prog-vnote__head {
+    /* 打磨批（□12 P2 极窄宿主）：窄容器日期+标签并排放不下时换行（原 nowrap 挤压裁切） */
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     margin-bottom: 3px;
@@ -2206,8 +2213,11 @@ html[data-theme-mode="dark"] .prog-tailcard--off {
 }
 .prog-vnote__label > svg { width: 12px; height: 12px; flex: none; }
 .prog-vnote__date {
-    font-size: 11px;
-    color: var(--b3-theme-on-surface-light, #999);
+    /* □12 vision P1：日期=倒排序唯一客观线索（最不该淡的一级）——12px+on-surface
+       .92（□9 tidyhint 同款结论：双主题 4.7:1 过 AA） */
+    font-size: 12px;
+    color: var(--b3-theme-on-surface);
+    opacity: .92;
     white-space: nowrap;
 }
 .prog-vnote__text {
@@ -2228,6 +2238,8 @@ html[data-theme-mode="dark"] .prog-tailcard--off {
     width: 100%;
     box-sizing: border-box;
     min-height: 72px;
+    /* 打磨批（□4 P2）：超长输入拖高无兜底——40vh 封顶后内部滚动 */
+    max-height: 40vh;
     resize: vertical;
     font-size: 13px;
     line-height: 1.6;
@@ -2239,10 +2251,26 @@ html[data-theme-mode="dark"] .prog-tailcard--off {
     gap: 8px;
 }
 .prog-vnote-input__hint {
+    /* 打磨批（□4 P2 亮色对比 ~2.8:1）：11px/on-surface-light → 12px+on-surface .92
+       （□9 tidyhint/□12 date 同款结论：双主题 4.7:1 过 AA） */
     margin-right: auto;
-    font-size: 11px;
-    color: var(--b3-theme-on-surface-light, #999);
+    font-size: 12px;
+    color: var(--b3-theme-on-surface);
+    opacity: .92;
 }
+
+
+/* 打磨批（□2 P2 footer 贴底，vision P1 实证~145px 悬空）：showDialog 的 #id 包装
+   div 挡断拉伸链（b3-dialog__body 本身=flex column，包装层裸 div 不拉伸）——:has
+   按 marker 接通（Dialog 拉伸链同族先例）；内容超长时 sticky footer 照旧滚动吸底 */
+.b3-dialog__body:has(> div > .prog-splitvols-root) > div {
+    flex: 1;
+    min-height: 0;
+}
+
+/* 打磨批（vision P2）：藏 xyflow attribution 角标（亮色小签=暗色画布最突兀亮元素；
+   elementFromPoint 实锤=非滚动条） */
+.prog-map-flow .svelte-flow__attribution { display: none; }
 
 
 /* vision P2-2：可点胶囊 hover=字色+底色双反馈（可发现性）；关态 opacity .65 见 --off 段 */

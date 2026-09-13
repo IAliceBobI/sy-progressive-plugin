@@ -21,8 +21,8 @@ const BLOCK_ID_RE = /^\d{14}-[a-z0-9]{7}$/;
 
 // ============ petal JSON 读取（siyuan.storage 根=前端 loadData 同目录） ============
 
-/** 读 petal JSON；文件不存在/解析失败=null（kernel storage.get 对缺失文件 reject） */
-async function readStorageText(file: string): Promise<string | null> {
+/** 读 petal JSON；文件不存在/解析失败=null（kernel storage.get 对缺失文件 reject）。□7 起导出：bookMapIo 读 vols.json/池子共用 */
+export async function readStorageText(file: string): Promise<string | null> {
   try {
     return await (await siyuan.storage.get(file)).text();
   } catch {
@@ -42,6 +42,9 @@ export interface KBookInfo {
   hidden?: boolean;
   writing?: boolean;
   manualMode?: boolean;
+  /** 目录成书标记（convert_apply 写入；heal 按 vols.json 存在性补的同一字段） */
+  dirMode?: boolean;
+  bookName?: string;
   time?: number;
 }
 
@@ -80,11 +83,19 @@ export function parseBookIndex(text: string): string[][] {
   return text.split("#").map(piece => piece.split(","));
 }
 
-/** 某书片索引（petal 文件名=<bookID>；不存在/空串=空数组——afterLoad("") 产 [[""]]，此处清洗） */
+/** 某书片索引（petal 文件名=<bookID>；不存在/空串=空数组——afterLoad("") 产 [[""]]，此处清洗）。
+ *  盘形态=saveData(object) 的 JSON `{"data":"id,id#..."}`（前端 afterLoad 取 .data 同源）——
+ *  文本直 split 会把 `{"data":"id` 割成垃圾块 id（片数巧合正确掩盖至今：kernel 面此前只
+ *  消费 length；convert 块态回退起消费块 id，此处必须先解 JSON 壳） */
 export async function readBookIndex(bookID: string): Promise<string[][]> {
   const text = await readStorageText(bookID);
   if (!text) return [];
-  return parseBookIndex(text).map(i => i.filter(j => j?.length > 0)).filter(i => i.length > 0);
+  let body = text;
+  try {
+    const j = JSON.parse(text);
+    if (j && typeof j === "object" && typeof j.data === "string") body = j.data;
+  } catch { /* 纯文本形态（历史手写/外部工具）原样消费 */ }
+  return parseBookIndex(body).map(i => i.filter(j => j?.length > 0)).filter(i => i.length > 0);
 }
 
 // ============ ctime 归书（复刻自 progData.parseBookIDFromCtime / fleetData） ============

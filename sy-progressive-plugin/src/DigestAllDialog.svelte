@@ -77,7 +77,7 @@
                 // □1 行首类型小标（Popover 同款）：失败静默降级保留无标形态
                 try {
                     const map = await digestBadgeInputsOf(
-                        flat.map(n => n.id), bookID, new Map(flat.map(n => [n.id, n.title])));
+                        flat.map(n => n.id), new Map(flat.map(n => [n.id, n.title])));
                     const now = Date.now();
                     flat = flat.map(n => ({ ...n, badge: map.get(n.id) ? digestBadgeOf(map.get(n.id)!, now) : undefined }));
                 } catch { /* 采集失败保留无标形态 */ }

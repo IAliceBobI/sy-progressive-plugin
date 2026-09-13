@@ -4,7 +4,6 @@
 // + 卡组一次查询；独立 60s TTL 缓存（refMap 同模式）——出场链五事件高频重挂胶囊不重查。
 // setReview 动作后 invalidateDigestBadge 即时失效（完成/推迟/移除跳下轮）。
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
-import { findDocByIal, getDocIalDigestDir } from "./progData";
 import { ReviewKey, PdigestReviewKey } from "./reviewQueue";
 import type { DigestBadgeInput } from "./digestBadge";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
@@ -19,15 +18,24 @@ export function invalidateDigestBadge(docID: string) {
     cache.delete(docID);
 }
 
-/** 摘抄文档已入卡的块 ID set（自 digestMarker 迁入，原注释照搬）：
- *  digest 夹 IAL 只读认回（findDocByIal 不建——无夹=无卡），卡挂摘抄文档块，
- *  card.id 即块 ID。夹不存在/查询异常 → 空 set 静默降级（四态退三态，不崩列表）。 */
-export async function cardIDSetOf(bookID: string): Promise<Set<string>> {
+/** 摘抄文档已入卡的块 ID set（09-13 群反馈 650189 盲区根治：数据源换块自身卡归属）：
+ *  旧口径=主力 digest 夹子树卡集合（findDocByIal+getTreeRiffCardsAll），非书摘抄
+ *  （札记匣/free 夹锚）与浮条逐次改向双夹（digestdiru/h）都不在主力夹子树 → 恒误显
+ *  「留档」。新口径=getRiffCardsByBlockIDs 直查这批块各自的卡归属，落点无关，且查
+ *  riff 库不过 SQL attributes（写后立读旧值回填坑免疫）。查询异常 → 空 set 静默降级
+ *  （四态退三态，不崩列表）。 */
+export async function cardIDSetOf(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
     try {
-        const dirID = await findDocByIal(getDocIalDigestDir(bookID));
-        if (!dirID) return new Set();
-        const cards = await siyuan.getTreeRiffCardsAll(dirID);
-        return new Set(cards.map(c => c.id));
+        const byBlock = await siyuan.getRiffCardsByBlockIDs(ids);
+        // 内核对无卡块补占位条目（Block{ID, Content}，riffCardID 零值 ""——kernel
+        // flashcard.go GetFlashcardsByBlockIDs），keys() 全量污染恒 true；须按
+        // riffCardID 过滤（readCurve.ts .some(s => s.riffCard) 同款判别式）
+        return new Set(
+            [...byBlock.entries()]
+                .filter(([, cards]) => cards.some(c => !!c.riffCardID))
+                .map(([id]) => id),
+        );
     } catch {
         return new Set();
     }
@@ -52,21 +60,22 @@ function foldThink(values: string[]): { active: string; done: boolean } {
     return { active, done };
 }
 
-/** 单文档快查（标题区胶囊）：走缓存；titles 兜底存量仿写副本（无标记，标题「仿写」前缀认回，
- *  tailCardAppend 同款口径）。bookID 空则卡组查询跳过（复访/思考可辨，背诵降级留档）。 */
+/** 单文档快查（标题区胶囊）：走缓存；title 兜底存量仿写副本（无标记，「仿写」前缀认回，
+ *  tailCardAppend 同款口径）。卡组走块自身归属（cardIDSetOf），与书/落点无关。 */
 export async function digestBadgeInputOf(
-    docID: string, bookID: string, title = "",
+    docID: string, title = "",
 ): Promise<DigestBadgeInput | null> {
     const hit = cache.get(docID);
     if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.input;
-    const map = await digestBadgeInputsOf([docID], bookID, new Map([[docID, title]]));
+    const map = await digestBadgeInputsOf([docID], new Map([[docID, title]]));
     return map.get(docID) ?? null;
 }
 
 /** 批量采集（两清单）：三键一次 SQL（显式 limit 防内核 64 截尾，dueReviewSQLFor 同款防线）；
- *  命中缓存的不重查。titles 参与仿写前缀兜底（title.startsWith("仿写")，存量副本无标记）。 */
+ *  命中缓存的不重查。titles 参与仿写前缀兜底（title.startsWith("仿写")，存量副本无标记）。
+ *  cardInSet 走 cardIDSetOf 块自身卡归属——与书归属/落点夹无关（09-13 盲区根治）。 */
 export async function digestBadgeInputsOf(
-    ids: string[], bookID: string, titles?: Map<string, string>,
+    ids: string[], titles?: Map<string, string>,
 ): Promise<Map<string, DigestBadgeInput>> {
     const out = new Map<string, DigestBadgeInput>();
     if (ids.length === 0) return out;
@@ -92,7 +101,7 @@ export async function digestBadgeInputsOf(
                 else if (r.name === FOR_RECITE_KEY) a.forRecite = !!r.value;
                 acc.set(r.root_id, a);
             }
-            const cardSet = bookID ? await cardIDSetOf(bookID) : new Set<string>();
+            const cardSet = await cardIDSetOf(missing);
             for (const id of missing) {
                 const a = acc.get(id);
                 const think = foldThink(a?.think ?? []);

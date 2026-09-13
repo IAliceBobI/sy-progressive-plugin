@@ -38,16 +38,24 @@ export async function openBookMenu(
         label: tomatoI18n.从总览隐匿,
         click: () => void actions.toggleHideBook(book.bookID, true),
     });
-    // □3 回访频率（书级）：✓ 当前档；改档=书 IAL 默认+在册 grow 卡批量跟随（toast 由
-    // setBookVisitFreq 内发），三档语义见 readCurveCore FREQ_MULT
+    // □3 回访频率（书级）：✓ 当前档（打磨批=官方 checked 通道防文案错位）；改档=书 IAL
+    // 默认+在册 grow 卡批量跟随（toast 由 setBookVisitFreq 内发），三档语义见 readCurveCore FREQ_MULT
     menu.addItem({
         icon: "iconClock",
         label: tomatoI18n.回访频率(),
         submenu: (["l", "m", "h"] as const).map(f => ({
             icon: "iconClock",
-            label: (freq === f ? "✓ " : "") + tomatoI18n.回访频率档名(f),
+            label: tomatoI18n.回访频率档名(f),
+            ...(freq === f ? { checked: true } : {}),
             click: () => void actions.setVisitFreq(book.bookID, f),
         })),
+    });
+    // □8 知识地图：查看动作非配置（配置组外独立项）；iconGraph 经 litheness icon.js
+    // 真相源核验存在
+    menu.addItem({
+        icon: "iconGraph",
+        label: tomatoI18n.知识地图(),
+        click: () => actions.openBookMap(book.bookID),
     });
     menu.addSeparator();
     menu.addItem({

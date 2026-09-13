@@ -73,6 +73,20 @@ export function isWritingFinished(pieces: WritingPieceState[]): boolean {
     return pieces.length > 0 && pieces.every(p => p.done);
 }
 
+/** □4② 写作书槽内导航：当前槽 docID 在 point 序里前后移动（含定稿槽——回看历史
+ *  写作现场合法）。首/尾越界或当前文档非本书槽 → null（调用方给「已是第一/最后
+ *  一个槽」提示）。不信任输入序（防御排序，同 pickWritingDispatch 口径） */
+export function neighborWritingSlot(
+    pieces: WritingPieceState[],
+    currentDocID: string,
+    step: number,
+): WritingPieceState | null {
+    const sorted = [...pieces].sort((a, b) => a.point - b.point);
+    const i = sorted.findIndex(p => p.docID === currentDocID);
+    if (i < 0) return null;
+    return sorted[i + step] ?? null;
+}
+
 /** 运行时拉写作书片列表（MarkKey+PROG_DONE_KEY 双 attributes join，显式 limit
  *  防内核 64 截尾）。索引恒空的设计共识在此兑现：不维护预存索引 */
 export async function fetchWritingPieces(bookID: string): Promise<WritingPieceState[]> {
@@ -403,7 +417,7 @@ export async function moveDigestToPool(targetBookID: string, digestDocID: string
 export async function copyDigestToPool(targetBookID: string, digestDocID: string): Promise<number> {
     const attrs = (await siyuan.getBlockAttrs(digestDocID)) ?? {};
     const ctime = attrs["custom-pdigest-ctime"] ?? "";
-    if (!parseBookIDFromCtime(ctime)) throw new Error("copyToPool: not a digest doc");
+    if (!parseBookIDFromCtime(ctime)) throw new Error(`copyToPool: ${NOT_A_DIGEST_MSG}`);
     const kds: string[] = [];
     for (const c of (await siyuan.getChildBlocks(digestDocID)) ?? []) {
         if (!isSubstanceChild(c)) continue;
@@ -430,6 +444,59 @@ export async function copyDigestToPool(targetBookID: string, digestDocID: string
     await appendTailCard({ v: 1, kind: "digest", bookID: targetBookID, point: 0, docID });
     debugLog("matfeed", `copyToPool done doc=${digestDocID} → copy=${docID} book=${targetBookID}`);
     return 1;
+}
+
+/** □3 批量入槽结果：copied=成功进池数；skipped=输入问题（非摘抄文档/无实质内容块）；
+ *  failed=链路错误（池夹未就绪/建文档失败等）。 */
+export interface DigestsToPoolResult {
+    total: number;
+    copied: number;
+    skipped: { id: string; reason: string }[];
+    failed: { id: string; error: string }[];
+}
+
+/** 「非摘抄文档」错误标识（copyDigestToPool 抛出侧与批量壳归类侧共用同一来源，
+ *  review P1-1：裸字面量两处零关联，改词即静默把 skipped 误归 failed） */
+export const NOT_A_DIGEST_MSG = "not a digest doc";
+
+/** □3 素材批量入槽批量壳（群反馈 650189：500+ 篇摘抄批量进池；正式 API 挂
+ *  window.syProgressive.copyDigestsToPool，见 index.ts）。串行防写盘风暴；失败跳过
+ *  最后汇总；单批上限 100（用户分批建议 50~100）；进度逐篇 console.log（用户在控制台
+ *  调用，这是 API 的回报输出非运行时埋点，不走 debugLog 门控）。批内 id 去重（复制
+ *  非幂等，重复=双份副本）；跨批重复管不到，重试请只传 failed 里的 id。executor/log
+ *  注入供单测，默认绑单篇真链路 copyDigestToPool。 */
+export async function copyDigestsToPool(
+    targetBookID: string, digestDocIDs: string[],
+    execOne: (bookID: string, docID: string) => Promise<number> = copyDigestToPool,
+    log: (line: string) => void = (l) => console.log(`[copyDigestsToPool] ${l}`),
+): Promise<DigestsToPoolResult> {
+    if (digestDocIDs.length > 100) {
+        throw new Error(`copyDigestsToPool: 单批上限 100 篇（本次 ${digestDocIDs.length}），请分批调用`);
+    }
+    const ids = [...new Set(digestDocIDs)];
+    const res: DigestsToPoolResult = { total: ids.length, copied: 0, skipped: [], failed: [] };
+    if (ids.length < digestDocIDs.length) log(`已去重 ${digestDocIDs.length - ids.length} 篇重复 id`);
+    for (const [i, id] of ids.entries()) {
+        const n = i + 1;
+        try {
+            const r = await execOne(targetBookID, id);
+            if (r === 1) { res.copied++; log(`${n}/${res.total} ✓ ${id}`); }
+            else { res.skipped.push({ id, reason: "无实质内容块" }); log(`${n}/${res.total} - 跳过（无实质内容块） ${id}`); }
+        } catch (e) {
+            const msg = String((e as Error)?.message ?? e);
+            if (msg.includes(NOT_A_DIGEST_MSG)) {
+                res.skipped.push({ id, reason: "非摘抄文档" });
+                log(`${n}/${res.total} - 跳过（非摘抄文档） ${id}`);
+            } else {
+                res.failed.push({ id, error: msg });
+                log(`${n}/${res.total} ✗ 失败 ${id}: ${msg}`);
+            }
+        }
+    }
+    log(`完成：成功 ${res.copied} / 跳过 ${res.skipped.length} / 失败 ${res.failed.length}（共 ${res.total}）`);
+    if (res.failed.length) log("有失败篇：重试请只传返回值 failed 里的 id（复制非幂等，整批重跑会双份）");
+    debugLog("matfeed", `copyDigestsToPool book=${targetBookID} copied=${res.copied} skipped=${res.skipped.length} failed=${res.failed.length}`, "progressive");
+    return res;
 }
 
 // ============ matfeed □4 写作书素材池位置档（书下/摘抄总夹） ============
@@ -536,13 +603,8 @@ export interface WritingFlameBook {
 }
 
 export async function pickWritingFlameBook(): Promise<WritingFlameBook | null> {
-    const infos = progStorage.booksInfos();
-    const writing = Object.entries(infos).filter(([id, info]) =>
-        info.writing && !info.ignored && !info.archived && progStorage.isRegisteredBook(id));
+    const writing = await orderedWritingBooks();
     if (writing.length === 0) return null;
-    const order = (await progStorage.loadReadingOrder()).order;
-    const rank = new Map(order.map((id, i) => [id, i]));
-    writing.sort((a, b) => (rank.get(a[0]) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b[0]) ?? Number.MAX_SAFE_INTEGER));
     for (const [bookID, info] of writing) {
         const target = pickWritingTarget(await fetchWritingPieces(bookID), info.activePoint);
         if (target) return { bookID, bookName: info.bookName || bookID, target, materialUnread: 0 };
@@ -553,6 +615,25 @@ export async function pickWritingFlameBook(): Promise<WritingFlameBook | null> {
     }
     const [bookID, info] = writing[0];
     return { bookID, bookName: info.bookName || bookID, target: null, materialUnread: 0 };
+}
+
+/** □4③ 写作书子集（过滤+滚筒序排序）：pickWritingFlameBook 与写作语境换书共用，
+ *  防两处选择逻辑漂移（fleet 刷新与打开侧共用同款纪律） */
+export async function orderedWritingBooks(): Promise<[string, NonNullable<ReturnType<typeof progStorage.booksInfos>[string]>][]> {
+    const infos = progStorage.booksInfos();
+    const writing = Object.entries(infos).filter(([id, info]) =>
+        info.writing && !info.ignored && !info.archived && progStorage.isRegisteredBook(id));
+    const order = (await progStorage.loadReadingOrder()).order;
+    const rank = new Map(order.map((id, i) => [id, i]));
+    return writing.sort((a, b) => (rank.get(a[0]) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b[0]) ?? Number.MAX_SAFE_INTEGER));
+}
+
+/** □4③ 写作语境换一本：已排序写作书 id 序里取当前的下一本（环形）。当前不在序中
+ *  （刚归档/状态刷新间隙）回落序首；单本返回自身（调用方判同 id 给对症提示） */
+export function nextOfOrderedIDs(ids: string[], current: string): string {
+    if (ids.length === 0) return "";
+    const i = ids.indexOf(current);
+    return ids[(i + 1) % ids.length];
 }
 
 /** 期A 滚筒分派判定（纯函数，TDD 见 tests/unit/writingBook.test.ts）：素材优先、

@@ -7,6 +7,7 @@
         cardAppendTime,
         cardLanding,
         cardUnderPiece,
+        flashcardAddOriginRef,
         flashcardAddRefs,
         flashcardMultipleLnks,
         hideBtnsInFlashCard,
@@ -38,6 +39,17 @@
             bind:checked={$flashcardAddRefs}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置相关概念}>{tomatoI18n.卡片最上面添加相关概念}</span>
+    </div>
+
+    <!-- 原文引用开关（2026-09-13 bear 拍板「原文快删不想要指向原文的引用」）：卡尾 `*`/
+         分片 `@` 统一控制，与上行「相关概念」=两种引用各一个开关 -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$flashcardAddOriginRef}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置原文引用}>{tomatoI18n.制卡时链接原文块}</span>
     </div>
 
     <div>

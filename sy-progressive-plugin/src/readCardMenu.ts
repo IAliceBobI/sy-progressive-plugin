@@ -42,9 +42,10 @@ export async function openReadCardMenu(
     if (!blockID) return;
     const ctx = await inspectReadCard(blockID);
     const items: MenuItemOption[] = [];
-    // 顶部只读状态行（无 click）；无键带退推标记 → 「已退出」提示行（□6 relaxedAt=书放宽尾句）
+    // 顶部只读状态行（无 click）；无键带退推标记 → 「已退出」提示行（□6 relaxedAt=书放宽尾句）。
+    // 打磨批：素材卡（material）状态行回落「✦ 素材 · due 尾」——无「第 N/5 次」骨架
     const status = ctx.readcard
-        ? statusLineOf(ctx.readcard, ctx.dueMs, Date.now(), ctx.relaxedAt)
+        ? statusLineOf(ctx.readcard, ctx.dueMs, Date.now(), ctx.relaxedAt, ctx.kind === "material")
         : ctx.optout ? tomatoI18n.已退出阅读推送 : null;
     if (status) {
         items.push({ icon: "iconInfo", label: status });
@@ -58,7 +59,8 @@ export async function openReadCardMenu(
                 label: tomatoI18n.每N天档位,
                 submenu: SCHED_CHOICES.map(n => ({
                     icon: "iconCalendar",
-                    label: (curEvery === n ? "✓ " : "") + tomatoI18n.计划每N天(n),
+                    label: tomatoI18n.计划每N天(n),
+                    ...(curEvery === n ? { checked: true } : {}),
                     click: () => void runAction(blockID, "sched", n, onApplied),
                 })),
             });
@@ -80,14 +82,17 @@ export async function openReadCardMenu(
             label: tomatoI18n.回访频率(),
             submenu: (["l", "m", "h"] as const).map(f => ({
                 icon: "iconClock",
-                label: (cur === f ? "✓ " : "") + tomatoI18n.回访频率档名(f),
+                label: tomatoI18n.回访频率档名(f),
+                ...(cur === f ? { checked: true } : {}),
                 click: () => void runFreq(blockID, f, onApplied),
             })),
         });
     }
     // □4 写留言：宿主=文档级的 kind（piece/slot/material/digest/plain——readcard 键挂
-    // 文档头块，blockID 即留言落点；rpcard=tomato 块级卡非渐进对象不给）
+    // 文档头块，blockID 即留言落点；rpcard=tomato 块级卡非渐进对象不给）。
+    // 打磨批（□3 P2 分隔符）：内容动作与上方配置组（频率/每 N 天）分隔
     if (ctx.kind && ctx.kind !== "rpcard") {
+        items.push({ type: "separator" } as MenuItemOption);
         items.push({
             icon: "iconInfo",
             label: tomatoI18n.写留言(),

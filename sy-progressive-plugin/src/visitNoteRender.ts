@@ -34,7 +34,8 @@ export function registerVisitNoteRender(plugin: CustomBlockPlugin): void {
             label.append(document.createTextNode(tomatoI18n.留言()));
             const ds = document.createElement("span");
             ds.className = "prog-vnote__date";
-            ds.textContent = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+            // □12 vision P1：倒排（新在上）靠日期读序——只到日则同日卡零区分度，补时分
+            ds.textContent = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
             head.append(label, ds);
             const body = document.createElement("div");
             body.className = "prog-vnote__text";

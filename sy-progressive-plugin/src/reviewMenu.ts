@@ -69,21 +69,24 @@ export function schedSubmenuItems(ids: string[], current: ReviewState | null, ra
     const done = current?.mode === "done";
     const items: MenuItemOption[] = [{
         icon: "iconGraph",
-        label: (live?.mode === "curve" ? "✓ " : "") + tomatoI18n.曲线重访,
-        ...(live?.mode === "curve" ? {} : { click: () => setReview(ids, markQuestion(Date.now()), tomatoI18n.已设曲线重访, key) }),
+        label: tomatoI18n.曲线重访,
+        // 打磨批（□3 P2 ✓对齐）：「✓ 」文本前缀=选中项文案右移与兄弟错位——官方
+        // checked 通道（尾部 iconSelect 勾，Menu 类原生渲染）与官方菜单同构
+        ...(live?.mode === "curve" ? { checked: true } : { click: () => setReview(ids, markQuestion(Date.now()), tomatoI18n.已设曲线重访, key) }),
     }];
     for (const n of SCHED_PRESETS) {
         const on = live?.mode === "sched" && live.every === n;
         items.push({
             icon: "iconCalendar",
-            label: (on ? "✓ " : "") + tomatoI18n.每N天重访(n),
-            ...(on ? {} : { click: () => setReview(ids, markSched(Date.now(), n), tomatoI18n.已设每N天重访(n), key) }),
+            label: tomatoI18n.每N天重访(n),
+            ...(on ? { checked: true } : { click: () => setReview(ids, markSched(Date.now(), n), tomatoI18n.已设每N天重访(n), key) }),
         });
     }
     if (key === ReviewKey) { // 心得（done 终态）是 think 专属语义；复访永不结业
         items.push(done ? {
             icon: "iconStar",
-            label: "✓ " + tomatoI18n.已标心得不再重访,
+            label: tomatoI18n.已标心得不再重访,
+            checked: true,
         } : {
             icon: "iconStar",
             label: tomatoI18n.标为心得不再重访,

@@ -40,7 +40,8 @@ export function showFloatTip(btn: HTMLElement) {
         { left: r.left, top: r.top, bottom: r.bottom, width: r.width },
         tip.clientWidth, tip.clientHeight, innerWidth, innerHeight,
     );
-    tip.style.left = `${pos.left}px`;
+    // 火苗在底栏最左时居中锚定被钳到 x:0 贴死屏缘（vision P2）——下限留 4px 白
+    tip.style.left = `${Math.max(pos.left, 4)}px`;
     tip.style.top = `${pos.top}px`;
 }
 

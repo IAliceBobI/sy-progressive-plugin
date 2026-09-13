@@ -65,3 +65,47 @@ export function mapPoint(oldVols: VolEntry[], newVols: VolEntry[], oldPoint: num
 export function volsFromCounts(volIDs: string[], perVol: number[]): VolEntry[] {
     return volIDs.map((d, i) => ({ d, n: perVol[i] ?? 0 }));
 }
+
+/** dirbook □1：多书卷表合并成「卷文档 id → 书根 id」反向映射（locatePiece 是正向
+ *  point→卷，卷 id 反查书根此前无原语）。0 片占位卷同样在册——占位卷上也要出 book 态。
+ *  空 d 损坏条目跳过（review P2-5：docBookID("") 不得返回书 id）。
+ *  同卷 id 撞车先者胜：卷文档物理上只属一本书，撞=卷表脏数据，取稳定结果不抛错。 */
+export function volOwnerMap(entries: { bookID: string; vols: VolEntry[] }[]): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const { bookID, vols } of entries) {
+        for (const v of vols) {
+            if (!v.d) continue;
+            if (!out.has(v.d)) out.set(v.d, bookID);
+        }
+    }
+    return out;
+}
+
+/** □10 同 point 双片竞态防线①：片文件树直查的纯逻辑核（IO 注入式——listDir 由调用方
+ *  供 siyuan.listDocsByPath 适配层）。背景=出场 createPiece 建片后 blocks.ial 索引滞后
+ *  24s+（□29 实测），sweep 对同 point 再跑 createPiece 时 findPieceDoc SQL miss →
+ *  间歇建出第二张同内容片。目录决策与 createPiece 同款：dirMode 卷定位优先、卷表
+ *  失配/非目录书落书壳根（双查兜底）；片名=[NNNNN] 前缀（7 字符定长，邻点不撞）。
+ *  返回全部前缀命中（review P2-1：同目录用户复制的同名前缀文档也会命中——上层逐个
+ *  IAL 复核取真正在册的那张，勿把副本当片）。 */
+export async function pieceTreeLookup(
+    box: string, shellPath: string, vols: VolEntry[] | null, point: number,
+    listDir: (box: string, path: string) => Promise<{ id: string; name: string }[] | null>,
+): Promise<string[]> {
+    if (point < 0) return [];
+    const out: string[] = [];
+    const prefix = `[${String(point).padStart(5, "0")}]`;
+    const dirs: string[] = [];
+    if (vols?.length) {
+        const loc = locatePiece(vols, point);
+        if (loc) dirs.push(`${shellPath}/${vols[loc.volIndex].d}`);
+    }
+    dirs.push(shellPath); // 非目录书=书壳根；目录书卷表失配窗兜底（createPiece 挂书壳同款）
+    for (const dir of dirs) {
+        const docs = await listDir(box, dir).catch(() => null);
+        for (const d of docs ?? []) {
+            if (String(d?.name ?? "").startsWith(prefix)) out.push(String(d?.id ?? ""));
+        }
+    }
+    return out;
+}

@@ -8,7 +8,7 @@
 // □12 修正（2026-08-29 dev 实例实测）：块 div 上 setAttribute 的 custom-* 属性会被
 // 编辑事务卷进 IAL 落盘（kramdown 出现 custom-prog-digested=""，只读时代结论在解锁
 // 分片后失效）——**块 div 一律零改动**，痕迹只由 span 承载，CSS 锚定用 :has() 选择器。
-import { Menu } from "siyuan";
+import { Menu, getAllEditor } from "siyuan";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { PDIGEST_CTIME, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
@@ -120,7 +120,7 @@ export async function markDigests(protyle: any, bookID: string, force = false) {
             if (!pluginRef) return;
             const jump = digestJumpOf(digestIDs);
             if (jump) OpenSyFile2(pluginRef, jump);
-            else openDigestListMenu(ev, digestIDs, bookID);
+            else openDigestListMenu(ev, digestIDs);
         });
         div.insertBefore(span, div.firstChild);
     });
@@ -134,7 +134,7 @@ export async function markDigests(protyle: any, bookID: string, force = false) {
  * independent 第三参 + setTimeout open——click 处理器内弹菜单惯例（reviewMenu 同款，
  * 单例菜单会被同次冒泡清空）。
  */
-async function openDigestListMenu(ev: MouseEvent, ids: string[], bookID = "") {
+async function openDigestListMenu(ev: MouseEvent, ids: string[]) {
     const rows: DigestRow[] = ((await siyuan.sql(
         `select b.id, b.content, b.root_id, d.content as doc from blocks b left join blocks d on d.id = b.root_id `
         + `where b.id in (${ids.map(id => `"${id}"`).join(",")}) limit 1000`,
@@ -159,7 +159,7 @@ async function openDigestListMenu(ev: MouseEvent, ids: string[], bookID = "") {
         else if (r.name === ReviewKey && !m.think) m.think = r.value;
         schedByDoc.set(r.root_id, m);
     }
-    const cardSet = bookID ? await cardIDSetOf(bookID) : new Set<string>();
+    const cardSet = rootIDs.length > 0 ? await cardIDSetOf(rootIDs) : new Set<string>();
     const items = buildDigestMenuItems(groups).map((it, i) => {
         const g = groups[i];
         const m = schedByDoc.get(g.rootId) ?? {};
@@ -244,7 +244,7 @@ export function markDigestTag(protyle: any) {
     if (!docID) return;
     const titleText = (title.querySelector(".protyle-title__input")?.textContent ?? "").trim();
     const bookID = parseBookIDFromCtime(ctime);
-    digestBadgeInputOf(docID, bookID, titleText)
+    digestBadgeInputOf(docID, titleText)
         .then((badgeInput) => {
             // 代际守卫：同 protyle 切文档（ctime 变）/页签关闭（断连）后丢弃迟到结果
             if (!badgeInput || !wys.isConnected || wys.getAttribute(PDIGEST_CTIME) !== ctime) return;
@@ -266,6 +266,32 @@ export function markDigestTag(protyle: any) {
             attachStateBadge(title, tag, digestBadgeOf(badgeInput, Date.now()), docID, bookID, refreshStateBadge);
         })
         .catch(() => { });
+}
+
+/** 摘抄完成链重挂（09-13 盲区③竞态根治，digestUtils.setDigestCard 完成后调）：
+ *  addCardSetDueTime 内部 1s 延迟才 addRiffCards，otab.open 触发的首次 markDigestTag
+ *  必然先于卡落库 → 胶囊误显「留档」且无出场事件纠正（用户停在摘抄文档上静止）。
+ *  延到卡落库后失效缓存+重挂（refreshMaterialTraceFor「入槽即见」同款模式）。
+ *  ⚠ editor 枚举必须放延迟回调内：otab.open 后立即枚举时新页签 editor 尚未注册
+ *  （protyle 异步就绪），零命中=永不重挂（e2e 实锤）。双发（1.3s/2.6s）锁余量：
+ *  大库/索引重建中的实例 addRiffCards 落库可超 1.3s（6809 实测卡 2s 后才落），
+ *  单发查空会把 cardInSet=false 钉进 60s 缓存——每发都 invalidate 防钉死；两发
+ *  幂等（markDigestTag 清旧重挂）。getAllEditor 不可用即跳过，出场事件兜底。 */
+export function refreshDigestTagBadgeFor(docID: string, delayMs = 1300) {
+    for (const delay of [delayMs, delayMs * 2]) {
+        setTimeout(() => {
+            try {
+                for (const editor of getAllEditor() as any[]) {
+                    const p = editor?.protyle;
+                    if (p?.block?.rootID === docID) {
+                        // 双失效：出场首挂（约 t+0.2s）已把 cardInSet=false 写进 60s 缓存
+                        invalidateDigestBadge(docID);
+                        markDigestTag(p);
+                    }
+                }
+            } catch { /* editor 枚举失败不挡摘抄主链，出场事件兜底 */ }
+        }, delay);
+    }
 }
 
 /** 类型胶囊文案（消费层 i18n 拼装，纯函数在 digestBadge）：复访带 ✧ 与日期（到期

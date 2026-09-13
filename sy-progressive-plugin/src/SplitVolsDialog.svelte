@@ -90,7 +90,7 @@
     }
 </script>
 
-<div class="container">
+<div class="container prog-splitvols-root">
     {#if loading}
         <div class="prog-loading-row">
             <span class="prog-spinner" aria-hidden="true"></span>
@@ -179,6 +179,10 @@
         gap: 10px;
         min-width: 0;
         padding: 12px 14px 0;
+        box-sizing: border-box;
+        /* 打磨批（footer 贴底）：短内容撑满整高（min-height 100% 解析=包装层已被
+           :has 规则 flex:1 接通）；长内容自然长高由 b3-dialog__body 滚动 */
+        min-height: 100%;
     }
     .prog-lede {
         margin: 0;
@@ -361,8 +365,11 @@
         bottom: 0;
         display: flex;
         gap: 10px;
-        /* -14px 负 margin 抵掉 container 水平 padding：分隔线贴弹窗两缘贯通（SplitPieceDialog 同款） */
+        /* -14px 负 margin 抵掉 container 水平 padding：分隔线贴弹窗两缘贯通（SplitPieceDialog
+           同款）；margin-top:auto 须在简写后（flex 尾行推底——短内容时按钮区贴 Dialog 底，
+           sticky 兜长内容滚动态） */
         margin: 0 -14px;
+        margin-top: auto;
         padding: 10px 14px 12px;
         background-color: var(--b3-theme-surface);
         border-top: 1px solid var(--b3-border-color);

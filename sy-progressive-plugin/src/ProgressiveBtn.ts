@@ -203,12 +203,21 @@ function retrofitDigestTailCard(protyle: IProtyle): void {
         if (!isEditor(protyle)) return;
         const { attrs, docID } = events.getInfo(protyle);
         if (!docID || !attrs || tailRetrofitSeen.has(docID)) return;
-        const id = detectFloatDoc(attrs, docID, bid => progStorage.isRegisteredBook(bid));
+        const id = detectFloatDoc(attrs, docID, bid => progStorage.docBookID(bid));
         if (!id) return;
-        tailRetrofitSeen.add(docID);
         if (id.kind === "digest") {
-            void ensureDigestTailCard(docID, id.bookID).catch(() => { });
+            // □11：ctime 锚写作书=素材文档，不补 digest 尾卡——素材≠摘抄，动作行
+            // （送仿写/回原书/汇总/再摘抄）语义错位，且 flag 置位绕过「写作书片尾卡
+            // 一期不做」拍板。写留言入口不丢（阅读卡菜单仍在）。不进负缓存：writing
+            // 位可漂移（书转回阅读书后素材语义恢复=digest 该补插，态要跟随）。
+            // 谓词纪律：peekBookInfo 勿裸查 booksInfos（review P2-2，ctime 值可撞非块 id）
+            const writing = () => !!progStorage.peekBookInfo(id.bookID)?.writing;
+            if (writing()) return;
+            tailRetrofitSeen.add(docID);
+            void ensureDigestTailCard(docID, id.bookID, writing).catch(() => { });
+            return;
         }
+        tailRetrofitSeen.add(docID);
     } catch { /* 装饰层静默不扰主流程 */ }
 }
 
@@ -263,11 +272,23 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     // 的事件高频面会在毫秒窗内丢兄弟事件。缓存安全性：mark/ctime 全仓只随新建文档写入
     // （无给既有文档后补的 flow），片/digest 恒新 docID 不命中，普通→书走 book 分支首轮
     // 即判；插件 reload 自然清零。
-    const isBook = (id: string) => progStorage.isRegisteredBook(id);
-    let id = detectFloatDoc(attrs, docID ?? "", isBook);
+    // dirbook □1：book 态判据经 bookOf 反查书根——dirMode 卷文档同权出场（载荷
+    // bookID=书根，noteID=卷 id 保持宿主身份）。负缓存加 gate：卷→书根映射
+    // （volOwner）未就绪时的落空可能是卷文档而非普通文档，不进负缓存，下次出场重试。
+    const bookOf = (id: string) => progStorage.docBookID(id);
+    let id = detectFloatDoc(attrs, docID ?? "", bookOf);
     if (!id && docID && !attrsIsFinal && !verifiedNormalDoc.has(docID)) {
-        id = detectFloatDoc(await siyuan.getBlockAttrs(docID), docID, isBook);
-        if (!id) verifiedNormalDoc.add(docID);
+        id = detectFloatDoc(await siyuan.getBlockAttrs(docID), docID, bookOf);
+        if (!id) {
+            if (progStorage.volOwnerReady()) {
+                verifiedNormalDoc.add(docID);
+            } else {
+                // 映射未就绪（onLayoutReady 前的出场/构建失败自愈）：kick 一次重建，
+                // 落空不钉死——就绪后卷文档首轮即命中；普通文档在就绪前窗口每次出场
+                // 多一次 getBlockAttrs 兜底重查，窗口秒级可接受
+                void progStorage.warmVolOwner();
+            }
+        }
     }
     const nextBookID = id?.bookID ?? "";
     const nextPoint = id?.point ?? 0;
@@ -304,7 +325,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // 展开态同款持久化（2026-09-02）：expandAtAppear 偏好优先——书/摘抄态出场不再
         // 无条件收球，跟随用户最后一次显式意志；无意志维持出厂默认（片/free 展开）
         expanded.set(expandAtAppear(floatbarExpandPref.get(), nextKind));
-        if (nextBookID && shouldRefreshDue(nextBookID, isBook)) refreshDue(nextBookID);
+        if (nextBookID && shouldRefreshDue(nextBookID, bid => progStorage.isRegisteredBook(bid))) refreshDue(nextBookID);
     }
     // 摘抄痕迹：四态出场求值（digestMarkBookID）——片态（块 custom-progref 命中）与
     // 书态原文（块 ID 即 ref 值）双侧打标；free 态自指 docID；digest 态恒不打（卡片
@@ -387,7 +408,12 @@ export function getContentPrefix(level: number) {
     return h + s + d;
 }
 
-/** 滚筒换书（公共组 🔄）：无参 startToLearn 走滚筒出下一本（出片即轮转） */
-export async function floatSwapBook() {
+/** 滚筒换书（公共组 🔄）：无参 startToLearn 走滚筒出下一本（出片即轮转）。
+ *  □4③ writingBookID（写作书系文档语境）：换到下一本写作书（noCount 导航），不进阅读滚筒 */
+export async function floatSwapBook(writingBookID?: string) {
+    if (writingBookID) {
+        await prog.swapWritingBook(writingBookID);
+        return;
+    }
     await prog.startToLearnWithLock();
 }

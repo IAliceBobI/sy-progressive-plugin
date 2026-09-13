@@ -14,7 +14,8 @@
         bookID,
         onJump,
         point = null,
-    }: { bookID: string; onJump: (blockID: string) => void; point?: number | null } = $props();
+        onOpenMap = undefined,
+    }: { bookID: string; onJump: (blockID: string) => void; point?: number | null; onOpenMap?: () => void } = $props();
 
     let loading = $state(true);
     let rows = $state<OutlineRow[]>([]);
@@ -53,9 +54,25 @@
 
 {#if loading}
     <div class="prog-popover-hint">{tomatoI18n.加载中}</div>
+{:else if rows.length === 0 && onOpenMap}
+    <div class="prog-popover-maprow">
+        <button class="b3-button b3-button--outline prog-popover-mapbtn" onclick={onOpenMap}>
+            <svg class="prog-popover-mapicon"><use xlink:href="#iconGraph"></use></svg>
+            {tomatoI18n.知识地图()}
+        </button>
+    </div>
+    <div class="prog-popover-hint">{tomatoI18n.本书没有大纲标题}</div>
 {:else if rows.length === 0}
     <div class="prog-popover-hint">{tomatoI18n.本书没有大纲标题}</div>
 {:else}
+    {#if onOpenMap}
+        <div class="prog-popover-maprow">
+            <button class="b3-button b3-button--outline prog-popover-mapbtn" onclick={onOpenMap}>
+                <svg class="prog-popover-mapicon"><use xlink:href="#iconGraph"></use></svg>
+                {tomatoI18n.知识地图()}
+            </button>
+        </div>
+    {/if}
     <div class="prog-popover-list" bind:this={listEl}>
         {#each rows as r (r.id)}
             <button
@@ -71,3 +88,24 @@
         {/each}
     </div>
 {/if}
+
+<style>
+    /* □8 地图入口行：目录列表上方通栏（目录答顺序/地图答关系，同族就地切换） */
+    .prog-popover-maprow {
+        padding: 4px 8px 6px;
+        border-bottom: 1px solid var(--b3-border-color);
+        margin-bottom: 4px;
+    }
+    .prog-popover-mapbtn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        justify-content: center;
+    }
+    .prog-popover-mapicon {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+</style>
