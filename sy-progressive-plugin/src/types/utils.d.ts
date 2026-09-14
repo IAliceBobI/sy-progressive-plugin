@@ -41,6 +41,9 @@ type BookInfo = {
     /** □1 目录成书：书=文档集（卷=直接子文档，目录序=读序）；片挂来源卷下、
      *  卷表旁挂 petal <bookID>.vols.json。缺省=单篇书走现状路径（存量零迁移） */
     dirMode?: boolean,
+    /** progtree □1 树即槽：存量书一次性整理（MarkKey 真值序 changeSort 钉齐）已
+     *  完成=树序权威生效；新建书出生即置位。缺省 falsy=首次读取时整理 */
+    treeAligned?: boolean,
 };
 
 type BookInfos = { [key: string]: BookInfo };

@@ -21,6 +21,10 @@ import {
 } from "../bookMapIo";
 import { convertPlan, convertApply, DEFAULT_MAX_CHARS, DEFAULT_SPLIT_WORDS } from "../bookConvertIo";
 import {
+  structurePlan, structureApply, structureDistill, MATERIAL_LIMIT, DISTILL_HEADING_LIMIT,
+} from "../structureIo";
+import type { SkeletonNode, Placement } from "../../structureCore";
+import {
   mergeIntoPool, neighborhood, deleteFromPool, updateNodes, viewsDigest, tidyViews,
   buildBookMapMD,
   type IncomingNode, type IncomingEdge, type BookMapView, type EdgeRef, type NodeUpdate,
@@ -585,6 +589,59 @@ async function convertApplyAction(input: Record<string, any>): Promise<ToolRespo
   return successResponse(await convertApply(bookID, { levels, maxChars, headings, splitWordNum }));
 }
 
+// ============ 结构树三 action（progtree □2：structure_plan/apply/distill） ============
+
+/** 骨架入参清洗：[{title, children?}] 递归——空名节点剔除（AI 笔误防御），全空=报错；
+ *  名字剥 [N] 前缀（review P2-5：AI 回传带前缀骨架名走序号增殖路径） */
+function parseSkeleton(v: any): SkeletonNode[] {
+  const clean = (nodes: any[]): SkeletonNode[] =>
+    (Array.isArray(nodes) ? nodes : [])
+      .filter(n => n && typeof n === "object" && String(n.title ?? "").trim())
+      .map(n => ({ title: String(n.title).trim().replace(/^\[\d+\]/, ""), children: clean(n.children) }));
+  const out = clean(v);
+  if (!out.length) return [];
+  return out;
+}
+
+function parsePlacements(v: any): Placement[] {
+  return (Array.isArray(v) ? v : [])
+    .filter(p => p && typeof p === "object")
+    .map(p => ({ materialID: String(p.materialID ?? ""), slotPath: String(p.slotPath ?? "") }))
+    .filter(p => p.materialID && p.slotPath);
+}
+
+async function structurePlanAction(input: Record<string, any>): Promise<ToolResponse> {
+  const bookID = String(input.bookID ?? "").trim();
+  if (!bookID) return errorResponse("bookID 必填：写作书书壳文档 id（list_books 返回 status=writing 的书）");
+  const slots = parseSkeleton(input.slots);
+  const placements = parsePlacements(input.placements);
+  if (input.slots != null && !slots.length) return errorResponse("slots 非法：骨架树 [{title(必填), children?}]（同层同名自动加序号；空名剔除后须非空）");
+  if (slots.length && input.placements != null && !placements.length && Array.isArray(input.placements)) {
+    return errorResponse("placements 非法：[{materialID, slotPath}]（materialID=盘点返回的素材 id，slotPath=骨架标题路径 / 分隔）");
+  }
+  const offset = Math.max(0, Number(input.offset ?? 0) || 0);
+  return successResponse(await structurePlan(bookID, { slots: slots.length ? slots : undefined, placements, offset }));
+}
+
+async function structureApplyAction(input: Record<string, any>): Promise<ToolResponse> {
+  const bookID = String(input.bookID ?? "").trim();
+  if (!bookID) return errorResponse("bookID 必填：写作书书壳文档 id");
+  const slots = parseSkeleton(input.slots);
+  if (!slots.length) return errorResponse("slots 必填：骨架树 [{title, children?}]（structure_plan 预演与用户确认后原样传入）");
+  const placements = parsePlacements(input.placements);
+  return successResponse(await structureApply(bookID, slots, placements));
+}
+
+async function structureDistillAction(input: Record<string, any>): Promise<ToolResponse> {
+  const out = await structureDistill({
+    docID: input.docID != null ? String(input.docID) : undefined,
+    bookID: input.bookID != null && input.docID == null ? String(input.bookID) : undefined,
+    vols: Array.isArray(input.vols) ? input.vols.map(String).filter(Boolean) : undefined,
+  });
+  if (out && typeof out.error === "string") return errorResponse(out.error);
+  return successResponse(out);
+}
+
 // ============ 工具定义 ============
 
 const progressiveDescription = [
@@ -602,6 +659,10 @@ const progressiveDescription = [
     "老书转目录成书：convert_plan(bookID)=现状盘点+建议参数（纯读）→用户确认后",
     "convert_apply(bookID,levels,maxChars,headings,splitWordNum)=清旧片+按标题切卷+重分片+注册",
     "（写操作：书壳正文清空前自动建备份快照；转完知识地图即可用——片文档读书出场时逐片生成）。",
+    "写作结构树（0→1 管道）：structure_plan(bookID[,slots,placements])=写作书素材盘点+槽树+缺口",
+    "（纯读；带 slots=增量预演返回动作清单不落盘）→与用户确认骨架后 structure_apply(bookID,slots,placements)",
+    "=建槽+改挂+素材归位（增量幂等：不删槽不重排不改名；有正文槽/已定稿槽只报告不动；素材=内容搬进槽+删源）；",
+    "structure_distill(docID|bookID)=拆范文出叙事骨架（标题层级+首段摘录），做写作骨架参考。",
     "给 AI 当学习管家的数据底座：先 list_books 看书单，get_due 看今天该复习什么/该读什么，",
     "get_schedule 看未来节奏，defer 执行推迟；读书理解面走知识地图三 action。日期参数支持 'today'/'tomorrow' 语义值与 'YYYY-MM-DD'。",
 ].join("");
@@ -612,8 +673,8 @@ export function createProgressiveTool(): ToolDefinition {
         config: objectSchema(progressiveDescription, {
             action: {
                 type: "string",
-                enum: ["list_books", "get_due", "get_schedule", "defer", "map_context", "map_save", "map_read", "map_delete", "map_update", "map_tidy", "map_tidy_apply", "convert_plan", "convert_apply", "echo"],
-                description: "list_books=书单+进度+状态；get_due=到期重访+片队列；get_schedule=未来排期分桶；defer=重访调度推迟（写）；map_context=知识地图建图素材；map_save=建图落盘（对齐合并）；map_read=读图/邻域；map_delete=删节点/删边（级联）；map_update=节点纠错（type/summary）；map_tidy=视图整理素材（给归并建议）；map_tidy_apply=视图归并落盘（用户确认后）；convert_plan=老书转目录成书盘点（纯读+建议参数）；convert_apply=执行转书（写：清旧片+切卷+重分片+注册）；echo=通道自检",
+                enum: ["list_books", "get_due", "get_schedule", "defer", "map_context", "map_save", "map_read", "map_delete", "map_update", "map_tidy", "map_tidy_apply", "convert_plan", "convert_apply", "structure_plan", "structure_apply", "structure_distill", "echo"],
+                description: "list_books=书单+进度+状态；get_due=到期重访+片队列；get_schedule=未来排期分桶；defer=重访调度推迟（写）；map_context=知识地图建图素材；map_save=建图落盘（对齐合并）；map_read=读图/邻域；map_delete=删节点/删边（级联）；map_update=节点纠错（type/summary）；map_tidy=视图整理素材（给归并建议）；map_tidy_apply=视图归并落盘（用户确认后）；convert_plan=老书转目录成书盘点（纯读+建议参数）；convert_apply=执行转书（写：清旧片+切卷+重分片+注册）；structure_plan=写作书结构盘点/预演（素材+槽树+增量动作清单）；structure_apply=结构落盘（建槽+改挂+素材归位，增量幂等）；structure_distill=拆范文出叙事骨架（标题层级+摘录）；echo=通道自检",
             },
             bookID: {
                 type: "string",
@@ -621,7 +682,7 @@ export function createProgressiveTool(): ToolDefinition {
             },
             vols: {
                 type: "array",
-                description: "map_context 用：只收这些卷的素材（卷 id 数组；大书分批省 token）",
+                description: "map_context/structure_distill(bookID 形态) 用：只收这些卷（卷 id 数组；大书分批省 token）",
                 items: { type: "string" },
             },
             points: {
@@ -697,6 +758,24 @@ export function createProgressiveTool(): ToolDefinition {
                 type: "number",
                 description: `convert_apply 用：每片字数（默认 ${DEFAULT_SPLIT_WORDS}；0=只按标题切不按字数）`,
             },
+            slots: {
+                type: "array",
+                description: "structure_plan(预演)/structure_apply 用：骨架树 [{title(必填), children?: 递归同构}]（structure_plan 不带=盘点模式带=预演模式；同层同名第二个自动加序号 -2/-3）",
+                items: { type: "object" },
+            },
+            placements: {
+                type: "array",
+                description: "structure_plan(预演)/structure_apply 用：素材归位表 [{materialID(盘点返回的素材 id), slotPath(骨架标题路径，/ 分隔)}]——素材内容搬进目标槽+删源，撤销=思源拖回",
+                items: { type: "object" },
+            },
+            offset: {
+                type: "number",
+                description: `structure_plan 盘点模式用：素材页偏移（每页 ${MATERIAL_LIMIT} 篇，超出翻页）`,
+            },
+            docID: {
+                type: "string",
+                description: `structure_distill 用：范文文档 id（单文档形态：标题层级树+每级首段摘录，上限 ${DISTILL_HEADING_LIMIT} 标题超限报错分批）`,
+            },
         }, ["action"]),
         handler: wrapHandler(async input => {
             switch (String(input.action ?? "")) {
@@ -715,8 +794,11 @@ export function createProgressiveTool(): ToolDefinition {
                 case "map_tidy_apply": return await mapTidyApply(input);
                 case "convert_plan": return await convertPlanAction(input);
                 case "convert_apply": return await convertApplyAction(input);
+                case "structure_plan": return await structurePlanAction(input);
+                case "structure_apply": return await structureApplyAction(input);
+                case "structure_distill": return await structureDistillAction(input);
                 default:
-                    return errorResponse(`未知 action：${input.action}（可用：list_books/get_due/get_schedule/defer/map_context/map_save/map_read/map_delete/map_update/map_tidy/map_tidy_apply/convert_plan/convert_apply/echo）`);
+                    return errorResponse(`未知 action：${input.action}（可用：list_books/get_due/get_schedule/defer/map_context/map_save/map_read/map_delete/map_update/map_tidy/map_tidy_apply/convert_plan/convert_apply/structure_plan/structure_apply/structure_distill/echo）`);
             }
         }),
     };

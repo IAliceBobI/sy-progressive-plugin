@@ -41,7 +41,8 @@ import { getDailyCardDocID, getDailyPath } from "./FlashBox";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { findPieceByCandidates, resolveBookID } from "./contentsJump";
 import { queryDigestTree } from "./digestUtils";
-import { fetchWritingPieces, pickWritingDispatch, listWritingSlotTargets, insertBlocksIntoPiece, insertDigestIntoPiece, moveDigestIntoPiece, pickWritingFlameBook, feedBlocksToPool, neighborWritingSlot, orderedWritingBooks, nextOfOrderedIDs, type WritingSlotTarget } from "./writeBook";
+import { fetchWritingPieces, pickWritingDispatch, listWritingSlotTargets, insertBlocksIntoPiece, insertDigestIntoPiece, moveDigestIntoPiece, pickWritingFlameBook, feedBlocksToPool, neighborWritingSlot, orderedWritingBooks, nextOfOrderedIDs, slotNameFromTitle, type WritingSlotTarget } from "./writeBook";
+import { fetchWritingTreeSlots } from "./writeTree";
 import { escapeHtml } from "./progData";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
@@ -707,6 +708,12 @@ class Progressive {
                     await siyuan.pushMsg(tomatoI18n.请选择段落块进行跳转);
                     return;
                 }
+            } else if (i % 5 === 0 && (await help.bookReachability(bookID)) === "gone") {
+                // □6：书壳已不可达（笔记本被关=内核 -1）——烧满 60 轮只会误报「请等待
+                // 索引建立」且每轮白打 p5 告警，停轮换对症提示；索引追赶期（code 3）照旧轮询
+                debugLog("bookreach", `jump loop stop at #${i}: book=${bookID} gone`, "progressive");
+                await siyuan.pushMsg(tomatoI18n.本书或所在笔记本已关闭);
+                return;
             }
             await utils.sleep(1000);
         }
@@ -752,16 +759,23 @@ class Progressive {
             // 每 500ms 刷 books.json（触发内核 dataChanges 广播风暴，事故实锤 3 分钟每秒 2 条）
             let ok: boolean | undefined | "skipped" = false;
             let i = 0;
-            while ((ok = await this.startToLearn(bookID, isRand, noCount)) === false || ok === "skipped") {
+            let gone = false; // □6：书壳终态不可达（笔记本被关）——立即收不再空烧 30 轮
+            while (!gone && ((ok = await this.startToLearn(bookID, isRand, noCount)) === false || ok === "skipped")) {
                 if (ok === "skipped") {
                     i = 0;
                 } else if (i === 0) {
                     await siyuan.pushMsg(tomatoI18n.分片索引建立中);
+                } else if (i % 5 === 0 && bookID
+                    && (await help.bookReachability(bookID)) === "gone") {
+                    debugLog("bookreach", `retry loop stop at #${i}: book=${bookID} gone`, "progressive");
+                    gone = true;
+                    break;
                 }
                 if (i++ > 30) break;
                 await utils.sleep(500);
             }
-            if (ok === false) await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
+            if (gone) await siyuan.pushMsg(tomatoI18n.本书或所在笔记本已关闭);
+            else if (ok === false) await siyuan.pushMsg(tomatoI18n.该分片内容已失效);
             await utils.sleep(constants.IndexTime2Wait);
         });
     }
@@ -823,34 +837,32 @@ class Progressive {
         }
     }
 
-    /** □4④ 本书槽列表（浮条「本书槽」格）：fetchWritingPieces 全槽（含定稿）+标题 →
-     *  Menu 行点击直达（同 gotoWritingSlotPage 语义：setActivePoint+开文档，纯导航
-     *  不计数）。openSlotMenu（materialTrace）同款形态；槽名=用户文档标题须转义 */
+    /** □4④ 本书槽列表（浮条「本书槽」格；progtree □1 树形版）：fetchWritingTreeSlots
+     *  全槽（含定稿、嵌套子槽缩进+树序号）→ Menu 行点击直达（同 gotoWritingSlotPage
+     *  语义：setActivePoint+开文档，纯导航不计数）。槽名=用户文档标题须转义 */
     async openWritingSlotList(ev: { clientX: number; clientY: number }, bookID: string, currentDocID?: string) {
         const pieces = await fetchWritingPieces(bookID);
         if (pieces.length === 0) {
             await siyuan.pushMsg(tomatoI18n.本书还没有槽, 2500);
             return;
         }
-        const rows = (await siyuan.sql(
-            `select id, content from blocks where type='d' and id in (${pieces.map(p => `"${p.docID}"`).join(",")}) limit 1000`)) ?? [];
-        const titleOf = new Map((rows as any[]).map(r => [r.id, r.content || ""]));
+        const slots = await fetchWritingTreeSlots(bookID);
+        const doneSet = new Set(pieces.filter(p => p.done).map(p => p.docID));
         const menu = new Menu("progWritingSlotList");
-        const done = pieces.filter(p => p.done).length;
-        menu.addItem({ label: `<span style="font-weight:600">${escapeHtml(tomatoI18n.本书N槽M定稿(pieces.length, done))}</span>` });
+        menu.addItem({ label: `<span style="font-weight:600">${escapeHtml(tomatoI18n.本书N槽M定稿(pieces.length, doneSet.size))}</span>` });
         menu.addSeparator();
-        for (const p of pieces) {
-            const cur = p.docID === currentDocID;
+        for (const s of slots) {
+            const cur = s.docID === currentDocID;
             menu.addItem({
-                label: escapeHtml(titleOf.get(p.docID) || `[${String(p.point).padStart(5, "0")}]`)
-                    + (p.done ? ` · ${tomatoI18n.已定稿槽}` : "")
+                label: escapeHtml(`${"　".repeat(s.depth)}#${s.point + 1} ${slotNameFromTitle(s.title)}`)
+                    + (doneSet.has(s.docID) ? ` · ${tomatoI18n.已定稿槽}` : "")
                     + (cur ? ` · ${tomatoI18n.当前槽}` : ""),
                 click: () => {
                     void (async () => {
-                        debugLog("wnav", `slotlist book=${bookID} -> point#${p.point} doc=${p.docID}`, "progressive");
-                        await progStorage.setActivePoint(bookID, p.point);
-                        events.setDocID(p.docID);
-                        await OpenSyFile2(this.plugin, p.docID);
+                        debugLog("wnav", `slotlist book=${bookID} -> point#${s.point} depth=${s.depth} doc=${s.docID}`, "progressive");
+                        await progStorage.setActivePoint(bookID, s.point);
+                        events.setDocID(s.docID);
+                        await OpenSyFile2(this.plugin, s.docID);
                     })();
                 },
             });
@@ -1588,11 +1600,16 @@ class Progressive {
             setTimeout(() => { if (!settledByClick) settle(null); }, 0);
         }, true) as Menu;
         menu.element.classList.add("prog-slot-menu");
+        // 视口边界 clamp（openSlotMenuCommon 同款——vision P1：内核 Menu.open 无边界处理）
+        const estH = Math.min(Math.max(160, targets.reduce((s, t) => s + (t.slots.length + 2) * 28, 0)), Math.round(innerHeight * 0.7));
+        const bx = Math.min(Math.max(8, x), innerWidth - 220);
+        const by = Math.min(Math.max(8, y), innerHeight - estH - 8);
         for (const t of targets) {
             menu.addItem({
                 label: escapeHtml(t.name),
                 submenu: t.slots.map(s => ({
-                    label: escapeHtml(s.title),
+                    // progtree □1 树形：子槽按 depth 全角空格缩进（平铺展开序=树序）
+                    label: escapeHtml("　".repeat(s.depth) + s.title),
                     click: async () => {
                         // Menu click 自带兜底纪律（openSlotMenuCommon 同款：内核不接 promise）
                         settledByClick = true;
@@ -1626,7 +1643,7 @@ class Progressive {
                 })),
             });
         }
-        menu.open({ x, y });
+        menu.open({ x: bx, y: by });
         return done;
     }
 
@@ -1653,6 +1670,12 @@ class Progressive {
         const yielded = yieldFloatbarForMenu();
         const menu = new (Menu as any)("progSlotMenu", () => restoreFloatbarAfterMenu(yielded), true) as Menu;
         menu.element.classList.add("prog-slot-menu");
+        // progtree □1 vision P1：内核 Menu.open 无视口边界处理——浮条贴底时菜单
+        // 底缘贴死视口（槽多即溢出裁切）。y 做上界收缩（菜单高度粗估=槽数×行高+
+        // 书头，260 起步封顶 70% 视口），x 右界对称收缩
+        const estH = Math.min(Math.max(160, targets.reduce((s, t) => s + (t.slots.length + 2) * 28, 0)), Math.round(innerHeight * 0.7));
+        const mx = Math.min(Math.max(8, x), innerWidth - 220);
+        const my = Math.min(Math.max(8, y), innerHeight - estH - 8);
         for (const t of targets) {
             // label=用户书名/槽名，Menu label 走 innerHTML 须转义（□12 存量补——
             // openBatchSlotMenu 期D 起已转义，此收口点补齐同款）
@@ -1678,7 +1701,8 @@ class Progressive {
             menu.addItem({
                 label: escapeHtml(t.name),
                 submenu: [...poolMenu, ...t.slots.map(s => ({
-                    label: escapeHtml(s.title),
+                    // progtree □1 树形：子槽按 depth 全角空格缩进（平铺展开序=树序）
+                    label: escapeHtml("　".repeat(s.depth) + s.title),
                     click: async () => {
                         // 思源 Menu click 既不 catch 也不接 promise——入槽动作自带
                         // 兜底（reasoning P1-1：内核 Menu.ts 丢弃 async click 的
@@ -1696,7 +1720,7 @@ class Progressive {
                 }))],
             });
         }
-        menu.open({ x, y });
+        menu.open({ x: mx, y: my });
     }
 
     /** □1-③ 直接入槽命令体（⌥;）：激活编辑器选区直送进槽——与浮条直送钮同菜单，
@@ -1718,6 +1742,7 @@ class Progressive {
         }
         const captured = [...ids];
         const targets = await listWritingSlotTargets();
+        debugLog("slotmenu", `directSlotCommand captured=${captured.length} targets=${targets.length}（progtree e2e 打点）`, "progressive");
         if (targets.length === 0) {
             await siyuan.pushMsg(tomatoI18n.还没有可入槽的写作书, 2500);
             return;

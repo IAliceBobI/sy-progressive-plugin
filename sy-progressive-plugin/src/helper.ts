@@ -10,7 +10,7 @@ import { progStorage } from "./ProgressiveStorage";
 import { isMultiLineElement } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { SplitSentence } from "./SplitSentence";
 import { prog } from "./Progressive";
-import { pieceDocName, pieceAlias, getDocIalWords, getDocIalPieces } from "./progData";
+import { pieceDocName, pieceAlias, getDocIalWords, getDocIalPieces, parseReachability } from "./progData";
 import { locatePiece, pieceTreeLookup } from "./volIndex";
 import { appendTailCard } from "./tailCardAppend";
 
@@ -33,13 +33,11 @@ export function getDocIalSummary(bookID: string) {
     return `summary#${TEMP_CONTENT}#${bookID}`;
 }
 
-export function getDocIalAllInOneKey(bookID: string) {
-    return `allInOneKeysDoc#${TEMP_CONTENT}#${bookID}`;
-}
-
-export function getDocIalNewBookKey(bookID: string) {
-    return `newBookDoc#${TEMP_CONTENT}#${bookID}`;
-}
+// progtree □1 P0-1：两编译产物锚搬 progData（writeTree 白名单要消费，helper 链拉
+// .svelte 进不了单测）——import 进本地+re-export 保旧 import 路径（纯 export-from
+// 不引本地绑定，文件内消费处报 TS2304）
+import { getDocIalAllInOneKey, getDocIalNewBookKey } from "./progData";
+export { getDocIalAllInOneKey, getDocIalNewBookKey };
 
 export function getDocIalKeysDoc(bookID: string, point: number) {
     return `keysDoc#${TEMP_CONTENT}#${bookID},${point}`;
@@ -146,6 +144,27 @@ export async function findPieceDoc(bookID: string, point: number) {
     // 会建出第二张同内容片
     const info = await progStorage.booksInfo(bookID).catch(() => null);
     return info ? findPieceDocByTree(info, point) : "";
+}
+
+/** □6（0954 档）：书壳可达性探针——轮询环族（startToLearn 重试/jumpToPieceBlockWhenReady）
+ *  曾在书不可达时 30~60 轮空烧且每轮打 p5 告警（09-14 关笔记本报障：内核返 -1 未找到
+ *  与 3 索引中两态交替刷屏）。不走 siyuan.call（code!=0 吞码返 null，分不出终态/暂时），
+ *  直连拿原始 code 交 parseReachability 三态判定；fetch 异常（网络抖动/内核瞬时无响应）
+ *  按 ok 不判决——误停正常索引追赶的代价大于多烧几轮。 */
+export async function bookReachability(bookID: string): Promise<"ok" | "indexing" | "gone"> {
+    try {
+        const res = await fetch("/api/block/getBlockInfo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: bookID }),
+        });
+        const r = parseReachability(await res.json());
+        debugLog("bookreach", `probe book=${bookID} → ${r}`, "progressive");
+        return r;
+    } catch {
+        debugLog("bookreach", `probe book=${bookID} fetch failed → ok（不判决）`, "progressive");
+        return "ok";
+    }
 }
 
 /** 文件树直查：片名 [NNNNN] 前缀+卷/书壳目录决策（纯逻辑核=pieceTreeLookup）。

@@ -1,6 +1,6 @@
 import { IProtyle } from "siyuan";
 import { getAllEditor } from "siyuan";
-import { CONTENT_EDITABLE } from "../../sy-tomato-plugin/src/libs/gconst";
+import { CONTENT_EDITABLE, MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import { getActiveDocID, getContenteditableElement, getSyElement, isEditor, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { HtmlCBType } from "./constants";
 import { prog } from "./Progressive";
@@ -14,6 +14,8 @@ import { FloatDocKind, detectFloatDoc, expandAtAppear, shouldRefreshDue, digestM
 import { progStorage } from "./ProgressiveStorage";
 import { formatDueCount } from "./progFloatState";
 import { markDigests, markDigestTag, clearDigestMarks } from "./digestMarker";
+import { detectWritingTreeDoc } from "./writeTree";
+import { getDocIalPieces } from "./progData";
 import { revTraceOnAppear } from "./revTrace";
 import { markMaterials } from "./materialMarker";
 import { markMaterialTraces, markMaterialTag } from "./materialTrace";
@@ -280,7 +282,18 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     if (!id && docID && !attrsIsFinal && !verifiedNormalDoc.has(docID)) {
         id = detectFloatDoc(await siyuan.getBlockAttrs(docID), docID, bookOf);
         if (!id) {
-            if (progStorage.volOwnerReady()) {
+            // progtree □1 树兜底：手动建的书下槽（无 MarkKey）立即生效——树判定命中
+            // 即懒补标（MarkKey 统一 0 值=出场识别缓存标记）并以 piece 态出场；判空
+            // 才进负缓存；"unknown"（拉取失败/休眠书）跳过本轮不下结论（P1-2：
+            // 瞬时故障≠普通文档，误进负缓存会钉死一个真槽直到 reload）
+            const wBookID = await detectWritingTreeDoc(docID).catch(() => "unknown" as const);
+            if (wBookID && wBookID !== "unknown") {
+                await siyuan.setBlockAttrs(docID, { [MarkKey]: getDocIalPieces(wBookID, 0) } as any).catch(() => { });
+                debugLog("progtree", `lazyMark doc=${docID} book=${wBookID}（手动槽出场补标）`);
+                id = { kind: "piece", bookID: wBookID, point: 0 };
+            } else if (wBookID === "unknown") {
+                // 不确定：不补标不进负缓存，下次出场重判
+            } else if (progStorage.volOwnerReady()) {
                 verifiedNormalDoc.add(docID);
             } else {
                 // 映射未就绪（onLayoutReady 前的出场/构建失败自愈）：kick 一次重建，
@@ -288,6 +301,20 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
                 // 多一次 getBlockAttrs 兜底重查，窗口秒级可接受
                 void progStorage.warmVolOwner();
             }
+        }
+    }
+    // progtree □1 拖出剥标：活跃注册写作书片出场验树——被拖出写作书=槽身份失效，剥
+    // MarkKey 降级（本次按普通文档走，下次出场 free；再拖回来懒补标闭环）。阅读
+    // 书片不验（MarkKey 体系照旧）；ignored/archived 休眠书跳过（P1-1：验树 filter
+    // 排除休眠书恒 null，照剥会把休眠书的槽全部降级=不对称且带写副作用）；"unknown"
+    // （拉取失败）同样跳过（P1-2：误剥比晚剥代价高）
+    const bi1 = id ? progStorage.peekBookInfo(id.bookID) : undefined;
+    if (id?.kind === "piece" && docID && bi1?.writing && !bi1.ignored && !bi1.archived) {
+        const wBookID = await detectWritingTreeDoc(docID).catch(() => "unknown" as const);
+        if (wBookID === null) {
+            await siyuan.setBlockAttrs(docID, { [MarkKey]: "" } as any).catch(() => { });
+            debugLog("progtree", `unmark doc=${docID} book=${id.bookID}（拖出写作书，剥槽标）`);
+            id = null;
         }
     }
     const nextBookID = id?.bookID ?? "";

@@ -13,8 +13,10 @@
         Progressive开始随机学习,
         Progressive上一页,
         Progressive下一页,
+        Progressive直接入槽,
         progSettingsOpenHK,
     } from "./Progressive";
+    import { split就地断句 } from "./splitInPlace";
     import {
         flashBox制卡,
         flashBox原地制卡,
@@ -49,6 +51,14 @@
     </div>
     <div>
         {digest执行摘抄背诵.langText()}<HotkeyCap hk={digest执行摘抄背诵} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <!-- 键帽补全（09-14）：就地断句 ⌥=（新命令）与直接入槽 ⌥; 同属摘抄-断句-入槽工作流，
+         命令翻新时快捷键卡漏带（翻页/制卡三连同款先例） -->
+    <div>
+        {split就地断句.langText()}<HotkeyCap hk={split就地断句} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {Progressive直接入槽.langText()}<HotkeyCap hk={Progressive直接入槽} pluginName="sy-progressive-plugin"></HotkeyCap>
     </div>
     <!-- 制卡三连补全（09-07 制卡入口战役遗留）：摘抄四连与制卡三连同属摘-卡工作流相邻动作，
          命令翻新时快捷键卡漏带；⌥E 在「菜单」卡右键开关行另有键帽（开关+键帽合行）不冲突 -->

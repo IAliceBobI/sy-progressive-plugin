@@ -227,7 +227,7 @@
                 {:else if id === "data"}
                     <ProgConfData></ProgConfData>
                 {:else if id === "mcp"}
-                    <McpPromo></McpPromo>
+                    <McpPromo plugin="progressive"></McpPromo>
                 {/if}
             {/snippet}
             {#if searchKey}

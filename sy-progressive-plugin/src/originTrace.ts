@@ -145,17 +145,21 @@ export function validDigestMd(md: string[]): string[] {
     });
 }
 
-/** 展示侧摘抄类型（□2 标题胶囊字标）：piece=片发起 / book=书态 / free=札记（非书）。
+/** 展示侧摘抄类型（□2 标题胶囊字标）：material=ctime 归属写作书（素材） / piece=片发起
+ *  / book=书态 / free=札记（非书）。素材档最高优先（群反馈 650189 09-14：槽内摘抄带
+ * 片序键，但进了写作书首要身份是素材，压过片摘防素材态永不生效）。
  *  与 resolveDigestOrigin 分工：发起侧管「这次摘抄落哪个匣」（输入来自选中态），
  *  展示侧管「这篇已存在的摘抄文档是什么身份」——数据源全是摘抄文档 IAL（稳定，
  *  title 用户可改不作依据）。问题/整摘不进此分类（title 的 ❓/[整] 前缀已自表达）。 */
-export type DigestTagKind = "piece" | "book" | "free";
+export type DigestTagKind = "material" | "piece" | "book" | "free";
 
 export function digestTagKind(
     pieceIdx: string | undefined | null,
     ctimeBookID: string,
     isRegistered: (id: string) => boolean,
+    isWriting: (id: string) => boolean = () => false,
 ): DigestTagKind {
+    if (ctimeBookID && isWriting(ctimeBookID)) return "material";
     if (pieceIdx) return "piece";
     if (ctimeBookID && isRegistered(ctimeBookID)) return "book";
     return "free";

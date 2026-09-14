@@ -17,7 +17,8 @@
     import { CARD_RECITE } from "./digestCardMode";
     import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, moveToFlatSeg, advGroupIndexesForKind, dedupFlatSegs, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, isFlatGhost, type FloatDocKind } from "./progFloatState";
     import { progStorage } from "./ProgressiveStorage";
-    import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, fetchWritingPieces, mergePieceIntoNeighbor, feedBlocksToPool, moveDigestToPool, copyDigestToPool } from "./writeBook";
+    import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, mergePieceIntoNeighbor, feedBlocksToPool, moveDigestToPool, copyDigestToPool, nextFlipMaterial, transferMaterialOut, removeMaterialDocs } from "./writeBook";
+    import { fetchWritingTreeSlots, invalidateWritingTreeCache } from "./writeTree";
     import { PROG_DONE_KEY } from "../../sy-tomato-plugin/src/libs/gconst";
     import { notifyFleetChanged } from "./fleetNotify";
     import { digSubrankOpen, floatbarFlatCollapsed, floatbarFlatManifest, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
@@ -50,7 +51,7 @@
     import { openReviewSchedMenu, openDigestReviewMenu, removeRevisitBySource } from "./reviewMenu";
     import { PdigestReviewKey, ReviewKey, parseReview, isDue } from "./reviewQueue";
     import { openRefillMenu } from "./refillMenu";
-    import { splitInPlaceRun } from "./splitInPlace";
+    import { splitInPlaceCommand } from "./splitInPlace";
 
     // v5 □5 浮条三态（docs/prog-v5-floatbar-design.md）：球（收起）↔ 浮条（展开）同屏只显示一个；
     // 片态出场直接展开，书/摘抄态收起成球。移动端保持顶栏（不做球）。
@@ -127,27 +128,39 @@
     );
     // matfeed □2 写作书系文档判定（原书 book/槽片/片副本 piece——isManage 的放宽版）：
     // 驱动平铺区「管理素材池」一级格与 OriginDigestPopover 底部旧入口（片态同出，
-    // 两面判定同源；free/digest 不在其列——free 无书、digest=被管理的素材本体）
+    // 两面判定同源）；free/digest 不在其列——free 无书、digest=被管理的素材本体
     const isWritingDoc = $derived(
         ($kind === "book" || $kind === "piece") && !!$bookID && !!(progStorage.peekBookInfo($bookID)?.writing),
     );
-    // □2 一级格拼接：managePool 挂「本书摘抄」（traceUp）之后——同区并列、语义相邻
-    // （原四层链=traceUp→浮层→底部入口，新格=旧链终点的直通电梯）。□4④ 增 slotList
-    // （本书槽列表）同区钉位。均不进 PIECE_LOW_POOL 配置池（设置面板复用池=跨态通用
-    // 动作，写作书专用同「插入素材」条件钮先例）；piece 态 traceUp 被拖上首行时落尾部
-    // （buildFlatCells 滤除后 indexOf 落空兜底）。
-    // □2 活界编排（progtail）：inherent low 不含 managePool/slotList（钉位格不进 manifest
-    // 词汇），flatSegs 合成后由它钉回 traceUp 后固有位——flatSegs/flatCells 定义在
-    // advVisible 之后（$derived 直接表达式前向引用过不了 svelte-check 的 TS2448；消费方
-    // 全在函数体/模板层）。WRITING_PINNED=钉位格词汇（拖拽/池守卫三处共用）
+    // matflow（0914 □2）：素材文档=ctime 挂写作书的摘抄本体（digest 态）——驱动
+    // 「素材出口」簇（删除/转出单条动作，鸟 00:22 点名；与 DigestAllDialog 批量档双落点）
+    const isMaterialDoc = $derived(
+        $kind === "digest" && !!$bookID && !!(progStorage.peekBookInfo($bookID)?.writing),
+    );
+    // matflow IA 重排（0914 □5 拍板=鸟两组方案）：写作书系文档平铺区首段钉「写作管理」
+    // 簇——本书素材（traceUp 语境改名）/翻素材（matFlip，槽片限定）/管理素材池/本书槽，
+    // 与其余低频钮以段头线分隔（.prog-fb-flat > * + *::before 对簇 span 自动出线）。
+    // 簇格不进 manifest 词汇（钉位格先例）；traceUp 写作语境收进簇=本态不可拖（非写作
+    // 态照旧可拖），已被用户拖上首行的照旧首行（簇内跳过防双渲染）。matFlip 限槽片
+    // （翻素材=从槽跳去读素材的语境动作）。
+    // 旧 withManagePool（managePool/slotList 插 traceUp 后）随簇化退役。
     const WRITING_PINNED = ["managePool", "slotList"];
-    function withManagePool(cells: string[]): string[] {
-        const i = cells.indexOf("traceUp");
-        return i >= 0 ? [...cells.slice(0, i + 1), "managePool", "slotList", ...cells.slice(i + 1)] : [...cells, "managePool", "slotList"];
-    }
+    const writingCluster = $derived(
+        !isWritingDoc ? []
+            : [
+                ...(mainIds.includes("traceUp") ? [] : ["traceUp"]),
+                ...(isWritingPiece ? ["matFlip"] : []),
+                "managePool",
+                "slotList",
+            ],
+    );
+    const materialCluster = $derived(isMaterialDoc ? ["matDel", "matOut"] : []);
     // □3 子排 id 序收单一事实源（digestSubrankIds）：whole（整摘）限片+自由态，自由态
     // 是右键退役后任意文档的整摘兜底；kind 空窗视同 digest 不渲染
-    const digIds = $derived($kind == null ? [] : digestSubrankIds($kind));
+    // matflow（0914 □5）：写作槽滤掉 splitinplace——命令层会拦（写作槽不能就地断句），
+    // 死路按钮不上排（指路即死路，review P1-1 纪律）；阅读分片保留（护卡拦截在执行层）
+    const digIds = $derived($kind == null ? []
+        : digestSubrankIds($kind).filter(id => !(id === "splitinplace" && isWritingPiece)));
 
     // □14b 平铺区折叠态（持久化偏好）：折叠=平铺区整个不渲染（浮条回落首行高度），
     // 与摘抄子排正交（临时动作层照常弹）；首行尾 chevron 钮切换，移动端顶栏同款
@@ -379,10 +392,11 @@
         quit: () => tip3(tomatoI18n.关闭分片, tomatoI18n.tip关闭分片),
         ignore: () => tip3(tomatoI18n.不再推送,
             $kind === "free" ? tomatoI18n.tip不再推送复访 : tomatoI18n.tip不再推送),
-        // □11 浮层族：map=路线指引浮层、traceUp=原文侧追溯（书态；free 态 650189=关联摘抄，跨态异义）
+        // □11 浮层族：map=路线指引浮层、traceUp=原文侧追溯（书态；free 态 650189=关联摘抄，跨态异义；
+        // matflow IA：写作书语境改称「本书素材」——鸟 11:58 帖：写作书下的摘抄心智模型=素材）
         map: () => tip3(tomatoI18n.路线指引, tomatoI18n.tip路线指引),
-        traceUp: () => tip3($kind === "free" ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
-            $kind === "free" ? tomatoI18n.tip关联摘抄 : tomatoI18n.tip本书摘抄),
+        traceUp: () => tip3($kind === "free" ? tomatoI18n.关联摘抄 : isWritingDoc ? tomatoI18n.本书素材 : tomatoI18n.本书摘抄,
+            $kind === "free" ? tomatoI18n.tip关联摘抄 : isWritingDoc ? tomatoI18n.tip本书素材 : tomatoI18n.tip本书摘抄),
         // □27 仿写本片（片态副本练习）；recite 在 digest 态是「把摘抄送进仿写」（文案在 TIPS，跨态同 id 异义）
         recite: () => tip3($kind === "digest" ? tomatoI18n.送进仿写 : tomatoI18n.仿写本片,
             $kind === "digest" ? tomatoI18n.tip送进仿写 : tomatoI18n.tip仿写本片),
@@ -394,6 +408,10 @@
         // splitinplace 原先只藏 ✂ 子排二层，入池=平铺区兜底可见+可拖上首行）
         whole: () => tip3(tomatoI18n.整篇摘抄, tomatoI18n.tip整篇摘抄),
         splitinplace: () => tip3(tomatoI18n.就地断句 + " Pro", tomatoI18n.tip就地断句),
+        // matflow（0914 □2+□5）钉位格三件：翻素材（写作管理簇）/删除素材+转出为摘抄（素材出口簇）
+        matFlip: () => tip3(tomatoI18n.翻素材, tomatoI18n.tip翻素材),
+        matDel: () => tip3(tomatoI18n.删除素材, tomatoI18n.tip删除素材),
+        matOut: () => tip3(tomatoI18n.转出为摘抄, tomatoI18n.tip转出为摘抄),
     };
     const FLAT_ICONS: Record<string, string> = {
         digest: "iconProgScissors",
@@ -424,6 +442,9 @@
         slotList: "iconProgPiece",
         whole: "iconProgWhole",
         splitinplace: "iconSplitTB",
+        matFlip: "iconProgShuffle",
+        matDel: "iconTrashcan",
+        matOut: "iconProgDigestToHub",
     };
     // 平铺区图标取值（reasoning review P1-1）：next 跨态异义——digest=纯浏览下一条
     //（iconProgFFast，SCENE.digest 同款；iconProgNext 是「删后前进」形会误导「会删」）
@@ -455,12 +476,15 @@
         delExit: () => tomatoI18n.删片退出,
         ignore: () => tomatoI18n.不再推送,
         map: () => tomatoI18n.路线指引,
-        traceUp: () => $kind === "free" ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
+        traceUp: () => $kind === "free" ? tomatoI18n.关联摘抄 : isWritingDoc ? tomatoI18n.本书素材 : tomatoI18n.本书摘抄,
         recite: () => $kind === "digest" ? tomatoI18n.送进仿写 : tomatoI18n.仿写本片,
         managePool: () => tomatoI18n.管理素材池,
         slotList: () => tomatoI18n.本书槽,
         whole: () => tomatoI18n.整篇摘抄,
         splitinplace: () => tomatoI18n.就地断句,
+        matFlip: () => tomatoI18n.翻素材,
+        matDel: () => tomatoI18n.删除素材,
+        matOut: () => tomatoI18n.转出为摘抄,
     };
     // □11 三行制：子排名沿用单字短名，用法句补齐（card 与高级组同 id 不同义，各自 getter；
     // multi/dialog 随三 tab Dialog 退役摘除）。key 走 DigSubrankId 精确匹配（□3 review
@@ -513,6 +537,7 @@
         const digestID = $noteID;
         const fromBookID = $bookID;
         const targets = await listWritingSlotTargets();
+        debugLog("slotmenu", `openSlotMenuForDigest digest=${digestID} targets=${targets.length}`, "progressive");
         if (targets.length === 0) {
             void siyuan.pushMsg(tomatoI18n.还没有可入槽的写作书, 2500);
             return;
@@ -634,13 +659,18 @@
             void siyuan.pushMsg(tomatoI18n.分片编辑器未就绪, 2500);
             return;
         }
-        const pieces = await fetchWritingPieces($bookID);
-        const cur = pieces.find(p => p.docID === $noteID);
+        // progtree □1 树序版：邻居=同层（同 parentID）相邻槽——跨层（子槽↔叔槽）不并；
+        // invalidate=破坏性操作强制实拉（mergePieceIntoNeighbor 同款 P1-3）
+        invalidateWritingTreeCache($bookID);
+        const slots = await fetchWritingTreeSlots($bookID);
+        const cur = slots.find(s => s.docID === $noteID);
         if (!cur) {
             void siyuan.pushMsg(tomatoI18n.合并失败请重试, 2500);
             return;
         }
-        if (!pieces.some(p => p.point === cur.point + dir)) {
+        const sameLayer = slots.filter(s => s.parentID === cur.parentID);
+        const i = sameLayer.findIndex(s => s.docID === $noteID);
+        if (!sameLayer[i + dir]) {
             await siyuan.pushMsg(dir < 0 ? tomatoI18n.没有上一槽 : tomatoI18n.没有下一槽, 2500);
             return;
         }
@@ -696,6 +726,31 @@
             return;
         }
         void prog.jumpTo(target.id);
+    }
+
+    /** matflow B1 翻素材（0914 □2，槽片 matFlip 钮）：本书素材池洗牌轮转——未消化集
+     *  随机起点起翻（槽片不在册），翻过去一条后 digest 态 prev/next 承接同一条走
+     *  （nextFlipMaterial 环形同向）；空池/唯一未消化=当前 对症 toast 不跳。 */
+    async function flipMaterial() {
+        let tree;
+        try {
+            tree = await queryDigestTree($bookID);
+        } catch {
+            await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500); // 内核瞬断≠池空（review P2）
+            return;
+        }
+        const cands = (tree?.flat ?? []).filter(n => !n.done).map(n => n.id);
+        if (cands.length === 0) {
+            await siyuan.pushMsg(tomatoI18n.素材池没有未消化素材);
+            return;
+        }
+        const target = nextFlipMaterial(cands, $noteID ?? "");
+        if (!target) {
+            await siyuan.pushMsg(tomatoI18n.已是唯一未消化素材);
+            return;
+        }
+        debugLog("matflow", `flip book=${$bookID} from=${$noteID ?? "-"} → ${target}`, "progressive");
+        void prog.jumpTo(target);
     }
 
     function openTreePopover(ev?: MouseEvent) {
@@ -1127,6 +1182,43 @@
             case "slotList": // □4④ 本书槽列表菜单：全槽（含定稿）+当前标记，点击直达
                 await prog.openWritingSlotList(ev ?? { clientX: 0, clientY: 0 }, $bookID, $noteID);
                 break;
+            case "matFlip": // matflow B1 翻素材（0914 □2）：洗牌轮转跳下一条未消化素材
+                await flipMaterial();
+                break;
+            case "matDel": { // matflow（0914 □2 出口）：当前素材文档删除（confirm 后连本体）
+                const docID = $noteID; // confirm 悬窗期防 $noteID 漂移（P1-2 捕获纪律）
+                if (!docID) break;
+                confirm("⚠️", tomatoI18n.删除素材确认(1), () => void (async () => {
+                    try {
+                        const n = await removeMaterialDocs([docID]);
+                        await siyuan.pushMsg(n > 0 ? tomatoI18n.已删除素材 : tomatoI18n.操作失败请重试, 2500);
+                        // 本体已删浮条退场；confirm 悬窗期用户可能已切页签——只收本篇的
+                        //（review P2：迟到回调误杀新文档浮条，crumbs 同款守卫）
+                        if (get(noteID) === docID) show.set(false);
+                    } catch (e) {
+                        console.error("matDel failed", e);
+                        await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500);
+                    }
+                })());
+                break;
+            }
+            case "matOut": { // matflow（0914 □2+□5 两档并存）：当前素材转出为摘抄落总夹
+                const docID = $noteID;
+                if (!docID) break;
+                confirm("⚠️", tomatoI18n.转出为摘抄确认(1), () => void (async () => {
+                    try {
+                        await transferMaterialOut(docID);
+                        await siyuan.pushMsg(tomatoI18n.已转出为摘抄);
+                        // 已非本书素材，浮条退场（重出场=切页签后，已知体验留档）——
+                        // confirm 悬窗期切页签时只收本篇的（review P2 同 matDel）
+                        if (get(noteID) === docID) show.set(false);
+                    } catch (e) {
+                        console.error("matOut failed", e);
+                        await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500);
+                    }
+                })());
+                break;
+            }
             case "refill": // □22 重插翻新：断句选档菜单 → confirm 清空警告 → refillPiece
                 openRefillMenu(ev ?? { clientX: 0, clientY: 0 },
                     stype => prog.refillPiece($bookID, $noteID, $point, stype));
@@ -1325,7 +1417,8 @@
     // □2 平铺区二级编排（progtail，群 650189「二级工具无法拖动排序」）：固有段位 × 用户
     // manifest 合成最终编排（manifest 按 kind 分份，浮条单例复用 kind 切换随 derived 换源）。
     // 定义须在 inherentAdv 之后（$derived 直接表达式前向引用过不了 TS2448；消费方全在
-    // 函数体/模板层）。最终 low 段的 managePool 由 withManagePool 钉回（不进 manifest 词汇）。
+    // 函数体/模板层）。matflow（0914）：managePool/slotList 不在 low 池——写作书系钉进
+    // writingCluster 簇（旧 withManagePool 钉回已随簇化退役）。
     // 移动端不跟随（bear 拍板）：顶栏固定编排——桌面自定义跨段布局不投影到窄屏顶栏
     // （canDrag=false 编辑不可达，显示跟随只会造成两端不一致的困惑），照固有段位渲染
     const flatSegs = $derived(
@@ -1343,11 +1436,17 @@
                 $floatbarFlatManifest[$kind] ?? {},
             ),
     );
-    const flatCells = $derived(
-        $kind == null ? [] : isWritingDoc
-            ? withManagePool(flatSegs.low)
-            : flatSegs.low,
+    // matflow：traceUp 写作语境归簇（writingCluster 首格）——渲染层从 low 与 adv 各段一并
+    // 滤除（review P1-1：manifest 可把 traceUp 指派进高级组，只滤 low=簇+组双渲染）；manifest
+    // 写路径（onSegDrop）仍用 flatSegs 原始序，用户编排不丢
+    const flatView = $derived(
+        !isWritingDoc ? flatSegs
+            : {
+                low: flatSegs.low.filter(id => id !== "traceUp"),
+                adv: flatSegs.adv.map(g => g.filter(id => id !== "traceUp")),
+            },
     );
+    const flatCells = $derived($kind == null ? [] : flatView.low);
 
     // ============ 摘抄子排（✂ inline 展开的去向分诊，docs/prog-v5-floatbar-design.md §4） ============
 
@@ -1414,13 +1513,15 @@
             case "tohub": // □4 落点变体：显式归总夹/札记匣（覆盖全局档，一次性）
                 await runDigest(false, false, undefined, false, "central");
                 break;
-            case "splitinplace": { // 就地断句（2026-09-09）：选中段落块原位拆句，改的是原文档（Pro）
+            case "splitinplace": { // 就地断句（2026-09-09）：选中段落块原位拆句，改的是原文档（Pro）。
+                // 0914 □5 起与命令通道同守卫链（splitInPlaceCommand：book 拒/piece 放行+
+                // 护卡拦截——浮窗子排不再有独立的放行口径）
                 const protyle = resolveSubrankProtyle();
                 if (!protyle) {
                     await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪);
                     break;
                 }
-                await splitInPlaceRun(protyle);
+                await splitInPlaceCommand(protyle);
                 break;
             }
             case "think":
@@ -1626,7 +1727,7 @@
                 onclick={(e) => openDirectSlotMenu(e)}
             >{@html icon("iconProgMaterial", 16)}</button>
         {/if}
-        {#if flatCells.length > 0 || flatSegs.adv.some(g => g.length > 0)}
+        {#if flatCells.length > 0 || writingCluster.length > 0 || materialCluster.length > 0 || flatView.adv.some(g => g.length > 0)}
             <!-- □14b 折叠钮：首行行尾，chevron 指向即动作方向（展开中显示⌃=收起） -->
             <button
                 class="prog-fb-fold prog-fbtip"
@@ -1636,13 +1737,47 @@
             >{@html icon(flatCollapsed ? "iconProgFoldDown" : "iconProgFoldUp", 14)}</button>
         {/if}
     </div>
-    {#if !flatCollapsed && (flatCells.length > 0 || flatSegs.adv.some(g => g.length > 0))}
+    {#if !flatCollapsed && (flatCells.length > 0 || writingCluster.length > 0 || materialCluster.length > 0 || flatView.adv.some(g => g.length > 0))}
         <!-- □10 方案 B 平铺区 + □2 活界编排：5 段 = 低频段（未勾池钮+低频，段内按格折行）
              + 高级四组（.prog-fb-adv-group 组容器不折断，折行只断组边）；段序/段内序由
              applyFlatManifest 合成（用户 manifest 在前+固有垫尾），段界统一 .prog-fb-flat
              > * + *::before 段头线（空段不渲染容器=段界连带消失）。格钮渲染统一走
              flatCell resolver（adv/池钮可互落任一段）；段容器挂 dragover/drop=活界落点 -->
         <div class="prog-fb-flat" role="group" class:prog-fb-flat--drop={dragId != null} ondragover={onFlatDragOver} ondrop={onFlatDrop}>
+            <!-- matflow IA 重排（0914 □5 鸟两组）：钉位簇段=平铺区首段——写作管理簇
+                 （本书素材/翻素材·槽片限定/管理素材池/本书槽）+素材出口簇（删除/转出，
+                 素材文档态，两簇互斥）。簇格钉位不可拖、不进 manifest 词汇（钉位格先例）；
+                 段头线由 .prog-fb-flat > * + *::before 对簇 span 自动出线（直接子级前提） -->
+            {#if writingCluster.length > 0}
+                <span class="prog-fb-flat-seg" role="group">
+                    {#each writingCluster as id (id)}
+                        {@const cell = flatCell(id)}
+                        <button
+                            data-fb-flat-id={id}
+                            class="prog-fb-flat-btn prog-fbtip"
+                            class:prog-fb-pro={cell.pro}
+                            class:prog-fb-flat-btn--ghost={cell.ghost}
+                            aria-label={cell.tip}
+                            onclick={cell.onclick}
+                        >{@html icon(cell.icon, 14)}<span class="prog-fb-flat-lbl">{cell.label}</span></button>
+                    {/each}
+                </span>
+            {/if}
+            {#if materialCluster.length > 0}
+                <span class="prog-fb-flat-seg" role="group">
+                    {#each materialCluster as id (id)}
+                        {@const cell = flatCell(id)}
+                        <button
+                            data-fb-flat-id={id}
+                            class="prog-fb-flat-btn prog-fbtip"
+                            class:prog-fb-pro={cell.pro}
+                            class:prog-fb-flat-btn--ghost={cell.ghost}
+                            aria-label={cell.tip}
+                            onclick={cell.onclick}
+                        >{@html icon(cell.icon, 14)}<span class="prog-fb-flat-lbl">{cell.label}</span></button>
+                    {/each}
+                </span>
+            {/if}
             <span class="prog-fb-flat-seg" role="group" ondragover={(e) => onSegDragOver("low", e)} ondrop={(e) => onSegDrop("low", e)}>
                 {#each flatCells as id, i (id)}
                     {#if flatDrop?.seg === "low" && flatDrop.index === i}<span class="prog-fb-dropmark"></span>{/if}
@@ -1662,7 +1797,7 @@
                 {/each}
                 {#if flatDrop?.seg === "low" && flatDrop.index === flatCells.length}<span class="prog-fb-dropmark"></span>{/if}
             </span>
-            {#each flatSegs.adv as group, gi (gi)}
+            {#each flatView.adv as group, gi (gi)}
                 {#if group.length > 0}
                     {@const seg = FLAT_SEG_IDS[gi + 1]}
                     <span class="prog-fb-adv-group" role="group" ondragover={(e) => onSegDragOver(seg, e)} ondrop={(e) => onSegDrop(seg, e)}>

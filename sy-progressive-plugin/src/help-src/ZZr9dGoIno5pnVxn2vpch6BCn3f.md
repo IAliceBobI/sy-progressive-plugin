@@ -69,7 +69,7 @@
 
 [**渐进阅读**](https://my.feishu.cn/docx/Zpnxdy7zeo36LlxkDEic5AhTnpd)——把长文拆成小分片，滚筒每天按节奏推给你读：加书切分、今日阅读、分片读写、断句。
 
-[**渐进写作**](https://my.feishu.cn/docx/LDYcdZaabooyxjxFUlvctvVKnsf)——你的素材排队等你写：大纲建槽、素材进槽、写完定稿、汇编成稿。
+[**渐进写作**](https://my.feishu.cn/docx/LDYcdZaabooyxjxFUlvctvVKnsf)——你的素材排队等你写：大纲建槽、素材进槽、写完定稿、汇编成稿；结构树一眼看到写到哪。
 
 [**摘抄与笔记**](https://my.feishu.cn/docx/FgLKdkPlrojE82x5jbHcSSKpnfe)——选中就能摘：摘抄的去向、痕迹与迁移、札记匣、笔记整理。
 
@@ -79,4 +79,4 @@
 
 [**收费与附录**](https://my.feishu.cn/docx/XvnUdrBEooOd1LxBdhmcpBWRnwc)——收费与激活、设置面板导览、快捷键、数据存放与 CSS 自定义、常见问题。
 
-[**AI 接入（MCP）**](https://my.feishu.cn/docx/BkRldeWJ7o3T4ExE2fdciZbgnRV)——把 AI 助手接进思源：让 AI 查书单进度、到期队列，替你推迟重访；ZCode / Trae / CodeBuddy / Qoder 三步接入。
+[**AI 接入（MCP）**](https://my.feishu.cn/docx/BkRldeWJ7o3T4ExE2fdciZbgnRV)——把 AI 助手接进思源：让 AI 查书单进度、到期队列，替你推迟重访，还能建知识地图、整理写作书结构；ZCode / Trae / CodeBuddy / Qoder 三步接入。

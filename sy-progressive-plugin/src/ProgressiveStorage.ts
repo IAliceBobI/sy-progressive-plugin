@@ -225,6 +225,7 @@ export class ProgressiveStorage {
         if (typeof opt.pinned === "boolean") info.pinned = opt.pinned;
         if (typeof opt.hidden === "boolean") info.hidden = opt.hidden;
         if (typeof opt.dirMode === "boolean") info.dirMode = opt.dirMode;
+        if (typeof opt.treeAligned === "boolean") info.treeAligned = opt.treeAligned;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
         if (utils.isValidNumber(opt.activePoint)) info.activePoint = opt.activePoint;
 
@@ -532,11 +533,15 @@ export class ProgressiveStorage {
     }
 
     private async saveBookInfos() {
-        if (!this.storageReady) return; // □13 门闩：防空对象/未初始化整体落盘覆盖旧书
-        // □1 取证打点：窗口内被门闩丢弃的写只改内存不落盘（2026-09-09 事故：reload 后
-        // 5s 点删片返回，gotoBlock(0) 的 point 落盘被拦=盘上 point 停旧值）。留 Loki 痕迹
-        // 供下次事故对时间线，不改门闩语义（空覆盖防护优先）
-        debugLog("storage", "saveBookInfos dropped by storageReady latch（写仅入内存）", "progressive");
+        // □13 门闩：防空对象/未初始化整体落盘覆盖旧书。□1 取证打点：窗口内被门闩
+        // 丢弃的写只改内存不落盘（2026-09-09 事故：reload 后 5s 点删片返回，
+        // gotoBlock(0) 的 point 落盘被拦=盘上 point 停旧值）。留 Loki 痕迹供下次
+        // 事故对时间线，不改门闩语义（空覆盖防护优先）——progtree e2e 抓出该日志
+        // 原打在 ready 分支（取证恒空转），挪进门闩分支
+        if (!this.storageReady) {
+            debugLog("storage", "saveBookInfos dropped by storageReady latch（写仅入内存）", "progressive");
+            return;
+        }
         return this.plugin.saveData(constants.STORAGE_BOOKS, this.booksInfos());
     }
 

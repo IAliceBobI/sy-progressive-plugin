@@ -2,7 +2,7 @@
 // 一行一槽名；空行/纯格式行跳过；用户自带序号前缀（1. / 一、/ (2) / ## 等）剥掉；
 // 剥掉文档名非法字符（/ 会把 createDocWithMd 的路径分层、全角空格与零宽空格静默吞）。
 import { MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
-import { getDocIalPieces, pieceDocName, pieceAlias } from "./progData";
+import { getDocIalPieces, pieceAlias } from "./progData";
 
 /** 行首序号前缀：阿拉伯/中文数字 + 分隔符，或括号包裹。序号与小数（3.14）靠
  *  「数字后紧跟数字不剥」区分（调用处特判，正则自身区分不了） */
@@ -40,44 +40,37 @@ export function parseOutlineLines(text: string): string[] {
     return out;
 }
 
-/** 写作书建片计划项：title=文档名（片名 [N]槽名），attrs=与阅读书 createNote 同款
- *  IAL（MarkKey 身份+card-priority+alias）；不写 origin-text/readonly（无原书） */
+/** 写作书建片计划项（progtree □1 树序版）：title=纯槽名（无 [N] 前缀——序=树序
+ *  显示层计算）、MarkKey=身份标记统一 0 值（无序语义，出场识别用）；不写
+ *  origin-text/readonly（无原书） */
 export interface WritingPiecePlan {
-    point: number;
     title: string;
     attrs: AttrType;
 }
 
-/** 槽名列表 → 建片计划（point 0 起，与阅读书片同一身份体系）；槽名须非空
- *  （parseOutlineLines 已滤空，无大纲时调用方先兜底默认槽再进来） */
+/** 槽名列表 → 建片计划（树序权威：物理落点/顺序由建后 changeSort 钉位）；槽名须
+ *  非空（parseOutlineLines 已滤空，无大纲时调用方先兜底默认槽再进来） */
 export function planWritingPieces(bookID: string, bookName: string, slots: string[]): WritingPiecePlan[] {
-    return slots.map((slot, i) => ({
-        point: i,
-        title: pieceDocName(i, slot),
+    return slots.map(slot => ({
+        title: slot,
         attrs: {
             "custom-card-priority": "50",
-            [MarkKey]: getDocIalPieces(bookID, i),
+            [MarkKey]: getDocIalPieces(bookID, 0),
             alias: pieceAlias(bookName, slot),
         } as AttrType,
     }));
 }
 
-/** 期D 书尾新建空槽计划：point=现有最大 +1（空书 0 起），attrs 与建书片同款。
- *  纯函数只算计划；路径占用由 IO 层 docIDAtPath 预检（title 带序号前缀，同槽名
- *  不同序天然共存，无需查重）。槽名空抛错（parseOutlineLines 取首行同 splitPiece） */
-export function planAppendPiece(
-    bookID: string, bookName: string,
-    pieces: { point: number }[], slotNameRaw: string,
-): WritingPiecePlan {
+/** 期D 书尾新建空槽计划（树序版）：钉尾由 IO 层 appendDocToEnd；槽名空抛错
+ *  （parseOutlineLines 取首行同 splitPiece） */
+export function planAppendPiece(bookID: string, bookName: string, slotNameRaw: string): WritingPiecePlan {
     const slotName = parseOutlineLines(slotNameRaw)[0] ?? "";
     if (!slotName) throw new Error("appendPiece: empty slot name");
-    const point = pieces.reduce((m, p) => Math.max(m, p.point), -1) + 1;
     return {
-        point,
-        title: pieceDocName(point, slotName),
+        title: slotName,
         attrs: {
             "custom-card-priority": "50",
-            [MarkKey]: getDocIalPieces(bookID, point),
+            [MarkKey]: getDocIalPieces(bookID, 0),
             alias: pieceAlias(bookName, slotName),
         } as AttrType,
     };

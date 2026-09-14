@@ -2,7 +2,7 @@
   "name": "sy-progressive-plugin",
   "author": "IAliceBobI",
   "url": "https://github.com/IAliceBobI/sy-progressive-plugin",
-  "version": "3.11.0",
+  "version": "3.12.0",
   "minAppVersion": "2.12.6",
   "disabledInPublish": false,
   "kernels": [
@@ -25,8 +25,8 @@
     "zh_CN": "渐进学习"
   },
   "description": {
-    "default": "🔓 Open source · Finally finish what you read — and what you write: progressive reading digests long-form input day by day, progressive writing queues your material into finished drafts — excerpts, slicing, cloze, flashcards, writing books & compile-to-draft. A full loop from reading to writing.",
-    "zh_CN": "🔓 已开源 · 让长文读得完，让作品写得完：渐进阅读消化输入，渐进写作排队产出——摘抄、分片、挖空、闪卡、写作书素材入槽、汇编成稿，从阅读到写作的完整闭环"
+    "default": "🔓 Open source · Finally finish what you read — and what you write: progressive reading digests long-form input day by day (excerpts, slicing, cloze, flashcards, AI knowledge maps), progressive writing queues your material into finished drafts (writing books, structure tree, compile-to-draft). A full loop from reading to writing.",
+    "zh_CN": "🔓 已开源 · 让长文读得完，让作品写得完：渐进阅读消化输入（摘抄、分片、挖空、闪卡、AI 知识地图），渐进写作排队产出（写作书素材入槽、结构树看进度、汇编成稿）——从阅读到写作的完整闭环"
   },
   "readme": {
     "default": "README.md",
@@ -47,6 +47,12 @@
     "Pinyin",
     "Daily Card",
     "渐进写作",
-    "Progressive Writing"
+    "Progressive Writing",
+    "知识地图",
+    "结构树",
+    "写作书",
+    "Knowledge Map",
+    "Structure Tree",
+    "Writing Book"
   ]
 }

@@ -109,6 +109,12 @@ export default defineConfig({
           ]),
       ],
 
+      // CJS 单产物无分包：动态导入被内联（躲循环依赖），此警告恒噪音
+      onwarn(warning, warn) {
+        if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+        warn(warning);
+      },
+
       // make sure to externalize deps that shouldn't be bundled
       // into your library
       external: ["siyuan", "process", "fs", "fs/promises", "os", "path", "util", "child_process"],

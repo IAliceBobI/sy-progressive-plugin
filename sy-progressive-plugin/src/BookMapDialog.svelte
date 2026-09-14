@@ -15,9 +15,12 @@
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
+    import { PDIGEST_CTIME, PROG_DONE_KEY } from "../../sy-tomato-plugin/src/libs/gconst";
+    import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/navUtils";
     import BookMapNode from "./BookMapNode.svelte";
     import BookMapEdge from "./BookMapEdge.svelte";
     import BookMapFitBridge from "./BookMapFitBridge.svelte";
+    import WritingTreeNode from "./WritingTreeNode.svelte";
     import { neighborhood, type BookMap, type MapNode } from "./bookMapCore";
     import { readPoolFront, collectPieceStats, saveView, jumpToPiece, type PieceStat } from "./bookMapFront";
     import {
@@ -25,6 +28,11 @@
     } from "./bookMapLayout";
     import { exportMapPng } from "./bookMapExport";
     import { progStorage } from "./ProgressiveStorage";
+    import { fetchWritingTreeSlots } from "./writeTree";
+    import {
+        buildWritingProjection, layoutWritingTree, WMAP_COL_W, WMAP_ROW_H,
+        type ProjectionSlot, type WritingProjection,
+    } from "./writingTreeMapCore";
 
     let { plugin, bookID, onClose }: { plugin: Plugin; bookID: string; onClose?: () => void } = $props();
 
@@ -39,13 +47,18 @@
     let stats = new Map<number, PieceStat>();
     let curPoint = -1;
     let mode = $state<Mode>({ t: "pano" });
+    // progtree □3 写作分派：writing=写作书（独立数据链+树投影；视图机/池链全不进）
+    let writing = $state(false);
+    let wproj: WritingProjection | null = null;
+    let wpos = new Map<string, { x: number; y: number }>();
+    let wheight = 0;
     // 用户拖动坐标（保存视图用；非响应式够用——保存时才读）
     const manualPos = new Map<string, { x: number; y: number }>();
     let flowEl = $state<HTMLElement>();
 
     const nodes = writable<Node[]>([]);
     const edges = writable<Edge[]>([]);
-    const nodeTypes = { progMapNode: BookMapNode };
+    const nodeTypes = { progMapNode: BookMapNode, wmapNode: WritingTreeNode };
     const edgeTypes = { progMapEdge: BookMapEdge };
 
     const readcardOf = (pt: number) => stats.get(pt)?.readcard;
@@ -72,6 +85,14 @@
 
     onMount(async () => {
         try {
+            // 写作书分派（□3）：结构读口=fetchWritingTreeSlots 唯一通道（30s TTL 与
+            // 调度/菜单共享），素材/done 两发 SQL 直查——视图机/池链/进度点亮全不进
+            const winfo = progStorage.peekBookInfo(bookID);
+            if (winfo?.writing) {
+                writing = true;
+                await loadWritingMap(winfo);
+                return;
+            }
             const [p, vols] = await Promise.all([
                 readPoolFront(bookID),
                 // onload 尾才绑定 this.plugin（懒注入）——极早打开窗口（onload 未完）
@@ -97,6 +118,87 @@
             phase = "error";
         }
     });
+
+    /** 写作书数据链：树槽（唯一读口）→ 素材/done 双 SQL → 投影+布局 → 建图。
+     *  empty 判据=roots 空（书下没有槽文档）；拉取失败沿 fetchWritingTreeSlots 语义
+     *  返 []（不缓存），与阅读链一样落 empty 提示重开重试 */
+    async function loadWritingMap(info: { bookName?: string; boxID?: string }) {
+        const slots = await fetchWritingTreeSlots(bookID, info);
+        if (slots.length === 0) {
+            phase = "empty";
+            return;
+        }
+        const [matRows, doneRows] = await Promise.all([
+            siyuan.sql(
+                `select block_id from attributes where name='${PDIGEST_CTIME}'` +
+                ` and (value like '${bookID}#%' or value like '🔨#${bookID}#%') limit 10000000`) as any,
+            siyuan.sql(
+                `select block_id, value from attributes where name='${PROG_DONE_KEY}'` +
+                ` and block_id in (${slots.map(s => `'${s.docID}'`).join(",")}) limit 10000000`) as any,
+        ]);
+        wproj = buildWritingProjection(
+            slots,
+            new Set((matRows ?? []).map((r: any) => String(r.block_id))),
+            new Set((doneRows ?? []).filter((r: any) => r.value === "1").map((r: any) => String(r.block_id))),
+            bookID);
+        if (wproj.roots.length === 0) {
+            phase = "empty";
+            return;
+        }
+        const laid = layoutWritingTree(wproj.roots);
+        wpos = laid.positions;
+        wheight = laid.height;
+        phase = "ready";
+        buildWritingGraph();
+        const slotsTotal = wproj.roots.reduce((a, r) => a + r.subtreeSlots, 0);
+        const matsTotal = wproj.roots.reduce((a, r) => a + r.subtreeMaterials, 0);
+        const gapsTotal = wproj.roots.reduce((a, r) => a + r.subtreeGaps, 0);
+        debugLog("prog.wmap", `dialog ready book=${bookID} slots=${slotsTotal} materials=${matsTotal} gaps=${gapsTotal} pool=${wproj.poolCount}`, "progressive");
+    }
+
+    /** 写作树建图：合成根（书名+汇总）+槽节点+父子边；坐标=layoutWritingTree */
+    function buildWritingGraph() {
+        if (!wproj) return;
+        const rootID = `wroot:${bookID}`;
+        const slotsTotal = wproj.roots.reduce((a, r) => a + r.subtreeSlots, 0);
+        const matsTotal = wproj.roots.reduce((a, r) => a + r.subtreeMaterials, 0);
+        const gapsTotal = wproj.roots.reduce((a, r) => a + r.subtreeGaps, 0);
+        const info = progStorage.peekBookInfo(bookID);
+        const flowNodes: Node[] = [{
+            id: rootID,
+            type: "wmapNode",
+            position: { x: -WMAP_COL_W, y: Math.max(0, (wheight - WMAP_ROW_H) / 2) },
+            data: {
+                kind: "wroot",
+                title: info?.bookName ?? bookID,
+                summary: tomatoI18n.结构汇总(slotsTotal, matsTotal, gapsTotal, wproj.poolCount),
+            },
+            draggable: true,
+        }];
+        const flowEdges: Edge[] = [];
+        const edgeStyle = "stroke: color-mix(in srgb, var(--b3-theme-on-surface) 18%, transparent); stroke-width: 1.5px;";
+        const walk = (n: ProjectionSlot, parent: string) => {
+            flowNodes.push({
+                id: n.docID,
+                type: "wmapNode",
+                position: wpos.get(n.docID) ?? { x: 0, y: 0 },
+                data: {
+                    kind: "wslot",
+                    title: n.title,
+                    materialCount: n.materialCount,
+                    childCount: n.childSlots.length,
+                    done: n.done,
+                    gap: n.gap,
+                },
+                draggable: true,
+            });
+            flowEdges.push({ id: `we:${parent}:${n.docID}`, source: parent, target: n.docID, style: edgeStyle });
+            for (const c of n.childSlots) walk(c, n.docID);
+        };
+        wproj.roots.forEach(r => walk(r, rootID));
+        nodes.set(flowNodes);
+        edges.set(flowEdges);
+    }
 
     function nodeDataOf(n: MapNode) {
         const deg = degrees.get(n.id) ?? 0;
@@ -211,6 +313,14 @@
     // 空白/错节点上=跳片静默失败。260ms 窗内来了 dblclick 即取消单击钻取。
     let drillTimer: ReturnType<typeof setTimeout> | undefined;
     function onNodeClick({ node }: { node: Node; event: MouseEvent | TouchEvent }) {
+        // 写作分派：单击槽=跳槽文档（树全展开无钻取无双击竞态，root 无动作）；
+        // 跳=去看素材原文，关 Dialog 让位（阅读链 dblclick 同款语义）
+        if (writing) {
+            clearTimeout(drillTimer);
+            if (node.id.startsWith("wroot:")) return;
+            void OpenSyFile2(plugin, node.id).then(() => onClose?.());
+            return;
+        }
         const go = (node.data as any)?.kind === "cluster"
             ? () => setMode({ t: "cluster", nodeType: String(node.id).split(":")[1] ?? "theme" })
             : () => setMode({ t: "drill", id: node.id });
@@ -307,7 +417,8 @@
                 await flowApi.fitView({ padding: 0.15, duration: 0 });
                 await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
             }
-            const ok = await exportMapPng(flowEl, `知识地图-${new Date().toISOString().slice(0, 10)}.png`);
+            const fname = `${writing ? "结构树" : "知识地图"}-${new Date().toISOString().slice(0, 10)}.png`;
+            const ok = await exportMapPng(flowEl, fname);
             if (!ok) void siyuan.pushMsg(tomatoI18n.导出图片失败(), 2500);
         } finally {
             if (prevVp) void flowApi?.setViewport(prevVp);
@@ -320,9 +431,38 @@
     {#if phase === "loading"}
         <div class="prog-map-hint">{tomatoI18n.加载中}</div>
     {:else if phase === "empty"}
-        <div class="prog-map-hint">{tomatoI18n.暂无地图数据()}</div>
+        <div class="prog-map-hint">{writing ? tomatoI18n.暂无结构数据() : tomatoI18n.暂无地图数据()}</div>
     {:else if phase === "error"}
         <div class="prog-map-hint">{tomatoI18n.地图加载失败()}</div>
+    {:else if writing}
+        <div class="prog-map-toolbar">
+            <span class="fn__flex-1"></span>
+            <button class="b3-button b3-button--outline" onclick={() => void onExport()} disabled={exporting}>{tomatoI18n.导出图片}</button>
+        </div>
+        <div class="prog-map-flow" bind:this={flowEl}>
+            {#key viewKey}
+                <SvelteFlowProvider>
+                    <BookMapFitBridge onReady={api => { flowApi = api; }} />
+                    <SvelteFlow
+                        bind:nodes={$nodes}
+                        bind:edges={$edges}
+                        {nodeTypes}
+                        {edgeTypes}
+                        minZoom={0.08}
+                        fitView
+                        fitViewOptions={{ padding: 0.2, maxZoom: 1.25 }}
+                        onnodeclick={onNodeClick}
+                        onnodedragstop={onNodeDragStop}
+                    >
+                        <Controls showLock={true} />
+                        <Background gap={25} size={1.2} />
+                        {#if $nodes.length >= 30}
+                            <MiniMap pannable zoomable width={130} height={94} />
+                        {/if}
+                    </SvelteFlow>
+                </SvelteFlowProvider>
+            {/key}
+        </div>
     {:else if pool}
         <div class="prog-map-toolbar">
             <select class="b3-select prog-map-viewsel" onchange={onViewChange} disabled={mode.t === "drill" || mode.t === "cluster"} aria-label={tomatoI18n.保存视图()}>

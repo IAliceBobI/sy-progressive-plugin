@@ -1,6 +1,6 @@
 import { IProtyle, Plugin } from "siyuan";
 import { add_href, attrNewLine, cloneCleanDiv, getAttribute, ial2str, isValidNumber, parseIAL, removeAttribute, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
-import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getDocIalPieces, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece } from "./helper";
+import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece } from "./helper";
 import { fetchWritingPieces } from "./writeBook";
 import { progStorage } from "./ProgressiveStorage";
 import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
@@ -210,21 +210,27 @@ class WritingCompareBox {
         OpenSyFile2(this.plugin, keysDocID, windowOpenStyle.get() as any);
     }
 
-    async extractAsBook(boxID: string, pieceID: string, notebookId: string, markKey: string, titleMsg = tomatoI18n.合并所有分片到新文件) {
-        if (!pieceID || !notebookId || !markKey) return;
+    async extractAsBook(boxID: string, pieceID: string, notebookId: string, markKey: string, titleMsg = tomatoI18n.合并所有分片到新文件, direct?: { pieceIDs: string[]; bookID: string }) {
+        // progtree □1 树序直通：写作书编译由调用方喂树序 pieces（markKey 认领链退役，
+        // markKey 参数可空）；阅读书命令链（isProtylePiece 入口）不传 direct 走原
+        // getAllPieces 路径——默认参不传=原行为逐字节等价（阅读书链零变化红线）
+        if (!pieceID || !notebookId) return;
         siyuan.pushMsg(titleMsg)
 
-        const { pieceIDs, bookID } = await getAllPieces(markKey);
-        const blocks = await getAllBlocks(pieceIDs, false, true, false);
+        const got = direct ?? await getAllPieces(markKey);
+        const gotIDs = got.pieceIDs;
+        const realBookID = direct ? direct.bookID : got.bookID;
+        if (!gotIDs || gotIDs.length === 0) return;
+        const blocks = await getAllBlocks(gotIDs, false, true, false);
         const sup = new DomSuperBlockBuilder();
         blocks.forEach(b => sup.append(b.div));
         const div = sup.build();
 
-        let newBookID = await findNewBookDoc(bookID);
+        let newBookID = await findNewBookDoc(realBookID);
         if (!newBookID) {
-            const hpath = await getHPathByDocID(bookID, "merged");
+            const hpath = await getHPathByDocID(realBookID, "merged");
             if (hpath) {
-                newBookID = await getNewBookDoc(bookID, boxID, hpath);
+                newBookID = await getNewBookDoc(realBookID, boxID, hpath);
             }
         }
         if (!newBookID) return;
@@ -249,13 +255,15 @@ class WritingCompareBox {
             return;
         }
         return lockWithLease("prog-compile-writing", async () => {
+            // progtree □1 树序直通：pieces=树序（含定稿槽——汇编全稿语义保持），
+            // extractAsBook 的 direct 分支跳过 MarkKey 认领
             const pieces = await fetchWritingPieces(bookID);
             if (pieces.length === 0) {
                 await siyuan.pushMsg(tomatoI18n.该书还没有分片, 2500);
                 return;
             }
-            const markKey = getDocIalPieces(bookID, pieces[0].point);
-            await this.extractAsBook(boxID, pieces[0].docID, boxID, markKey, tomatoI18n.汇编成稿);
+            await this.extractAsBook(boxID, pieces[0].docID, boxID, "", tomatoI18n.汇编成稿,
+                { pieceIDs: pieces.map(p => p.docID), bookID });
         });
     }
 

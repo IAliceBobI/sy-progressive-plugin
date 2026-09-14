@@ -2397,8 +2397,8 @@ html[data-theme-mode="dark"] .prog-material-tag {
 // 阅读曲线接管（1530 期2）：官方复习界面阅读卡评分套——注入独立「下一张」主钮
 // （b3-button--info=官方 Good 同款主色），官方评分钮组（1/2/3/4）整组 CSS 隐藏
 // （外层 div 同藏防空占位；官方 DOM 零就地改动，翻到普通卡 teardown 即还原）；
-// 跳过 -3 与左移 -2 官方原生保留。徽标=评分套行内左端小灰标（tomato-rp-card
-// 身份行同款视觉）
+// 跳过 -3 与左移 -2 官方原生保留。徽标=评分套行内左端可点按钮（点击弹阅读曲线
+// 配置菜单；bear 09-14 截图「看起来不像能点的按钮」□7 按钮化）
 .prog-revcard .card__action > div:has(button[data-type="1"]),
 .prog-revcard .card__action > div:has(button[data-type="2"]),
 .prog-revcard .card__action > div:has(button[data-type="3"]),
@@ -2410,15 +2410,26 @@ html[data-theme-mode="dark"] .prog-material-tag {
 .prog-revcard .card__action:has(> button) .prog-revcard-next-el {
   display: none;
 }
+// □7 按钮化：手写官方 cancel 控件语言（灰字/透明底/hover list-hover 圆角钮，
+// padding/圆角/nowrap/cursor 与 b3-button 基类逐项一致、按压瞬变同族无过渡）——
+// 不挂 b3-button 类：官方 .card .card__action .b3-button (0,3,0) 带
+// display:block+width:100%+padding:8px 0 会把直接子级徽标拉成全宽块
 .prog-revcard-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   align-self: center;
+  flex: none; // 显式防行内收缩（nowrap 的 min-content 地板实际已兜底，双保险）
   margin-right: 8px;
-  font-size: 11px;
-  color: var(--b3-theme-on-surface-light, #999);
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--b3-theme-on-surface);
   white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--b3-border-radius);
+
+  &:hover { background-color: var(--b3-list-hover); }
+  &:active { background-color: var(--b3-list-icon-hover); }
 }
 // P2-1：评分行=组式布局（行内无直接 button 子级）首段 36px 是紧凑上一步钮带、
 // 高钮带 y=44~130（3.8.3 实测）——徽标盒对齐高钮带（同顶同高、内容居中=与
@@ -2428,6 +2439,11 @@ html[data-theme-mode="dark"] .prog-material-tag {
   align-self: flex-start;
   height: 86px;
   margin-top: 36px;
+  // □7 按钮化的 padding 会把 content-box 总高撑到 86+8=94 破坏钮带中线对齐，
+  // border-box 让 86px 含 padding（内容居中位不变）
+  box-sizing: border-box;
+  // hover 底色=86px 全盒高亮系有意沿用：与右侧跳过/主钮卡片同高同带（vision 实证
+  // 判「不突兀」），大热区=既有设计（按钮化前徽标盒即 86px）非本次引入
 }
 .prog-revcard-badge > svg {
   width: 14px;
@@ -2436,12 +2452,20 @@ html[data-theme-mode="dark"] .prog-material-tag {
   color: var(--b3-theme-secondary);
 }
 // □4 最后一见强调（5/5 第 5 见）：主色+加重，与常规灰态一望可分；
-// 变色加粗属同一元素的态切换，非删激活孪生规则（css.md 先例不适用）
+// 变色加粗属同一元素的态切换，非删激活孪生规则（css.md 先例不适用）。
+// □7 vision P1：暗色下 midnight 主色 #3575f0 对卡片底仅 ~3:1（强调态比常规
+// 12.6:1 更难读=倒挂）——color-mix 混 35% 白提亮至 ~6:1（--b3-theme-primary-light
+// 是 72% 透明色叠暗底反而更暗，不可用；color-mix 先例=b3 主题 success 修法）
 .prog-revcard-badge.prog-revcard-last {
   color: var(--b3-theme-primary);
   font-weight: 600;
 
   > svg { color: var(--b3-theme-primary); }
+}
+html[data-theme-mode="dark"] .prog-revcard-badge.prog-revcard-last {
+  color: color-mix(in srgb, var(--b3-theme-primary), white 35%);
+
+  > svg { color: color-mix(in srgb, var(--b3-theme-primary), white 35%); }
 }
 // □4 下一张即时反馈闪换态（「N 天后再见」）：轻底色示意瞬态，1.2s 还原
 .b3-button.prog-revcard-flashed {

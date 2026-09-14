@@ -4,6 +4,7 @@ import changelog2025 from "./changelog/2025.json";
 import changelog2026 from "./changelog/2026.json";
 import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
 import helpDocs from "./help.json";
+import pluginJson from "../plugin.json";
 import { openHelpMenu } from "../../sy-tomato-plugin/src/libs/helpMenu";
 import { buildSettingsHeader } from "../../sy-tomato-plugin/src/libs/settingsHeader";
 import { migrateLegacyHotkeys } from "../../sy-tomato-plugin/src/libs/hotkeyCap";
@@ -16,7 +17,7 @@ import { pieceSummaryBox } from "./PieceSummaryBox";
 import { writingCompareBox } from "./WritingCompareBox";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
-import { getPluginSpec, isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
+import { isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, readCurveReadingPoint, readCurvePlainDocs,
     readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
@@ -57,6 +58,7 @@ import { invalidateBookStatusCache } from "./bookStatus";
 import { registerTailCardRender } from "./tailCardRender";
 import { registerVisitNoteRender } from "./visitNoteRender";
 import { copyDigestsToPool } from "./writeBook";
+import { split就地断句, splitInPlaceCommand } from "./splitInPlace";
 
 // 更新日志按年拆分存储（src/changelog/<年>.json，当年文件追加、往年冻结），此处组装倒序全集
 const changelog = [...changelog2026, ...changelog2025];
@@ -351,7 +353,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         // outline 保存钮退役（帮助收进菜单，保存走 footer「保存并关闭」）
         const header = buildSettingsHeader({
             title: tomatoI18n.渐进学习 + " · " + tomatoI18n.设置,
-            version: "v" + this.pluginSpec?.version + "p",
+            version: "v" + pluginJson.version + "p",
             pro: lastVerifyResult() === true,
             onHelp: (e) => openHelpMenu(e, {
                 usage: () => openHelpDialog("https://my.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink", helpDocs),
@@ -408,8 +410,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
         this.bookMapDm?.destroyBy();
         this.bookMapDm = dm;
         const id = newID();
+        // progtree □3：写作书同入口打开时标题=结构树（数据链在组件内分派）
+        const winfo = progStorage.peekBookInfo(bookID);
         const dialog = new Dialog({
-            title: tomatoI18n.知识地图(),
+            title: winfo?.writing ? tomatoI18n.结构树() : tomatoI18n.知识地图(),
             content: `<div id="${id}" style="height:100%"></div>`,
             width: events.isMobile ? "94vw" : "min(1100px, 94vw)",
             height: events.isMobile ? "120svw" : "680px",
@@ -431,6 +435,12 @@ export default class ThePlugin extends BaseTomatoPlugin {
         initMaterialTrace(this);
         events.onload(this);
         tomatoI18n.init();
+        // e2e 通道=window 挂点（渐进全局键盐前缀纪律——只读转发，globalThis 注册表
+        // 容忍重注册）：舰队书卡续读的最终链+读这一片（bookreach □6 复现用）
+        (window as any).__progStartToLearn = (b: string, r = false, n = false) =>
+            prog.startToLearnWithLock(b, r, n);
+        (window as any).__progReadThisPiece = (blockID: string) =>
+            prog.readThisPiece(blockID);
         // □2 片尾收束卡渲染器（3.8.3+；旧内核 customBlockRenders 缺省=注册即无操作，
         // 建卡链 supportsTailCardBlock 同判 false 整体不触发）
         registerTailCardRender(this);
@@ -458,6 +468,16 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 // 否则重启/插件 reload 后开关回旧值，与设置面板通道行为不对称
                 revTraceScope.write().catch(() => { });
             },
+        });
+
+        // 0914 □4：就地断句命令通道（鸟申请不依赖浮窗的快捷键）——执行体/Pro 门禁复用
+        // 浮条钮的 splitInPlaceRun，命令层只加态位守卫（书/分片引导拒绝）；顶层 catch
+        // 防 HTTP 失败冒泡成 unhandled rejection（commandAdapter 不接 rejection）
+        this.addCommand({
+            langKey: split就地断句.langKey,
+            langText: split就地断句.langText(),
+            hotkey: split就地断句.m,
+            editorCallback: async (protyle) => { await splitInPlaceCommand(protyle).catch(() => { }); },
         });
 
         this.setting = new Setting({
@@ -496,9 +516,6 @@ export default class ThePlugin extends BaseTomatoPlugin {
         this.eventBus.on(EventType.click_blockicon, this.blockIconEventBindThis);
         this.eventBus.on(EventType.opened_notebook, this.notebookChangedEventBindThis);
         this.eventBus.on(EventType.closed_notebook, this.notebookChangedEventBindThis);
-        getPluginSpec(this.name).then(sp => {
-            this.pluginSpec = sp
-        });
 
         // 顶栏设置火苗（topbar-logo 战役返工，与状态栏火苗同源=插件身份标识）：挂类着 --prog-topbar
         // 家族琥珀色（recite 顶栏 icon 挂 .recite-topbar-gear 同款机制——线稿 stroke:currentColor

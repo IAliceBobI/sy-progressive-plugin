@@ -4,7 +4,7 @@ Finally finish what you read — and what you write: progressive reading digests
 
 ## Highlights
 
-- ✍ **Progressive writing** — your material, queued to be written: send selected blocks from any document straight into a writing book, let the roller serve you one piece a day, finalize as you go, then compile the draft. What you read becomes the raw material of what you write
+- ✍ **Progressive writing** — your material, queued to be written: send selected blocks from any document straight into a writing book, let the roller serve you one piece a day, finalize as you go, then compile the draft; a four-color structure tree shows at a glance how far the book has come. What you read becomes the raw material of what you write
 - 📖 **Two progressive modes** — excerpt-based (pick the essence) and piece-based (slice the whole doc), so long reads get digested day by day
 - ✂️ **Text-splitting toolkit** — sentence splitting, Enter-to-split, block merging, double-tap multi-select on mobile
 - 🎴 **Card-making pipeline** — multi-line cloze, multi-line cards, word flashcards and Daily Card — make cards where you read
@@ -18,6 +18,9 @@ Finally finish what you read — and what you write: progressive reading digests
 - **Three ways to feed slots** — send selected blocks from any doc, pull from the excerpt pool, or push from the floating bar; material carries a source badge that jumps back to the original text
 - **One roller, two phases** — reading books and writing books share the same scheduler: reading is content written by others queued to read; writing is your own material queued to write
 - **Piece management** — split into new pieces, move material across pieces, finalize when done (reversible)
+- **Structure tree at a glance** — writing books open the knowledge map too: green = finalized, theme color = has material, orange = gap, grey = container; nodes carry material and sub-chapter counts, click to jump straight to a slot, export as image
+- **Let AI structure it (MCP)** — AI inventories where material sits and where the gaps are, proposes a skeleton and previews every step before touching anything; it can also break a model essay down into a reusable skeleton
+- **Recite link-up** — send a whole book or a single piece into Recite Practice: type on the original to annotate, extract into exercises, close the original, write from memory and compare word by word
 - **Compile to draft (Pro)** — turn finalized pieces into a standalone document in one click, from material to finished work; the everyday writing flow is free
 
 ### 📖 Progressive Reading
@@ -72,7 +75,7 @@ One rule of thumb: **the whole reading & writing loop is free — unlimited book
 
 - 📖 **[Documentation](https://my.feishu.cn/docx/ZZr9dGoIno5pnVxn2vpch6BCn3f?from=from_copylink)** (Chinese, with GIFs & videos for every feature)
 - 🎬 **[Hands-on Tutorial](https://my.feishu.cn/docx/SrLmdJypwoZmBhxjVhAcp5zPnae)** (Chinese, zero jargon — follow along to finish the "read → recall → review" loop in ~10 minutes, with GIFs & full videos for every step)
-- 🤖 **[Connect AI to SiYuan (MCP)](https://my.feishu.cn/docx/BkRldeWJ7o3T4ExE2fdciZbgnRV)** (Chinese) — let AI check your reading queue and reschedule reviews; three-step setup for ZCode / Trae / CodeBuddy / Qoder
+- 🤖 **[Connect AI to SiYuan (MCP)](https://my.feishu.cn/docx/BkRldeWJ7o3T4ExE2fdciZbgnRV)** (Chinese) — let AI check your reading queue, reschedule reviews and sort out your writing books' structure; three-step setup for ZCode / Trae / CodeBuddy / Qoder
 - 🙏 [Acknowledgments](https://my.feishu.cn/docx/FQ7udC3jeorfDYxI39ict2UNn2g?from=from_copylink)
 - 💬 [QQ Group](https://pd.qq.com/s/r3jz0g16) (Chinese) — feedback and feature requests
 - 💬 [Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=f08gff0c-d6b0-4a0d-8323-c8a0553e4fff&qr_code=true) (Chinese) — feedback and feature requests

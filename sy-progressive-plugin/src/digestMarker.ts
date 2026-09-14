@@ -206,14 +206,20 @@ export function markDigestTag(protyle: any) {
     if (!wys?.getAttribute(PDIGEST_CTIME)) return;
     const title = root.querySelector<HTMLElement>(".protyle-title");
     if (!title) return; // 无标题布局（移动端等），静默降级
-    // □2 类型字标：片摘（片序号键）> 书摘（ctime 归属注册书）> 札记（非书）——
-    // 全类型统一「摘抄」被用户点名无信息量；问题/整摘靠 title 的 ❓/[整] 前缀自表达
+    // □2 类型字标：素材（ctime 归属写作书）> 片摘（片序号键）> 书摘（ctime 归属注册书）
+    // > 札记（非书）——全类型统一「摘抄」被用户点名无信息量；问题/整摘靠 title 的
+    // ❓/[整] 前缀自表达。素材档（群反馈 650189 09-14）：槽内摘抄/纯收集书摘抄的
+    // ctime 挂写作书——writing 标记只在注册书上有意义，booksInfos 缺键即非写作书
     const kind = digestTagKind(
         wys.getAttribute(PIECE_IDX_KEY),
         parseBookIDFromCtime(wys.getAttribute(PDIGEST_CTIME) ?? ""),
         (id) => progStorage.isRegisteredBook(id),
+        (id) => progStorage.booksInfos()[id]?.writing === true,
     );
-    const label = kind === "piece" ? tomatoI18n.片摘 : kind === "book" ? tomatoI18n.书摘 : tomatoI18n.札记徽章;
+    const label = kind === "material" ? tomatoI18n.素材
+        : kind === "piece" ? tomatoI18n.片摘
+        : kind === "book" ? tomatoI18n.书摘
+        : tomatoI18n.札记徽章;
     const tag = document.createElement("span");
     tag.className = "prog-digest-tag";
     tag.setAttribute("contenteditable", "false");

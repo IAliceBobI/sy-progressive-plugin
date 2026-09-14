@@ -51,6 +51,18 @@ export function getDocIalNoteDir(docID: string): string {
 }
 
 /** words 单词文档（v5 □4 起进 prog-data；值格式沿用历史 `words#t#bookID`，旧书下文档按 IAL 原位认回） */
+/** 编译成稿产物锚（merged-书名 落书下）：progtree □1 P0-1——树权威下书下文档默认=槽，
+ *  编译产物必须白名单排除，否则成稿变身槽（isWritingFinished 恒 false+懒补标覆写锚
+ *  致重复建稿）。原在 helper.ts（链拉 .svelte 进不了 writeTree 单测，progData 纪律） */
+export function getDocIalNewBookKey(bookID: string): string {
+    return `newBookDoc#${TEMP_CONTENT}#${bookID}`;
+}
+
+/** 多合一键词笔记锚（同族编译产物，一并排除） */
+export function getDocIalAllInOneKey(bookID: string): string {
+    return `allInOneKeysDoc#${TEMP_CONTENT}#${bookID}`;
+}
+
 export function getDocIalWords(bookID: string): string {
     return `words#${TEMP_CONTENT}#${bookID}`;
 }
@@ -85,6 +97,13 @@ const freshCreatedIds = new Map<string, string>();
 /** 单测隔离用：清空刚建 ID 缓存 */
 export function resetAnchoredCacheForTest() {
     freshCreatedIds.clear();
+}
+
+/** 刚建锚定文档查询口（progtree □1 P1-5）：白名单 fail-open 兜底——attributes SQL
+ *  索引滞后/故障时锚认回落空，本进程刚建的夹（freshCreatedIds 在册）直接并入排除集，
+ *  防池夹子树涌入槽列表。缓存写入时 checkBlockExist 已验活；死 id 残留无害（树不含它） */
+export function freshCreatedIDFor(ialValue: string): string | null {
+    return freshCreatedIds.get(ialValue) ?? null;
 }
 
 /** 统一锚定链：storage ID → checkBlockExist → IAL 全库搜 →（刚建缓存校验）→ 惰性新建。 */
@@ -296,6 +315,15 @@ export function parentIDFromDocPath(path: string): string {
     const parts = (path ?? "").split("/").filter(Boolean);
     if (parts.length < 2) return "";
     return parts[parts.length - 2];
+}
+
+/** □6（0954 档）：内核 getBlockInfo 响应三态解析——书壳可达性供轮询环停轮决策。
+ *  code 3=索引重建中（暂时态，重试有意义）；0=可达；其余（-1 未找到 ID=笔记本已关/
+ *  书已删，及权限等别的非零码）对轮询环而言重试无意义，一律按终态 gone。 */
+export function parseReachability(json: unknown): "ok" | "indexing" | "gone" {
+    const code = (json as { code?: unknown } | null)?.code;
+    if (code === 3) return "indexing";
+    return code === 0 ? "ok" : "gone";
 }
 
 /** 列文档夹的直接子文档（id+name）——文档父子在 path 层（parent_id 恒空），按父 path 去掉 .sy 的目录前缀匹配一层。

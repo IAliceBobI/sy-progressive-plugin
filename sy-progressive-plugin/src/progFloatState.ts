@@ -589,12 +589,47 @@ export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
     // 单词两钮；review/sched 与首行 ✧ 复访组重复、write 与首行送仿写重复、whole 对卡片
     // 无意义（整摘复制）——不收。再摘抄走非书链路（落源文档下/札记匣）。
     // splitinplace 就地断句（2026-09-09）限 free+digest——book 态不给（README 初版警告：
-    // 分片后改原书会让渐进找不到块），piece 态不收（重插菜单已是断句入口）。
+    // 分片后改原书会让渐进找不到块）。0914 □5 放开 piece（鸟：只想断选中几段，重插
+    // 必然全断）：挂闪卡的段落执行层拦（护卡），写作槽在组件层滤（死路指路勿上钮）。
     if (kind === "digest") return ["inbox", "tobook", "tohub", "splitinplace", "think", "card", "word", "wordai"];
     const base: DigSubrankId[] = ["inbox", "tobook", "tohub", "think", "card", "review", "word", "wordai", "write", "sched"];
     if (kind === "book") return base;
     // □3 语义清理：piece 态砍 write（与低频段 recite「仿写本片」同调 runPieceRecite 纯重复；
-    // book/free 首行无仿写钮保留不算重复）
-    if (kind === "piece") return [...base.filter(id => id !== "write"), "whole"];
+    // book/free 首行无仿写钮保留不算重复）；0914 □5 增 splitinplace（分片部分断句，
+    // 落位同 free 态=tohub 之后）
+    if (kind === "piece") return ["inbox", "tobook", "tohub", "splitinplace", ...base.filter(id => id !== "write").slice(3), "whole"];
     return ["inbox", "tobook", "tohub", "splitinplace", ...base.slice(3), "whole"];
+}
+
+/**
+ * 就地断句命令通道态位守卫（0914 □4 起，□5 放宽）：book 恒拒（改原书会让渐进找不到
+ * 块，README 初版警告）；piece 放行（0914 □5 拍板——分片允许只断选中几段，挂闪卡的
+ * 段落由执行层护卡拦截；写作槽的拒绝在命令层 writingSlot 分支出槽文案）。null=放行
+ * （piece/digest/free；普通文档识别落空 null 视同 free 态同款放行）。
+ */
+export function splitInPlaceGuard(kind: FloatDocKind | null): "book" | null {
+    if (kind === "book") return "book";
+    return null;
+}
+
+/**
+ * 拖出槽校正决策（0914 □4 review P1-2，纯函数供单测）：piece 且书=活跃写作书时按
+ * 树验结果校正——inTree=null（已拖出，出场链拖出剥标同语义）→ 降级 null 放行；
+ * inTree 命中 → 维持 piece 且标记写作槽（writingSlot，命令层走槽文案——重插对写作
+ * 槽被拦是死路指路，review P1-1）；unknown（拉取失败）fail-closed 按写作槽拒绝
+ * （review P1-3：0914 □5 放开 piece 后「维持 piece」≠拒绝，瞬断放行会拆断胶囊
+ * 血缘——误拦代价一条 toast、误放代价不可逆，两害取其轻）。非活跃写作书一律不
+ * 校正：阅读分片树验恒 null，去掉 writing gate 会把阅读分片全部误放行（单测钉死
+ * 此语义）。
+ */
+export function correctStaleSlot(
+    kind: FloatDocKind | null,
+    bi: { writing?: boolean; ignored?: boolean; archived?: string | boolean } | null | undefined,
+    inTree: string | null | "unknown",
+): { kind: FloatDocKind | null; writingSlot: boolean } {
+    if (kind !== "piece") return { kind, writingSlot: false };
+    if (!(bi?.writing && !bi.ignored && !bi.archived)) return { kind: "piece", writingSlot: false };
+    if (inTree === null) return { kind: null, writingSlot: false };
+    if (inTree === "unknown") return { kind: "piece", writingSlot: true };
+    return { kind: "piece", writingSlot: true };
 }

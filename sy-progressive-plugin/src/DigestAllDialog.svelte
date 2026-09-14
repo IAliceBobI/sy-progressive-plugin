@@ -7,7 +7,7 @@
     import { digestBadgeInputsOf } from "./digestBadgeStore";
     import { digestBadgeOf } from "./digestBadge";
     import { writingPoolUnderBook } from "../../sy-tomato-plugin/src/libs/stores";
-    import { poolDirPlacement, movePoolDir } from "./writeBook";
+    import { poolDirPlacement, movePoolDir, setMaterialsDigested, transferMaterialOut, removeMaterialDocs } from "./writeBook";
     import type { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 
     // □29 摘抄清单大界面：浮层超量（>30 条）时的升级浏览（用户拍板「浮层截断+查看全部」）
@@ -54,6 +54,9 @@
     let list = $derived(
         kw.trim() ? flat.filter(n => n.title.toLowerCase().includes(kw.trim().toLowerCase())) : flat,
     );
+    // matflow（0914 □2+□5）：全选态与消化标记方向（动作钮 label 数据源）
+    let allSelected = $derived(list.length > 0 && list.every(n => selected.includes(n.id)));
+    let markDirection = $derived(flat.some(n => selected.includes(n.id) && !n.done));
     // 搬迁方向：设置=书下且夹在别处 → 搬书下；设置=总夹且夹在书下 → 搬总夹（同构对称）
     let moveUnder = $derived($writingPoolUnderBook);
     let showMoveDir = $derived(manage && ((moveUnder && placement === "hub") || (!moveUnder && placement === "book")));
@@ -166,6 +169,80 @@
             busy = false;
         }
     }
+
+    // ---- matflow（0914 □2+□5 合拍）池管理三件：全选 / 解除关联两档 / 删除 ----
+
+    /** □5① 全选/清选 toggle：勾选当前过滤视图全量（搜索态=选中可见的，符合直觉；
+     *  全已选中再点=清空）。 */
+    function toggleSelectAll() {
+        if (busy || list.length === 0) return;
+        const allIds = list.map(n => n.id);
+        selected = allIds.every(id => selected.includes(id)) ? [] : allIds;
+    }
+
+    /** 解除关联·可逆档（🔨 消化标记）：方向=选中集里还有未锤的→打锤，全已锤→剥锤。
+     *  done 态本会话直接改 flat 即时弱化，不重查（SQL 索引窗幽灵行，doSend 同纪律） */
+    async function digestMark() {
+        if (busy || selected.length === 0) return;
+        const sel = new Set(selected);
+        const mark = flat.some(n => sel.has(n.id) && !n.done);
+        busy = true;
+        try {
+            const n = await setMaterialsDigested(selected, mark);
+            await siyuan.pushMsg(mark ? tomatoI18n.已标记N篇已消化(n) : tomatoI18n.已取消N篇消化标记(n));
+            flat = flat.map(m => (sel.has(m.id) ? { ...m, done: mark } : m));
+        } catch (e) {
+            console.error("digest mark failed", e);
+            await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500);
+        } finally {
+            busy = false;
+        }
+    }
+
+    /** 解除关联·物理档（转出为摘抄，鸟建议档）：confirm→逐篇转出（单篇失败不中断，
+     *  转出的剔行、失败的原样在列=可见反馈），选择集保失败的。 */
+    function transfer() {
+        if (busy || selected.length === 0) return;
+        busy = true;
+        confirm("⚠️", tomatoI18n.转出为摘抄确认(selected.length), () => void (async () => {
+            try {
+                const ids = [...selected];
+                const ok: string[] = [];
+                for (const id of ids) {
+                    try { await transferMaterialOut(id); ok.push(id); } catch (e) { console.error("transferOut failed", id, e); }
+                }
+                if (ok.length > 0) {
+                    await siyuan.pushMsg(tomatoI18n.已转出N篇为摘抄(ok.length));
+                    flat = flat.filter(n => !ok.includes(n.id));
+                    selected = selected.filter(id => !ok.includes(id));
+                } else {
+                    await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500);
+                }
+            } finally {
+                busy = false;
+            }
+        })(), () => { busy = false; });
+    }
+
+    /** 删除档（□2A+□5③）：连摘抄本体彻底删，confirm 后逐篇 removeDocByID。 */
+    function removeSel() {
+        if (busy || selected.length === 0) return;
+        busy = true;
+        confirm("⚠️", tomatoI18n.删除素材确认(selected.length), () => void (async () => {
+            try {
+                const ids = [...selected];
+                const n = await removeMaterialDocs(ids);
+                await siyuan.pushMsg(tomatoI18n.已删除N篇素材(n));
+                flat = flat.filter(m => !ids.includes(m.id));
+                selected = [];
+            } catch (e) {
+                console.error("remove materials failed", e);
+                await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500);
+            } finally {
+                busy = false;
+            }
+        })(), () => { busy = false; });
+    }
 </script>
 
 <div class="prog-digest-all" data-busy={busy ? "true" : undefined} bind:this={rootEl}>
@@ -207,6 +284,28 @@
     {#if manage}
         <div class="da-actionbar" bind:this={actionbarEl}>
             <span class="da-selected">{busy ? tomatoI18n.发送中 : (selected.length > 0 ? tomatoI18n.已选N篇(selected.length) : "")}</span>
+            <!-- matflow（0914 □2+□5）：全选 / 解除关联两档（🔨 可逆+转出物理）/ 删除；
+                 destructive 三钮与入槽两钮同 disabled 面（busy 或空选择集） -->
+            <button
+                class="b3-button b3-button--text tomato-button"
+                disabled={busy || list.length === 0}
+                onclick={toggleSelectAll}
+            >{allSelected ? tomatoI18n.取消全选 : tomatoI18n.全选}</button>
+            <button
+                class="b3-button b3-button--outline tomato-button"
+                disabled={busy || selected.length === 0}
+                onclick={() => void digestMark()}
+            >{(selected.length === 0 || markDirection) ? tomatoI18n.标记已消化 : tomatoI18n.取消消化标记}</button>
+            <button
+                class="b3-button b3-button--outline tomato-button"
+                disabled={busy || selected.length === 0}
+                onclick={transfer}
+            >{tomatoI18n.转出为摘抄}</button>
+            <button
+                class="b3-button b3-button--outline da-btn--danger"
+                disabled={busy || selected.length === 0}
+                onclick={removeSel}
+            >{tomatoI18n.删除素材}</button>
             <button
                 class="b3-button b3-button--outline tomato-button"
                 disabled={busy || selected.length === 0}
@@ -217,11 +316,6 @@
                 disabled={busy || selected.length === 0}
                 onclick={() => send("move")}
             >{tomatoI18n.移动入槽}</button>
-            {#if selected.length > 0}
-                <button class="b3-button b3-button--text" disabled={busy} onclick={() => (selected = [])}
-                    >{tomatoI18n.取消全选}</button
-                >
-            {/if}
             <!-- □4 池夹位置与设置档不一致才亮（位置无关语义：改档不静默挪，显式搬） -->
             {#if showMoveDir}
                 <button class="b3-button b3-button--text" disabled={busy} onclick={moveDir}
@@ -343,10 +437,21 @@
     .da-actionbar {
         flex: none;
         display: flex;
+        flex-wrap: wrap; /* matflow：动作钮 7 枚，窄弹窗折行防溢出 */
         align-items: center;
         gap: 8px;
         padding: 8px 0 2px;
         border-top: 1px solid var(--b3-border-color);
+    }
+    /* 删除档 destructive 色（b3 error 族：浅底红字，重操作警示不喧宾）。钮不挂
+       tomato-button——该全局类 color 带 !important 统一主题蓝（vision P1 实测文字
+       压不过边框红），destructive 语义本就要背离统一蓝；父级平拼提特异性过 b3 单类 */
+    .prog-digest-all .da-actionbar .da-btn--danger {
+        color: var(--b3-card-error-color, #d23f31);
+        border-color: color-mix(in srgb, var(--b3-card-error-color, #d23f31) 45%, transparent);
+        &:hover {
+            background: color-mix(in srgb, var(--b3-card-error-color, #d23f31) 8%, transparent);
+        }
     }
     .da-selected {
         flex: 1;
