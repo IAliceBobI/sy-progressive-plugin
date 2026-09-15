@@ -16,7 +16,7 @@ Finally finish what you read — and what you write: progressive reading digests
 
 - **Writing books** — create one with a name and an outline; each outline line becomes a slot, so you frame the skeleton before you write
 - **Three ways to feed slots** — send selected blocks from any doc, pull from the excerpt pool, or push from the floating bar; material carries a source badge that jumps back to the original text
-- **One roller, two phases** — reading books and writing books share the same scheduler: reading is content written by others queued to read; writing is your own material queued to write
+- **One roller, two phases** — reading books and writing books share the same scheduler: reading is content written by others queued to read; writing is your own material queued to write. Each phase gets its own status-bar flame (reading / teal writing), so writing never eats into your reading quota
 - **Piece management** — split into new pieces, move material across pieces, finalize when done (reversible)
 - **Structure tree at a glance** — writing books open the knowledge map too: green = finalized, theme color = has material, orange = gap, grey = container; nodes carry material and sub-chapter counts, click to jump straight to a slot, export as image
 - **Let AI structure it (MCP)** — AI inventories where material sits and where the gaps are, proposes a skeleton and previews every step before touching anything; it can also break a model essay down into a reusable skeleton
@@ -56,7 +56,7 @@ One rule of thumb: **the whole reading & writing loop is free — unlimited book
 
 | Domain | Free | Pro adds |
 |---|---|---|
-| 📚 Reading | Add books, daily piece rolling, fleet & flame progress, floating bar, excerpts, all views, physical volume split for huge books | Auto sentence splitting — books & excerpts sliced by sentence, no manual splitting |
+| 📚 Reading | Add books, daily piece rolling, fleet & dual-flame progress (reading & writing tracked separately), floating bar, excerpts, all views, physical volume split for huge books | Auto sentence splitting — books & excerpts sliced by sentence, no manual splitting |
 | ✍️ Writing | Writing books, three ways to feed slots, piece management, moving pieces across books | Compile finalized pieces into a standalone draft, material to work in one step; extract notes (all / current piece / append to bottom) — gather them as you finish; one-click note-color strip & restore |
 | 🎴 Cards | Word flashcards, cloze deletion, multi-line card creation, Daily Card, turning excerpts into review cards | AI word lookup — saving words is free; AI translation & example sentences are Pro |
 | 📥 Collection | — | Collect selected content to a file (Shift+Alt+O), merging as you go |
