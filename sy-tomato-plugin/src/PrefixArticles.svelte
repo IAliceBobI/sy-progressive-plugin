@@ -167,16 +167,20 @@
         >
             <svg><use xlink:href="#iconEdit"></use></svg>
         </button>
-        <button
-            title={tomatoI18n.标题内竖线分割出来的标签}
-            class="pa-iconbtn"
-            class:pa-iconbtn--on={$prefixArticlesTagsShow}
-            onclick={() => {
-                prefixArticlesTagsShow.write(!$prefixArticlesTagsShow);
-            }}
-        >
-            <svg><use xlink:href="#iconTags"></use></svg>
-        </button>
+        {#if isDock}
+            <!-- Tags 钮只留 dock 面板（review P1-3）：Dialog 分支（⇧⌥G/右键弹窗）开着时独立
+                 Tags 窗 z=12 压在官方 Dialog 遮罩（z 自 200 爬升）之下变暗不可点——入口收敛 -->
+            <button
+                title={tomatoI18n.标题内竖线分割出来的标签}
+                class="pa-iconbtn"
+                class:pa-iconbtn--on={$prefixArticlesTagsShow}
+                onclick={() => {
+                    prefixArticlesTagsShow.write(!$prefixArticlesTagsShow);
+                }}
+            >
+                <svg><use xlink:href="#iconTags"></use></svg>
+            </button>
+        {/if}
         <button
             title={tomatoI18n.刷新}
             class="pa-iconbtn"

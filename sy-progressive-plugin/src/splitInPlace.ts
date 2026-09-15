@@ -11,7 +11,7 @@
 import { confirm, IProtyle } from "siyuan";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { getAllContentEditableText } from "../../sy-tomato-plugin/src/libs/domUtils";
+import { getBlockOwnEditableText } from "../../sy-tomato-plugin/src/libs/domUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
@@ -123,7 +123,7 @@ export async function splitInPlaceRun(protyle: IProtyle, blocked?: Set<string>) 
             if (blocked?.has(s.ids[i])) { cardSkipped++; continue; }
             const el = s.selected[i];
             if (!el || !isSplittableInPlace(el.getAttribute("data-type"))) continue;
-            const text = getAllContentEditableText(el);
+            const text = getBlockOwnEditableText(el);
             const sentences = splitInPlaceSentences(text);
             if (sentences.length <= 1) continue;
             if (!styled) styled = hasInlineStyles(text);

@@ -24,6 +24,10 @@ export interface DayLogData {
     /** 全局重现计数（□2 额度分池：重现族消耗轮次计数，与书池 b 独立——重现=复习
         不占书额度不计已读；老块无此字段读作 0） */
     rc?: number;
+    /** 写作侧当日活动计数（火苗分家 bear 2026-09-15 拍板：写作书开槽/素材消化退出
+        阅读 quota 池 b，改记本池——重度写作用户阅读欠债变小=预期；与 rc 分池同款
+        模式。写作火苗「今日已写」/书卡写作书「今日点」数据源。老块无此字段读作 {} */
+    w?: { [bookID: string]: number };
 }
 
 export interface DebtSummary {
@@ -102,8 +106,13 @@ export function incrementRevisit(data: DayLogData): DayLogData {
     return { ...data, rc: (data.rc ?? 0) + 1 };
 }
 
+/** 写作活动 +1（火苗分家 w 分池：b/q/p 全不动——阅读已读/欠债与写作计数彻底分家） */
+export function incrementWriting(data: DayLogData, bookID: string): DayLogData {
+    return { ...data, w: { ...(data.w ?? {}), [bookID]: ((data.w ?? {})[bookID] ?? 0) + 1 } };
+}
+
 export function summarizeDebt(
-    days: { date: string; q: number; read: number }[],
+    days: { date: string; q: number; read: number; write?: number }[],
     today: string,
     quotaToday: number,
 ): DebtSummary {
@@ -111,12 +120,17 @@ export function summarizeDebt(
     let readToday = 0;
     let todayGapInDebt = 0;
     for (const d of days) {
+        // 火苗分家 P0（review 09-15）：纯写作日（read=0 且 write>0）不背阅读债——
+        // markWrite 首笔会建当日块（b={}），若照算 gap=q 则「只写作的一天」比
+        // 「什么都没干的一天」（无日块不入债）更亏债，与「写作退出阅读 quota」
+        // 拍板方向相反。混合日照算（阅读部分欠多少记多少，写作不代偿）
+        const writingOnly = d.read === 0 && (d.write ?? 0) > 0;
         // 今天 q 以实时档位覆盖（改档位立即生效）；历史天按当日记录（不追溯）。
         // 同日双块（数据异常，□5 防撞修因）：今日分量取末行（与 findDayBlock 更新行同源）
         if (d.date === today) {
             readToday = d.read;
-            todayGapInDebt = Math.max(0, quotaToday - d.read);
-        } else {
+            todayGapInDebt = writingOnly ? 0 : Math.max(0, quotaToday - d.read);
+        } else if (!writingOnly) {
             histDebt += Math.max(0, d.q - d.read);
         }
     }
@@ -130,7 +144,11 @@ export function formatDaySummary(data: DayLogData, bookNames: { [bookID: string]
     const total = Object.values(data.b).reduce((s, n) => s + n, 0);
     const parts = Object.entries(data.b).map(([id, n]) => `${bookNames[id] || id}×${n}`);
     const rc = data.rc ? ` · 重现 ${data.rc}` : "";
-    return `档位 ${data.q} · 已读 ${total}${parts.length ? " —— " + parts.join("、") : ""}${rc}`;
+    // w 分池附行（火苗分家）：写作活动与阅读已读分开呈现，老块无 w 无附行
+    const wTotal = Object.values(data.w ?? {}).reduce((s, n) => s + n, 0);
+    const wParts = Object.entries(data.w ?? {}).map(([id, n]) => `${bookNames[id] || id}×${n}`);
+    const wLine = wTotal ? ` · 写作 ${wTotal}${wParts.length ? ` —— ${wParts.join("、")}` : ""}` : "";
+    return `档位 ${data.q} · 已读 ${total}${parts.length ? ` —— ${parts.join("、")}` : ""}${wLine}${rc}`;
 }
 
 export function isFinished(point: number, indexLength: number): boolean {
@@ -177,6 +195,30 @@ export async function markRead(deps: RollerDeps, bookID: string, point?: number)
     }
 }
 
+/** 写作活动记账（火苗分家 w 分池）：markRead 同款建块/防撞链，写 w 不动 b/q——
+ *  point=槽 point 当日去重锚（复用 p 池：写作书整体不走 markRead 写 p，无混池；
+ *  review P1-1：无锚时反复点书卡同槽可刷「今日已写」——锚语义同阅读书，同日
+ *  同槽只计一次；素材侧不传（锤幂等天然防重） */
+export async function markWrite(deps: RollerDeps, bookID: string, point?: number): Promise<void> {
+    const date = deps.getTodayStr();
+    const quota = deps.getQuota();
+    let blockID = await deps.findDayBlock(date);
+    if (!blockID) {
+        await new Promise(r => setTimeout(r, 800));
+        blockID = await deps.findDayBlock(date);
+    }
+    const data = blockID ? await deps.readDayBlockData(blockID) : { q: quota, b: {} };
+    if (point != null && data.p && point <= (data.p[bookID] ?? -1)) return;
+    let next = incrementWriting(data, bookID);
+    if (point != null) next = { ...next, p: { ...(next.p ?? {}), [bookID]: point } };
+    const summary = formatDaySummary(next, { [bookID]: await deps.getBookName(bookID) });
+    if (blockID) {
+        await deps.updateDayBlock(blockID, date, next, summary);
+    } else {
+        await deps.createDayBlock(date, next, summary);
+    }
+}
+
 export async function archiveBook(deps: RollerDeps, bookID: string): Promise<void> {
     await deps.setBookArchivedIal(bookID, deps.nowTimestamp());
 }
@@ -188,7 +230,7 @@ import { dailyQuota } from "../../sy-tomato-plugin/src/libs/stores";
 import { progStorage } from "./ProgressiveStorage";
 import * as constants from "./constants";
 import { loadBookStatuses } from "./bookStatus";
-import { fetchWritingPieces, isWritingFinished, hasUnreadMaterial } from "./writeBook";
+import { hasUnreadMaterial } from "./writeBook";
 
 function todayStr(): string {
     const n = new Date();
@@ -224,12 +266,13 @@ function makeRollerDeps(): RollerDeps {
             const s = new Set<string>();
             for (const [id, info] of Object.entries(progStorage.booksInfos())) {
                 if (info.ignored || info.archived) continue;
-                // 期2 写作书：索引恒空，isFinished(point>=0) 恒 true=误伤（写作书被滚筒
-                // 静默排除）；finished 语义=片列表全定稿（0 槽书不算完，提示建槽）。
-                // 期A 补判（review P1-1）：片全定稿但素材池有未读 → 不退役——
-                // 「定稿完继续往里摘」是素材并行的常见稳态，退役会让素材饿死
+                // 火苗分家（bear 2026-09-15 拍板）：写作书整体退出阅读滚筒——素材/槽
+                // 只从写作火苗出（openWritingFlameTarget 指定书路径，调度链共享但入口
+                // 分家），阅读轮转池不再含写作书。旧语义「片全定稿+无未读素材才退役
+                // （期A P1-1 素材饿死防线）」随之退役：写作侧供给改由写作火苗承担，
+                // 阅读轮不再喂它（书卡 finished 显示走 fleetData 独立判定不受影响）
                 if (info.writing) {
-                    if (isWritingFinished(await fetchWritingPieces(id)) && !(await hasUnreadMaterial(id))) s.add(id);
+                    s.add(id);
                     continue;
                 }
                 // □2 手动书进轮转（fbfeat，鸟 09-15）：片=摘抄，finished=0 未锤摘抄
@@ -299,7 +342,8 @@ function makeRollerDeps(): RollerDeps {
                 where a.name = '${constants.PLOG_DATA}' limit 10000000`) ?? [];
             return (rows as any[]).map(r => {
                 const d = parseDayLogData(r.data);
-                return { date: r.date, q: d.q, read: Object.values(d.b).reduce((s, n) => s + n, 0) };
+                // write 逐日携带（火苗分家 P0：summarizeDebt 据此跳过纯写作日的阅读债）
+                return { date: r.date, q: d.q, read: Object.values(d.b).reduce((s, n) => s + n, 0), write: Object.values(d.w ?? {}).reduce((s, n) => s + n, 0) };
             });
         },
         setBookArchivedIal: async (bookID, ts) => {
@@ -319,6 +363,11 @@ export async function rollerNextBook(): Promise<string> {
 
 export async function rollerMarkRead(bookID: string, point?: number): Promise<void> {
     await markRead(makeRollerDeps(), bookID, point);
+}
+
+/** 写作活动记账便捷入口（写作分派消费；w 分池不进阅读 quota；point=槽锚防同日重复计） */
+export async function rollerMarkWrite(bookID: string, point?: number): Promise<void> {
+    await markWrite(makeRollerDeps(), bookID, point);
 }
 
 export async function rollerArchiveBook(bookID: string): Promise<void> {
@@ -341,6 +390,15 @@ export async function rollerTodayReads(): Promise<{ [bookID: string]: number }> 
     const blockID = await deps.findDayBlock(todayStr());
     if (!blockID) return {};
     return (await deps.readDayBlockData(blockID)).b;
+}
+
+/** 今日逐书写作活动数（火苗分家：写作火苗「今日已写」/书卡写作书「今日点」数据源；
+ *  无当日块/老块无 w=空对象） */
+export async function rollerTodayWrites(): Promise<{ [bookID: string]: number }> {
+    const deps = makeRollerDeps();
+    const blockID = await deps.findDayBlock(todayStr());
+    if (!blockID) return {};
+    return (await deps.readDayBlockData(blockID)).w ?? {};
 }
 
 /** 今日全局重现计数（□2 额度分池闸门判定；无当日块/老块无 rc=0） */

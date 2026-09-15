@@ -1,6 +1,6 @@
 import { IProtyle, Plugin } from "siyuan";
 import { BlockNodeEnum, DATA_NODE_ID, DATA_NODE_INDEX, DATA_TYPE, IN_BOOK_INDEX, MarkKey, PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_LAST_ID, PROG_ORIGIN_TEXT, RefIDKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
-import { cleanDiv, get_siyuan_lnk_md, parseIAL, replaceAll, addCardSetDueTime, siyuan, getAllContentEditableText, getAllText } from "../../sy-tomato-plugin/src/libs/utils";
+import { cleanDiv, get_siyuan_lnk_md, parseIAL, replaceAll, addCardSetDueTime, siyuan, getAllText, getBlockOwnEditableText } from "../../sy-tomato-plugin/src/libs/utils";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { invalidateDigestMarker, markDigests, refreshDigestTagBadgeFor } from "./digestMarker";
@@ -446,7 +446,7 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
                 if (attrLine) parts.push(attrLine);
                 attrLine = '{: id=""}';
             }
-            const edit = getAllContentEditableText(cloned, "\n");
+            const edit = getBlockOwnEditableText(cloned, "\n");
             let ps = [edit];
             ps = splitLines(ps);
             ps.map(p => replaceAll(p, "\u200b", "").trim())

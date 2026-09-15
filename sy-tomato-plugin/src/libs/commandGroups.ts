@@ -113,7 +113,7 @@ import {
     MarkdownExport增量导出,
     MarkdownExport确保导出符合配置,
 } from "../MarkdownExportBox";
-import { PrefixArticles前缀文档树 } from "../PrefixArticles";
+import { PrefixArticles前缀文档树, PrefixArticlesTags } from "../PrefixArticles";
 import { KnowledgeBox知识库面板 } from "../KnowledgeBox";
 import {
     ListBox取消勾选当前文档所有已完成的todo任务,
@@ -355,6 +355,9 @@ export const COMMAND_GROUPS: GatedCommandGroup[] = [
         label: () => tomatoI18n.前缀文档树,
         items: [
             { langKey: PrefixArticles前缀文档树.langKey, label: () => PrefixArticles前缀文档树.langText(), hk: PrefixArticles前缀文档树 },
+            // Tags 窗开关命令（tagsdecouple □2）：状态栏钮/快捷键两通道的命令本体——钮挂载只受
+            // prefixArticlesEnable 总开关门控，命令行开关在此独立可关（review P1 补登）
+            { langKey: PrefixArticlesTags.langKey, label: () => PrefixArticlesTags.langText(), hk: PrefixArticlesTags },
         ],
     },
     {

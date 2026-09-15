@@ -6,7 +6,7 @@
     import { reloadSelfPlugin } from "./libs/pluginReload";
     import { getTomatoPluginInstance, siyuan } from "./libs/utils";
     import { events, EventType } from "./libs/Events";
-    import { prefixArticlesTagsShow } from "./libs/stores";
+    import { prefixArticlesTagsGroup, prefixArticlesTagsShow } from "./libs/stores";
     import {
         aggregateParts,
         countPartMatches,
@@ -91,8 +91,10 @@
         await siyuan.pushMsg(tomatoI18n.刷新, 1000);
     }
 
+    // X 关闭与面板钮同走 write（review P1-1）：set 只改内存，会被后续任意整文件 saveData
+    // 搭车落盘（如 DialogSvelte 拖动结束的 userID.write）——关窗是否持久取决于无关操作
     function exit() {
-        prefixArticlesTagsShow.set(false);
+        void prefixArticlesTagsShow.write(false);
     }
 
     function togglePart(part: string, ev: MouseEvent) {
@@ -140,11 +142,20 @@
     minWidth={240}
     minHeight={220}
     width={events.isMobile ? "90vw" : "300px"}
-    height={events.isMobile ? "70vh" : "460px"}
+    height={$prefixArticlesTagsGroup ? (events.isMobile ? "70vh" : "460px") : "auto"}
 >
     {#snippet dialogInner()}
         <div class="pp-body">
             <div class="pp-head">
+                <!-- 组区开关（tagsdecouple □3）：关=窗只剩 chip 云纯标签浏览（列表需求归侧边栏）；两态 title 平铺当前动作 -->
+                <button
+                    class="pp-iconbtn"
+                    class:pp-iconbtn--on={$prefixArticlesTagsGroup}
+                    title={$prefixArticlesTagsGroup ? tomatoI18n.隐藏文档列表 : tomatoI18n.显示文档列表}
+                    onclick={() => prefixArticlesTagsGroup.write(!$prefixArticlesTagsGroup)}
+                >
+                    <svg><use xlink:href="#iconList"></use></svg>
+                </button>
                 <button
                     title={tomatoI18n.切换笔记本}
                     class="pp-iconbtn"
@@ -159,7 +170,7 @@
             {#if targets.length === 0}
                 <div class="pp-empty">{tomatoI18n.暂无相关文档}</div>
             {:else}
-                <div class="pp-cloud">
+                <div class="pp-cloud" class:pp-cloud--solo={!$prefixArticlesTagsGroup}>
                     {#each targets as t (t.part)}
                         <button
                             class="pp-chip"
@@ -172,53 +183,56 @@
                         </button>
                     {/each}
                 </div>
-                {#if selectedParts.length === 0}
-                    <div class="pp-hint">
-                        <div class="pp-hint__main">{tomatoI18n.点击标签查看这组文档}</div>
-                        {#if !events.isMobile}
-                            <!-- 移动端无修饰键（tap 自然降级单选）：多选提示不渲染（□4 vision P1） -->
-                            <div class="pp-hint__sub">
-                                {tomatoI18n.按住此键点击标签可多选.replace("{k}", modKey)}
-                            </div>
-                        {/if}
-                    </div>
-                {:else}
-                    <div class="pp-group">
-                        <div class="pp-grouphead">
-                            <span class="pp-gcount" title={tomatoI18n.文档数量}
-                                >{groupTotal > groupDocs.length
-                                    ? `${groupDocs.length}+`
-                                    : groupTotal}{tomatoI18n.篇}</span
-                            >
-                            <span class="pp-gsel" title={selDisplay}>{selDisplay}</span>
-                            <button
-                                class="pp-clearbtn"
-                                title={tomatoI18n.清除选择}
-                                onclick={clearSelection}
-                            >
-                                <svg><use xlink:href="#iconClose"></use></svg>
-                            </button>
-                        </div>
-                        <div class="pp-list" bind:this={groupListEl}>
-                            {#if groupTotal === 0}
-                                <!-- 空交集：多选筛选无同时命中文档（单选正常态不进——chip 徽章计数
-                                     同谓词兜底；targets 陈旧竞态窗口可作单选降级提示，优雅不炸） -->
-                                <div class="pp-nogroup">{tomatoI18n.没有同时含这些标签的文档}</div>
-                            {:else}
-                                {#each groupDocs as doc (doc.id)}
-                                    <button
-                                        class="pp-row"
-                                        class:pp-row--cur={doc.id === curDocID}
-                                        onclick={() => gotoDoc(doc)}
-                                    >
-                                        <svg class="pp-row__icon"><use xlink:href="#iconFile"></use></svg>
-                                        <span class="pp-row__name">{doc.docName}</span>
-                                        <span class="pp-row__hit" title={doc.prefix}>{doc.prefix}</span>
-                                    </button>
-                                {/each}
+                <!-- 组区开关（tagsdecouple □3）：关=只有 chip 云，选中态保留（重开组区直接回显筛选） -->
+                {#if $prefixArticlesTagsGroup}
+                    {#if selectedParts.length === 0}
+                        <div class="pp-hint">
+                            <div class="pp-hint__main">{tomatoI18n.点击标签查看这组文档}</div>
+                            {#if !events.isMobile}
+                                <!-- 移动端无修饰键（tap 自然降级单选）：多选提示不渲染（□4 vision P1） -->
+                                <div class="pp-hint__sub">
+                                    {tomatoI18n.按住此键点击标签可多选.replace("{k}", modKey)}
+                                </div>
                             {/if}
                         </div>
-                    </div>
+                    {:else}
+                        <div class="pp-group">
+                            <div class="pp-grouphead">
+                                <span class="pp-gcount" title={tomatoI18n.文档数量}
+                                    >{groupTotal > groupDocs.length
+                                        ? `${groupDocs.length}+`
+                                        : groupTotal}{tomatoI18n.篇}</span
+                                >
+                                <span class="pp-gsel" title={selDisplay}>{selDisplay}</span>
+                                <button
+                                    class="pp-clearbtn"
+                                    title={tomatoI18n.清除选择}
+                                    onclick={clearSelection}
+                                >
+                                    <svg><use xlink:href="#iconClose"></use></svg>
+                                </button>
+                            </div>
+                            <div class="pp-list" bind:this={groupListEl}>
+                                {#if groupTotal === 0}
+                                    <!-- 空交集：多选筛选无同时命中文档（单选正常态不进——chip 徽章计数
+                                         同谓词兜底；targets 陈旧竞态窗口可作单选降级提示，优雅不炸） -->
+                                    <div class="pp-nogroup">{tomatoI18n.没有同时含这些标签的文档}</div>
+                                {:else}
+                                    {#each groupDocs as doc (doc.id)}
+                                        <button
+                                            class="pp-row"
+                                            class:pp-row--cur={doc.id === curDocID}
+                                            onclick={() => gotoDoc(doc)}
+                                        >
+                                            <svg class="pp-row__icon"><use xlink:href="#iconFile"></use></svg>
+                                            <span class="pp-row__name">{doc.docName}</span>
+                                            <span class="pp-row__hit" title={doc.prefix}>{doc.prefix}</span>
+                                        </button>
+                                    {/each}
+                                {/if}
+                            </div>
+                        </div>
+                    {/if}
                 {/if}
             {/if}
         </div>
@@ -261,6 +275,12 @@
         background: var(--b3-list-hover);
         color: var(--b3-theme-on-surface);
     }
+    /* 组区开关激活态（列表显示中）：主色示态——chip--on/状态栏钮点亮同语言 */
+    .pp-iconbtn--on,
+    .pp-iconbtn--on:hover {
+        background: color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+        color: var(--b3-theme-primary);
+    }
     /* chip 云：可滚，定高窗内占 30% 上限（□6 收紧：视觉重心让给组区）、内容少随内容收缩 */
     .pp-cloud {
         display: flex;
@@ -274,6 +294,14 @@
         padding: 6px 4px;
         border-bottom: 1px solid var(--b3-border-color);
         box-sizing: border-box;
+    }
+    /* 精简态（组区关，tagsdecouple □3）：云独占窗体——flex 撑满 + 30% 上限换 60vh 绝对封顶
+       （窗 height:auto 收矮后 30% 百分比随矮窗缩水失去滚动价值；60vh 防 auto 高被巨量 chip 撑破视口） */
+    .pp-cloud--solo {
+        flex: 1 1 auto;
+        max-height: 60vh;
+        /* 精简态云=窗体唯一内容区，底部悬空分隔线随组区一起退役 */
+        border-bottom: none;
     }
     .pp-chip {
         display: inline-flex;
@@ -485,5 +513,10 @@
     :global(html[data-theme-mode="light"]) .pp-clearbtn,
     :global(html[data-theme-mode="light"]) .pp-iconbtn {
         color: #6f7377;
+    }
+    /* 亮色激活态：主色须赢过上一条加深清单（(0,2,1) 压 scoped 单类 (0,2,0)）——同 global
+       形态平特异性、靠声明顺序后置取胜 */
+    :global(html[data-theme-mode="light"]) .pp-iconbtn--on {
+        color: var(--b3-theme-primary);
     }
 </style>

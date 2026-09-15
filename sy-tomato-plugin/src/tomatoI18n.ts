@@ -10239,6 +10239,15 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    public get 写作书不进阅读轮转() {
+        switch (this.lang) {
+            case "zh_CN": return "暂无可轮转的阅读书；写作书的素材与槽位请点旁边的写作火苗（青色）";
+            case "zh_CHT": return "暫無可輪轉的閱讀書；寫作書的素材與槽位請點旁邊的寫作火苗（青色）";
+            case "en_US":
+            default: return "No reading books to serve; for writing materials and slots, click the writing flame (teal) beside";
+        }
+    }
+
     public get 手动分片模式说明() {
         switch (this.lang) {
             case "zh_CN": return "已开启手动分片：不自动切分，阅读时用浮条摘抄，每次摘抄即一片";
@@ -14634,6 +14643,18 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Tags";
         }
     }
+    /** Tags 悬浮窗开关命令名/状态栏钮 tooltip（tagsdecouple □2：两通道同源 toggle） */
+    public get 标签悬浮窗() {
+        switch (this.lang) {
+            case "zh_CN": return "标签悬浮窗";
+            case "zh_CHT": return "標籤懸浮窗";
+            case "es_ES": return "Ventana de etiquetas";
+            case "fr_FR": return "Fenêtre d'étiquettes";
+            case "ja_JP": return "タグフロートウィンドウ";
+            case "en_US":
+            default: return "Tags float window";
+        }
+    }
     /** Tags 窗空选态提示第一行 */
     public get 点击标签查看这组文档() {
         switch (this.lang) {
@@ -14680,6 +14701,30 @@ export class TomatoI18n extends TomatoI18nABC {
             case "ja_JP": return "選択を解除";
             case "en_US":
             default: return "Clear selection";
+        }
+    }
+    /** Tags 窗组区列表开关钮：关闭态 title（点击后显示组区，tagsdecouple □3） */
+    public get 显示文档列表() {
+        switch (this.lang) {
+            case "zh_CN": return "显示文档列表";
+            case "zh_CHT": return "顯示文件列表";
+            case "es_ES": return "Mostrar lista de documentos";
+            case "fr_FR": return "Afficher la liste des documents";
+            case "ja_JP": return "ドキュメント一覧を表示";
+            case "en_US":
+            default: return "Show document list";
+        }
+    }
+    /** Tags 窗组区列表开关钮：开启态 title（点击后隐藏组区，窗只剩标签云，tagsdecouple □3） */
+    public get 隐藏文档列表() {
+        switch (this.lang) {
+            case "zh_CN": return "隐藏文档列表";
+            case "zh_CHT": return "隱藏文件列表";
+            case "es_ES": return "Ocultar lista de documentos";
+            case "fr_FR": return "Masquer la liste des documents";
+            case "ja_JP": return "ドキュメント一覧を隠す";
+            case "en_US":
+            default: return "Hide document list";
         }
     }
 }

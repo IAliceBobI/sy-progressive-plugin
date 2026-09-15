@@ -21,7 +21,7 @@ import DigestAllDialogSvelte from "./DigestAllDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
-import { rollerNextBook, rollerMarkRead, rollerArchiveBook } from "./roller";
+import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
 import { addToReadingCurve, buildReadingCard, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, sweepReadCurve } from "./readCurve";
@@ -745,7 +745,7 @@ class Progressive {
     /** 内层结果版：InLock 各分支据此决定关页签/闪卡结算——租约孤儿窗口里内层没跑完
      *  就不关用户当前页签（review P2-1）。对外签名仍是 void 的 startToLearnWithLock。
      *  noCount（□4①）：导航入口（写作火苗/写作换书）回到写作现场不计数——slot 分派
-     *  跳过 markReadSafe；material 分派恒计数（消化素材=读，设计共识不受导航语义影响） */
+     *  跳过 markWriteSafe；material 分派恒计数（火苗分家后记 w 写作池，不受导航语义影响） */
     private async startToLearnLeased(bookID = "", isRand = false, noCount = false): Promise<LockLeaseResult> {
         return this.withProgLock(constants.StartToLearnLock, async () => {
             // □2 文案梳理：删「正在为您打开文档片段」——每次出片必弹但结果自可见（片
@@ -796,7 +796,8 @@ class Progressive {
      *  打开走 startToLearnWithLock 指定书路径——与滚筒轮转/书卡续读同一条调度链
      *  （片选择/状态判定），写作侧只多一步「限定写作书集」。□4① 计数分家：点击
      *  火苗=导航回现场（tooltip「点击回到写作现场」），slot 分派不计数；material
-     *  态 tooltip 明示「点击去消化素材」，消化=读，计数保持（设计共识）。 */
+     *  态 tooltip 明示「点击去消化素材」——火苗分家（09-15 拍板）后消化/开槽一律
+     *  记 w 分池（写作活动），不再进阅读 quota。 */
     async openWritingFlameTarget() {
         try {
             const hit = await pickWritingFlameBook();
@@ -912,6 +913,10 @@ class Progressive {
                 // □2 后手动书有未锤摘抄即在册可读——能落到这=所有手动书都 0 摘抄
                 // （或全锤），给「先摘一次」对症指引，不再误报「您还没添加任何文档」
                 await siyuan.pushMsg(tomatoI18n.手动书摘抄一次后进入轮转);
+            } else if (Object.values(progStorage.booksInfos()).some(i => i?.writing && !i.ignored && !i.archived)) {
+                // 火苗分家（bear 2026-09-15）：写作书整体退出阅读滚筒——只剩写作书时
+                // 给「去写作火苗」对症指引，不再误报「您还没添加任何文档」
+                await siyuan.pushMsg(tomatoI18n.写作书不进阅读轮转);
             } else {
                 siyuan.pushMsg(tomatoI18n.您还没添加任何文档);
             }
@@ -951,12 +956,14 @@ class Progressive {
             await this.openOriginBook(bookID);
             return;
         }
-        // 期A 写作书调度（素材优先、清空转槽，设计共识 memory material-parallel-design）：
-        // 素材池（digest-书名 夹）有未读素材→推最老未读，推过即打 🔨 锤（ctime 锤前缀=
-        // 手动书完成态同款格式，读侧 queryDigestTree/DigestAllDialog 已弱化显示），
-        // 素材对标分片计数同权（鸟 09-08 模型）；池清空→activePoint 槽（期2 原行为）；
-        // 两者皆空（0 槽纯收集书空池/全定稿）=终态提示（开书给建槽/摘抄现场）。
-        // 索引恒空不走 createPiece 链
+        // 写作书调度（素材优先、清空转槽；期A 素材并行共识 material-parallel-design）
+        // ——火苗分家（bear 2026-09-15 拍板）：本分支只在指定书路径执行（写作火苗/
+        //   换书/书卡导航），滚筒路径经 roller 写作书整体排除已不可达；两侧内容仍进
+        //   同一条自建间隔重复曲线（入口分家、曲线不分家）。素材推过即打 🔨 锤
+        //   （ctime 锤前缀=手动书完成态同款格式），素材对标分片计数同权（鸟 09-08
+        //   模型）；池清空→activePoint 槽（期2 原行为）；两者皆空（0 槽纯收集书空池/
+        //   全定稿）=终态提示（开书给建槽/摘抄现场）。计数走 w 分池（火苗分家：写作
+        //   活动退出阅读 quota——欠债口径见 markWriteSafe）。索引恒空不走 createPiece 链
         if (bookInfo.writing) {
             const flat = (await queryDigestTree(bookID)).flat;
             const pieces = await fetchWritingPieces(bookID);
@@ -993,18 +1000,18 @@ class Progressive {
                 debugLog("wdispatch", `material book=${bookID} doc=${dispatch.id} ct=${dispatch.ctime}`, "progressive");
                 events.setDocID(dispatch.id);
                 await OpenSyFile2(this.plugin, dispatch.id);
-                await this.markReadSafe(bookID);
+                // w 分池（火苗分家）：素材消化=写作侧活动，退出阅读 quota——保持旧
+                // 「material 恒计数」语义但改记 w（写作火苗「今日已写」+1，阅读已读不动）
+                await this.markWriteSafe(bookID);
                 return true;
             }
             await progStorage.setActivePoint(bookID, dispatch.point);
             events.setDocID(dispatch.docID);
             await OpenSyFile2(this.plugin, dispatch.docID);
-            // 计数同权：轮到写作书开片=今日阅读 +1（与阅读书翻片同 quota 池）。补传
-            // slotPoint 锚（1530 期1 配套修正）：官方复习评分回写走同锚——双入口同锚
-            // 互斥零双计，同日重复开同 slot 不再重复计（旧语义与阅读书不对称，顺手修正）。
-            // □4①：noCount=导航入口（写作火苗「点击回到写作现场」/写作换书）——回现场
-            // 非「读了一片」，跳过计数；锚不更新无碍（滚筒/书卡路径计入时自会写锚）
-            if (!noCount) await this.markReadSafe(bookID, dispatch.point);
+            // w 分池（火苗分家）：写作书开槽退出阅读 quota 改记 w。noCount=导航入口
+            // （写作火苗「点击回到写作现场」/写作换书）——回现场非「写了一片」，跳过
+            // 计数；point=槽锚防同日重复点书卡刷「今日已写」（review P1-1）
+            if (!noCount) await this.markWriteSafe(bookID, dispatch.point);
             return true;
         }
         // □1 目录书：出场前校验卷表新鲜度（卷增删/重排→按卷 id 重组索引+point 映射；
@@ -1265,7 +1272,7 @@ class Progressive {
     }
 
     /** 已读记账；附属动作失败只降级不阻断开片。routemap □1：point=前进后的新 point，
-     * 传给 roller 当日去重锚（回看后再前进到旧高度不重复计） */
+     *  传给 roller 当日去重锚（回看后再前进到旧高度不重复计） */
     private async markReadSafe(bookID: string, point?: number) {
         try {
             await rollerMarkRead(bookID, point);
@@ -1273,6 +1280,20 @@ class Progressive {
             notifyFleetChanged(); // □6 火苗/面板即时联动（fleet.ts 不 import 本类，单向无环）
         } catch (e) {
             console.error("roller markRead failed", e);
+        }
+    }
+
+    /** 写作活动记账（火苗分家 2026-09-15 拍板：写作书开槽/素材消化退出阅读 quota
+     *  改记 w 分池——阅读欠债/已读不再含写作活动，重度写作用户欠债数字变小=预期；
+     *  写作火苗「今日已写」数据源；纯写作日不背阅读债=review P0 修）。附属动作同
+     *  markReadSafe 只降级不阻断；point=槽锚（同日同槽不重复计，review P1-1） */
+    private async markWriteSafe(bookID: string, point?: number) {
+        try {
+            await rollerMarkWrite(bookID, point);
+            invalidateTailToday();
+            notifyFleetChanged();
+        } catch (e) {
+            console.error("roller markWrite failed", e);
         }
     }
 

@@ -45,6 +45,7 @@ type TomatoSettings = {
     cardBoxReviewDocMenu: boolean,
     refCleanMenu: boolean,
     prefixArticlesTagsShow: boolean,
+    prefixArticlesTagsGroup: boolean,
     fastNoteBoxDocPrefix: boolean,
     foldTypesNODE_listITEM: boolean,
     dailyNoteMoveLeaveLnk: boolean,

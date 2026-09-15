@@ -9,7 +9,7 @@ import FleetFlame from "./FleetFlame.svelte";
 import WritingFlame from "./WritingFlame.svelte";
 import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
-import { rollerDebtSummary, rollerTodayReads, type DebtSummary } from "./roller";
+import { rollerDebtSummary, rollerTodayWrites, type DebtSummary } from "./roller";
 import { pickWritingFlameBook } from "./writeBook";
 import { latestVisitNoteOfBook } from "./visitNoteQuery";
 import { progStorage } from "./ProgressiveStorage";
@@ -119,8 +119,8 @@ export async function refreshPanel() {
 }
 
 /** □5 写作火苗刷新：书选择走 pickWritingFlameBook（与打开侧共用防漂移）；
- *  今日已写=DayLogData.b 中写作书集合的计数求和（滚筒对写作书计数同权，此处只是
- *  拆出独立显示，不改记账）。并发闸与 refreshPanel 同款（review P2-1：防慢旧轮
+ *  今日已写=DayLogData.w 中写作书集合的计数求和（火苗分家 w 分池：写作活动
+ *  独立记账，不进阅读 quota 池 b）。并发闸与 refreshPanel 同款（review P2-1：防慢旧轮
  *  在新轮 set(null) 后回写旧值）。槽标题查失败回落 [point]（review P2-3：null 严格
  *  留给「真无未定稿槽」，tooltip 文案分叉依赖它） */
 let wrefreshing = false;
@@ -133,8 +133,10 @@ export async function refreshWritingFlame() {
             writingFlameState.set(null);
             return;
         }
-        const reads = await rollerTodayReads();
+        const reads = await rollerTodayWrites();
         const infos = progStorage.booksInfos();
+        // w 分池（火苗分家）：写作活动改记 DayLogData.w（退出阅读 quota 池 b）——
+        // 写作书求和口径不变只换数据源；老块无 w 读作 {}，数字从今日起重新累积
         const today = Object.entries(infos).reduce((s, [id, info]) =>
             info?.writing && !info.ignored && !info.archived && progStorage.isRegisteredBook(id)
                 ? s + (reads[id] ?? 0) : s, 0);

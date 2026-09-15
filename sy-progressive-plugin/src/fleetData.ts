@@ -223,7 +223,7 @@ export function filterFleetBooks(books: FleetBook[], kw: string): FleetBook[] {
 
 // ============ 生产侧（真实 siyuan/storage） ============
 
-import { rollerAllDays, rollerTodayReads } from "./roller";
+import { rollerAllDays, rollerTodayReads, rollerTodayWrites } from "./roller";
 
 function quotaNum(): number {
     return Number(dailyQuota.get()) || 3;
@@ -244,14 +244,18 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
 
     // attributes 反查显式 limit：内核对外层无 LIMIT 的 SELECT 套 Search.Limit（默认 64）
     // 静默截尾——✒ctime/✱think/✧review 三源 >64 篇即漏徽章（getDocRowsByName 同款防线）
-    const [ctimeRows, thinkRows, pdigestRows, allDays, ro, todayReads] = await Promise.all([
+    const [ctimeRows, thinkRows, pdigestRows, allDays, ro, todayReads, todayWrites] = await Promise.all([
         siyuan.sql(`select block_id, value from attributes where name='${PDIGEST_CTIME}' limit 10000000`) as Promise<any[]> ?? [],
         siyuan.sql(`select root_id, value from attributes where name='${ReviewKey}' limit 10000000`) as Promise<any[]> ?? [],
         siyuan.sql(`select root_id, value from attributes where name='${PdigestReviewKey}' limit 10000000`) as Promise<any[]> ?? [],
         rollerAllDays(),
         progStorage.loadReadingOrder(),
         rollerTodayReads(),
+        rollerTodayWrites(),
     ]);
+    // w 分池（火苗分家）：写作书「今日点」换写作活动计数（b 不再记写作书，防数字
+    // 归零）；非写作书条目不受影响
+    for (const id of ids) if (infos[id]?.writing) todayReads[id] = todayWrites[id] ?? 0;
 
     // 书名：bookName 缓存优先，缺失的一次 SQL 兜底（书被改名以 SQL 为准）
     const names: { [bookID: string]: string } = {};

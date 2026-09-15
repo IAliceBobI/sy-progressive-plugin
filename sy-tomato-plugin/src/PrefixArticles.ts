@@ -1,4 +1,5 @@
 import { DestroyManager } from "./libs/destroyer";
+import { BaseTomatoPlugin } from "./libs/BaseTomatoPlugin";
 import { getDocTracer } from "./libs/docUtils";
 import { events } from "./libs/Events";
 import { getTomatoPluginInstance, siyuan } from "./libs/utils";
@@ -10,12 +11,20 @@ import { tomatoI18n } from "./tomatoI18n";
 import PrefixArticles from "./PrefixArticles.svelte"
 import { newID } from "stonev5-utils";
 import { adaptHotkey, Dialog } from "siyuan";
-import { prefixArticlesEnable, prefixArticlesMenu, prefixArticlesSoftLimit } from "./libs/stores";
+import { prefixArticlesEnable, prefixArticlesMenu, prefixArticlesSoftLimit, prefixArticlesTagsShow } from "./libs/stores";
 import { matchPart, nameParts } from "./libs/prefixUtils";
 import { mount, unmount } from "svelte";
 import PrefixArticleParts from "./PrefixArticleParts.svelte"
 export const PrefixArticles前缀文档树 = winHotkey("shift+alt+g", "前缀文档树", "iconSort", () => tomatoI18n.前缀文档树, false, prefixArticlesMenu)
 export const PrefixArticlesDock = winHotkey("shift+alt+F5", "PrefixArticlesDock", "iconFiles", () => tomatoI18n.前缀文档树, false, prefixArticlesMenu)
+// Tags 窗开关命令（tagsdecouple □2）：⇧⌥F6 与前缀树 dock（⇧⌥F5）成族；与面板 Tags 钮、窗 X 钮
+// 同源 toggle prefixArticlesTagsShow（write 落盘）。不传 menu 族开关——该命令无右键菜单消费点，
+// 族开关语义=「前缀树右键菜单条目显隐」，挂它反而制造「关右键菜单=状态栏钮失联」意外（review P2）
+export const PrefixArticlesTags = winHotkey("shift+alt+F6", "PrefixArticlesTags", "iconTags", () => tomatoI18n.标签悬浮窗)
+
+function toggleTagsWin() {
+    prefixArticlesTagsShow.write(!prefixArticlesTagsShow.get());
+}
 
 // Tags 窗独立挂载（tagsdecouple □1）：body 直挂自持组件，不再随 dock 面板子树 mount/unmount——
 // 面板关掉/隐藏时窗仍在（bear 拍板「它们俩应该是独立的」）；显隐纯由 prefixArticlesTagsShow
@@ -31,6 +40,39 @@ export function prefixArticlesOnunload() {
         unmount(tagsSvelte);
         tagsSvelte = null;
     }
+    removeTagsStatusBarBtn();
+}
+
+// 状态栏 Tags 钮（tagsdecouple □2）：点击 toggle 窗（与快捷键/面板钮同源）；窗开着时主色点亮
+// （无官方 active 类，store 订阅切 color——同面板 Tags 钮 --on 语义）
+let tagsBtnEl: HTMLElement | null = null;
+let tagsBtnUnsub: (() => void) | null = null;
+function addTagsStatusBarBtn(plugin: BaseTomatoPlugin) {
+    if (tagsBtnEl) return; // 幂等防叠挂（与 mountArticleParts 对称；双挂会覆盖 unsub 句柄泄漏旧订阅）
+    const label = PrefixArticlesTags.langText() + " " + PrefixArticlesTags.w();
+    const tmp = document.createElement("template");
+    tmp.innerHTML = `<div class="toolbar__item ariaLabel" role="button"><svg><use xlink:href="#${PrefixArticlesTags.icon}"></use></svg></div>`;
+    const el = tmp.content.firstElementChild as HTMLElement;
+    // w() 读 keymap custom（用户可改键）——label 走 setAttribute 天然转义，勿拼进 innerHTML（review P2）
+    el.setAttribute("aria-label", label);
+    el.addEventListener("click", () => toggleTagsWin());
+    plugin.addStatusBar({ element: el, position: "left" });
+    tagsBtnEl = el;
+    tagsBtnUnsub = prefixArticlesTagsShow.subscribe((on) => {
+        tagsBtnEl?.style.setProperty("color", on ? "var(--b3-theme-primary)" : "");
+    });
+}
+function removeTagsStatusBarBtn() {
+    tagsBtnUnsub?.();
+    tagsBtnUnsub = null;
+    if (tagsBtnEl) {
+        tagsBtnEl.remove();
+        // addStatusBar 只 push 不移除（TomatoClock 同坑）：同步摘注册防 detached 节点驻留
+        const arr = (getTomatoPluginInstance() as any).statusBarIcons as Element[];
+        const i = arr?.indexOf(tagsBtnEl) ?? -1;
+        if (i >= 0) arr.splice(i, 1);
+        tagsBtnEl = null;
+    }
 }
 
 /** □4 时序统一：index.async onload 已 await taskCfg（框架保序），双路竞态消化退役 */
@@ -39,8 +81,10 @@ export function initPrefixArticles() {
     if (prefixArticlesEnable.get()) {
         if (!events.isMobile) {
             addDock();
+            // 移动端不常驻（review P1-2）：90vw×70vh 窗盖编辑区且移动端无 dock=无 Tags 钮
+            // 入口，X 关闭曾是会话级=「重启复现」观感；桌面常驻语义先行，移动端形态待立项
+            mountArticleParts();
         }
-        mountArticleParts();
         // plugin.addCommand({
         //     langKey: PrefixArticlesAllParts.langKey,
         //     langText: PrefixArticlesAllParts.langText(),
@@ -57,6 +101,18 @@ export function initPrefixArticles() {
                 findArticlesByPrefix(name, docID);
             },
         });
+        if (!events.isMobile) {
+            // Tags 窗开关通道（tagsdecouple □2）：窗仅桌面 mount，命令/状态栏钮同步桌面限定
+            // （移动端注册=点了无效果死钮）。callback 非 editorCallback——窗不依赖编辑器
+            gatedAddCommand(plugin, PrefixArticlesTags.langKey, {
+                langText: PrefixArticlesTags.langText(),
+                hotkey: PrefixArticlesTags.m,
+                callback: () => {
+                    toggleTagsWin();
+                },
+            });
+            addTagsStatusBarBtn(plugin);
+        }
         plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
             addIfVisible(menu, PrefixArticles前缀文档树.langKey, {

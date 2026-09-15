@@ -17,7 +17,7 @@ import { MarkKey, PDIGEST_CTIME, TEMP_CONTENT } from "../../sy-tomato-plugin/src
 import { progStorage } from "./ProgressiveStorage";
 import * as constants from "./constants";
 import { lockWithLease } from "./lockLease";
-import { mergeMissingBooks, rollerMarkRead, rollerTodayReads, rollerTodayRevisits, rollerCountRevisit } from "./roller";
+import { mergeMissingBooks, rollerMarkRead, rollerMarkWrite, rollerTodayReads, rollerTodayRevisits, rollerCountRevisit } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
 import { queryDigestTree } from "./digestUtils";
@@ -331,6 +331,18 @@ async function markReadAndNotify(bookID: string, point?: number) {
     }
 }
 
+/** 写作侧同款三件（火苗分家 w 分池：素材锤/槽片评分退出阅读 quota 改记 w——
+ *  写作火苗「今日已写」数据源；point=槽锚防同日重复计） */
+async function markWriteAndNotify(bookID: string, point?: number) {
+    try {
+        await rollerMarkWrite(bookID, point);
+        invalidateTailToday();
+        notifyFleetChanged();
+    } catch (e) {
+        console.error("roller markWrite failed", e);
+    }
+}
+
 /** lastServed 回流（公平轮转双入口一致） */
 async function saveLastServed(bookID: string) {
     if (!bookID) return;
@@ -370,9 +382,10 @@ async function reconcileCurveRound(c: CurvePlanCard, st: NonNullable<ReturnType<
         firstPush = isMaterialFirstPush(c.kind, st, ct);
         if (firstPush) {
             if (ct && !ct.startsWith("🔨")) {
-                // 锤+计已读一体（已锤=编辑器分派链已 markReadSafe，双入口一账不双计）
+                // 锤+计写作一体（已锤=编辑器分派链已 markWriteSafe，双入口一账不双计；
+                // w 分池=火苗分家：素材消化退出阅读 quota）
                 await siyuan.setBlockAttrs(c.blockID, { [PDIGEST_CTIME]: `🔨#${ct}` } as any);
-                await markReadAndNotify(c.bookID);
+                await markWriteAndNotify(c.bookID);
             }
             await saveLastServed(c.bookID);
         }
@@ -407,7 +420,7 @@ async function reconcileCurveRound(c: CurvePlanCard, st: NonNullable<ReturnType<
         await setReadingDues([{ id: c.blockID, due: cr.due }]);
     }
     debugLog("readcurve", `consumed ${c.kind} ${c.blockID} → ${cr.value}${cr.graduated ? " (graduated)" : ""}`, "progressive");
-    return firstPush ? 0 : 1;  // 首推=书池已计（markRead），rc 只数重现轮次
+    return firstPush ? 0 : 1;  // 首推=w 池已计（markWrite，火苗分家），rc 只数重现轮次
 }
 
 /** 已评分卡对账（isRated=身份键水位线判据，进程重启丢基线也幂等——对完即摘，
@@ -446,12 +459,13 @@ async function reconcileRated(rated: CurvePlanCard[], notifyGrad = false): Promi
                 const ct = String((attrs as any)?.[PDIGEST_CTIME] ?? "");
                 if (ct && !ct.startsWith("🔨")) {
                     await siyuan.setBlockAttrs(c.blockID, { [PDIGEST_CTIME]: `🔨#${ct}` } as any);
-                    await markReadAndNotify(c.bookID);
+                    await markWriteAndNotify(c.bookID);
                 }
                 await saveLastServed(c.bookID);
             } else if (c.kind === "slot" && c.point != null && info) {
-                // 槽片：评分≠定稿不前进，slotPoint 锚防同 slot 重复计；持续为下一片直到定稿
-                await markReadAndNotify(c.bookID, c.point);
+                // 槽片：评分≠定稿不前进，持续为下一片直到定稿（w 分池=火苗分家：
+                // 写作书槽片评分退出阅读 quota；c.point=槽锚防同日重复计）
+                await markWriteAndNotify(c.bookID, c.point);
                 await saveLastServed(c.bookID);
             }
             await removeReadingCards([c.blockID]);
