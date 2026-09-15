@@ -42,6 +42,8 @@ import { PROG_FLOAT_ICONS } from "./progIcons";
 import { initDigestMarker } from "./digestMarker";
 import { initMaterialMarker } from "./materialMarker";
 import { initMaterialTrace } from "./materialTrace";
+import { onMatopsWsMain } from "./matManualOps";
+import { onPoolStampWsMain } from "./poolStampOps";
 import { applyRevTraceEnabled, lastRevTraceScope, rememberRevTraceScope } from "./revTrace";
 import { initFleet, onunloadFleet, type FleetActions } from "./fleet";
 import { setBookVisitFreq } from "./readCurve";
@@ -162,6 +164,13 @@ function loadStore(plugin: BaseTomatoPlugin) {
 
 export default class ThePlugin extends BaseTomatoPlugin {
     private blockIconEventBindThis = this.blockIconEvent.bind(this);
+    // manualops □1 剪贴自动记账：ws 事务监听（记账员被动旁路，吞错不打扰编辑主链）。
+    // ⚠ eventBus 监听器收的是 CustomEvent——detail 须解构取（裸取首参=event 本体，
+    // detail?.cmd 恒 undefined 静默早退，probe5~8 三轮才定位）
+    private matopsWsBindThis = ({ detail }: any) => {
+        void onMatopsWsMain(detail);
+        void onPoolStampWsMain(detail); // loosemat □6：文档级 moveDocs/create 池盖章
+    };
 
     // 开/关箱即时失效判定链缓存（否则 30s TTL 窗口内书卡状态陈旧：开箱后误报
     // 「笔记本已关闭」、关箱后书卡仍可点）并联动舰队面板刷新
@@ -516,6 +525,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
         this.eventBus.on(EventType.click_blockicon, this.blockIconEventBindThis);
         this.eventBus.on(EventType.opened_notebook, this.notebookChangedEventBindThis);
         this.eventBus.on(EventType.closed_notebook, this.notebookChangedEventBindThis);
+        // manualops □1：原生剪贴/拖块进槽自动补血缘（ws-main 事务广播配对；插件自身
+        // setBlockAttrs 只广播 updateAttrs 族——txView 三簇不认，无自吞回声）。
+        // loosemat □6：同订阅复用——文档级 moveDocs/create 广播池盖章（住进池夹=素材）
+        this.eventBus.on(EventType.ws_main, this.matopsWsBindThis);
 
         // 顶栏设置火苗（topbar-logo 战役返工，与状态栏火苗同源=插件身份标识）：挂类着 --prog-topbar
         // 家族琥珀色（recite 顶栏 icon 挂 .recite-topbar-gear 同款机制——线稿 stroke:currentColor

@@ -3,13 +3,13 @@
 // 纯函数核=src/structureCore.ts（kernel 直接 import，splitCore 先例）；常量本地声明防拖
 // 前端依赖链（bookConvertIo MarkKey 先例，改源头须同步）。
 // 四分叉定案（计划档 docs/superpowers/plans/2026-09-13-progtree-structure-mcp.md）：
-// 素材身份=ctime 归属、槽身份=MarkKey、sacred=有非素材实质块、位置四档只报告不误动。
+// 素材身份=ctime 归属、槽身份=MarkKey、sacred=含手写内容（用户原创保护，manualops 翻转定案）、位置四档只报告不误动。
 import * as api from "./api";
 import { readBooksInfos } from "./progData";
 import { runExclusive, readVolTable } from "./bookMapIo";
 import { volOffsets } from "../volIndex";
 import {
-    planStructureActions, slotNameFromTitle, BOOK_ROOT_ID,
+    planStructureActions, slotNameFromTitle, deriveSlotGuard, blocksToSlotText, planSlotReadPage, composeTitle, BOOK_ROOT_ID,
     type StructSlot, type StructMaterial, type SkeletonNode, type Placement, type StructureDiff,
 } from "../structureCore";
 
@@ -26,7 +26,8 @@ export const DISTILL_HEADING_LIMIT = 300;
 
 function log(msg: string) { void siyuan.logger.info("[progtree]", msg); }
 
-/** 六锚值（复刻自前端 progData.getDocIal*：digestdir×3/words/编译成稿×2——改源头须同步） */
+/** 七锚值（复刻自前端 progData.getDocIal*：digestdir×3/words/编译成稿×2/AI 成稿——
+ *  改源头须同步。composedoc=loosemat □7 成文产物，多稿并存） */
 function anchorValues(bookID: string): string[] {
     return [
         `digestdir#${TEMP_CONTENT}#${bookID}`,
@@ -35,6 +36,7 @@ function anchorValues(bookID: string): string[] {
         `words#${TEMP_CONTENT}#${bookID}`,
         `newBookDoc#${TEMP_CONTENT}#${bookID}`,
         `allInOneKeysDoc#${TEMP_CONTENT}#${bookID}`,
+        `composedoc#${TEMP_CONTENT}#${bookID}`,
     ];
 }
 
@@ -42,7 +44,7 @@ function anchorValues(bookID: string): string[] {
 async function excludedIDs(bookID: string): Promise<Set<string>> {
     const anchors = anchorValues(bookID);
     const rows = await api.sql<{ block_id: string }>(
-        `select block_id from attributes where name='${MarkKey}' and value in (${anchors.map(a => `'${a}'`).join(",")}) limit 100`) ?? [];
+        `select block_id from attributes where name='${MarkKey}' and value in (${anchors.map(a => `'${a}'`).join(",")}) limit 10000000`) ?? [];
     return new Set(rows.map(r => String(r.block_id)));
 }
 
@@ -69,24 +71,21 @@ function isSubstanceChildKernel(c: any): boolean {
     return true;
 }
 
-/** 槽 sacred+素材计数：实质子块 ∉ 素材块集合（MATERIAL_KEY SQL 一发）→ sacred。
- *  materialCount=素材**篇数**（血缘值去重——复评 P2-B：逐块散挂后按块数计会让一篇
- *  10 块素材算 10，与胶囊形态「一篇一锚」语义漂移）。拉取失败按 sacred=true——
- *  保护性判定 fail-safe（宁可误拦不误挪） */
-async function slotGuardState(docID: string): Promise<{ sacred: boolean; materialCount: number }> {
+/** 槽守卫：sacred=含手写实质块（用户原创=默认保护）+ 素材篇数 + 手写块数（判定核=
+ *  structureCore.deriveSlotGuard 同源）。拉取失败按 sacred=true——保护性判定
+ *  fail-safe（宁可误拦不误挪，翻转后语义=误保护优于误动用户原创） */
+async function slotGuardState(docID: string): Promise<{ sacred: boolean; materialCount: number; handwrittenCount: number }> {
     const children = await api.getChildBlocks(docID).catch(() => null);
-    if (children == null) return { sacred: true, materialCount: 0 };
+    if (children == null) return { sacred: true, materialCount: 0, handwrittenCount: 0 };
     const substance = (children ?? []).filter(isSubstanceChildKernel).map(c => String(c.id));
-    if (!substance.length) return { sacred: false, materialCount: 0 };
+    if (!substance.length) return { sacred: false, materialCount: 0, handwrittenCount: 0 };
     const inList = substance.map(i => `'${i}'`).join(",");
     const rows = await api.sql<{ block_id: string; value: string }>(
         `select block_id, value from attributes where name='${MATERIAL_KEY}' and block_id in (${inList}) limit 10000000`) ?? [];
-    const matSet = new Set(rows.map(r => String(r.block_id)));
-    const lineageCount = new Set(rows.map(r => String(r.value ?? ""))).size;
-    return { sacred: substance.some(id => !matSet.has(id)), materialCount: lineageCount };
+    return deriveSlotGuard(substance, rows);
 }
 
-/** 拉写作书结构槽现状（树权威+判定层：done/marked/sacred/素材计数；每次实拉无缓存）。
+/** 拉写作书结构槽现状（树权威+判定层：done/marked/sacred/素材篇数/手写块数；每次实拉无缓存）。
  *  带本书 ctime 的文档=素材不是槽（分叉 3 定案「槽下无 ctime 文档=结构」反推；
  *  review P1-3：书根直属素材混进槽列表会冒名骨架同名节点→该分支动作全被误拦） */
 export async function fetchStructureSlots(bookID: string, withGuard = true): Promise<StructSlot[]> {
@@ -101,7 +100,7 @@ export async function fetchStructureSlots(bookID: string, withGuard = true): Pro
     const flat: StructSlot[] = [];
     const walk = (list: TreeNode[], parentID: string, depth: number) => {
         for (const n of list) {
-            flat.push({ docID: n.row.id, title: slotNameFromTitle(n.row.name), depth, parentID, done: false, sacred: false, marked: false, materialCount: 0 });
+            flat.push({ docID: n.row.id, title: slotNameFromTitle(n.row.name), depth, parentID, done: false, sacred: false, marked: false, materialCount: 0, handwrittenCount: 0 });
             walk(n.children, n.row.id, depth + 1);
         }
     };
@@ -121,6 +120,7 @@ export async function fetchStructureSlots(bookID: string, withGuard = true): Pro
             const g = await slotGuardState(s.docID);
             s.sacred = g.sacred;
             s.materialCount = g.materialCount;
+            s.handwrittenCount = g.handwrittenCount;
         }
     }
     return flat;
@@ -163,7 +163,7 @@ export async function collectMaterials(
 export function buildSlotTree(slots: StructSlot[]): Record<string, any>[] {
     const byParent = new Map<string, { slot: StructSlot; node: Record<string, any> }[]>();
     for (const s of slots) {
-        const entry = { slot: s, node: { title: s.title, docID: s.docID, done: s.done, sacred: s.sacred, marked: s.marked, materialCount: s.materialCount, children: [] as Record<string, any>[] } };
+        const entry = { slot: s, node: { title: s.title, docID: s.docID, done: s.done, sacred: s.sacred, marked: s.marked, materialCount: s.materialCount, handwrittenCount: s.handwrittenCount, children: [] as Record<string, any>[] } };
         const list = byParent.get(s.parentID) ?? [];
         list.push(entry);
         byParent.set(s.parentID, list);
@@ -273,8 +273,8 @@ export interface PlanResult {
 const PLAN_HINT = [
     "结构管道契约：本工具给素材与现状，你（AI）归纳骨架 [{title, children?}] 与归位表 [{materialID, slotPath}]（slotPath=骨架标题路径，/ 分隔）。",
     "把骨架+归位表回传 structure_plan 做预演（返回动作清单不落盘），与用户确认后 structure_apply 执行。",
-    "增量铁律：不删槽/不重排既有顺序/不改名；有正文槽(sacred)与已定稿槽只报告不动；素材归位=内容搬进槽+删源（可拖回思源原生兜底）。",
-    "缺口=空槽（materialCount=0）；location=inSlot=用户已手动挂进结构（既成事实，不自动处理）。",
+    "增量铁律：不删槽/不重排既有顺序/不改名；含手写内容的槽(sacred=用户原创，默认保护，AI 不动其结构)与已定稿槽只报告不挪不入；素材归位=内容搬进槽+删源（可拖回思源原生兜底）。",
+    "盘点平权：每槽 materialCount=素材篇数（血缘去重）、handwrittenCount=手写块数（用户原创，与素材同为正当公民）；缺口=空槽（materialCount=0）；location=inSlot=用户已手动挂进结构（既成事实，不自动处理）。",
 ].join("");
 
 /** structure_plan（纯读两模式）：盘点（无 slots）=素材页+槽树+缺口；预演（带 slots）=增量动作清单 */
@@ -456,4 +456,142 @@ export async function structureDistill(input: { docID?: string; bookID?: string;
         kind: "book", bookID, vols: out,
         hint: "叙事骨架=卷结构+片标题序列。给 AI 做写作骨架参考；titles 即该片文件名（含 [NNNNN] 序号=阅读序）。",
     };
+}
+
+// ============ loosemat □7 成文整理：读面（structure_read）/写面（structure_compose） ============
+
+/** 槽读预算/次（≈15k token；整槽装到为止分页，nextOffset 续读） */
+export const READ_CHAR_BUDGET = 60_000;
+/** 单文档读取硬顶（巨文档分篇；distill 300 标题上限同族不对称补齐——review P2-2） */
+export const DOC_READ_CHAR_LIMIT = 500_000;
+/** 成稿单次字符上限（防巨 payload 单事务；长稿分节 appendTo 续写） */
+export const COMPOSE_CHAR_LIMIT = 100_000;
+
+/** 读闪烁重试（getBlockAttrs 空 map/null 两形态同病——poolStampOps.stampOne 先例；
+ *  review P1-2：验真读失败零重试会把已成功的写误报失败→AI 重试=重复落稿） */
+async function attrsWithRetry(id: string): Promise<Record<string, string> | null> {
+    let a = await api.getBlockAttrs(id).catch(() => null);
+    if (a == null || Object.keys(a).length === 0) {
+        await new Promise(r => setTimeout(r, 250));
+        a = await api.getBlockAttrs(id).catch(() => null);
+    }
+    return a;
+}
+
+const COMPOSE_HINT = [
+    "成稿=书下独立文档（不挂素材血缘、不占槽位、不进消化调度——血缘断就断，bear Q2 拍板）。",
+    "继续写=再调 structure_compose 带 appendTo=本 docID（只认本书成稿）；不满意在思源里直接改（普通文档）。",
+    "structure_read 可再取槽全文；structure_apply 照旧只管素材搬运，永不动成稿与手写。",
+].join("");
+
+/** structure_read（纯读）：docID 模式=单文档全文（槽/素材/手写皆可——改写原料）；
+ *  列表模式=槽序预算分页。全槽文本逐发拉（写作书槽量级人建，几十发可忍；改写场景
+ *  低频）。withGuard=false——sacred 计数面 structure_plan 已给，读面只要内容 */
+export async function structureRead(
+    bookID: string,
+    opts: { docID?: string; offset?: number } = {},
+): Promise<Record<string, any>> {
+    const guard = await structureBookGuard(bookID);
+    if (typeof guard === "string") throw new Error(guard);
+    if (opts.docID != null && String(opts.docID).trim()) {
+        const docID = String(opts.docID).trim();
+        if (!BLOCK_ID_RE.test(docID)) throw new Error(`docID 形态非法：${docID.slice(0, 40)}`);
+        const blocks = await api.getChildBlocks(docID).catch(() => null);
+        if (blocks == null) throw new Error(`文档不可读（docID=${docID}——槽/素材/手写文档 id 皆可）`);
+        if (!blocks.length) {
+            // 内核对不存在 id 返 code 0+[]（review P2-2）——补一发存在性甄别：真空文档放行
+            const info = await api.getBlockInfo(docID).catch(() => null);
+            if (!info?.box) throw new Error(`文档不存在（docID=${docID}）——内核对 bogus id 返空集不可与真空文档分`);
+        }
+        const text = blocksToSlotText(blocks);
+        if (text.length > DOC_READ_CHAR_LIMIT) {
+            throw new Error(`文档 ${text.length} 字符超单文档读取上限 ${DOC_READ_CHAR_LIMIT}——先在思源里分篇再逐篇取`);
+        }
+        return {
+            mode: "doc", bookID, docID,
+            doc: { docID, text, chars: text.length },
+            hint: "单文档全文（纯文本+标题层级标注）。改写原料面：槽/素材/手写皆可取。",
+        };
+    }
+    const slots = await fetchStructureSlots(bookID, false);
+    const offset = Math.max(0, Math.floor(Number(opts.offset ?? 0) || 0));
+    // 惰性拉取（review P2-1）：从 offset 起拉到预算必够即停（分页只会消费到首个超预算槽），
+    // 深页不再 O(全书)；单槽读失败=哨兵文本进页（AI 知情可重试，勿静默当空槽）
+    const texts = new Map<string, string>();
+    let cum = 0;
+    for (let i = offset; i < slots.length && cum <= READ_CHAR_BUDGET; i++) {
+        const blocks = await api.getChildBlocks(slots[i].docID).catch(() => null);
+        const t = blocks == null ? "（槽文本读取失败——重试，或用 docID 单文档模式取本槽）" : blocksToSlotText(blocks);
+        texts.set(slots[i].docID, t);
+        cum += t.length;
+    }
+    const page = planSlotReadPage(slots, texts, READ_CHAR_BUDGET, offset);
+    return {
+        mode: "slots", bookID,
+        totalSlots: slots.length,
+        slots: page.included.map(s => ({ docID: s.docID, title: s.title, chars: s.chars, text: s.text })),
+        nextOffset: page.nextOffset,
+        truncated: page.truncated,
+        hint: `槽内容全文（素材+手写一视同仁，纯文本+标题层级标注）${page.nextOffset != null ? `；预算分页——带 offset=${page.nextOffset} 取下页` : "（全量到此）"}${page.truncated ? "；本页单槽超预算独占返回" : ""}。改写完用 structure_compose 落成稿。`,
+    };
+}
+
+/** structure_compose（写）：书下建成稿文档（composedoc 锚=编译产物同族排除，多稿并存
+ *  迭代起草）；appendTo=续写既有成稿（守卫：只认本书 composedoc 锚——防误写槽/无辜
+ *  文档）。成稿块不挂 MATERIAL_KEY。写后验真=锚复核读/新块 id 可读+块数增长 */
+export async function structureCompose(
+    bookID: string,
+    input: { title?: string; markdown: string; appendTo?: string },
+): Promise<Record<string, any>> {
+    const guard = await structureBookGuard(bookID);
+    if (typeof guard === "string") throw new Error(guard);
+    const markdown = String(input.markdown ?? "").trim();
+    if (!markdown) throw new Error("markdown 必填：成稿正文（Markdown 文本）");
+    if (markdown.length > COMPOSE_CHAR_LIMIT) {
+        throw new Error(`markdown 超 ${COMPOSE_CHAR_LIMIT} 字符上限（收到 ${markdown.length}）——分节写：首次 compose 落首节，后续带 appendTo=返回的 docID 逐节续写`);
+    }
+    const composeAnchor = `composedoc#${TEMP_CONTENT}#${bookID}`;
+    return runExclusive(bookID, async () => {
+        if (input.appendTo != null && String(input.appendTo).trim()) {
+            const target = String(input.appendTo).trim();
+            if (!BLOCK_ID_RE.test(target)) throw new Error(`appendTo 形态非法：${target.slice(0, 40)}`);
+            const attrs = await attrsWithRetry(target);
+            if (!attrs) throw new Error(`续写目标不可读（appendTo=${target}）`);
+            if (attrs[MarkKey] !== composeAnchor) throw new Error("appendTo 只认本书成稿文档（structure_compose 返回的 docID）——槽/手写文档不接受续写");
+            // 一发严格读兼取基线与尾块（review P1-1：getDocLastID 读失败坍缩空串会静默
+            // 头插进既有成稿顶——失败在写前上抛=重试安全）
+            const rows = await api.getChildBlocks(target);
+            const before = rows.length;
+            const tail = rows.at(-1)?.id ?? "";
+            const tx = await api.insertBlock(target, markdown, "markdown", tail);
+            const newID = String(tx?.[0]?.doOperations?.[0]?.id ?? "");
+            const verify = newID ? await api.getBlockAttrs(newID).catch(() => null) : null;
+            const afterRows = await api.getChildBlocks(target).catch(() => null);
+            const after = afterRows?.length ?? 0;
+            if (!verify || after <= before) throw new Error("续写落盘验真失败（新块不可读或块数未增——重试或查内核日志）");
+            log(`structureCompose append book=${bookID} doc=${target} chars=${markdown.length}`);
+            return { bookID, docID: target, appended: true, chars: markdown.length, blockCount: after, hint: COMPOSE_HINT };
+        }
+        const shell = await api.getBlockInfo(bookID).catch(() => null);
+        if (!shell?.box || !shell?.path) throw new Error(`书壳不可读（bookID=${bookID}）`);
+        const box = String(shell.box);
+        const bookHPath = await api.getHPathByID(bookID, box);
+        if (!bookHPath) throw new Error("拿不到书可读路径（getHPathByID 空）");
+        const title = composeTitle(guard.bookName, input.title, Date.now());
+        let path = `${bookHPath}/${title}`;
+        if ((await api.getIDsByHPath(box, path)).length > 0) path = `${path}-${Date.now()}`;
+        const docID = await api.createDocWithMd(box, path, markdown);
+        if (!docID) throw new Error(`建成稿失败（path=${path}）`);
+        await api.setBlockAttrs(docID, { [MarkKey]: composeAnchor });
+        const after = await attrsWithRetry(docID);
+        if (after?.[MarkKey] !== composeAnchor) {
+            // review P1-2：闪烁误报会引导重试=时间戳后缀重复建稿留孤儿——终验失败时
+            // best-effort 删己（doc 刚建无子树，removeDocByID 安全）再上抛
+            await api.removeDocByID(docID).catch(() => { });
+            throw new Error(`成稿锚落盘验真失败（docID=${docID}，已回收半成品）`);
+        }
+        await appendSlotToEnd(box, docID, bookID);
+        log(`structureCompose create book=${bookID} doc=${docID} title=${title} chars=${markdown.length}`);
+        return { bookID, docID, title, hpath: path, appended: false, chars: markdown.length, hint: COMPOSE_HINT };
+    });
 }

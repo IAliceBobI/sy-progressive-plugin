@@ -9,7 +9,7 @@
 import { MarkKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
-import { getDocIalPieces, getDocIalDigestDir, getDocIalDigestDirUnder, getDocIalDigestDirHub, getDocIalWords, getDocIalNewBookKey, getDocIalAllInOneKey, freshCreatedIDFor } from "./progData";
+import { getDocIalPieces, getDocIalDigestDir, getDocIalDigestDirUnder, getDocIalDigestDirHub, getDocIalWords, getDocIalNewBookKey, getDocIalAllInOneKey, getDocIalComposeDoc, freshCreatedIDFor } from "./progData";
 import { parseWritingPieceRows } from "./writeBook";
 
 /** listDocsByPath 行子集（树拉取只认这四个字段，防响应形态耦合） */
@@ -78,20 +78,21 @@ export function slotMarkValue(bookID: string): string {
 
 // ============ IO 段（树权威读写；行为由 e2e/手验覆盖） ============
 
-/** 白名单六锚（书下系统文档）：主力池夹+under/hub 方向夹+words+编译成稿 merged+
- *  多合一键词笔记；锚值挂 MarkKey（ensureAnchoredDoc 通道，位置无关认回——池夹被
- *  手挪后照样认得）。P0-1：编译产物锚不在册则成稿变身槽（书永不退役+懒补标覆写锚
- *  重复建稿）。P1-5 fail-open 兜底：attributes 索引滞后/故障时并入 freshCreatedIds
- *  在册刚建夹（本进程保证），防池夹子树涌入槽列表 */
+/** 白名单七锚（书下系统文档）：主力池夹+under/hub 方向夹+words+编译成稿 merged+
+ *  多合一键词笔记+AI 成稿（loosemat □7，多稿并存不认回）；锚值挂 MarkKey
+ *  （ensureAnchoredDoc 通道，位置无关认回——池夹被手挪后照样认得）。P0-1：编译产物锚
+ *  不在册则成稿变身槽（书永不退役+懒补标覆写锚重复建稿）。P1-5 fail-open 兜底：
+ *  attributes 索引滞后/故障时并入 freshCreatedIds 在册刚建夹（本进程保证），防池夹
+ *  子树涌入槽列表 */
 export async function writingTreeExcludedIDs(bookID: string): Promise<Set<string>> {
-    const anchors = [getDocIalDigestDir(bookID), getDocIalDigestDirUnder(bookID), getDocIalDigestDirHub(bookID), getDocIalWords(bookID), getDocIalNewBookKey(bookID), getDocIalAllInOneKey(bookID)];
+    const anchors = [getDocIalDigestDir(bookID), getDocIalDigestDirUnder(bookID), getDocIalDigestDirHub(bookID), getDocIalWords(bookID), getDocIalNewBookKey(bookID), getDocIalAllInOneKey(bookID), getDocIalComposeDoc(bookID)];
     const out = new Set<string>();
     for (const a of anchors) {
         const fresh = freshCreatedIDFor(a);
         if (fresh) out.add(fresh);
     }
     const rows = await siyuan.sql(
-        `select block_id, value from attributes where name='${MarkKey}' and value in (${anchors.map(a => `'${a}'`).join(",")}) limit 100`) as any[] ?? [];
+        `select block_id, value from attributes where name='${MarkKey}' and value in (${anchors.map(a => `'${a}'`).join(",")}) limit 10000000`) as any[] ?? [];
     for (const r of rows) out.add(r.block_id);
     return out;
 }

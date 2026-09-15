@@ -2398,7 +2398,8 @@ html[data-theme-mode="dark"] .prog-material-tag {
 // （b3-button--info=官方 Good 同款主色），官方评分钮组（1/2/3/4）整组 CSS 隐藏
 // （外层 div 同藏防空占位；官方 DOM 零就地改动，翻到普通卡 teardown 即还原）；
 // 跳过 -3 与左移 -2 官方原生保留。徽标=评分套行内左端可点按钮（点击弹阅读曲线
-// 配置菜单；bear 09-14 截图「看起来不像能点的按钮」□7 按钮化）
+// 配置菜单；bear 09-14 截图「看起来不像能点的按钮」□7 按钮化〔cancel 透明底〕→
+// 同日二次反馈：不悬浮也要按钮样子，常态换「跳过」同款 white 芯片）
 .prog-revcard .card__action > div:has(button[data-type="1"]),
 .prog-revcard .card__action > div:has(button[data-type="2"]),
 .prog-revcard .card__action > div:has(button[data-type="3"]),
@@ -2410,62 +2411,94 @@ html[data-theme-mode="dark"] .prog-material-tag {
 .prog-revcard .card__action:has(> button) .prog-revcard-next-el {
   display: none;
 }
-// □7 按钮化：手写官方 cancel 控件语言（灰字/透明底/hover list-hover 圆角钮，
-// padding/圆角/nowrap/cursor 与 b3-button 基类逐项一致、按压瞬变同族无过渡）——
-// 不挂 b3-button 类：官方 .card .card__action .b3-button (0,3,0) 带
-// display:block+width:100%+padding:8px 0 会把直接子级徽标拉成全宽块
+// 常态白芯片：b3-button--white 同族（固定浅底 #fafbfc/主色字，明暗两态常态可见，
+// 同行「跳过」同款）。不挂 b3-button 类：官方 .card .card__action .b3-button (0,3,0)
+// 带 display:block+width:100%+padding:8px 0 会把直接子级徽标拉成全宽块。
+// 芯片收内层 .prog-revcard-chip（外盒只扛几何+大热区点击）：评分行芯片撑满 86px
+// 全盒=与「跳过」大钮同尺寸同排版（bear 09-14 23:28 三次反馈「按钮大小不一致」，
+// 28px 小芯片挨着 86px 大白钮=同类按钮尺寸错了）；答题行=36px 紧凑芯片与该行
+// 钮等高（该行 b3-button padding 8px 0 → 36px 同段）
 .prog-revcard-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   align-self: center;
   flex: none; // 显式防行内收缩（nowrap 的 min-content 地板实际已兜底，双保险）
   margin-right: 8px;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: var(--b3-theme-on-surface);
-  white-space: nowrap;
   cursor: pointer;
-  border-radius: var(--b3-border-radius);
 
-  &:hover { background-color: var(--b3-list-hover); }
-  &:active { background-color: var(--b3-list-icon-hover); }
+  > .prog-revcard-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    font-size: 14px; // 官方钮继承正文 14px（white 变体 12px 是紧凑场景值，此处向同行钮看齐）
+    line-height: 20px; // b3-button 基类同款
+    white-space: nowrap;
+    box-sizing: border-box; // 评分行 height:100% 撑满 86px 盒须含 padding（content-box 会溢出 8px×2）
+    border-radius: var(--b3-border-radius);
+    color: var(--b3-theme-primary);
+    background-color: #fafbfc; // b3-button--white 同款（固定浅底，明暗通吃）
+
+    > svg {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      color: var(--b3-theme-primary);
+    }
+  }
+
+  // white 变体官方 hover=#f3f4f6（变体无 active 定义，降一档 #eceef1 同族）
+  &:hover:not(.prog-revcard-last) > .prog-revcard-chip { background-color: #f3f4f6; }
+  &:active:not(.prog-revcard-last) > .prog-revcard-chip { background-color: #eceef1; }
 }
 // P2-1：评分行=组式布局（行内无直接 button 子级）首段 36px 是紧凑上一步钮带、
-// 高钮带 y=44~130（3.8.3 实测）——徽标盒对齐高钮带（同顶同高、内容居中=与
-// 跳过/下一张钮中线齐平）；行几何中心在钮带上方 18px=视觉偏上根因。
-// 36/86 来自官方 DOM 实测，随 3.9.0 复习界面重写一并重验（文件头预警同款）
+// 高钮带 y=44~130（3.8.3 实测，y 含行自身 8px padding；盒内 margin-top 36 同段）——
+// 徽标盒对齐高钮带（与跳过大钮同顶 36..122 同高 86，此前 DOM 断言 badgeTop==skipTop
+// 已证无偏）。盒 flex:1=官方组格等分列（.card__action > div 的 flex:1 只给 div，
+// 徽标是 span 不吃官方规则须显式补）；芯片撑满全盒、列布局图标上文字下=官方大钮
+// 同构（card__icon 32px 字形居中 46px 行高+margin-bottom 4+文字 20+padding 8=86 逐段
+// 同构）。36/86 来自官方 DOM 实测，随 3.9.0 复习界面重写一并重验（文件头预警同款）
 .prog-revcard .card__action:not(:has(> button)) .prog-revcard-badge {
   align-self: flex-start;
   height: 86px;
   margin-top: 36px;
-  // □7 按钮化的 padding 会把 content-box 总高撑到 86+8=94 破坏钮带中线对齐，
-  // border-box 让 86px 含 padding（内容居中位不变）
-  box-sizing: border-box;
-  // hover 底色=86px 全盒高亮系有意沿用：与右侧跳过/主钮卡片同高同带（vision 实证
-  // 判「不突兀」），大热区=既有设计（按钮化前徽标盒即 86px）非本次引入
+  flex: 1; // 官方组格同款等分列（badge=span 直接子级，官方 > div 规则够不着）
+
+  > .prog-revcard-chip {
+    width: 100%;
+    height: 100%;
+    flex-direction: column; // 官方大钮排版：图标上、文字下
+    justify-content: center;
+    gap: 4px; // card__icon margin-bottom:4px 同款
+
+    > svg {
+      width: 32px;
+      height: 46px; // card__icon 同款：32px 字形在 46px 行高盒内居中（svg 默认 preserveAspectRatio=meet）
+    }
+
+    // revbadge3：素材卡文案变长（「渐进阅读 · 素材 · 剩 N 条」），zh 在等分列内实测
+    // 不溢出；en 等长语种超列宽时截断兜底（title 语义同族——信息平铺，ellipsis 只兜极端）
+    > .prog-revcard-badge-text {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
 }
-.prog-revcard-badge > svg {
-  width: 14px;
-  height: 14px;
-  flex: none;
-  color: var(--b3-theme-secondary);
-}
-// □4 最后一见强调（5/5 第 5 见）：主色+加重，与常规灰态一望可分；
-// 变色加粗属同一元素的态切换，非删激活孪生规则（css.md 先例不适用）。
-// □7 vision P1：暗色下 midnight 主色 #3575f0 对卡片底仅 ~3:1（强调态比常规
-// 12.6:1 更难读=倒挂）——color-mix 混 35% 白提亮至 ~6:1（--b3-theme-primary-light
-// 是 72% 透明色叠暗底反而更暗，不可用；color-mix 先例=b3 主题 success 修法）
-.prog-revcard-badge.prog-revcard-last {
-  color: var(--b3-theme-primary);
+// □4 最后一见强调（5/5 第 5 见）：白芯片换 b3-button--error 软红芯片（官方「忘了」
+// 同款 color/bg 配对，明暗两态官方自适配）——与常规白芯片一望可分。上代「主色+
+// 暗色 color-mix 提亮」随透明底语言一并退役（浅底倒挂根因已不存在）；
+// 变色属同一元素的态切换，非删激活孪生规则（css.md 先例不适用）
+.prog-revcard-badge.prog-revcard-last > .prog-revcard-chip {
+  color: var(--b3-card-error-color);
+  background-color: var(--b3-card-error-background);
   font-weight: 600;
 
-  > svg { color: var(--b3-theme-primary); }
+  > svg { color: var(--b3-card-error-color); }
 }
-html[data-theme-mode="dark"] .prog-revcard-badge.prog-revcard-last {
-  color: color-mix(in srgb, var(--b3-theme-primary), white 35%);
-
-  > svg { color: color-mix(in srgb, var(--b3-theme-primary), white 35%); }
+// error 变体官方无 hover bg 态，回落 b3-button 基类 hover=box-shadow
+.prog-revcard-badge.prog-revcard-last:hover > .prog-revcard-chip {
+  box-shadow: var(--b3-button-shadow);
 }
 // □4 下一张即时反馈闪换态（「N 天后再见」）：轻底色示意瞬态，1.2s 还原
 .b3-button.prog-revcard-flashed {

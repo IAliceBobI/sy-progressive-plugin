@@ -17,12 +17,15 @@ export interface StructSlot {
     parentID: string;
     /** custom-prog-done="1"=已定稿 */
     done: boolean;
-    /** 有非素材实质块（人动过正文）——不挪不入 */
+    /** 含手写内容（无素材血缘的实质块）=用户原创，默认保护——不挪不入
+     *  （fail-safe：IO 层守卫拉取失败按保护计）。语义翻转定案：手写=正当公民非可疑绕开 */
     sacred: boolean;
     /** 挂 MarkKey（TEMP#bookID,* 前缀）=体系认领的槽 */
     marked: boolean;
     /** 槽内素材胶囊数（MATERIAL_KEY 块） */
     materialCount: number;
+    /** 槽内手写实质块数（非血缘块）——盘点平权：每槽报「素材 N 篇+手写 M 块」 */
+    handwrittenCount: number;
 }
 
 /** 素材行（箱内盘点：ctime 归属=位置无关权威） */
@@ -75,6 +78,20 @@ export function slotMatches(title: string, name: string): boolean {
 /** 书根直属槽的 parentID 约定值（IO 层 fetchStructureSlots 与 diff 层共用） */
 export const BOOK_ROOT_ID = "book";
 
+/** 槽守卫判定核（kernel IO slotGuardState 同源锁定；manualops sacred 翻转定案）：
+ *  sacred=槽含手写实质块（用户原创=保护，非「可疑绕开」）；materialCount=素材**篇数**
+ *  （血缘值去重——一篇 10 块散挂算 1 篇，胶囊「一篇一锚」语义）；handwrittenCount=
+ *  手写块数（substance ∉ 素材块集合）。IO 层 fail-safe（拉取失败按保护）不在此函数职责 */
+export function deriveSlotGuard(
+    substance: string[],
+    matRows: { block_id: string; value: string }[],
+): { sacred: boolean; materialCount: number; handwrittenCount: number } {
+    const matSet = new Set(matRows.map(r => String(r.block_id)));
+    const lineageCount = new Set(matRows.map(r => String(r.value ?? ""))).size;
+    const handwrittenCount = substance.filter(id => !matSet.has(id)).length;
+    return { sacred: handwrittenCount > 0, materialCount: lineageCount, handwrittenCount };
+}
+
 export function planStructureActions(
     slots: StructSlot[],
     materials: StructMaterial[],
@@ -123,7 +140,7 @@ export function planStructureActions(
                 if (exist.parentID !== parentID) {
                     const fromParentTitle = exist.parentID === BOOK_ROOT_ID || !titleOf.has(exist.parentID)
                         ? "(书根)" : titleOf.get(exist.parentID)!;
-                    if (exist.sacred) diff.skips.push({ ref: `槽「${name}」`, reason: "sacred（有正文）不静默挪" });
+                    if (exist.sacred) diff.skips.push({ ref: `槽「${name}」`, reason: "sacred（含手写内容=用户原创，保护）不挪" });
                     else if (exist.done) diff.skips.push({ ref: `槽「${name}」`, reason: "已定稿不挪" });
                     else diff.reparents.push({ docID: exist.docID, title: name, fromParentTitle, toParentPath: parentPath });
                 }
@@ -160,7 +177,7 @@ export function planStructureActions(
         }
         const targetDoc = pathToDoc.get(probe) ?? "";
         const targetSlot = targetDoc ? slots.find(s => s.docID === targetDoc) : undefined;
-        if (targetSlot?.sacred) { diff.skips.push({ ref: m.id, reason: `目标槽「${seg.at(-1)}」sacred（有正文）不入素材` }); continue; }
+        if (targetSlot?.sacred) { diff.skips.push({ ref: m.id, reason: `目标槽「${seg.at(-1)}」sacred（含手写内容=用户原创，保护）不入素材` }); continue; }
         if (targetSlot?.done) { diff.skips.push({ ref: m.id, reason: `目标槽「${seg.at(-1)}」已定稿不入素材` }); continue; }
         diff.placements.push({ materialID: m.id, slotPath: probe, targetTitle: seg.at(-1)!, targetDocID: targetDoc });
     }
@@ -180,7 +197,7 @@ export function simulateApply(slots: StructSlot[], diff: StructureDiff): StructS
             title: c.seqTitle ?? c.title,
             depth,
             parentID: parent?.docID ?? BOOK_ROOT_ID,
-            done: false, sacred: false, marked: true, materialCount: 0,
+            done: false, sacred: false, marked: true, materialCount: 0, handwrittenCount: 0,
         });
     }
     for (const r of diff.reparents) {
@@ -189,4 +206,67 @@ export function simulateApply(slots: StructSlot[], diff: StructureDiff): StructS
         if (s && to) { s.parentID = to.docID; s.depth = to.depth + 1; }
     }
     return next;
+}
+
+// ============ loosemat □7 成文整理纯函数核（TDD 见 structureCore.test.ts 尾段） ============
+
+/** 槽文本渲染（structure_read 消费）：getChildBlocks 行→纯文本+标题层级标注。
+ *  实质块过滤=空段落/custom 块剔除（custom=机器块：本插件收束卡/他人 JSON 块，非
+ *  正文——读面全剔，口径比 isSubstanceChild 更宽：成文原料只要可读散文） */
+export function blocksToSlotText(blocks: any[]): string {
+    const out: string[] = [];
+    for (const b of blocks ?? []) {
+        const type = String(b?.type ?? "");
+        const content = String(b?.content ?? "").trim();
+        if (type === "custom") continue;
+        if (type === "p" && !content) continue;
+        if (!content) continue;
+        if (type === "h") {
+            const level = Math.min(6, Math.max(1, Number(String(b?.subType ?? "h1").replace(/^h/, "")) || 1));
+            out.push(`${"#".repeat(level)} ${content}`);
+        } else {
+            out.push(content);
+        }
+    }
+    return out.join("\n\n");
+}
+
+/** 读预算分页：从 offset 起整槽装到预算为止。单槽>预算且页首=独占返回 truncated
+ *  （截断保下页续读）；已装 ≥1 则超预算槽留给下页。尾页 nextOffset=null */
+export function planSlotReadPage(
+    slots: { docID: string; title: string }[],
+    texts: Map<string, string>,
+    budget: number,
+    offset: number,
+): { included: { docID: string; title: string; text: string; chars: number }[]; nextOffset: number | null; truncated: boolean } {
+    const included: { docID: string; title: string; text: string; chars: number }[] = [];
+    let used = 0;
+    let i = Math.max(0, Math.floor(offset));
+    for (; i < slots.length; i++) {
+        const text = texts.get(slots[i].docID) ?? "";
+        if (text.length > budget) {
+            if (included.length === 0) {
+                return { included: [{ docID: slots[i].docID, title: slots[i].title, text, chars: text.length }], nextOffset: i + 1 < slots.length ? i + 1 : null, truncated: true };
+            }
+            break;
+        }
+        if (used + text.length > budget) break;
+        included.push({ docID: slots[i].docID, title: slots[i].title, text, chars: text.length });
+        used += text.length;
+    }
+    return { included, nextOffset: i < slots.length ? i : null, truncated: false };
+}
+
+/** 成稿标题：显式优先（trim+路径分隔符换空格——hpath 段字符勿进标题）；
+ *  缺省=成稿-书名-yyyyMMdd-HHmm（多稿并存可辨时序） */
+export function composeTitle(bookName: string, explicit: string | undefined, now: number): string {
+    // 显式分支拒点名字面量（`.`/`..` 经内核 path.Join 坍缩到父层——review P2-6）
+    const t = String(explicit ?? "").trim().replace(/[\\/]+/g, " ").trim();
+    if (t === "." || t === "..") return composeTitle(bookName, "", now);
+    if (t) return t;
+    const d = new Date(now);
+    const p = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+    // 缺省分支同消毒 bookName（书名带 / 会劈 hpath 层——与显式分支对称）
+    return `成稿-${String(bookName ?? "").trim().replace(/[\\/]+/g, " ").trim() || "未命名"}-${stamp}`;
 }

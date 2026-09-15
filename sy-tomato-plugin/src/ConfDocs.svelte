@@ -26,6 +26,7 @@
         storeMergeDoc,
         storeMoveDocContentHere,
         hiddenMenuItems,
+        exportFilesMenu,
     } from "./libs/stores";
     import {
         DailyNoteBox上一个日志,
@@ -182,6 +183,12 @@
         <div class="section-title">
             {tomatoI18n.文档树工具}
             <ConfHelpIcon token="NXSPd81W4oxUJrxW2XsctewUn5g" />
+        </div>
+        <!-- □5 总开关：三件套（合并/导出单文件/导入MD）整体显隐；关=菜单全不出现，
+             下方逐项开关仍在（合成判定=总开关 AND 逐项，二者独立通道） -->
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$exportFilesMenu} />
+            {tomatoI18n.文档树批处理菜单}
         </div>
         {#key doctreeMenuTick}
             {#each DOCTREE_CARD_MENU_ITEMS as item (item.key)}

@@ -13,9 +13,10 @@
     // 已装转发 reciteTogglePractice 命令把本书设为仿写原文（已在练习中则按钮换删除语义）。
     let {
         kind,
+        isMaterial = false,
         reciteOn = false,
         onSendRecite,
-    }: { kind: FloatDocKind; reciteOn?: boolean; onSendRecite?: () => void } = $props();
+    }: { kind: FloatDocKind; isMaterial?: boolean; reciteOn?: boolean; onSendRecite?: () => void } = $props();
 
     interface RouteItem { icon: string; text: () => string }
     interface RouteGroup { title?: () => string; items: RouteItem[] }
@@ -66,13 +67,16 @@
             ],
         },
         digest: {
-            title: () => tomatoI18n.路线指引摘抄,
+            // matflow □2（评审 P1-2）：素材文档（digest+写作书）语境分叉——标题与三个
+            // 同名动作行跟随浮条新名（读最早素材/素材汇总/去读书），防同钮异名；
+            // 回原书/再摘抄两行为 □1 遗留（回出处/收集素材语域），队列备案
+            title: () => isMaterial ? tomatoI18n.路线指引素材 : tomatoI18n.路线指引摘抄,
             groups: [{
                 // □2 翻新 5→10：补 □1 池扩容后的能力面。排序=去源书（继续读/回原书）→
                 // 卡与记忆（附属卡/复访/制卡与收集）→ 转化产出（送仿写/再摘抄）→ 总览 → 离开。
                 // 归档有意不列（bear 定稿「不进」：退出语义，路指引进场用户还不需要）
                 items: [
-                    { icon: "iconProgPlay", text: () => tomatoI18n.路线摘抄继续读 },
+                    { icon: "iconProgPlay", text: () => isMaterial ? tomatoI18n.路线素材读最早 : tomatoI18n.路线摘抄继续读 },
                     { icon: "iconProgBook", text: () => tomatoI18n.路线摘抄回原书 },
                     { icon: "iconProgCard", text: () => tomatoI18n.路线摘抄附属卡 },
                     { icon: "iconProgSched", text: () => tomatoI18n.路线摘抄复访 },
@@ -80,8 +84,8 @@
                     { icon: "iconProgSend", text: () => tomatoI18n.路线摘抄送仿写 },
                     { icon: "iconProgScissors", text: () => tomatoI18n.路线摘抄再摘抄 },
                     { icon: "iconProgTree", text: () => tomatoI18n.路线摘抄路线图 },
-                    { icon: "iconProgQuill", text: () => tomatoI18n.路线摘抄汇总 },
-                    { icon: "iconProgSwap", text: () => tomatoI18n.路线摘抄换书 },
+                    { icon: "iconProgQuill", text: () => isMaterial ? tomatoI18n.路线素材汇总 : tomatoI18n.路线摘抄汇总 },
+                    { icon: "iconProgSwap", text: () => isMaterial ? tomatoI18n.路线素材去读书 : tomatoI18n.路线摘抄换书 },
                 ],
             }],
         },

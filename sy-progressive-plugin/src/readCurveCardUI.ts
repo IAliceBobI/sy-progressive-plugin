@@ -26,6 +26,7 @@ const NEXT_CLS = "prog-revcard-next-el";
 const CARD_CLS = "prog-revcard";
 const BADGE_TEXT_CLS = "prog-revcard-badge-text";
 const NEXT_TEXT_CLS = "prog-revcard-next-text";
+const CHIP_CLS = "prog-revcard-chip";
 
 let observer: MutationObserver | null = null;
 let cardMainEl: HTMLElement | null = null;
@@ -46,19 +47,26 @@ function isMaterialCard(el: HTMLElement | null): boolean {
     return !!(bookID && progStorage.booksInfos()[bookID]?.writing);
 }
 
-/** 翻卡预算当前素材书未锤数（点「下一张」预告用——素材间隔=materialInterval(剩余量)，
- *  非曲线上 count 推进档）。best-effort：查失败/未及返回=null（预告宁缺毋错不出数） */
+/** 翻卡预算当前素材书未锤数（「下一张」预告与徽标「剩 M 条」共用——素材间隔=
+ *  materialInterval(剩余量)，非曲线上 count 推进档）。best-effort：查失败/未及返回
+ *  =null（预告/徽标进度宁缺毋错回落兜底）。同 key 已有真值不重发（updateBadgeText
+ *  落地重刷会进 observer 回声，无此守卫=每轮空转多一次 SQL）；落地后重刷徽标文本
+ *  （A 兜底「第 N 见」→B 真值「剩 M 条」，textContent 同值跳过守卫保证无乒乓） */
 function prefetchMatRemaining(key: string, el: HTMLElement | null): void {
     const bookID = el ? parseBookIDFromCtime(el.getAttribute(PDIGEST_CTIME) ?? "") : "";
     if (!bookID || !progStorage.booksInfos()[bookID]?.writing) {
         matCard = null;
         return;
     }
+    if (matCard?.key === key && matCard.remaining != null) return;
     matCard = { key, remaining: null };
     void siyuan.sql(
         `select value from attributes where name='${PDIGEST_CTIME}' and value like '${bookID}#%' limit 10000000`)
         .then(rows => {
-            if (matCard?.key === key) matCard = { key, remaining: (rows as any[] ?? []).length };
+            if (matCard?.key !== key) return;
+            matCard = { key, remaining: (rows as any[] ?? []).length };
+            debugLog("readcurve", `mat remaining=${matCard.remaining} book=${bookID}`, "progressive");
+            if (cardMainEl) updateBadgeText(cardMainEl);
         })
         .catch(() => {
             if (matCard?.key === key) matCard = null;
@@ -117,12 +125,20 @@ function teardown() {
 
 /** □4 徽标进度刷新（翻页换卡：评分行 DOM 持存，徽标文本不刷会是旧卡的 N/5）——
  *  两套评分行的徽标全刷（class 选择器天然覆盖）。打磨批：翻卡顺带预算素材剩余量
- *  （点「下一张」的素材间隔预告用——见 prefetchMatRemaining） */
+ *  （「下一张」预告与徽标「剩 M 条」共用——见 prefetchMatRemaining） */
 function refreshBadge(cardMain: HTMLElement) {
     const keyEl = findReadCard(cardMain);
+    prefetchMatRemaining(keyEl?.getAttribute(READCARD_KEY) ?? "", keyEl);
+    updateBadgeText(cardMain);
+}
+
+/** 徽标文本纯刷新（不重发剩余量查询——prefetchMatRemaining 落地回调复用，防回声环）：
+ *  素材卡走 materialHintOf 消费预算值（B 主「剩 M 条」/未及 A 兜底「第 N 见」） */
+function updateBadgeText(cardMain: HTMLElement) {
+    const keyEl = findReadCard(cardMain);
     const key = keyEl?.getAttribute(READCARD_KEY) ?? "";
-    prefetchMatRemaining(key, keyEl);
-    const spec = badgeSpec(key, isMaterialCard(keyEl));
+    const hint = materialHintOf(keyEl, key);
+    const spec = badgeSpec(key, hint?.material ?? false, hint?.matRemaining);
     const text = !spec ? tomatoI18n.渐进阅读
         : `${tomatoI18n.渐进阅读} · ${spec.lastSee ? `${spec.text} · ${tomatoI18n.最后一见}` : spec.text}`;
     const lastSee = !!spec?.lastSee;
@@ -187,12 +203,18 @@ function mountIntoAction(action: HTMLElement, good: HTMLButtonElement, cardMain:
     const badge = document.createElement("span");
     badge.className = `prog-revcard-badge ${MARK_CLS}`;
     badge.setAttribute("aria-label", tomatoI18n.tip设置阅读曲线);
+    // 常态白芯片收进内层：徽标盒在评分行对齐规则里是 86px 全盒（钮带几何+大热区），
+    // 芯片直接挂盒上=常态底色把整盒撑成 86px 白柱——视觉体必须内层收口（bear 09-14
+    // 二次反馈：不悬浮也要按钮样子）
+    const chip = document.createElement("span");
+    chip.className = CHIP_CLS;
     const bicon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     // iconBookmark=番茄阅读点卡身份行同款（sprite 无 iconBook，空引用渲染为空盒）
     bicon.innerHTML = '<use xlink:href="#iconBookmark"></use>'; // svg use 必 innerHTML（命名空间坑）
     const t = document.createElement("span");
     t.className = BADGE_TEXT_CLS;
-    badge.append(bicon, t);
+    chip.append(bicon, t);
+    badge.append(chip);
     // □4 徽标=动作菜单入口（不再推/每 N 天/再来一轮/推迟/转记忆卡）
     badge.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -253,6 +275,11 @@ function mount(cardMain: HTMLElement) {
             scheduleRecheck();
         } else if (!findReadCard(cm)) {
             teardown();
+            // 同款 recheck 兜底：此分支除真翻到普通卡外，还有「同卡 DOM 瞬态窗口」（伴学
+            // 面板等第三方注入的 childList 突变里 custom 键短暂不在 DOM）误判路径——无
+            // recheck 则徽标永久失踪到下次翻卡（revbadge2 6810 实锤）。recheck 自带
+            // findReadCard 守卫：普通卡空转、阅读卡 200ms 后重挂
+            scheduleRecheck();
         } else {
             // □4：翻页换卡的内容区晚于事件链渲染（revCardOnAppear 刷新时键属性未上 DOM
             // → 徽标回落静态文案），childList 变更兜底再刷一次进度
@@ -281,8 +308,12 @@ export function revCardOnAppear(protyleEl: HTMLElement | undefined) {
     const cardMain = protyleEl.closest<HTMLElement>(".card__main");
     if (!cardMain) return;
     if (!findReadCard(cardMain)) {
-        // 普通卡：清掉上一张阅读卡的残留注入（评分套还原=类摘除+钮移除即无痕）
-        if (cardMainEl === cardMain) teardown();
+        // 普通卡：清掉上一张阅读卡的残留注入（评分套还原=类摘除+钮移除即无痕）。
+        // 带 recheck 兜底（同 observer 分支②）：事件早于键属性上 DOM 的瞬态误拆 200ms 自愈
+        if (cardMainEl === cardMain) {
+            teardown();
+            scheduleRecheck();
+        }
         return;
     }
     if (document.querySelector(`.${MARK_CLS}`) && cardMainEl === cardMain) {

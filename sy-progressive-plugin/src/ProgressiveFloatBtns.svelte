@@ -137,6 +137,9 @@
     const isMaterialDoc = $derived(
         $kind === "digest" && !!$bookID && !!(progStorage.peekBookInfo($bookID)?.writing),
     );
+    // matflow □2 两小件②：summary 语域对齐——素材文档与写作书主文档（book 态）都报
+    // 「素材汇总」（同屏 traceUp「本书素材」同语境）；写作槽片照旧「摘抄汇总」（全局口径）
+    const isMaterialSummary = $derived(isMaterialDoc || ($kind === "book" && isWritingDoc));
     // matflow IA 重排（0914 □5 拍板=鸟两组方案）：写作书系文档平铺区首段钉「写作管理」
     // 簇——本书素材（traceUp 语境改名）/翻素材（matFlip，槽片限定）/管理素材池/本书槽，
     // 与其余低频钮以段头线分隔（.prog-fb-flat > * + *::before 对簇 span 自动出线）。
@@ -325,31 +328,35 @@
     // $kind 切换、mainIds 变化——同态翻片不重渲染，改键后旧浮条停留旧键到下次收展/切态
     // （改键低频+恢复路径多，接受；PairBar 先例同款）。
     const TIPS: Record<string, () => string> = {
-        digest: () => tip3(tomatoI18n.摘抄, tomatoI18n.tip摘抄),
+        digest: () => tip3(isMaterialDoc ? tomatoI18n.收集素材 : tomatoI18n.摘抄,
+            isMaterialDoc ? tomatoI18n.tip收集素材 : tomatoI18n.tip摘抄), // matflow □1 素材文档语境
         cards: () => tip3(tomatoI18n.附属卡, tomatoI18n.tip本书附属卡), // 名用无占位 getter（本书附属卡带「·到期 {N}」尾巴）
-        swap: () => tip3(tomatoI18n.换书, isWritingDoc ? tomatoI18n.tip换写作书 : tomatoI18n.tip换书), // □4③ 写作语境=下一本写作书
+        swap: () => tip3(isMaterialDoc ? tomatoI18n.去读书 : tomatoI18n.换书,
+            isMaterialDoc ? tomatoI18n.tip去读书 : isWritingDoc ? tomatoI18n.tip换写作书 : tomatoI18n.tip换书), // matflow □2 素材语境改名（行为=滚筒下一本阅读书，「换书」会误导为换写作书）；□4③ 写作语境=下一本写作书
         // □4② 写作书片（槽）语境：next 绝无删片语义（槽=用户定稿文档）、prev/next=槽间
         // 纯导航；与「上一页/下一页」命令同链（gotoPage 已分叉槽导航），快捷键行照挂
         next: () => isWritingPiece
             ? tip3(tomatoI18n.下一槽, tomatoI18n.tip下一槽, Progressive下一页.w())
-            : tip3($kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
-                $kind === "digest" ? tomatoI18n.tip下一条摘抄 : tomatoI18n.tip下片删),
+            : tip3($kind === "digest" ? (isMaterialDoc ? tomatoI18n.下一条素材 : tomatoI18n.下一条摘抄) : tomatoI18n.下片删,
+                $kind === "digest" ? (isMaterialDoc ? tomatoI18n.tip下一条素材 : tomatoI18n.tip下一条摘抄) : tomatoI18n.tip下片删),
         prev: () => isWritingPiece
             ? tip3(tomatoI18n.上一槽, tomatoI18n.tip上一槽, Progressive上一页.w())
-            : tip3($kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
-                $kind === "digest" ? tomatoI18n.tip上一条摘抄 : tomatoI18n.tip回看,
+            : tip3($kind === "digest" ? (isMaterialDoc ? tomatoI18n.上一条素材 : tomatoI18n.上一条摘抄) : tomatoI18n.回看,
+                $kind === "digest" ? (isMaterialDoc ? tomatoI18n.tip上一条素材 : tomatoI18n.tip上一条摘抄) : tomatoI18n.tip回看,
                 $kind === "digest" ? undefined : Progressive上一页.w()),
         // origin 主排只有片/摘抄两态在用：片态=回原书带块级定位（2026-08-31 升级），
-        // 摘抄态文案（回原书·定位摘抄原文）在渲染处特判覆盖
+        // 摘抄态文案在渲染处特判覆盖（阅读摘抄=回分片；素材文档=回出处，matflow □1）
         origin: () => tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书, $kind === "piece" ? Progressive跳到分片或回到原文.w() : undefined), // 摘抄态文案在渲染处特判
         nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片, Progressive下一页.w()), // 托盘动作勾上主排后主排也要有文案
         delBack: () => tip3(tomatoI18n.上片删, tomatoI18n.tip上片删),
         quit: () => tip3(tomatoI18n.关闭分片, tomatoI18n.tip关闭分片),
-        continue: () => tip3(tomatoI18n.继续读, tomatoI18n.tip继续读), // ⌥- 命令=滚筒全局轮转≠本书断点，不挂键
+        continue: () => tip3(isMaterialDoc ? tomatoI18n.读最早素材 : tomatoI18n.继续读,
+            isMaterialDoc ? tomatoI18n.tip读最早素材 : tomatoI18n.tip继续读), // matflow □2 素材语境改名（行为=写作书调度推最老素材，非断点续读）；⌥- 命令=滚筒全局轮转≠本书断点，不挂键
         toPiece: () => tip3(tomatoI18n.跳到分片, tomatoI18n.tip跳到分片, Progressive跳到分片或回到原文.w()), // □2 书态就地跳片
-        summary: () => tip3(tomatoI18n.摘抄汇总, tomatoI18n.tip摘抄汇总),
-        archive: () => tip3(tomatoI18n.归档本书, tomatoI18n.tip归档本书),
-        recite: () => tip3(tomatoI18n.送进仿写, tomatoI18n.tip送进仿写),
+        summary: () => tip3(isMaterialSummary ? tomatoI18n.素材汇总 : tomatoI18n.摘抄汇总,
+            isMaterialSummary ? tomatoI18n.tip素材汇总 : tomatoI18n.tip摘抄汇总),
+        archive: () => tip3(tomatoI18n.归档本书, isMaterialDoc ? tomatoI18n.tip归档写作书 : tomatoI18n.tip归档本书), // matflow □2 素材语境 tip 点明归档对象=写作书（名实已符不改名）
+        recite: () => tip3(tomatoI18n.送进仿写, isMaterialDoc ? tomatoI18n.tip送进仿写素材 : tomatoI18n.tip送进仿写), // matflow □1 素材分支仅换 tip 用语
         // □7 ✧复访动作组（digest 态）：无键=加入复访（□8 后补入口），有键=完成一轮/改节奏/退出
         revisit: () => tip3(tomatoI18n.复访, tomatoI18n.tip复访管理),
         // □11：tree=路线图浮层（digest 态）；addBook=📥 加书（□18 起 free/book/piece 三态常驻）
@@ -361,28 +368,34 @@
     // digest 态 next/prev/origin 与书态场景钮也要有落位文案——跨态异义按 $kind 特判，
     // 与 TIPS 表同口径）。名与格内短标签（FLAT_LABELS）同源
     const FLAT_TIPS: Record<string, () => string> = {
-        digest: () => tip3(tomatoI18n.摘抄, tomatoI18n.tip摘抄), // 「…」暗示弹子排的旧单行态退役，三行制统一
+        digest: () => tip3(isMaterialDoc ? tomatoI18n.收集素材 : tomatoI18n.摘抄,
+            isMaterialDoc ? tomatoI18n.tip收集素材 : tomatoI18n.tip摘抄), // 「…」暗示弹子排的旧单行态退役，三行制统一；matflow □1 素材文档语境
         cards: () => tip3(tomatoI18n.附属卡, tomatoI18n.tip本书附属卡),
-        swap: () => tip3(tomatoI18n.换书, isWritingDoc ? tomatoI18n.tip换写作书 : tomatoI18n.tip换书), // □4③ 写作语境=下一本写作书
+        swap: () => tip3(isMaterialDoc ? tomatoI18n.去读书 : tomatoI18n.换书,
+            isMaterialDoc ? tomatoI18n.tip去读书 : isWritingDoc ? tomatoI18n.tip换写作书 : tomatoI18n.tip换书), // matflow □2 素材语境改名（行为=滚筒下一本阅读书，「换书」会误导为换写作书）；□4③ 写作语境=下一本写作书
         next: () => isWritingPiece
             ? tip3(tomatoI18n.下一槽, tomatoI18n.tip下一槽, Progressive下一页.w())
-            : tip3($kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
-                $kind === "digest" ? tomatoI18n.tip下一条摘抄 : tomatoI18n.tip下片删),
+            : tip3($kind === "digest" ? (isMaterialDoc ? tomatoI18n.下一条素材 : tomatoI18n.下一条摘抄) : tomatoI18n.下片删,
+                $kind === "digest" ? (isMaterialDoc ? tomatoI18n.tip下一条素材 : tomatoI18n.tip下一条摘抄) : tomatoI18n.tip下片删),
         prev: () => isWritingPiece
             ? tip3(tomatoI18n.上一槽, tomatoI18n.tip上一槽, Progressive上一页.w())
-            : tip3($kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
-                $kind === "digest" ? tomatoI18n.tip上一条摘抄 : tomatoI18n.tip回看,
+            : tip3($kind === "digest" ? (isMaterialDoc ? tomatoI18n.上一条素材 : tomatoI18n.上一条摘抄) : tomatoI18n.回看,
+                $kind === "digest" ? (isMaterialDoc ? tomatoI18n.tip上一条素材 : tomatoI18n.tip上一条摘抄) : tomatoI18n.tip回看,
                 $kind === "digest" ? undefined : Progressive上一页.w()),
-        // digest 态 origin=回分片（定位摘抄原文，与首行 aria-label 特判同口径）；片态带快捷键行
-        origin: () => $kind === "digest" ? tip3(tomatoI18n.回分片, tomatoI18n.tip回分片)
+        // digest 态 origin=回分片（定位摘抄原文，与首行 aria-label 特判同口径；素材文档=回出处，
+        // matflow □1）；片态带快捷键行
+        origin: () => $kind === "digest" ? tip3(isMaterialDoc ? tomatoI18n.回出处 : tomatoI18n.回分片,
+            isMaterialDoc ? tomatoI18n.tip回出处 : tomatoI18n.tip回分片)
             : tip3(tomatoI18n.回原书, tomatoI18n.tip片回原书, $kind === "piece" ? Progressive跳到分片或回到原文.w() : undefined),
         addBook: () => tip3(tomatoI18n.加书, tomatoI18n.tip加书, Progressive添加当前文档到渐进阅读分片模式.w()), // □18：存量 mainIds 未含时平铺区兜底
         revisit: () => tip3(tomatoI18n.复访, tomatoI18n.tip复访管理), // digest 态池钮（✧ 复访动作组）落平铺区兜底
         tree: () => tip3(tomatoI18n.路线图, tomatoI18n.tip路线图), // digest 态池钮（□11 路线图浮层）
-        summary: () => tip3(tomatoI18n.摘抄汇总, tomatoI18n.tip摘抄汇总), // digest/book 态池钮
-        continue: () => tip3(tomatoI18n.继续读, tomatoI18n.tip继续读), // book 态池钮（▶ 本书断点）
+        summary: () => tip3(isMaterialSummary ? tomatoI18n.素材汇总 : tomatoI18n.摘抄汇总,
+            isMaterialSummary ? tomatoI18n.tip素材汇总 : tomatoI18n.tip摘抄汇总), // digest/book 态池钮
+        continue: () => tip3(isMaterialDoc ? tomatoI18n.读最早素材 : tomatoI18n.继续读,
+            isMaterialDoc ? tomatoI18n.tip读最早素材 : tomatoI18n.tip继续读), // book 态池钮（▶ 本书断点）；素材语境=读最早素材（matflow □2）
         toPiece: () => tip3(tomatoI18n.跳到分片, tomatoI18n.tip跳到分片, Progressive跳到分片或回到原文.w()), // book 态池钮（□2 就地跳片）
-        archive: () => tip3(tomatoI18n.归档本书, tomatoI18n.tip归档本书), // book 态池钮
+        archive: () => tip3(tomatoI18n.归档本书, isMaterialDoc ? tomatoI18n.tip归档写作书 : tomatoI18n.tip归档本书), // book 态池钮；素材语境 tip 点明归档对象=写作书（matflow □2，名实已符不改名）
         contents: () => tip3(tomatoI18n.打开目录, tomatoI18n.tip打开目录),
         refill: () => tip3(tomatoI18n.重插, tomatoI18n.tip重插),
         clean: () => tip3(tomatoI18n.删原文, tomatoI18n.tip删原文),
@@ -399,7 +412,7 @@
             $kind === "free" ? tomatoI18n.tip关联摘抄 : isWritingDoc ? tomatoI18n.tip本书素材 : tomatoI18n.tip本书摘抄),
         // □27 仿写本片（片态副本练习）；recite 在 digest 态是「把摘抄送进仿写」（文案在 TIPS，跨态同 id 异义）
         recite: () => tip3($kind === "digest" ? tomatoI18n.送进仿写 : tomatoI18n.仿写本片,
-            $kind === "digest" ? tomatoI18n.tip送进仿写 : tomatoI18n.tip仿写本片),
+            $kind === "digest" ? (isMaterialDoc ? tomatoI18n.tip送进仿写素材 : tomatoI18n.tip送进仿写) : tomatoI18n.tip仿写本片),
         // □2 写作书系文档专属（isWritingDoc 一级格；大界面=批量复制/移动入槽）
         managePool: () => tip3(tomatoI18n.管理素材池, tomatoI18n.tip管理素材池),
         // □4④ 本书槽列表（写作书系文档钉位格）：弹本书全槽菜单直达
@@ -454,17 +467,17 @@
     // □10 格内短标签（2-6 字，i18n 清单见 docs/prog-floatbar-ux-redesign.md □10 视觉规格；
     // 全名 tooltip 走 FLAT_TIPS，两层互不挤占；移动端无 hover 靠它兜底）
     const FLAT_LABELS: Record<string, () => string> = {
-        digest: () => tomatoI18n.摘抄,
+        digest: () => isMaterialDoc ? tomatoI18n.收集素材 : tomatoI18n.摘抄,
         cards: () => tomatoI18n.附属卡,
-        swap: () => tomatoI18n.换书,
-        next: () => isWritingPiece ? tomatoI18n.下一槽 : $kind === "digest" ? tomatoI18n.下一条摘抄 : tomatoI18n.下片删,
-        prev: () => isWritingPiece ? tomatoI18n.上一槽 : $kind === "digest" ? tomatoI18n.上一条摘抄 : tomatoI18n.回看,
-        origin: () => $kind === "digest" ? tomatoI18n.回分片 : tomatoI18n.回原书,
+        swap: () => isMaterialDoc ? tomatoI18n.去读书 : tomatoI18n.换书,
+        next: () => isWritingPiece ? tomatoI18n.下一槽 : $kind === "digest" ? (isMaterialDoc ? tomatoI18n.下一条素材 : tomatoI18n.下一条摘抄) : tomatoI18n.下片删,
+        prev: () => isWritingPiece ? tomatoI18n.上一槽 : $kind === "digest" ? (isMaterialDoc ? tomatoI18n.上一条素材 : tomatoI18n.上一条摘抄) : tomatoI18n.回看,
+        origin: () => $kind === "digest" ? (isMaterialDoc ? tomatoI18n.回出处 : tomatoI18n.回分片) : tomatoI18n.回原书,
         addBook: () => tomatoI18n.加书,
         revisit: () => tomatoI18n.复访,
         tree: () => tomatoI18n.路线图,
-        summary: () => tomatoI18n.摘抄汇总,
-        continue: () => tomatoI18n.继续读短, // □2 拆短版（2-6 字规格）；全名在 FLAT_TIPS 层
+        summary: () => isMaterialSummary ? tomatoI18n.素材汇总 : tomatoI18n.摘抄汇总,
+        continue: () => isMaterialDoc ? tomatoI18n.读最早素材 : tomatoI18n.继续读短, // □2 拆短版（2-6 字规格）；全名在 FLAT_TIPS 层；素材语境名=读最早素材（matflow □2）
         toPiece: () => tomatoI18n.跳到分片,
         archive: () => tomatoI18n.归档本书,
         nextPure: () => isWritingPiece ? tomatoI18n.下一槽 : tomatoI18n.下一个分片, // □4② 槽语境同形
@@ -493,7 +506,7 @@
         inbox: () => tip3(tomatoI18n.留档, tomatoI18n.tip留档),
         // □4 落点变体（去向级覆盖，不落盘不改 digestLanding 全局档）：书/片态挂所属书下、
         // free 态挂源文档下（source 档原生语义）｜总夹/札记匣按是否在书（central 原生语义）
-        tobook: () => tip3(tomatoI18n.摘抄挂书侧, tomatoI18n.tip摘抄挂书侧),
+        tobook: () => tip3(tomatoI18n.摘抄挂书侧, isMaterialDoc ? tomatoI18n.tip素材挂本书池 : tomatoI18n.tip摘抄挂书侧), // matflow □2 素材语境：落点=本书素材池
         tohub: () => tip3(tomatoI18n.摘抄归总夹, tomatoI18n.tip摘抄归总夹),
         // 就地断句（2026-09-09）：Pro 标随钮名走（子排钮无锁角标，执行层兜底门禁+toast 引导）
         splitinplace: () => tip3(tomatoI18n.就地断句 + " Pro", tomatoI18n.tip就地断句),
@@ -717,12 +730,15 @@
         const tree = await queryDigestTree($bookID);
         const i = tree.flat.findIndex(n => n.id === $noteID);
         if (i < 0) {
-            await siyuan.pushMsg(tomatoI18n.未找到本条摘抄);
+            await siyuan.pushMsg(isMaterialDoc ? tomatoI18n.未找到本条素材 : tomatoI18n.未找到本条摘抄);
             return;
         }
         const target = tree.flat[i - step];
         if (!target) {
-            await siyuan.pushMsg(step > 0 ? tomatoI18n.已是最新一条摘抄 : tomatoI18n.已是最早一条摘抄);
+            // matflow □1 素材文档语境：边界 toast 同池两套口径
+            await siyuan.pushMsg(step > 0
+                ? (isMaterialDoc ? tomatoI18n.已是最新一条素材 : tomatoI18n.已是最新一条摘抄)
+                : (isMaterialDoc ? tomatoI18n.已是最早一条素材 : tomatoI18n.已是最早一条摘抄));
             return;
         }
         void prog.jumpTo(target.id);
@@ -846,7 +862,7 @@
             title: tomatoI18n.路线指引,
             x: anchorXY(ev).x, y: anchorXY(ev).y,
             component: RouteGuidePopover,
-            props: { kind: $kind, reciteOn, onSendRecite },
+            props: { kind: $kind, isMaterial: isMaterialDoc, reciteOn, onSendRecite }, // matflow □2：素材文档语境分叉（评审 P1-2）
         });
     }
 
@@ -938,7 +954,7 @@
         // 键盘切页签漂移开错书——浮层列的是哪本书的清单，动作就跟哪本书
         const poolBookID = $bookID;
         openFloatPopover({
-            title: isFree ? tomatoI18n.关联摘抄 : tomatoI18n.本书摘抄,
+            title: isFree ? tomatoI18n.关联摘抄 : isWritingDoc ? tomatoI18n.本书素材 : tomatoI18n.本书摘抄, // matflow □2：写作语境标题跟钮名（语域收口，复用既有键）
             x: anchorXY(ev).x, y: anchorXY(ev).y,
             component: OriginDigestPopover,
             props: {
@@ -1659,7 +1675,8 @@
                 class:prog-fb-btn--dragging={dragId === b.id}
                 class:prog-fb-pro={isAdvPro(b.id)}
                 aria-label={(b.id === "digest" && $digOpen) ? tomatoI18n.收起
-                    : (b.id === "origin" && $kind === "digest") ? tip3(tomatoI18n.回分片, tomatoI18n.tip回分片)
+                    : (b.id === "origin" && $kind === "digest") ? tip3(isMaterialDoc ? tomatoI18n.回出处 : tomatoI18n.回分片,
+                        isMaterialDoc ? tomatoI18n.tip回出处 : tomatoI18n.tip回分片) // matflow □1 素材文档语境（与 FLAT_TIPS.origin 同口径）
                     : mainTip(b.id)}
                 onclick={(e) => onBtn(b.id, e)}
                 ondragstart={(e) => onDragStart(b.id, e)}
@@ -1714,7 +1731,7 @@
         {#if $kind === "digest"}
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
-                aria-label={tip3(tomatoI18n.入槽, tomatoI18n.tip入槽)}
+                aria-label={tip3(tomatoI18n.入槽, isMaterialDoc ? tomatoI18n.tip入槽素材 : tomatoI18n.tip入槽)}
                 onclick={(e) => openSlotMenuForDigest(e)}
             >{@html icon("iconProgPiece", 16)}</button>
         {/if}

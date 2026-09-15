@@ -55,16 +55,20 @@ export async function updateBlock(id: string, data: string, dataType = "markdown
   return call("/api/block/updateBlock", { id, data, dataType });
 }
 
-/** 块尾追加（返回事务数组——形态同 appendBlock：读块 id 走 doOperations[0].id） */
-export async function insertBlock(parentID: string, data: string, dataType = "markdown"): Promise<any> {
-  return call("/api/block/insertBlock", { parentID, data, dataType, previousID: "" });
+/** 块尾追加（返回事务数组——形态同 appendBlock：读块 id 走 doOperations[0].id）。
+ *  previousID 非空=插在该块之后（成文续写钉文档尾：getDocLastID 传入）；空=首子位 */
+export async function insertBlock(parentID: string, data: string, dataType = "markdown", previousID = ""): Promise<any> {
+  return call("/api/block/insertBlock", { parentID, data, dataType, previousID });
 }
 
-/** 文件树目录枚举（直查无索引窗；maxListCount:0 防截断）。空/不存在目录内核返
- *  code=-1+data=null（09-13 6808 实测）——语义化为 [] 返；其余 code!=0 与网络 reject
- *  上抛（progtree □2 P1-2：fail-open 会把瞬断当空树，apply 误建重复槽） */
+/** 文件树目录枚举（磁盘直查无索引窗；maxListCount:0 防截断；sort=15 生效序=文档
+ *  自定义序——不传则吃用户全局排序档，字母序用户会把槽序/changeSort 钉序碾错
+ *  〔review P2-7：注释宣称 sort=15 实未传，按 doctree-order 通道契约补上〕）。
+ *  空或不存在目录内核返 code=-1+data=null（09-13 6808 实测）——语义化为 [] 返；
+ *  其余 code!=0 与网络 reject 上抛（progtree □2 P1-2：fail-open 会把瞬断当空树，
+ *  apply 误建重复槽） */
 export async function listDocsByPath(notebook: string, path: string): Promise<any[]> {
-  const d = await call("/api/filetree/listDocsByPath", { notebook, path, maxListCount: 0 })
+  const d = await call("/api/filetree/listDocsByPath", { notebook, path, maxListCount: 0, sort: 15 })
     .catch((e: any) => {
       if (/code=-1(?!\d)/.test(String(e?.message ?? e))) return null;
       throw e;

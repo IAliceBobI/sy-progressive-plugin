@@ -114,6 +114,7 @@ import {
     MarkdownExport确保导出符合配置,
 } from "../MarkdownExportBox";
 import { PrefixArticles前缀文档树 } from "../PrefixArticles";
+import { KnowledgeBox知识库面板 } from "../KnowledgeBox";
 import {
     ListBox取消勾选当前文档所有已完成的todo任务,
     ListBox删除当前文档所有已完成的todo任务,
@@ -351,6 +352,7 @@ export const COMMAND_GROUPS: GatedCommandGroup[] = [
         label: () => tomatoI18n.文档管理,
         items: [
             { langKey: PrefixArticles前缀文档树.langKey, label: () => PrefixArticles前缀文档树.langText(), hk: PrefixArticles前缀文档树 },
+            { langKey: KnowledgeBox知识库面板.langKey, label: () => KnowledgeBox知识库面板.langText(), hk: KnowledgeBox知识库面板 },
             { langKey: ListBox取消勾选当前文档所有已完成的todo任务.langKey, label: () => ListBox取消勾选当前文档所有已完成的todo任务.langText(), hk: ListBox取消勾选当前文档所有已完成的todo任务 },
             { langKey: ListBox删除当前文档所有已完成的todo任务.langKey, label: () => ListBox删除当前文档所有已完成的todo任务.langText(), hk: ListBox删除当前文档所有已完成的todo任务 },
         ],

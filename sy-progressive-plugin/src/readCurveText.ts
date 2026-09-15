@@ -17,14 +17,18 @@ export interface MaterialHint {
 }
 
 /** 复习卡徽标进度文案：daily=第 N/5 天 / grow=N/5（count+1=当前第几见）/ sched=每 N 天；
- *  count=4（第 5 见）=最后一见。素材卡（material）无五轮毕业语义——count 不封顶也不
- *  毕业（消耗驱动出池），「N/5·最后一见」恒误导，徽标回落素材身份标签。毕业/垃圾/空 →
- *  null（徽标不挂） */
-export function badgeSpec(readcard: string, material = false): { text: string; lastSee: boolean } | null {
+ *  count=4（第 5 见）=最后一见。素材卡（material）无五轮毕业语义——count 不封顶也不毕业
+ *  （消耗驱动出池），「N/5·最后一见」恒误导；徽标进度=「剩 M 条」为主（matRemaining=该书
+ *  未锤素材数，剩余量才是素材进度真值，含当前卡），查询未及/失败（undefined 宁缺毋错）
+ *  回落「第 N 见」兜底（count+1 开放无上限）。毕业/垃圾/空 → null（徽标不挂） */
+export function badgeSpec(readcard: string, material = false, matRemaining?: number): { text: string; lastSee: boolean } | null {
     const st = parseReadCard(readcard);
     if (!st || st.graduated) return null;
     if (st.mode === "sched") return { text: tomatoI18n.计划每N天(st.count), lastSee: false };
-    if (material) return { text: tomatoI18n.素材, lastSee: false };
+    if (material) {
+        if (matRemaining != null) return { text: tomatoI18n.素材剩N条(matRemaining), lastSee: false };
+        return { text: tomatoI18n.素材第N见(st.count + 1), lastSee: false };
+    }
     const n = Math.min(st.count + 1, GRADUATE_ROUNDS);
     return {
         text: st.mode === "daily" ? tomatoI18n.阅读卡第N天(n, GRADUATE_ROUNDS) : tomatoI18n.阅读卡进度N(n, GRADUATE_ROUNDS),

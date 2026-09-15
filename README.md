@@ -52,15 +52,15 @@ Finally finish what you read — and what you write: progressive reading digests
 
 ## Free vs Pro
 
-One rule of thumb: **the whole reading & writing loop is free — unlimited books, pieces, excerpts and views**. Pro adds the automation layer: letting the machine do the repetitive splitting, converting and comparing, plus decorating your workspace.
+One rule of thumb: **the whole reading & writing loop is free — unlimited books, pieces, excerpts and views**. Pro adds the automation layer: letting the machine do the repetitive splitting, extracting and converting, plus decorating your workspace.
 
 | Domain | Free | Pro adds |
 |---|---|---|
-| 📚 Reading | Add books, daily piece rolling, fleet & flame progress, floating bar, excerpts, all views, physical volume split for huge books | Auto sentence splitting |
-| ✍️ Writing | Writing books, three ways to feed slots, piece management, moving pieces across books | Compile pieces to draft; the writing-compare family |
-| 🎴 Cards | Word flashcards, cloze deletion, multi-line card creation, Daily Card, turning excerpts into review cards | Word lookup by AI |
+| 📚 Reading | Add books, daily piece rolling, fleet & flame progress, floating bar, excerpts, all views, physical volume split for huge books | Auto sentence splitting — books & excerpts sliced by sentence, no manual splitting |
+| ✍️ Writing | Writing books, three ways to feed slots, piece management, moving pieces across books | Compile finalized pieces into a standalone draft, material to work in one step; extract notes (all / current piece / append to bottom) — gather them as you finish; one-click note-color strip & restore |
+| 🎴 Cards | Word flashcards, cloze deletion, multi-line card creation, Daily Card, turning excerpts into review cards | AI word lookup — saving words is free; AI translation & example sentences are Pro |
 | 📥 Collection | — | Collect selected content to a file (Shift+Alt+O), merging as you go |
-| 🎨 Appearance | Native look — clean and distraction-free | Skin sets |
+| 🎨 Appearance | Native look — clean and distraction-free | Skin sets — a whole new look in one click |
 
 **Pro is ¥72, one-time** — and it gifts [Recite Practice](https://github.com/IAliceBobI/sy-recite-plugin) **Pro** (¥10, yours for free): activate once, own both. Purchase & activation: plugin settings → order → paste the redemption code back in settings — it binds to your SiYuan account automatically.
 

@@ -2,6 +2,7 @@ import { DestroyManager } from "./libs/destroyer";
 import { getDocTracer } from "./libs/docUtils";
 import { events } from "./libs/Events";
 import { getTomatoPluginInstance, siyuan } from "./libs/utils";
+import { sqlQuoteStr } from "./libs/strUtils";
 import { winHotkey } from "./libs/winHotkey";
 import { gatedAddCommand } from "./libs/cmdGate";
 import { addIfVisible } from "./libs/menuManager";
@@ -178,7 +179,7 @@ export async function getPrefixDocs(docID: string, name: string, force = false) 
         .then(r => r.filter(i => !!i))
     if (tags.length > 1) {
         if (force) {
-            await tryFixTracerByLike(tags.map(p => `content like "%${p}%"`).join(" or "))
+            await tryFixTracerByLike(tags.map(p => `content like ${sqlQuoteStr("%" + p + "%")}`).join(" or "))
         }
         for (const part of tags) {
             for (const [id, block] of tracer.getDocMap().entries()) {
@@ -197,7 +198,7 @@ export async function getPrefixDocs(docID: string, name: string, force = false) 
         return prefixDocs
     } else {
         if (force) {
-            await tryFixTracerByLike(prefixDocs.map(p => `content like "${p.prefix.trim()}%"`).join(" or "))
+            await tryFixTracerByLike(prefixDocs.map(p => `content like ${sqlQuoteStr(p.prefix.trim() + "%")}`).join(" or "))
         }
         for (const [id, block] of tracer.getDocMap().entries()) {
             const docName = block.content;
@@ -217,6 +218,9 @@ export async function getPrefixDocs(docID: string, name: string, force = false) 
 function prune(prefixDocs: ArticlesPrefix[], docID: string, MAX_RESULTS: number) {
     const result: ArticlesPrefix[] = [];
     let idx = prefixDocs.findIndex(d => d.id === docID)
+    // 当前文档不在候选集（前缀失联/tracer 过期）：at(-1)=末元素错锚+窗口从两头错位拼——
+    // 退化为取排序后前 MAX 条（调用方已 titleSort，语义=最靠近字典序头部的一组）
+    if (idx < 0) return prefixDocs.slice(0, MAX_RESULTS);
     let left = idx - 1
     let right = idx + 1
     result.push(prefixDocs.at(idx))

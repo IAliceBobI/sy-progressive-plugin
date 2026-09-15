@@ -5,6 +5,7 @@
     import { getDocTracer, OpenSyFile2, resetDocTracer } from "./libs/docUtils";
     import { reloadSelfPlugin } from "./libs/pluginReload";
     import { getTomatoPluginInstance, Siyuan, siyuan } from "./libs/utils";
+    import { sqlQuoteStr } from "./libs/strUtils";
     import { events, EventType } from "./libs/Events";
     import { getPrefixDocs } from "./PrefixArticles";
     import { Protyle } from "siyuan";
@@ -125,7 +126,8 @@
         }
         await siyuan.createSnapshot("tomato-prefix-rename");
         const rows = await siyuan.sql(
-            `select id,content,box,path from blocks where type='d' and content like "${oldPrefix}%" limit 999999`,
+            // 用户输入直拼 SQL 掺引号会炸语句（内核静默 null）——like 值整体过 sqlQuoteStr
+            `select id,content,box,path from blocks where type='d' and content like ${sqlQuoteStr(oldPrefix + "%")} limit 999999`,
         );
         for (const row of rows) {
             const title = row.content.replace(oldPrefix, newPrefix);

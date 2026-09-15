@@ -709,6 +709,16 @@ export const prefixArticlesEnable = settingFactory("prefixArticlesEnable", false
 export const prefixArticlesSoftLimit = settingFactory("prefixArticlesSoftLimit", "50", STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesMenu = settingFactory("prefixArticlesMenu", true, STORAGE_SETTINGS, null as TSK);
 export const prefixArticlesTagsShow = settingFactory("prefixArticlesTagsShow", false, STORAGE_SETTINGS, null as TSK);
+// 知识库面板（knowledgebox 原型期）：总开关+右键菜单开关+自动同步间隔（分钟，0=关）
+export const knowledgeBoxCheckbox = settingFactory("knowledgeBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
+export const knowledgeMenu = settingFactory("knowledgeMenu", true, STORAGE_SETTINGS, null as TSK);
+export const knowledgeAutoSyncMin = settingFactory("knowledgeAutoSyncMin", "30", STORAGE_SETTINGS, null as TSK);
+// 知识库通道（□3 智谱首发）：配置项少而清晰（bear 深夜拍板「MCP 一句话配置」铺路=Key 一项+可选库名）；
+// kb_id 等派生状态不进设置（petal knowledge-channel.json）
+export const zhipuApiKey = settingFactory("zhipuApiKey", "", STORAGE_SETTINGS, null as TSK);
+export const zhipuKbName = settingFactory("zhipuKbName", "", STORAGE_SETTINGS, null as TSK);
+// 文档树文件批处理三件套（合并/导出单文件/导入MD）右键菜单总开关（□5 结构缺口：此前只有 hiddenMenuItems 逐项）
+export const exportFilesMenu = settingFactory("exportFilesMenu", true, STORAGE_SETTINGS, null as TSK);
 export const markdownExportBoxCheckbox = settingFactory("markdownExportBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const floatingballEnable = settingFactory("floatingballEnable", false, STORAGE_SETTINGS, null as TSK);
 export const floatingballDocList = settingFactory("floatingballDocList", [] as FloatingDocItem[], STORAGE_SETTINGS, null as TSK);
@@ -731,10 +741,6 @@ export const mindWireStarRefOnly = settingFactory("mindWireStarRefOnly", true, S
 export const mindWireWordWire = settingFactory("mindWireWordWire", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxMenuShow = settingFactory("aiBoxMenuShow", true, STORAGE_SETTINGS, null as TSK);
 export const aiBoxPrompts = settingFactory("aiBoxPrompts", [], STORAGE_SETTINGS, null as TSK);
-export const cozeSearchSpaceID = settingFactory("cozeSearchSpaceID", "", STORAGE_SETTINGS, null as TSK);
-export const cozeSearchKnowledgeID = settingFactory("cozeSearchKnowledgeID", "", STORAGE_SETTINGS, null as TSK);
-export const cozeSearchOauthTokenID = settingFactory("cozeSearchOauthTokenID", "", STORAGE_SETTINGS, null as TSK);
-export const cozeSearchAppID = settingFactory("cozeSearchAppID", "", STORAGE_SETTINGS, null as TSK);
 export const fastNoteBoxCheckbox = settingFactory("fastNoteBoxCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const fastNoteBoxDisableBK = settingFactory("fastNoteBoxDisableBK", true, STORAGE_SETTINGS, null as TSK);
 export const fastNoteBoxAdd2Flashcard = settingFactory("fastNoteBoxAdd2Flashcard", false, STORAGE_SETTINGS, null as TSK);

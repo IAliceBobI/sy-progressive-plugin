@@ -286,7 +286,8 @@ export class DigestBuilder {
 // ============ □11 浮层族数据层（trace 文档机制的「拉」版替代，getDigestLnk SQL 链路复用） ============
 
 /** 摘抄树节点：children=本摘抄上再摘抄的支路（支路→主干）；done=🔨 完成态（读侧保留）；
- *  badge=floatbar □1 类型小标（清单组件用 digestBadgeInputsOf 采集后填充，queryDigestTree 不填） */
+ *  badge=floatbar □1 类型小标（清单组件用 digestBadgeInputsOf 采集后填充，queryDigestTree 不填）；
+ *  created=块创建 14 位时间戳（loosemat □6 Q3：ctime 缺/脏时排序兜底） */
 export interface DigestTreeNode {
     id: string;
     title: string;
@@ -294,6 +295,7 @@ export interface DigestTreeNode {
     done: boolean;
     children: DigestTreeNode[];
     badge?: import("./digestBadge").DigestBadge;
+    created?: string;
 }
 
 export interface DigestTreeData {
@@ -307,7 +309,7 @@ export interface DigestTreeData {
 // doneCtime 迁至 progData.ts（vitest 链禁 .svelte——纯函数落纯模块可单测）；re-export
 // 保外部消费不变，另 import 原名供 queryDigestTree 内部引用（export…from 不占本地绑定）
 export { doneCtime } from "./progData";
-import { doneCtime } from "./progData";
+import { doneCtime, ctimeSortKey } from "./progData";
 
 /**
  * 查书的全摘抄树（路线图浮层/原文侧追溯浮层共用）：SQL 取书+全部摘抄文档（ctime
@@ -318,7 +320,7 @@ import { doneCtime } from "./progData";
 export async function queryDigestTree(bookID: string): Promise<DigestTreeData> {
     // 外层显式 limit 防内核 64 截尾：内核只看最外层 SELECT 有无 LIMIT（block_query.go
     // getLimitClause），子查询自带的 limit 1000000 挡不住——摘抄 >64 篇的书整树丢节点
-    const rows = await siyuan.sql(`select ial,content,id from blocks where id = "${bookID}" or id in
+    const rows = await siyuan.sql(`select ial,content,id,created from blocks where id = "${bookID}" or id in
         (select block_id from attributes where name="${PDIGEST_CTIME}" and (value like "${bookID}#%" or value like "🔨#${bookID}#%") limit 1000000) limit 10000000`);
     let bookName = "";
     const nodes: DigestTreeNode[] = [];
@@ -331,7 +333,7 @@ export async function queryDigestTree(bookID: string): Promise<DigestTreeData> {
         }
         const ct = a[PDIGEST_CTIME] ?? "";
         // 排序统一按剥前缀后的真实时间；done 单独记，弱化渲染用
-        nodes.push({ id: r.id, title: r.content ?? "", ctime: doneCtime(ct) ?? ct, done: doneCtime(ct) != null, children: [] });
+        nodes.push({ id: r.id, title: r.content ?? "", ctime: doneCtime(ct) ?? ct, done: doneCtime(ct) != null, children: [], created: r.created ?? "" });
         parentOf.set(r.id, a["custom-pdigest-parent-id"] ?? "");
     }
     const byId = new Map(nodes.map(n => [n.id, n]));
@@ -361,7 +363,10 @@ export async function queryDigestTree(bookID: string): Promise<DigestTreeData> {
             stack.push(...m.children);
         }
     }
-    const byCtimeDesc = (a: DigestTreeNode, b: DigestTreeNode) => -a.ctime.localeCompare(b.ctime);
+    // loosemat □6 Q3：ctime 末段缺/脏回落块 created（ctimeSortKey 数值比较——
+    // 良构 13 位毫秒串等长，与原 localeCompare 字典序结果一致零回归）
+    const byCtimeDesc = (a: DigestTreeNode, b: DigestTreeNode) =>
+        ctimeSortKey(b.ctime, b.created) - ctimeSortKey(a.ctime, a.created);
     roots.sort(byCtimeDesc);
     const sortTree = (list: DigestTreeNode[]) => {
         list.sort(byCtimeDesc);
@@ -475,6 +480,8 @@ export interface MaterialPoolItem {
     /** 剥 🔨 前缀后的毫秒时间串（排序键） */
     ctime: string;
     done: boolean;
+    /** 块创建 14 位时间戳（loosemat □6 Q3：ctime 缺/脏时排序兜底） */
+    created?: string;
 }
 
 export interface MaterialPoolGroup {
@@ -488,7 +495,7 @@ export interface MaterialPoolGroup {
  *  ctime 倒序，组间=组内最新在前（活跃源书优先）。外层显式 limit 防内核 64 截尾 */
 export async function queryMaterialPool(): Promise<MaterialPoolGroup[]> {
     const rows = await siyuan.sql(
-        `select a.block_id as id, a.value as ctime, b.content from attributes a` +
+        `select a.block_id as id, a.value as ctime, b.content, b.created from attributes a` +
         ` join blocks b on b.id = a.block_id and b.type = 'd'` +
         ` where a.name = '${PDIGEST_CTIME}' limit 10000000`) as any[] ?? [];
     const groups = new Map<string, MaterialPoolGroup>();
@@ -503,10 +510,10 @@ export async function queryMaterialPool(): Promise<MaterialPoolGroup[]> {
             g = { key, name: "", items: [] };
             groups.set(key, g);
         }
-        g.items.push({ id: r.id, title: r.content ?? "", ctime: ct, done });
+        g.items.push({ id: r.id, title: r.content ?? "", ctime: ct, done, created: r.created ?? "" });
     }
     for (const g of groups.values()) {
-        g.items.sort((a, b) => Number(b.ctime || 0) - Number(a.ctime || 0));
+        g.items.sort((a, b) => ctimeSortKey(b.ctime, b.created) - ctimeSortKey(a.ctime, a.created));
     }
     // 组名：booksInfos bookName 缓存优先，缺失批量 SQL（源可能是普通文档=自由态摘抄）
     const { progStorage } = await import("./ProgressiveStorage");
@@ -523,6 +530,8 @@ export async function queryMaterialPool(): Promise<MaterialPoolGroup[]> {
         for (const r of nameRows) nameMap.set(r.id, r.content ?? "");
     }
     const out = [...groups.values()].map(g => ({ ...g, name: nameMap.get(g.key) || g.key }));
-    out.sort((a, b) => Number(b.items[0]?.ctime || 0) - Number(a.items[0]?.ctime || 0));
+    out.sort((a, b) =>
+        ctimeSortKey(b.items[0]?.ctime ?? "", b.items[0]?.created) -
+        ctimeSortKey(a.items[0]?.ctime ?? "", a.items[0]?.created));
     return out;
 }

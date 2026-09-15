@@ -63,6 +63,13 @@ export function getDocIalAllInOneKey(bookID: string): string {
     return `allInOneKeysDoc#${TEMP_CONTENT}#${bookID}`;
 }
 
+/** AI 成稿文档锚（loosemat □7 structure_compose 产物，落书下）：编译产物同族排除
+ *  语义但**多稿并存**（迭代起草常态）——不走 ensureAnchoredDoc 单例认回，排除面
+ *  按 attributes 查询全量命中天然支持多文档同锚；勿对它做 findDocByIal（多值无主） */
+export function getDocIalComposeDoc(bookID: string): string {
+    return `composedoc#${TEMP_CONTENT}#${bookID}`;
+}
+
 export function getDocIalWords(bookID: string): string {
     return `words#${TEMP_CONTENT}#${bookID}`;
 }
@@ -287,12 +294,32 @@ export function doneCtime(v: string): string | null {
     return v.startsWith("🔨#") ? v.slice("🔨#".length) : null;
 }
 
-/** □6 ctime 值末段 14 位→ms（🔨 锤前缀保留原 ts=摘抄时刻）；坏值/空值 null */
+/** □6 ctime 值末段→ms（🔨 锤前缀保留原 ts=摘抄时刻）；坏值/空值 null。
+ *  两形态并收（loosemat □6 期间实锤）：实盘主力=13 位毫秒（digestUtils/
+ *  writeBook 两写点 Date.now()）；14 位 yyyyMMddHHmmss 兼容收（parseStamp
+ *  归一）——首版只认 14 位对实盘恒 null，digestCountsInWindow 窗口计数空转
+ *  （autoRelaxSweep 放宽判定被污染，主实例 attributes 采样实锤后补 13 位门） */
 export function tsMsOfCtimeValue(v: string): number | null {
     const s = String(v ?? "");
     const clean = s.startsWith("🔨#") ? s.slice("🔨#".length) : s;
     const seg = clean.split("#")[1] ?? "";
+    if (/^\d{13}$/.test(seg)) return Number(seg);
     return /^\d{14}$/.test(seg) ? parseStamp(seg) : null;
+}
+
+/** 素材排序键（loosemat □6 Q3 兜底）：ctime 末段毫秒优先（实盘形态=13 位 ms，
+ *  digestUtils/writeBook 两写点 Date.now()；🔨 前缀剥掉），缺/脏回落块 created
+ *  （14 位 yyyyMMddHHmmss，parseStamp 归一 ms——本地时近似，同库同区单调即可）；
+ *  两者皆废 → 0（沉底最老）。仅排序用途，不改 membership 判定。 */
+export function ctimeSortKey(ctimeRaw: string, created?: string): number {
+    const seg = (ctimeRaw ?? "").replace(/^🔨#/, "").split("#").pop() ?? "";
+    const n = Number(seg);
+    if (Number.isFinite(n) && n > 0) return n;
+    if (created && /^\d{14}$/.test(created)) {
+        const t = parseStamp(created);
+        if (Number.isFinite(t)) return t;
+    }
+    return 0;
 }
 
 /** □6 窗口内摘抄计数：PDIGEST_CTIME 全量行→按书 Map（锤行同计——锤=消耗非产出撤销；

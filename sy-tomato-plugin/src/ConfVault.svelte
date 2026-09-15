@@ -9,9 +9,13 @@
         prefixArticlesEnable,
         prefixArticlesMenu,
         prefixArticlesSoftLimit,
+        knowledgeBoxCheckbox,
+        knowledgeMenu,
+        knowledgeAutoSyncMin,
         hiddenMenuItems,
     } from "./libs/stores";
     import { PrefixArticles前缀文档树 } from "./PrefixArticles";
+    import { KnowledgeBox知识库面板 } from "./KnowledgeBox";
     import {
         MixBox复制文档为纯文本,
         MixBox空格隔开的所有内容都转为引用,
@@ -79,6 +83,24 @@
             <div>
                 <input class="b3-text-field" bind:value={$prefixArticlesSoftLimit} />
                 {tomatoI18n.最大列出的文件数量}
+            </div>
+        {/if}
+    </div>
+    <!-- 知识库面板（knowledgebox 原型期）：同步管理+问答双区 dock 面板 -->
+    <div class="settingBox">
+        <div class="section-title">
+            <input type="checkbox" class="b3-switch" bind:checked={$knowledgeBoxCheckbox} />
+            {tomatoI18n.知识库同步}
+        </div>
+        {#if $knowledgeBoxCheckbox}
+            <div>
+                <input type="checkbox" class="b3-switch" bind:checked={$knowledgeMenu} />
+                {tomatoI18n.menu添加右键菜单}: {tomatoI18n.同步到知识库}
+                <HotkeyCap hk={KnowledgeBox知识库面板} pluginName="sy-tomato-plugin"></HotkeyCap>
+            </div>
+            <div>
+                <input class="b3-text-field" style="width:48px" bind:value={$knowledgeAutoSyncMin} />
+                {tomatoI18n.自动同步间隔分钟}
             </div>
         {/if}
     </div>

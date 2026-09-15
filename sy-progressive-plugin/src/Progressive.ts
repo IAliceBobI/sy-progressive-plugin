@@ -1300,7 +1300,10 @@ class Progressive {
     async openDigestSummary(bookID: string) {
         const dirID = await this.findDigestDir(bookID);
         if (!dirID) {
-            await siyuan.pushMsg(tomatoI18n.本书还没有摘抄);
+            // matflow □2（评审 P1-3）：写作书语境该域叫素材——空池是新写作书常态，
+            // 「还没有摘抄」会把用户引去找不到的「摘抄」入口（判定同 isMaterialDoc 款）
+            await siyuan.pushMsg(progStorage.peekBookInfo(bookID)?.writing
+                ? tomatoI18n.本书还没有素材 : tomatoI18n.本书还没有摘抄);
             return;
         }
         await OpenSyFile2(this.plugin, dirID);
@@ -1309,7 +1312,11 @@ class Progressive {
     /** 归档（书态 ghost，confirm）：原书退出一切推送，摘抄永久留存 */
     async archiveBookWithConfirm(bookID: string) {
         const name = await progStorage.bookName(bookID);
-        confirm("📦", tomatoI18n.归档本书确认.replace("{name}", name ?? bookID), async () => {
+        // matflow □2（评审 P2-3）：写作书语境 confirm 措辞跟 tip 归档写作书（素材与槽
+        // 永久留存——「原书/摘抄」在写作语境下指错对象）
+        const tmpl = progStorage.peekBookInfo(bookID)?.writing
+            ? tomatoI18n.归档写作书确认 : tomatoI18n.归档本书确认;
+        confirm("📦", tmpl.replace("{name}", name ?? bookID), async () => {
             await rollerArchiveBook(bookID);
             await siyuan.pushMsg(tomatoI18n.已归档本书);
             // confirm 落定后即时通知（□5 review P1-1：原本只靠 30s 刷新兜底，归档最后一本
