@@ -1483,7 +1483,7 @@
             await siyuan.pushMsg(tomatoI18n.分片编辑器未就绪);
             return;
         }
-        const s = await events.selectedDivs(protyle);
+        const s = await events.selectedDivs(protyle, { fine: true }); // fbfeat □5：容器内拖蓝收真选子块
         if (!s || s.ids.length === 0) {
             await siyuan.pushMsg(tomatoI18n.请先选择要摘抄的块);
             return;

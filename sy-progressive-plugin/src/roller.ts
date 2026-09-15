@@ -232,6 +232,14 @@ function makeRollerDeps(): RollerDeps {
                     if (isWritingFinished(await fetchWritingPieces(id)) && !(await hasUnreadMaterial(id))) s.add(id);
                     continue;
                 }
+                // □2 手动书进轮转（fbfeat，鸟 09-15）：片=摘抄，finished=0 未锤摘抄
+                // （判据与写作书素材同函数=语义统一）。today 无消费者给手动摘抄挂锤
+                // → 有摘抄即持续在池，退役=用户归档/忽略（手动书「读完」=用户判断，
+                // 无 point>=len 可依）；0 摘抄=finished（首读走点击引导开原书摘抄）
+                if (info.manualMode) {
+                    if (!(await hasUnreadMaterial(id))) s.add(id);
+                    continue;
+                }
                 const idx = await progStorage.loadBookIndexIfNeeded(id);
                 if (isFinished(info.point ?? 0, idx.length)) s.add(id);
             }

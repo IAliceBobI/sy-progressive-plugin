@@ -52,6 +52,7 @@ type TomatoSettings = {
     prefixArticlesEnable: boolean,
     floatingballDocMenu: boolean,
     floatingballEnable: boolean,
+    floatingballDocOpenBottom: boolean,
     floatingballDocList: FloatingDocItem[],
     floatingballKeyboardList: FloatingKeyboardItem[],
     floatingballBallList: BallItem[],

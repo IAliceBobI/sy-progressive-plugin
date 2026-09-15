@@ -132,6 +132,7 @@ class FlashBox {
                 els = collectSelectedBlocks(wysiwyg, {
                     range: detail.protyle?.toolbar?.range,
                     blockEl: (detail as any).element,
+                    fine: true, // fbfeat □5：拖蓝/块选细粒度，容器内不整锅端
                 }).blocks;
             }
             if (els.length === 0) return;
@@ -206,11 +207,13 @@ class FlashBox {
         if (!protyle) return;
         // 块级通道取块（2026-09-13 跨块修复，bear 拍板「直接使用这几个块」）：统一三级链
         // ——块多照旧 + 跨块拖蓝整块进卡不挖空。旧版只查块选类，思源 3.8 起拖蓝不再转
-        // 块选（issue 8554）漏检 → 退挖空分支只抓 endContainer 末块=前块蒸发
+        // 块选（issue 8554）漏检 → 退挖空分支只抓 endContainer 末块=前块蒸发。
+        // fine（fbfeat □5）：与摘抄同语义——容器内拖蓝收真选子块不整锅端（bear：两通道
+        // 行为应当一致）
         const wysiwyg = protyle?.wysiwyg?.element;
         const sel = document.getSelection();
         const live = sel?.rangeCount ? sel.getRangeAt(0) : undefined;
-        const chain = wysiwyg ? collectSelectedBlocks(wysiwyg, { range: live, cursorEl: utils.getCursorElement() }) : null;
+        const chain = wysiwyg ? collectSelectedBlocks(wysiwyg, { range: live, cursorEl: utils.getCursorElement(), fine: true }) : null;
         debugLog("flashcard", `makeCard t=${t} doc=${protyle.block?.rootID ?? "-"} level=${chain?.level} blocks=${chain?.blocks?.length} multi=${cardBlocksForMake(chain)?.length} lastBlock=${events.lastBlockID} blank=${(live?.cloneContents?.()?.textContent ?? "").length}`, "prog");
         const multi = cardBlocksForMake(chain);
         if (multi?.length) {

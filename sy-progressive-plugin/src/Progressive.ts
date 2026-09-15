@@ -30,7 +30,7 @@ import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCor
 import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
 import { HtmlCBType } from "./constants";
 import { lockWithLease, type LockLeaseResult } from "./lockLease";
-import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime } from "./progData";
+import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime, latestDigestAnchorOfBook } from "./progData";
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
@@ -41,6 +41,7 @@ import { getDailyCardDocID, getDailyPath } from "./FlashBox";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { findPieceByCandidates, resolveBookID } from "./contentsJump";
 import { queryDigestTree } from "./digestUtils";
+import { readPointBlockOfDoc } from "../../sy-tomato-plugin/src/libs/bookmark";
 import { fetchWritingPieces, pickWritingDispatch, listWritingSlotTargets, insertBlocksIntoPiece, insertDigestIntoPiece, moveDigestIntoPiece, pickWritingFlameBook, feedBlocksToPool, neighborWritingSlot, orderedWritingBooks, nextOfOrderedIDs, slotNameFromTitle, type WritingSlotTarget } from "./writeBook";
 import { fetchWritingTreeSlots } from "./writeTree";
 import { escapeHtml } from "./progData";
@@ -658,7 +659,7 @@ class Progressive {
                 for (const div of document.querySelectorAll(`div[${DATA_NODE_ID}="${blockID}"]`)) {
                     const refID = utils.getAttribute(div as any, RefIDKey)
                     if (refID) {
-                        OpenSyFile2(this.plugin, refID, "front", ["cb-get-context", "cb-get-focus", "cb-get-hl"]);
+                        OpenSyFile2(this.plugin, refID, "front", ["cb-get-context", "cb-get-hl"]); // bear 09-15 拍板全插件禁聚焦
                         return;
                     }
                 }
@@ -895,6 +896,9 @@ class Progressive {
 
     private async startToLearn(bookID = "", isRand = false, noCount = false) {
         let noteID = "";
+        // □2 手动书进轮转：无参调用=滚筒轮转路径（手动书落点分叉用）；带 bookID=
+        // 点击路径（书卡/管理页/浮条 ▶，保持 manualbook □3 直达最早摘抄）
+        const fromRoller = !bookID;
         if (!bookID) {
             // 滚筒出片：order 中 lastServed 之后第一个可读书（跳过忽略/归档/读完），出片即轮转
             bookID = await rollerNextBook();
@@ -905,9 +909,9 @@ class Progressive {
             if (blocked) {
                 await this.handleUnreadableBook("", blocked);
             } else if (Object.values(progStorage.booksInfos()).some(i => i?.manualMode && !i.ignored && !i.archived)) {
-                // 期3 手动分片书：书架可读书只剩手动书（空索引恒 finished 被滚筒排除），
-                // 给手动书对症指引，不再误报「您还没添加任何文档」
-                await siyuan.pushMsg(tomatoI18n.手动书不参与推送请点击书卡打开);
+                // □2 后手动书有未锤摘抄即在册可读——能落到这=所有手动书都 0 摘抄
+                // （或全锤），给「先摘一次」对症指引，不再误报「您还没添加任何文档」
+                await siyuan.pushMsg(tomatoI18n.手动书摘抄一次后进入轮转);
             } else {
                 siyuan.pushMsg(tomatoI18n.您还没添加任何文档);
             }
@@ -923,12 +927,18 @@ class Progressive {
             return;
         }
         const bookInfo = await progStorage.booksInfo(bookID);
-        // 期3 手动分片书：无自动片，统一拦截（Dock 书卡/管理页/浮条 ▶ 全入口）。manualbook □3
-        //  起：片=摘抄，点击直达最早一篇摘抄（鸟 09-08 17:41：手动书无续读指针，原 flat[0]
-        //  =ctime 最新的「续读」只是静态近似；自动书从第一片推进，跳最早才语义统一）；
-        //  0 片回落原行为（开原书+「请直接摘抄」引导）。无参滚筒路径不会选中手动书（空索引恒
-        //  finished），无需再判
+        // 手动分片书：无自动片，统一拦截（Dock 书卡/管理页/浮条 ▶ 点击入口）。manualbook
+        //  □3：片=摘抄，点击直达最早一篇摘抄（鸟 09-08 17:41：跳最早与自动书从第一片
+        //  推进语义统一）；0 片回落原行为（开原书+「请直接摘抄」引导）。□2（fbfeat，
+        //  鸟 09-15）滚筒路径也选中手动书了：轮到=回原书阅读点续读（与自动书「跳最新
+        //  阅读的那片」同语义），与点击路径分叉（见 openManualBookForRotation）
         if (bookInfo.manualMode) {
+            if (fromRoller) {
+                await this.openManualBookForRotation(bookID);
+                // 轮到=今日阅读+1（无 point 锚；与写作书素材分派同权计入 quota 池）
+                if (!noCount) await this.markReadSafe(bookID);
+                return;
+            }
             const tree = await queryDigestTree(bookID);
             if (tree.flat.length > 0) {
                 // flat 经 byCtimeDesc 全局降序（digestUtils queryDigestTree 尾部 flat.sort），
@@ -1337,6 +1347,28 @@ class Progressive {
         await OpenSyFile2(this.plugin, target);
     }
 
+    /** □2 手动书滚筒落点（鸟 09-15「回原书的阅读点，同自动切片的逻辑统一」）三级
+     *  兜底：①READAT 阅读点（番茄阅读点，一书一点——用户显式「读到这」，gotoBookmark
+     *  同解析口径）→ ②最新摘抄源锚（digestAddReadingpoint 默认关→阅读点常缺，最新
+     *  摘抄位=最近阅读位近似）→ ③原书顶部。openOriginBook 自带悬空锚兜底；一级
+     *  查询异常整链落 ③ 不静默死。 */
+    private async openManualBookForRotation(bookID: string) {
+        try {
+            const rpBlock = await readPointBlockOfDoc(bookID);
+            if (rpBlock) {
+                debugLog("manualrot", `serve book=${bookID} land=rp block=${rpBlock}`, "progressive");
+                await this.openOriginBook(bookID, rpBlock);
+                return;
+            }
+            const anchor = await latestDigestAnchorOfBook(bookID);
+            debugLog("manualrot", `serve book=${bookID} land=${anchor ? "anchor" : "top"} block=${anchor || "-"}`, "progressive");
+            await this.openOriginBook(bookID, anchor || undefined);
+        } catch (e) {
+            debugLog("manualrot", `serve fail book=${bookID}: ${e}`, "progressive");
+            await this.openOriginBook(bookID);
+        }
+    }
+
     /**
      * 片态浮条「回原书」（2026-08-31 升级，原=仅打开原书文档）：按文档序取片内首个带
      * custom-progref 的块定位跳原文位置——⌥⇧W 回程同款块级体验且免选块；旧片无 progref
@@ -1523,6 +1555,10 @@ class Progressive {
      *  防护同 openSlotMenuForDigest 的 P1-2 纪律） */
     openManagePoolDialog(bookID: string) {
         if (!bookID) return;
+        // 守卫：管理池=写作书专属（内含 🔨 批量锤）。今日三入口全写作门控，但浮条
+        // manifest 等未来入口若绕过门控，此处兜底防手动书摘抄被锤→书静默退出轮转
+        // （fbfeat □2 前提=无消费者给手动书摘抄挂锤，reasoning review P2 落守卫）
+        if (!progStorage.peekBookInfo(bookID)?.writing) return;
         showDialog((target, dm) => {
             return mount(DigestAllDialogSvelte, {
                 target,

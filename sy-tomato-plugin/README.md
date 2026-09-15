@@ -6,7 +6,7 @@ The all-in-one productivity toolbox for SiYuan — one plugin slot for a whole n
 
 - 🧰 **All-in-one toolbox** — 40+ features grouped by scenario: focus, reading, review, capture, references, visualization, AI. One install replaces a row of plugins
 - 🍅 **Status-bar Pomodoro** — one click to start; focus/break cycles rotate automatically, with configurable backgrounds and sounds
-- 🤖 **AI power** — knowledge-base Q&A grounded in your own notes, streaming answers with sources; annotation discussions can be saved as content blocks
+- 🤖 **AI power** — sync notes into a cloud knowledge base: Q&A grounded in your own notes with sources, and any MCP-connected AI tool can search it; annotation discussions can be saved as content blocks
 - 📖 **Reading input loop** — reading points remember where you stopped, annotations mark as you read, and what you read turns into review cards in one click
 - 🃏 **Flashcard power-ups** — priority ordering, image cloze, delete-while-reviewing, one-click cleanup of broken cards
 
@@ -58,6 +58,7 @@ The all-in-one productivity toolbox for SiYuan — one plugin slot for a whole n
 ### 🤖 AI
 
 - **AI knowledge-base Q&A** — ask questions over your own notes, streaming answers with sources
+- **Knowledge-base sync** — sync chosen docs (subdocs included) to Zhipu BigModel: per-doc whitelist, subtree exclusion, on-tree status marks; AI tools connected via SiYuan MCP can search it too
 
 > Plus a row of editor mini-tools: enhanced folding, multi-select, list tools, copy-as-image, document aliases… right in the context menu, no extra plugin slot needed.
 

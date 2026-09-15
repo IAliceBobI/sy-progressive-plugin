@@ -6,7 +6,8 @@
 import { objectSchema, successResponse, errorResponse, type ToolDefinition, type ToolResponse } from "./common";
 import type { ToolEnv } from "./env";
 
-const SETUP_HINT = "请在思源「设置 → 番茄 → AI 助手」填写智谱 API Key，并在「知识库」面板把要检索的文档加入同步白名单";
+// knowledgebox □9 后 Key 在「知识库」域（不再挂 AI 助手域）；□6 发版材料核对时修正
+const SETUP_HINT = "请在思源「设置 → 番茄 → 知识库」填写智谱 API Key，并在「知识库」面板把要检索的文档加入同步白名单";
 
 export function createKnowledgeTools(env: ToolEnv): ToolDefinition[] {
   const getChannel = env.getKbChannel;

@@ -1,6 +1,6 @@
 // v5 数据模型层：prog-data 锚定链（IAL 三段式 + ensure 认回）+ 归拢迁移。
 // 原则：插件内部一切引用走 ID/IAL，永不走路径；hpath 只在创建瞬间用作落点。
-import { TEMP_CONTENT, MarkKey, PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
+import { TEMP_CONTENT, MarkKey, PDIGEST_CTIME, PDIGEST_LAST_ID } from "../../sy-tomato-plugin/src/libs/gconst";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { parseStamp } from "./readCurveCore";
 
@@ -320,6 +320,55 @@ export function ctimeSortKey(ctimeRaw: string, created?: string): number {
         if (Number.isFinite(t)) return t;
     }
     return 0;
+}
+
+// □2 手动分片书进换书轮转（fbfeat，鸟 09-15「回原书阅读点」）：滚筒轮到手动书的
+// 落点二级兜底——阅读点缺失时（digestAddReadingpoint 默认关），最新摘抄位=最近
+// 阅读位近似，跳其源锚块续读。
+
+/** ctime 属性行 → 本书 ts 最大的摘抄块 id（纯函数，单测 tests/unit/manualRotation；
+ *  ts=tsMsOfCtimeValue 归一毫秒，13 位实盘/14 位兼容两形态同池比）。🔨 锤态同池
+ *  参选：位置证据不因已锤失效（与 matUnreadOfRows 分工——那边剔锤算「未读」，
+ *  这边含锤算「最近位置」）；他书行/坏行/缺 block_id 剔除；无命中返 ""。 */
+export function latestDigestBlockOfRows(rows: { block_id?: unknown; value?: unknown }[], bookID: string): string {
+    let best = "";
+    let bestTs = -1;
+    for (const r of rows ?? []) {
+        const id = String(r?.block_id ?? "");
+        const v = String(r?.value ?? "");
+        if (!id) continue;
+        const clean = doneCtime(v) ?? v;
+        const i = clean.indexOf("#");
+        if (i <= 0 || clean.slice(0, i) !== bookID) continue;
+        const ts = tsMsOfCtimeValue(v);
+        if (ts == null || ts <= bestTs) continue;
+        bestTs = ts;
+        best = id;
+    }
+    return best;
+}
+
+/** 本书最新摘抄的源锚块（custom-pdigest-last-id；digestUtils 建摘时锚=原文书内块）。
+ *  查询失败/无摘抄/无锚属性返 ""（调用方落原书顶部兜底）。 */
+export async function latestDigestAnchorOfBook(bookID: string): Promise<string> {
+    try {
+        const rows = await siyuan.sqlAttr(
+            `select block_id, value from attributes where name="${PDIGEST_CTIME}"` +
+            ` and (value like "${bookID}#%" or value like "🔨#${bookID}#%") limit 1000000`) as any[];
+        const latest = latestDigestBlockOfRows(rows ?? [], bookID);
+        if (!latest) return "";
+        // getBlockAttrs 读通道偶发回空 map（cache 命中窗竞态，踩坑索引 09-13 三验）——
+        // ctime 行刚在 SQL 命中的文档 IAL 恒非空，空读=闪烁：重试一次再判，防真锚被
+        // 误判缺失落原书顶部（落点不稳定削「回阅读点」核心承诺，review P1）
+        let attrs = (await siyuan.getBlockAttrs(latest)) ?? {};
+        if (!Object.keys(attrs).length) {
+            await new Promise(r => setTimeout(r, 150));
+            attrs = (await siyuan.getBlockAttrs(latest)) ?? {};
+        }
+        return String((attrs as any)[PDIGEST_LAST_ID] ?? "");
+    } catch {
+        return "";
+    }
 }
 
 /** □6 窗口内摘抄计数：PDIGEST_CTIME 全量行→按书 Map（锤行同计——锤=消耗非产出撤销；

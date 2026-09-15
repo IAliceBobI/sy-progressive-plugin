@@ -71,7 +71,8 @@ class DigestProgressiveBox {
                 await siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
                 return;
             }
-            const s = await events.selectedDivs(protyle);
+            // fine（fbfeat □5）：容器内拖蓝摘抄收用户真选的子块，不整锅端容器
+            const s = await events.selectedDivs(protyle, { fine: true });
             const di = await initDi(s, protyle, this.settings);
             const cm = cardModeFor(intent);
             if (cm) di.cardMode = cm;

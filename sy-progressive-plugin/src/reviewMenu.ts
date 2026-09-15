@@ -343,7 +343,8 @@ function reviewRowItem(
         click: async () => {
             await OpenSyFile2(
                 getProgressivePluginInstance() as any, r.id, "front",
-                ["cb-get-context", "cb-get-focus", "cb-get-hl"]);
+                // bear 09-15 拍板全插件禁聚焦：去掉 cb-get-focus 只留滚动定位
+                ["cb-get-context", "cb-get-hl"]);
         },
         submenu: future ? [
             {

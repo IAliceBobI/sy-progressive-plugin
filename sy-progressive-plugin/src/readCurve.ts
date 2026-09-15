@@ -249,7 +249,9 @@ async function computeTargets(noCreate: boolean, readcards?: Map<string, string>
         const info = infos[bookID];
         if (!info || info.ignored || info.archived || lost.has(bookID)) continue; // 忽略/归档/丢失：曲线族 sink 沉底
         gateOpen.set(bookID, (todayReads[bookID] ?? 0) < quota);
-        if (info.manualMode) continue; // 手动书滚筒排除，不投影（曲线卡同沉底；digest 也不自动建）
+        // 手动书曲线层排除（fbfeat □2 后滚筒层已纳入轮转——两层独立拍板：曲线是实验
+        // 特性，手动书不投影、曲线卡沉底、digest 也不自动建，语义维持）
+        if (info.manualMode) continue;
         // readable 在 manualMode 之后（review P2-1）：手动书不在册可读集，其曲线卡到期
         // 照沉底——否则与上行注释矛盾（到期重现打扰手动阅读节奏）
         readable.add(bookID);

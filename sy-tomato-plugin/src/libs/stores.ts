@@ -727,6 +727,8 @@ export const floatingballDocTabMenu = settingFactory("floatingballDocTabMenu", t
 export const floatingballKeyboardList = settingFactory("floatingballKeyboardList", [] as FloatingKeyboardItem[], STORAGE_SETTINGS, null as TSK);
 // 悬浮球翻新期1：统一球列表（旧 doc/keyboard 两列表启动时迁移进来后清空，见 FloatingBall.ts）
 export const floatingballBallList = settingFactory("floatingballBallList", [] as BallItem[], STORAGE_SETTINGS, null as TSK);
+// fbfeat □1：文档球打开落底（速记「接着写」场景；默认关与 dailyNoteGoToBottom 先例一致）
+export const floatingballDocOpenBottom = settingFactory("floatingballDocOpenBottom", false, STORAGE_SETTINGS, null as TSK);
 export const markdownExportPics = settingFactory("markdownExportPics", false, STORAGE_SETTINGS, null as TSK);
 export const mindWireCheckbox = settingFactory("mindWireCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const mindWireEnable = settingFactory("mindWireEnable", true, STORAGE_SETTINGS, null as TSK);

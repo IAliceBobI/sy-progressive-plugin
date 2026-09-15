@@ -187,7 +187,7 @@ async function getDue(input: Record<string, any>) {
       items,
     },
     pieces,
-    hint: "revisit=到期重访（think=块级思考/pdigest=文档级复访；id 可跳转：think 为块 id、pdigest 为摘抄文档 id）；pieces=渐进阅读片队列（quotaToday=今日档位/readToday=今日已读/debt=累积欠债/nextBooks=滚筒接下来会轮到的书·只读模拟非精确承诺）",
+    hint: "revisit=到期重访（think=块级思考/pdigest=文档级复访；id 可跳转：think 为块 id、pdigest 为摘抄文档 id）；pieces=渐进阅读片队列（quotaToday=今日档位/readToday=今日已读/debt=累积欠债/nextBooks=滚筒接下来会轮到的书·只读模拟非精确承诺，不含手动分片书与写作书——前端滚筒已纳入手动书，本模拟面未跟随）",
   });
 }
 
@@ -203,6 +203,9 @@ async function simulateNextBooks(n: number): Promise<{ bookID: string; title: st
     bookTitles(entries.map(([id]) => id)),
   ]);
   // 索引长度逐书读（petal 本地读，书数量级 IO 可接受；手动/写作书恒空=滚筒本就不推）
+  // 索引长度逐书读（petal 本地读，书数量级 IO 可接受）；手动/写作书不进本模拟
+  // （readable 双排除）——fbfeat □2 后前端滚筒已纳入手动书，kernel 模拟面维持不
+  // 跟随（bookStatus 报身份态同理；hint 已注明），真需求出现再对齐
   const pieceCounts = new Map<string, number>();
   for (const [id, info] of entries) {
     pieceCounts.set(id, (info.writing || info.manualMode) ? 0 : (await readBookIndex(id)).length);

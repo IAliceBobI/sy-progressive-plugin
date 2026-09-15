@@ -5,8 +5,9 @@
     import { onMount } from "svelte";
     import { getTomatoPluginInstance } from "./libs/utils";
     import { createFrontendToolEnv } from "./agentToolBridge";
-    import { loadKS, removeFromSync, syncAll, checkChanges, type KSyncData, type SyncProgress } from "./libs/knowledgeSync";
+    import { loadKS, removeFromSync, syncAll, checkChanges, isSyncBusy, type KSyncData, type SyncProgress } from "./libs/knowledgeSync";
     import { createDefaultChannel } from "./libs/knowledgeChannel";
+    import { kbTreeMarkRefresh } from "./KnowledgeTreeMark";
     import { renderMD } from "./libs/mdRender";
     import { zhipuApiKey } from "./libs/stores";
     import { tomatoI18n } from "./tomatoI18n";
@@ -43,6 +44,7 @@
             });
             progress = `${tomatoI18n.同步完成}：${tomatoI18n.更新} ${r.ok} · ${tomatoI18n.跳过} ${r.skip} · ${tomatoI18n.失败} ${r.fail}`;
             data = await loadKS();
+            kbTreeMarkRefresh();
         } catch (e: any) {
             progress = `${e?.message ?? e}`;
         } finally {
@@ -56,6 +58,7 @@
         progress = "";
         try {
             data = await checkChanges(env);
+            kbTreeMarkRefresh();
         } finally {
             busy = false;
         }
@@ -63,9 +66,10 @@
 
     async function onRemove(docID: string) {
         // 同步进行中禁移除（review P1-3：syncAll 循环里 saveKS 会用旧实例整体覆盖落盘，
-        // 把刚移除的文档复活回白名单）
-        if (busy) return;
+        // 把刚移除的文档复活回白名单）；autoTimer 后台同步不置面板 busy——补 isSyncBusy（review P0-1）
+        if (busy || isSyncBusy()) return;
         data = await removeFromSync([docID]);
+        kbTreeMarkRefresh();
     }
 
     function scrollMsgs() {
@@ -112,15 +116,16 @@
         }
     }
 
-    function stateBadge(docID: string): { text: string; cls: string } {
+    function stateBadge(docID: string): { text: string; cls: string; tip?: string } {
         const s = data.state[docID];
         if (!s) return { text: tomatoI18n.未同步, cls: "none" };
-        if (!s.ok) return { text: `${tomatoI18n.同步失败}`, cls: "fail" };
+        if (!s.ok) return { text: `${tomatoI18n.同步失败}`, cls: "fail", tip: s.err ?? "" };
         if (s.changed) return { text: tomatoI18n.待同步, cls: "chg" };
         const t = new Date(s.syncedAt);
         const hh = String(t.getHours()).padStart(2, "0");
         const mm = String(t.getMinutes()).padStart(2, "0");
-        return { text: `${tomatoI18n.已同步} ${hh}:${mm}`, cls: "ok" };
+        // ok 态缩短为纯时间（vision P1-2：窄面板行内元素挤标题；颜色语义+tooltip 已表达「已同步」）
+        return { text: `${hh}:${mm}`, cls: "ok", tip: `${tomatoI18n.已同步} ${hh}:${mm}` };
     }
 </script>
 
@@ -145,10 +150,20 @@
             {:else}
                 {#each data.list as item (item.docID)}
                     {@const badge = stateBadge(item.docID)}
+                    {@const st = data.state[item.docID]}
                     <div class="kb-row">
                         <span class="kb-dot kb-dot--{badge.cls}"></span>
                         <span class="kb-name" title={item.hpath}>{item.title}</span>
-                        <span class="kb-badge kb-badge--{badge.cls}">{badge.text}</span>
+                        {#if st && ((st.childCount ?? 0) > 1 || (st.excludedCount ?? 0) > 0)}
+                            <!-- 文件夹条目（□8）：childCount=实际同步篇数（含根），排除后自动缩水。
+                                 紧凑无空格形态（vision P1-2：dock 窄面板里空格+全宽徽章把标题挤瘪）；
+                                 childCount=0 且排除>0=内容全被排除（平台副本已 purge）也展示（review P1-2 配套） -->
+                            <span class="kb-folder">
+                                <svg class="kb-folder__icon"><use xlink:href="#iconFolder"></use></svg>{st.childCount ?? 0}{tomatoI18n.篇}{#if (st.excludedCount ?? 0) > 0}<span class="kb-folder__excl">·{tomatoI18n.排除}{st.excludedCount}</span>{/if}
+                            </span>
+                        {/if}
+                        <span class="kb-badge kb-badge--{badge.cls}" class:b3-tooltips={!!badge.tip}
+                            class:b3-tooltips__nw={!!badge.tip} aria-label={badge.tip ?? undefined}>{badge.text}</span>
                         <span class="kb-icon b3-tooltips b3-tooltips__nw" aria-label={tomatoI18n.移除} class:kb-icon--off={busy}
                             role="button" tabindex="0" onclick={() => onRemove(item.docID)}
                             onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onRemove(item.docID); } }}>✕</span>
@@ -230,7 +245,7 @@
     .kb-dot--fail { background: var(--b3-theme-error); }
     .kb-dot--none { background: transparent; border: 1.5px solid var(--b3-theme-on-surface-light); }
     .kb-name {
-        flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        flex: 1; min-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         font-size: 12px; cursor: default;
     }
     /* 徽章文字与圆点双重色彩编码（vision P1：窄面板里 7px 点不够扫读） */
@@ -238,6 +253,17 @@
     .kb-badge--ok { color: var(--b3-theme-primary); }
     .kb-badge--chg { color: var(--b3-theme-secondary); }
     .kb-badge--fail { color: var(--b3-theme-error); }
+    /* 文件夹条目徽章（□8）：sprite 图标+篇数；排除数同位次级展示 */
+    .kb-folder {
+        flex: none; display: inline-flex; align-items: center; gap: 2px;
+        font-size: 11px; color: var(--b3-theme-on-surface-light);
+        padding: 1px 4px; border-radius: var(--b3-border-radius);
+        background: color-mix(in srgb, var(--b3-theme-on-surface-light) 10%, transparent);
+    }
+    .kb-folder__icon { width: 12px; height: 12px; flex: none; }
+    /* 排除数中性灰（vision P2：secondary 橙与「待同步」状态橙同排撞色——橙色留给同步状态语义） */
+    .kb-folder__excl { color: var(--b3-theme-on-surface-light); }
+    :global(html[data-theme-mode="light"]) .kb-folder { color: #6f7377; }
     .kb-icon {
         flex: none; cursor: pointer; font-size: 11px; line-height: 1;
         padding: 7px 7px; margin: -5px -5px -5px 0; border-radius: var(--b3-border-radius);

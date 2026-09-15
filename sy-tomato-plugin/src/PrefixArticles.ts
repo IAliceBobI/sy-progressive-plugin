@@ -11,9 +11,27 @@ import PrefixArticles from "./PrefixArticles.svelte"
 import { newID } from "stonev5-utils";
 import { adaptHotkey, Dialog } from "siyuan";
 import { prefixArticlesEnable, prefixArticlesMenu, prefixArticlesSoftLimit } from "./libs/stores";
+import { matchPart, nameParts } from "./libs/prefixUtils";
 import { mount, unmount } from "svelte";
+import PrefixArticleParts from "./PrefixArticleParts.svelte"
 export const PrefixArticles前缀文档树 = winHotkey("shift+alt+g", "前缀文档树", "iconSort", () => tomatoI18n.前缀文档树, false, prefixArticlesMenu)
 export const PrefixArticlesDock = winHotkey("shift+alt+F5", "PrefixArticlesDock", "iconFiles", () => tomatoI18n.前缀文档树, false, prefixArticlesMenu)
+
+// Tags 窗独立挂载（tagsdecouple □1）：body 直挂自持组件，不再随 dock 面板子树 mount/unmount——
+// 面板关掉/隐藏时窗仍在（bear 拍板「它们俩应该是独立的」）；显隐纯由 prefixArticlesTagsShow
+// 持久 store 驱动（DialogSvelte {#if show} 整树渲染，关=零 DOM）。先例=initDocNavigator 族。
+let tagsSvelte: ReturnType<typeof mount> | null = null;
+function mountArticleParts() {
+    if (tagsSvelte) return; // 幂等防双窗
+    tagsSvelte = mount(PrefixArticleParts, { target: document.body });
+}
+/** onunload 链收尾：插件卸载/重载时摘窗（官方 destroyPlugin 只清 dock/顶栏，body 直挂须自理） */
+export function prefixArticlesOnunload() {
+    if (tagsSvelte) {
+        unmount(tagsSvelte);
+        tagsSvelte = null;
+    }
+}
 
 /** □4 时序统一：index.async onload 已 await taskCfg（框架保序），双路竞态消化退役 */
 export function initPrefixArticles() {
@@ -22,6 +40,7 @@ export function initPrefixArticles() {
         if (!events.isMobile) {
             addDock();
         }
+        mountArticleParts();
         // plugin.addCommand({
         //     langKey: PrefixArticlesAllParts.langKey,
         //     langText: PrefixArticlesAllParts.langText(),
@@ -52,6 +71,7 @@ export function initPrefixArticles() {
         });
     } else {
         dm?.destroyBy();
+        prefixArticlesOnunload();
     }
 }
 
@@ -88,7 +108,7 @@ function addDock() {
                         <svg class="toolbar__icon"><use xlink:href="#${PrefixArticlesDock.icon}"></use></svg>
                             <div class="toolbar__text">${title}</div>
                         </div>
-                        <div id="${eleID}"></div>
+                        <div id="${eleID}" class="fn__flex-1" style="min-height:0;overflow-y:auto;"></div>
                     </div>`;
             } else {
                 dock.element.innerHTML = `<div class="fn__flex-1 fn__flex-column">
@@ -99,7 +119,7 @@ function addDock() {
                             <span class="fn__flex-1 fn__space"></span>
                             <span data-type="min" class="block__icon b3-tooltips b3-tooltips__sw" aria-label="Min ${adaptHotkey("⌘W")}"><svg><use xlink:href="#iconMin"></use></svg></span>
                         </div>
-                        <div id="${eleID}"></div>
+                        <div id="${eleID}" class="fn__flex-1 fn__flex-column" style="min-height:0;"></div>
                     </div>`;
             }
             svelte = mount(PrefixArticles, {
@@ -155,8 +175,17 @@ async function tryFixTracerByLike(like: string) {
     })
 }
 
-function titleSort(a: ArticlesPrefix, b: ArticlesPrefix) {
+export function titleSort(a: ArticlesPrefix, b: ArticlesPrefix) {
     return a.docName.localeCompare(b.docName, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+/** 组区/跟随列表共用封顶：prefixArticlesSoftLimit 解析（非法值兜底 50） */
+export function getSoftLimit() {
+    const max = parseInt(prefixArticlesSoftLimit.get());
+    if (typeof max !== "number" || isNaN(max) || max < 1) {
+        return 50;
+    }
+    return max;
 }
 
 export async function getPrefixDocs(docID: string, name: string, force = false) {
@@ -164,28 +193,29 @@ export async function getPrefixDocs(docID: string, name: string, force = false) 
     const tracer = await getDocTracer();
     let prefixDocs: ArticlesPrefix[] = [];
 
-    let max = parseInt(prefixArticlesSoftLimit.get());
-    if (typeof max !== "number" || isNaN(max) || max < 1) {
-        max = 50;
-    }
+    const max = getSoftLimit();
     const tags = await siyuan.getRowByID(docID)
         .then(r => r.tag ?? "")
         .then(t => t.split("#").map(i => i.trim()))
         .then(tags => {
-            const parts = name.replaceAll("丨", "|").split("|").map(i => i.trim())
-            tags.push(...parts)
+            // 名字分段=去末段（□7 与 Tags 云同规，nameParts 单一事实源）：
+            // 末段标题词不再参与相关文档匹配（bear「喜恶」病灶），IAL tag 通道不受影响
+            tags.push(...nameParts(name))
             return tags
         })
         .then(r => r.filter(i => !!i))
-    if (tags.length > 1) {
+    // 有标签源（名字段或 IAL tag）即按标签子串匹配；公共前缀分支只留给无任何标签源的
+    // 普通文档。□7 前条件是 >1（旧分段含末段恒 ≥2 掩盖了单段名场景），去末段后单段名
+    // 文档 tags=[该段] 落 else=首字公共前缀混入无关文档（「人性|恶」带进「人物」），修正为 >0；
+    // 尾空段名 a| 随之 else→if（tags=[a]），与云 chip「a」同现对齐
+    if (tags.length > 0) {
         if (force) {
             await tryFixTracerByLike(tags.map(p => `content like ${sqlQuoteStr("%" + p + "%")}`).join(" or "))
         }
         for (const part of tags) {
             for (const [id, block] of tracer.getDocMap().entries()) {
                 const docName = block.content?.trim() ?? "";
-                const tag = block.tag?.trim() ?? "";
-                if (docName.includes(part) || tag.includes(part)) {
+                if (matchPart(block, part)) {
                     prefixDocs.push({ id, docName, prefix: part });
                 }
             }

@@ -95,6 +95,9 @@ export interface KbChannel {
     /** 幂等重建上传（先删同名旧版再传）；返回平台文档 id。
      *  preList=调用方已拉取的文档清单（批量同步复用一次列表扫描，免每文档全量翻页） */
     uploadDoc(docID: string, title: string, markdown: string, preList?: KbDocInfo[]): Promise<{ externalID: string }>;
+    /** 清平台侧该条目的既有副本（kb8 review P1-2：内容全被排除时旧全量不得留平台；
+     *  best-effort，失败抛错由调用方并入同步 err） */
+    purgeDoc?(docID: string, title: string, preList?: KbDocInfo[]): Promise<void>;
     /** 按平台文档 id 删除 */
     deleteDoc(externalID: string): Promise<void>;
     /** 知识库检索（普通 JSON，非 SSE）：top_k 上限 20，recall_method=mixed 混合检索 */
@@ -244,6 +247,13 @@ export function createZhipuChannel(http: KbHttp, cfg: ZhipuCfg): KbChannel {
             };
         },
         listDocs,
+        async purgeDoc(docID, title, preList) {
+            const name = getKbDocName(title, docID);
+            for (const d of (preList ?? await listDocs())) {
+                if (stripMd(d.name) === name) await this.deleteDoc(d.externalID);
+            }
+            cfg.log?.(`purgeDoc: ${name} (platform copy removed)`);
+        },
         async uploadDoc(docID, title, markdown, preList) {
             const kbID = await ensureKb();
             const name = getKbDocName(title, docID);
