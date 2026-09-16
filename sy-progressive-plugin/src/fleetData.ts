@@ -38,6 +38,9 @@ export interface FleetBook {
     writing: boolean;
     /** 舰队管理 □2：置顶书（置顶组最优先，组内保滚筒序） */
     pinned: boolean;
+    /** progpush □2 暂停改造：原「忽略」书沉底灰化+暂停标记，右键恢复（ignored 字段
+     *  与滚筒跳过/曲线冻结引擎不动，只改表现层；数据面照常取齐） */
+    paused: boolean;
 }
 
 /** 热力格（近 N 天横条，右端=今天） */
@@ -50,6 +53,8 @@ export interface FleetSummary {
     quota: number;
     /** ✧ 全局到期待办数（think+pdigest 双源，含 free 源；Dock 待办胶囊） */
     dueTotal: number;
+    /** progpush □2：累计已读 N 篇（各日 read 全历史求和；火苗 tooltip 尾行） */
+    totalRead: number;
 }
 
 /** PDIGEST_CTIME 行是否结构合法（值 = bookID#ct，至少一个 # 分隔） */
@@ -151,8 +156,15 @@ export function buildHeat(days: { date: string; q: number; read: number }[], tod
     return cells;
 }
 
-/** 书卡聚合：滚筒序输出，过滤忽略/归档/隐匿（□2 hidden 纯视觉：调度链不含 hidden）；
- *  order 外的书按 books.json 序兜底排尾。
+/** 累计已读（progpush □2 火苗 tooltip「累计已读 N 篇」）：各日 read 求和——
+ *  全历史口径（写作日 read=0 天然不贡献），与热力图同数据源 allDays */
+export function totalReadOf(days: { read: number }[]): number {
+    return days.reduce((s, d) => s + d.read, 0);
+}
+
+/** 书卡聚合：滚筒序输出，过滤归档/隐匿（□2 hidden 纯视觉：调度链不含 hidden；
+ *  progpush □2 暂停改造：ignored 不再过滤——沉底灰化+暂停标记+右键恢复，引擎
+ *  侧滚筒跳过/曲线冻结不动）；order 外的书按 books.json 序兜底排尾。
  *  status 缺省全 ok（lost/closed 相对序与管理页一致；在读/读完分档为总览面板专属，
  *  管理页仍是自己的三档——勿同步）。
  *  期2 写作书：point/total 语义=定稿片数/片数（doneLens 注入；进度=定稿占比） */
@@ -173,13 +185,15 @@ export function buildFleetBooks(args: {
     materialUnread?: Map<string, number>;
 }): FleetBook[] {
     const merged = mergeMissingBooks({ order: args.order, lastServed: "" }, Object.keys(args.infos));
-    // □3 档位：在读 0 → 读完 1 → ⚠lost 2 → ⏸closed 3（异常书仍垫底；lost/closed 不看 finished）
+    // progpush □2 rank 五档：在读 0 → 读完 1 → 暂停 2 → ⚠lost 3 → ⏸closed 4（组内
+    // 保滚筒序）。暂停恒档 2：用户显式动作优先于异常判定（暂停+lost 书恢复后仍走
+    // lost 提示修复，不吞异常态——status 字段原样保留）
     const rank = (b: FleetBook) =>
-        b.status === "ok" ? (b.finished ? 1 : 0) : b.status === "lost" ? 2 : 3;
+        b.paused ? 2 : b.status === "ok" ? (b.finished ? 1 : 0) : b.status === "lost" ? 3 : 4;
     const books: FleetBook[] = [];
     for (const bookID of merged.order) {
         const info = args.infos[bookID];
-        if (!info || info.ignored || info.archived || info.hidden) continue;
+        if (!info || info.archived || info.hidden) continue;
         const total = args.indexLens[bookID] ?? 0;
         const point = info.writing ? (args.doneLens?.[bookID] ?? 0) : (info.point ?? 0);
         const think = args.thinkBadges.get(bookID);
@@ -198,12 +212,13 @@ export function buildFleetBooks(args: {
             manual: !!info.manualMode,
             writing: !!info.writing,
             pinned: !!info.pinned,
+            paused: !!info.ignored,
             // 期A：写作书全定稿仍要看池（未读素材在=书还活着）；非写作书 materialUnread 恒空不受影响
             finished: total > 0 && point >= total && (info.writing ? (args.materialUnread?.get(bookID) ?? 0) === 0 : true),
         });
     }
     // □2 置顶组最优先（组内保滚筒序=不按 status 分层，📌 读完书天然豁免 □3 沉底）；
-    // □3 其余四档：在读 → 读完 → lost → closed（组内保滚筒序）。
+    // □3+progpush□2 其余五档：在读 → 读完 → 暂停 → lost → closed（组内保滚筒序）。
     // JS sort 稳定：组内比较返回 0 即保输入（滚筒）序
     books.sort((a, b) => {
         if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
@@ -316,5 +331,6 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
         heat: buildHeat(allDays, todayLocalStr(), spanDays),
         quota,
         dueTotal: dueCountOf(thinkRows ?? [], now) + dueCountOf(pdigestRows ?? [], now),
+        totalRead: totalReadOf(allDays ?? []),
     };
 }

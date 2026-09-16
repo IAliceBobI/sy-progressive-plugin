@@ -1101,6 +1101,24 @@ html[data-theme-mode="dark"] .prog-wflame[data-state="idle"] {
     border-color: var(--prog-card-border);
   }
 }
+// progpush □2 暂停卡（忽略改造）：灰化对齐 closed 沉底语言（用户显式动作=静默灰，
+// 非 lost 的警示色）；进度轨道保留（数据面不裁，恢复即接上次进度）
+.prog-fleet-card.paused {
+  opacity: 0.62;
+  border-style: dashed;
+  box-shadow: none;
+  &:hover {
+    transform: none;
+    border-color: var(--prog-card-border);
+  }
+  .fill {
+    opacity: 0.55;
+  }
+  // vision 二轮 P2-2：说明行原=muted(44% on-surface)×整卡 0.62 双重弱化偏淡，掺 15% 纯 on-surface 提亮一档
+  .st-line {
+    color: color-mix(in srgb, var(--b3-theme-on-surface) 15%, var(--prog-muted));
+  }
+}
 .prog-fleet-card.lost {
   border-color: color-mix(in srgb, var(--prog-status-warn) 38%, var(--prog-card-border));
   background: color-mix(in srgb, var(--prog-status-warn) 4%, var(--prog-card-bg));

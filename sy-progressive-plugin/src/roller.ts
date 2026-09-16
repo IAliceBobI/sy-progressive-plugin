@@ -41,6 +41,8 @@ export interface DebtSummary {
     todayGap: number;
     /** 历史欠债 = Σ 历史天 max(0, q−read)（当日结算恒定）。同日异常双块时取末行口径 */
     histDebt: number;
+    /** 累计已读 = Σ 各日 read（progpush □2 火苗 tooltip 尾行；含今天，超额原样） */
+    totalRead: number;
     state: "ok" | "warn" | "over";
 }
 
@@ -137,7 +139,7 @@ export function summarizeDebt(
     const debt = histDebt + todayGapInDebt;
     // 绿=无欠债；红=欠债≥2×今日档位（连续两天颗粒未收即双倍欠债）；中间为黄
     const state = debt === 0 ? "ok" : debt >= 2 * quotaToday ? "over" : "warn";
-    return { readToday, quotaToday, debt, todayGap: Math.max(0, quotaToday - readToday), histDebt, state };
+    return { readToday, quotaToday, debt, todayGap: Math.max(0, quotaToday - readToday), histDebt, totalRead: days.reduce((s, d) => s + d.read, 0), state };
 }
 
 export function formatDaySummary(data: DayLogData, bookNames: { [bookID: string]: string }): string {
@@ -390,6 +392,34 @@ export async function rollerTodayReads(): Promise<{ [bookID: string]: number }> 
     const blockID = await deps.findDayBlock(todayStr());
     if (!blockID) return {};
     return (await deps.readDayBlockData(blockID)).b;
+}
+
+// ============ 出片硬闸（progpush □1：每书每天出片上限=档位值） ============
+
+/** 闸判定（纯）：当日该书读数已达档位 且 要出的片越过当日去重锚（=开新片）。
+ *  重开当前片（point=锚）/回看旧片（point<锚）恒放行——拦截≠禁读，续读自由；
+ *  「读一半关页签再点书卡回来」不受闸影响。口径与 readCurve gateOpen 同源（同
+ *  b 计数、同 dailyQuota 档位值）：闸拦出片动作、gate 管目标新卡 due 今/明，并存 */
+export function gateBlocked(todayRead: number, quota: number, nextPoint: number, dayAnchor: number): boolean {
+    return todayRead >= quota && nextPoint > dayAnchor;
+}
+
+/** 闸数据（当日该书读数+去重锚）：markRead 同款直读链——findDayBlock 走 sqlAttr
+ *  （PLOG_DATE 值恒定、按值查块 id，不吃写后立读窗）+ getBlockAttrs IAL 直读拿
+ *  PLOG_DATA（勿走 SQL attributes 读回数据：写后立查缓存回旧值）。当日块刚建的
+ *  防撞窗内 findDayBlock 可能 miss：markRead 同款 800ms 重查压缩；仍 miss=今日
+ *  零读（闸偏松方向，markRead 锚互斥防双计）。返回 -1 锚=当日该书无前进记录 */
+export async function rollerTodayGate(bookID: string): Promise<{ reads: number; anchor: number }> {
+    const deps = makeRollerDeps();
+    const date = todayStr();
+    let blockID = await deps.findDayBlock(date);
+    if (!blockID) {
+        await new Promise(r => setTimeout(r, 800));
+        blockID = await deps.findDayBlock(date);
+        if (!blockID) return { reads: 0, anchor: -1 };
+    }
+    const data = await deps.readDayBlockData(blockID);
+    return { reads: data.b[bookID] ?? 0, anchor: data.p?.[bookID] ?? -1 };
 }
 
 /** 今日逐书写作活动数（火苗分家：写作火苗「今日已写」/书卡写作书「今日点」数据源；

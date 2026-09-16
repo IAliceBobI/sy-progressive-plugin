@@ -21,10 +21,10 @@ import DigestAllDialogSvelte from "./DigestAllDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
-import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook } from "./roller";
+import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, rollerTodayGate } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
-import { addToReadingCurve, buildReadingCard, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, sweepReadCurve } from "./readCurve";
+import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, retirePieceCard, sweepReadCurve } from "./readCurve";
 import { openReadCardMenu } from "./readCardMenu";
 import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCore";
 import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
@@ -34,7 +34,7 @@ import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime, latestDigestAnc
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
-import { mobileSelectBtns, readCurveCadMaterial, readCurveMaterial, readCurveTakeover } from "../../sy-tomato-plugin/src/libs/stores";
+import { dailyQuota, mobileSelectBtns, readCurveCadMaterial, readCurveMaterial, readCurveTakeover } from "../../sy-tomato-plugin/src/libs/stores";
 import { addClickEvent, progressiveBtnFloating, yieldFloatbarForMenu, restoreFloatbarAfterMenu } from "./ProgressiveBtn";
 import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
@@ -161,6 +161,12 @@ class Progressive {
             callback: () => {
                 void this.splitVolsDialogFromActive();
             }
+        });
+        // progpush □3：原生复习「跳过」→推迟明天（grow/sched 曲线卡 due=明天 00:00，曲线
+        // 零消耗）。click-flashcard-action=内核卡动作广播（payload={type,card}，-3=跳过；
+        // npm siyuan 类型包尚无此枚举，as any 绕过）。非曲线卡 defer 内判键零动作放行原生语义
+        (this.plugin.eventBus.on as any)("click-flashcard-action", ({ detail }: any) => {
+            if (detail?.type === "-3" && detail.card?.blockID) void deferSkippedReadCard(detail.card.blockID);
         });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;
@@ -1047,6 +1053,13 @@ class Progressive {
             await siyuan.pushMsg(tomatoI18n.已经是第一页了);
             return;
         }
+        // progpush □1 硬闸（滚筒+书卡点击路径的统一闸口）：当日该书已读满档位且
+        // point 越过当日锚=开新片 → 拦。重开当前片（读一半回来续读）/next 链放行
+        // 后的 leased（point=刚推的锚）天然不中此闸
+        if (await this.gateCheck(bookID, point)) {
+            await this.gateNotice(bookID);
+            return;
+        }
         let openPiece = false;
         noteID = await help.createPiece(bookInfo, bookIndex, point)
         if (noteID) {
@@ -1152,10 +1165,21 @@ class Progressive {
                 break;
             }
             case HtmlCBType.next: {
+                // progpush □1 硬闸：满了完整拦停（不前进/不记账/不出片）——被拒的
+                // 已读宣告明天从当前片重来，账面不超额；判定必须在 markRead 前
+                // （记账会把锚推到 point+1，事后判=重开当前片形态恒放行）
+                if (await this.gateCheck(bookID, point + 1)) {
+                    await this.gateNotice(bookID);
+                    break;
+                }
                 await progStorage.gotoBlock(bookID, point + 1);
                 // routemap □1 计数解耦：读到新片即前进——翻页不删片与下片删同权计数
                 // （片可留作草稿，point+1 为去重锚判新高的新 point）
                 await this.markReadSafe(bookID, point + 1);
+                // progpush □2 读即退场：「下一个」=当前片已读凭证，当场摘卡不再
+                // 等评分——skip 不消卡的回锅根治位（deleteAndNext 删片文档键随灭
+                // 天然退场，无需同款）
+                await retirePieceCard(noteID);
                 const r = await this.startToLearnLeased(bookID);
                 if (r === "done") {
                     this.closePeices(bookID);
@@ -1186,6 +1210,12 @@ class Progressive {
                 });
                 break;
             case HtmlCBType.deleteAndNext: {
+                // progpush □1 硬闸：满了完整拦停（不删片/不前进/不记账/不出片）——
+                // 想删当前片走「删除并退出」（deleteAndExit 不出片不在闸面）
+                if (await this.gateCheck(bookID, point + 1)) {
+                    await this.gateNotice(bookID);
+                    break;
+                }
                 // v5「读完即删」：分片是一次性餐具（原文档还在、误删可重分片），主循环高频动作不再 confirm
                 await siyuan.removeRiffCards([noteID]);
                 await progStorage.gotoBlock(bookID, point + 1);
@@ -1269,6 +1299,26 @@ class Progressive {
             invalidateRevTrace(noteID);
             await utils.sleep(constants.IndexTime2Wait);
         });
+    }
+
+    /** 出片硬闸判定（progpush □1：每书每天出片上限=档位值）：只在「开新片」时判
+     *  拦（gateBlocked 锚语义）——重开当前片/回看旧片恒放行，拦截≠禁读。手动书
+     *  （开原书/摘抄直达）与写作书（素材 materialInterval 自己节奏）不在闸面。无
+     *  副作用，提示由 gateNotice 出（拦停点手调） */
+    private async gateCheck(bookID: string, nextPoint: number): Promise<boolean> {
+        const info = await progStorage.booksInfo(bookID);
+        if (!info || info.manualMode || info.writing) return false;
+        const { reads, anchor } = await rollerTodayGate(bookID);
+        const quota = Number(dailyQuota.get()) || 3;
+        if (!gateBlocked(reads, quota, nextPoint, anchor)) return false;
+        debugLog("floatbar", `gate block book=${bookID}(${info.bookName}) reads=${reads}/${quota} point=${nextPoint} anchor=${anchor}`, "progressive");
+        return true;
+    }
+
+    /** 闸拦截提示：书名+档位，明天再来（想连读自己开原书——闸只拦「产生分片」） */
+    private async gateNotice(bookID: string) {
+        const info = await progStorage.booksInfo(bookID);
+        await siyuan.pushMsg(tomatoI18n.今日已读满N篇(info?.bookName ?? "", Number(dailyQuota.get()) || 3), 3000);
     }
 
     /** 已读记账；附属动作失败只降级不阻断开片。routemap □1：point=前进后的新 point，

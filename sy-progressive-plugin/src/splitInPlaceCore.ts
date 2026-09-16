@@ -15,14 +15,16 @@ export function isSplittableInPlace(dataType: string | null): boolean {
     return dataType === "NodeParagraph";
 }
 
-/** 断句产物：splitLines 盲切 → $$ 前导片回粘 → 摘抄管线同款噪音过滤（@/* 单字符）→
- *  句首块级标记转义。单句输入返回单元素数组，调用方据此跳过该块。 */
+/** 断句产物：splitLines 盲切 → $$ 前导片回粘 → 摘抄管线同款噪音过滤（@ 与星号单字符）→
+ *  句首块级标记转义。单句输入返回单元素数组，调用方据此跳过该块。
+ *  噪音过滤=「仅由 @、星号、空白构成」泛化（devbatch □1 收编 splitBy 尾星清理后，
+ *  混合噪音片不再被上游预删星，此处模式兜底；textContent 通道字面星=噪音）。 */
 export function splitInPlaceSentences(text: string): string[] {
     const ps = mergeMathLead(splitLines([text]));
     return ps
         .map(p => p.trim())
         .filter(p => p.length > 0)
-        .filter(p => p != "@" && p != "*" && p != "@*" && p != "*@")
+        .filter(p => !/^[@*\s]+$/.test(p))
         .map(escapeLead);
 }
 

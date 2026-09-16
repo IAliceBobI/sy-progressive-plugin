@@ -223,7 +223,28 @@
             {:else}
                 <div class="prog-fleet-books">
                     {#each filteredBooks as book (book.bookID)}
-                    {#if book.status === "closed" || book.status === "lost"}
+                    {#if book.paused}
+                        <!-- progpush □2 暂停卡（忽略改造）：沉底灰化+⏸ 标记，进度/徽章数据
+                             面保留；点击=弹右键同款菜单（首项「继续阅读」）——点卡续读会
+                             破坏暂停语义，菜单=「提示带恢复入口」 -->
+                        <button
+                            class="prog-fleet-card paused"
+                            onclick={(e) => { lpCancel(); openBookMenu(e, book, actions); }}
+                            oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); openBookMenu(e, book, actions); }}
+                            onpointerdown={(e) => lpStart(e)}
+                            onpointerup={() => lpUp(book)}
+                            onpointercancel={lpCancel}
+                            onpointerleave={lpCancel}
+                        >
+                            <div class="row">
+                                <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.name}</span>
+                                <!-- ⏸&#xFE0E;：VS15 强制文本呈现，防 macOS emoji 化蓝方块（vision 二轮 P2-1） -->
+                                <span class="st-chip" data-st="paused">⏸&#xFE0E; {tomatoI18n.已暂停}</span>
+                            </div>
+                            <div class="track"><div class="fill" style="width:{bookPercent(book)}%"></div></div>
+                            <div class="st-line">{tomatoI18n.已暂停推送说明}</div>
+                        </button>
+                    {:else if book.status === "closed" || book.status === "lost"}
                         <!-- ⏸/⚠ 状态卡（bookStatus 判定链）：灰化/warn 沉底；点击仍走续读，由 startToLearn 拦截给对症提示（lost 直接弹清理 confirm） -->
                         <button
                             class="prog-fleet-card"
@@ -239,7 +260,7 @@
                             <div class="row">
                                 <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.name}</span>
                                 <span class="st-chip" data-st={book.status}
-                                    >{book.status === "closed" ? `⏸ ${tomatoI18n.笔记本已关闭}` : `⚠ ${tomatoI18n.疑似失效}`}</span
+                                    >{book.status === "closed" ? `⏸\uFE0E ${tomatoI18n.笔记本已关闭}` : `⚠ ${tomatoI18n.疑似失效}`}</span
                                 >
                             </div>
                             <div class="st-line"
@@ -280,7 +301,7 @@
                             <div class="track"><div class="fill" style="width:{bookPercent(book)}%"></div></div>
                             <div class="row sub">
                                 <span class="dots">
-                                    {#each Array(quota) as _, i}
+                                    {#each Array(book.writing ? $writingQuota : quota) as _, i}
                                         <span class="dot" class:lit={i < book.todayRead}></span>
                                     {/each}
                                 </span>

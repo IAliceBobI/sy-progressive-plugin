@@ -321,7 +321,14 @@ function insertMarkSpan(div: HTMLElement, tier: number, days: number, updated: s
     // □7 后悬停走宿主块委托（ensureHoverDelegate，span 本体 pointer-events:none 真鼠标
     // 永不命中——旧 span mouseenter 是死通道已拆，勿再挂回来）
     span.setAttribute("aria-label", markLabel(days, updated));
-    div.insertBefore(span, div.firstChild);
+    // 插位=块尾（.protyle-attr 之前；无 attr 容器则绝对末尾）——绝不占首位。行首退格
+    // 误删根因（09-16 群反馈 650189 二分实锤修订痕迹单坐实）：占首位时，引用块内第二段
+    // 行首退格走「并入前段」，内核按块内第一个可编辑位置定位合并锚点，首位
+    // contenteditable=false 元素扰动锚点计算=概率性整段误删+引用样式破坏；块尾是官方
+    // 非编辑元素区（protyle-attr 常驻），内核游标天然避让。CSS :has(> mark) 只认直子，
+    // 末位仍是直子，锚定链不受影响
+    const attr = div.querySelector(":scope > .protyle-attr");
+    div.insertBefore(span, attr);
 }
 
 async function revTraceOnAppear0(welement: HTMLElement, docID: string) {
@@ -376,12 +383,12 @@ function ensureReplantObserver(welement: HTMLElement, docID: string, base: strin
     replantStates.set(welement, { docID, base });
     if (replantObservers.has(welement)) return;
     const mo = new MutationObserver((muts) => {
-        const st = replantStates.get(welement);
+        const st0 = replantStates.get(welement);
         const scope = revTraceScope.get();
         // 三档门控（revtrace-scope）：off 不补挂；"prog" 档须文档仍是渐进的（切档
         // all→prog 后残留 observer 的宿主可能已不在范围内）——同步读判定缓存
-        if (!st || scope === "off") return;
-        if (scope === "prog" && !isProgDocSync(st.docID)) return;
+        if (!st0 || scope === "off") return;
+        if (scope === "prog" && !isProgDocSync(st0.docID)) return;
         const divs = new Set<HTMLElement>();
         for (const m of muts) {
             for (const n of m.addedNodes) {
@@ -391,13 +398,25 @@ function ensureReplantObserver(welement: HTMLElement, docID: string, base: strin
             }
         }
         if (!divs.size) return;
-        const map = peekUpdatedMap(st.docID);
-        if (!map?.size) return; // 无缓存=文档未出场过，出场链全量兜底
-        const editingID = editingBlockID(welement);
-        const now = new Date();
-        let n = 0;
-        divs.forEach((d) => { if (reconcileBlock(d, map!, st.base, now, editingID)) n++; });
-        if (n) debugLog("revtrace", `replant docID=${st.docID} blocks=${n}`, "progressive");
+        if (!peekUpdatedMap(st0.docID)?.size) return; // 无缓存=文档未出场过，出场链全量兜底
+        // 补挂出波 defer（setTimeout 宏任务）：mutation 回调在 microtask 跑，若内核
+        // patch（Backspace 合并/重画）分帧进行中，波内同步插 span 会撞 patch 半程的
+        // DOM 结构假设（行首退格误删同族根因，09-16 群反馈二分实锤）；出波后内核
+        // patch 与 selection 均已落地再补，代价=补挂晚一帧视觉无感。依赖（st/map/
+        // editingID/now）全部 defer 内重取——editingID 晚取更准（selection 已摆好）
+        setTimeout(() => {
+            const st = replantStates.get(welement);
+            const cur = revTraceScope.get();
+            if (!st || cur === "off") return;
+            if (cur === "prog" && !isProgDocSync(st.docID)) return;
+            const map = peekUpdatedMap(st.docID);
+            if (!map?.size) return;
+            const editingID = editingBlockID(welement);
+            const now = new Date();
+            let n = 0;
+            divs.forEach((d) => { if (reconcileBlock(d, map!, st.base, now, editingID)) n++; });
+            if (n) debugLog("revtrace", `replant docID=${st.docID} blocks=${n}`, "progressive");
+        }, 0);
     });
     mo.observe(welement, { childList: true, subtree: true });
     replantObservers.set(welement, mo);

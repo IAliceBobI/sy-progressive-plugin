@@ -591,7 +591,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 notifyFleetChanged();
             },
             ignoreBook: async (bookID) => {
-                await progStorage.setIgnoreBook(bookID, true);
+                // progpush □2：toggle 语义——bookMenu 两入口互补态调用（非暂停态
+                // 「暂停本书」=置 true；暂停态「继续阅读」=置 false），由 setIgnoreBook
+                // 无参分支按当前态翻转
+                await progStorage.setIgnoreBook(bookID);
                 notifyFleetChanged();
             },
             archiveBook: (bookID) => prog.archiveBookWithConfirm(bookID),

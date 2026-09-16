@@ -57,21 +57,23 @@ export class ProgressiveStorage {
     }
 
     async setIgnoreBook(bookID: string, v?: boolean) {
+        // progpush □2 暂停改造：ignored 字段与滚筒跳过/曲线冻结引擎不动，只换用户
+        // 词汇（忽略→暂停）；toast 指引恢复入口（右键书卡）
         if (v === undefined) {
             const info = await this.booksInfo(bookID);
             if (!info.ignored) {
                 await this.updateBookInfo(bookID, { ignored: true } as any);
-                await siyuan.pushMsg(tomatoI18n.已经忽略本书);
+                await siyuan.pushMsg(tomatoI18n.已暂停本书);
             } else {
                 await this.updateBookInfo(bookID, { ignored: false } as any);
-                await siyuan.pushMsg(tomatoI18n.重新推送本书);
+                await siyuan.pushMsg(tomatoI18n.已恢复推送);
             }
         } else {
             await this.updateBookInfo(bookID, { ignored: v } as any);
             if (v) {
-                await siyuan.pushMsg(tomatoI18n.已经忽略本书);
+                await siyuan.pushMsg(tomatoI18n.已暂停本书);
             } else {
-                await siyuan.pushMsg(tomatoI18n.重新推送本书);
+                await siyuan.pushMsg(tomatoI18n.已恢复推送);
             }
         }
     }

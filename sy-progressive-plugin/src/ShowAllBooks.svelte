@@ -336,7 +336,7 @@
                         <div class="row top">
                             <span class="name">{b.name}</span>
                             <span class="chip chip-closed"
-                                >⏸ {tomatoI18n.笔记本已关闭}</span
+                                >⏸&#xFE0E; {tomatoI18n.笔记本已关闭}</span
                             >
                         </div>
                         <div class="status-line">
@@ -453,9 +453,9 @@
                                 class="switch"
                                 role="switch"
                                 aria-checked={!!b.bookInfo.ignored}
-                                aria-label={`${tomatoI18n.忽略}《${b.name}》`}
+                                aria-label={`${tomatoI18n.暂停}《${b.name}》`}
                                 onclick={() => toggleIgnore(b)}
-                            >{tomatoI18n.忽略}</button
+                            >{tomatoI18n.暂停}</button
                             >
                             {#if b.bookInfo.hidden}
                                 <button

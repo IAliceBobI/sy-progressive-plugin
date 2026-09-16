@@ -88,6 +88,14 @@ export function parseReadCard(value: string): ReadCardState | null {
     return { mode, waterlineMs: +m[2], count: +m[3], graduated: false };
 }
 
+/** progpush □3：原生「跳过」是否补 defer（due=明天，曲线零消耗）。拦=grow/sched 曲线族
+ *  未毕业；daily=分片族不归此链（□1 读即退场），毕业卡已摘不在队列，非渐进卡无键
+ *  天然放行——原生 skip（skipCardCache 仅会话内不弹、due 不动）对它们保持原语义 */
+export function skipDefersCard(value: string): boolean {
+    const st = parseReadCard(value);
+    return !!st && !st.graduated && (st.mode === "grow" || st.mode === "sched");
+}
+
 /** 状态 → 身份键值（毕业态落 g；与 parseReadCard 互逆。□3：频率尾段只落 grow/毕业态
  *  且仅非中档——中档省略=旧格式字节不变，默认零感知） */
 export function formatReadCard(s: ReadCardState): string {

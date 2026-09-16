@@ -3,7 +3,7 @@
 // 单例坑（AGENTS.md 踩坑表）+ setTimeout 包 open + 键盘触发落屏中。
 // □3 回访频率：async 化（开菜单前一书一读 IAL 档位，openReadCardMenu inspect 同款
 // 先查后组配形态；调用方 fire-and-forget 不受影响）。
-import { Menu } from "siyuan";
+import { Menu, showMessage } from "siyuan";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import type { FleetActions } from "./fleet";
 import { bookVisitFreq } from "./readCurve";
@@ -18,11 +18,20 @@ function menuPos(ev: { clientX: number; clientY: number }) {
 
 export async function openBookMenu(
     ev: { clientX: number; clientY: number },
-    book: { bookID: string; name: string; pinned: boolean },
+    book: { bookID: string; name: string; pinned: boolean; paused?: boolean },
     actions: FleetActions,
 ) {
     const freq = await bookVisitFreq(book.bookID);
     const menu = new (Menu as any)("progBookMenu", undefined, true) as Menu;
+    // progpush □2 暂停改造：暂停态首项=「继续阅读」（恢复=最高频动作置顶；点暂停卡
+    // 也走本菜单=「弹提示带恢复入口」）。改写 ignored 字段与旧忽略完全同链
+    if (book.paused) {
+        menu.addItem({
+            icon: "iconPlay",
+            label: tomatoI18n.继续阅读,
+            click: () => void actions.ignoreBook(book.bookID),
+        });
+    }
     // vision P1-1：全项补图标（与 readCardMenu 全项带图标惯例对齐，图标名经
     // appearance/icons/litheness/icon.js 真相源核验）；P2-1：配置组（置顶/隐匿/回访频率）
     // 与退场组（忽略/归档）分隔线分组
@@ -57,16 +66,33 @@ export async function openBookMenu(
         label: tomatoI18n.知识地图(),
         click: () => actions.openBookMap(book.bookID),
     });
-    menu.addSeparator();
+    // anno-round2 □3：全书划线总览浮层（批注域二期）。走 tomato 的 globalThis 桥
+    // （tomatoOpenAnnoOverview_*）——任何 import 形态（静态/动态）都会把 CommentBox
+    // 大图卷进渐进 bundle 踩 svelte 循环初始化崩（踩坑表 EFFECT_TRANSPARENT 家族）
     menu.addItem({
-        icon: "iconClose",
-        label: tomatoI18n.忽略本书菜单,
-        click: () => void actions.ignoreBook(book.bookID),
+        icon: "iconMark",
+        label: tomatoI18n.全书划线总览,
+        click: () => {
+            const opener = (globalThis as any)["tomatoOpenAnnoOverview_zZmqus5PtYRi"] as
+                | ((seed: { bookID?: string }, ev?: { clientX: number; clientY: number }) => void)
+                | undefined;
+            if (typeof opener === "function") opener({ bookID: book.bookID }, ev);
+            else showMessage(tomatoI18n.番茄插件未启用, 2500);
+        },
     });
-    menu.addItem({
-        icon: "iconInbox",
-        label: tomatoI18n.归档本书菜单,
-        click: () => void actions.archiveBook(book.bookID),
-    });
+    // progpush □2：暂停态不出退场组（已暂停无「再暂停/归档」高频诉求，恢复首项承担）
+    if (!book.paused) {
+        menu.addSeparator();
+        menu.addItem({
+            icon: "iconClose",
+            label: tomatoI18n.忽略本书菜单,
+            click: () => void actions.ignoreBook(book.bookID),
+        });
+        menu.addItem({
+            icon: "iconInbox",
+            label: tomatoI18n.归档本书菜单,
+            click: () => void actions.archiveBook(book.bookID),
+        });
+    }
     setTimeout(() => menu.open(menuPos(ev)), 0);
 }

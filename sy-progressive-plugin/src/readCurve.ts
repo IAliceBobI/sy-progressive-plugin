@@ -30,7 +30,7 @@ import {
     AUTORELAX_KEY, AUTO_RELAX_CAP, CurveMode, CurvePlanCard, parseReadCard, RATING_GRACE_MS, READCARD_KEY, READOUT_KEY, ReadCardKind,
     cadenceDays, cadenceOpts, consumeRound, DIGEST_BUILD_CAP, dueStamp, formatReadCard, GROW_INTERVALS,
     growInterval, isConsumedCurve, isMaterialFirstPush, isRPCardMarkdown, isRated, normalizeDue, parseStamp, planSweep, plusDays,
-    RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, sortForReconcile, tailFollowState,
+    RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, skipDefersCard, sortForReconcile, tailFollowState,
     toSchedValue, tomorrowStart, VisitFreq, VISITRATE_KEY,
 } from "./readCurveCore";
 import { statusLineOf } from "./readCurveText";
@@ -55,6 +55,15 @@ async function getReadingCardStates(blockIDs: string[]): Promise<Map<string, Get
 async function removeReadingCards(blockIDs: string[]) {
     if (!blockIDs.length) return;
     await siyuan.removeRiffCards(blockIDs, Constants.QUICK_DECK_ID);
+}
+
+/** 读即退场（progpush □2）：片文档阅读卡当场摘除——「下一个分片」动作本身=已读
+ *  凭证，不再等评分对账退场（skip 后卡反复回锅的根治位）。与 reconcileRated 摘卡
+ *  同款通道（QUICK 牌组限定+清键），幂等：无卡零效果，先于此的评分对账同链自洽 */
+export async function retirePieceCard(docID: string): Promise<void> {
+    if (!docID) return;
+    await removeReadingCards([docID]);
+    await clearKeysSafe([docID]);
 }
 
 // ============ 卡集合（身份键 SQL × riff 现状合并） ============
@@ -1178,6 +1187,24 @@ async function hammerMaterial(blockID: string, bookID: string): Promise<void> {
     const ct = String(attrs[PDIGEST_CTIME] ?? "");
     if (ct && !ct.startsWith("🔨")) {
         await siyuan.setBlockAttrs(blockID, { [PDIGEST_CTIME]: `🔨#${ct}` } as any);
+    }
+}
+
+/** progpush □3：原生「跳过」→推迟明天。拦=grow/sched 曲线族（skipDefersCard 判定）：
+ *  原生 skip 只进内核会话缓存（本次复习不再弹）而 due 不动=「反复回锅」根因；此处补
+ *  due=tomorrowStart——今天不再弹、明天照常、曲线零消耗（不动 count/水位线/身份键）。
+ *  IAL 直读判键（写后立读八连纪律：判向/现值通道禁 SQL）。无锁单写：只碰 riff due 一处，
+ *  与巡查 diff 的交叠面=同一 due 字段，后写胜=幂等无害 */
+export async function deferSkippedReadCard(blockID: string): Promise<void> {
+    if (!blockID) return;
+    try {
+        const attrs = ((await siyuan.getBlockAttrs(blockID)) ?? {}) as any;
+        if (!skipDefersCard(String(attrs[READCARD_KEY] ?? ""))) return;
+        await setReadingDues([{ id: blockID, due: tomorrowStart(new Date()) }]);
+        notifyFleetChanged();
+        debugLog("readcurve", `skip→defer ${blockID}`, "progressive");
+    } catch (e) {
+        debugLog("readcurve", `skip→defer fail ${blockID}: ${e}`, "progressive");
     }
 }
 
