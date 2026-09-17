@@ -585,7 +585,10 @@ class Progressive {
         }, {
             title: `${tomatoI18n.物理分卷}·${docName}`,
             width: events.isMobile ? "90vw" : undefined,
-            height: events.isMobile ? "180vw" : "min(620px, 92vh)",
+            // 高度按 7 卷态实测撑够（body 需 661+title 43≈704；620 时警示条/汇总行被
+            // body 内滚裁出首屏，09-17 vision P1 两轮）。卷列表 max-height 260 封顶
+            // → 再多卷内容也不超此高度
+            height: events.isMobile ? "180vw" : "min(712px, 92vh)",
         });
     }
 

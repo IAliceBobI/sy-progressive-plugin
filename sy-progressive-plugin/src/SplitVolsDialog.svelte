@@ -16,14 +16,24 @@
     export function destroy() { dm.destroyBy(); }
     onDestroy(destroy);
 
-    // 每卷上限档（字符）：默认 50 万——300 万字巨书→6 卷，落在「拆 3~6 片」区间；
-    // 首档 10 万照顾中等书（10 万字书拆 2 卷也有查阅价值）
+    // 每卷上限档（字符）；首档 10 万照顾中等书（10 万字书拆 2 卷也有查阅价值）
     const MAX_TIERS: number[] = [10_0000, 20_0000, 30_0000, 50_0000, 80_0000, 100_0000];
-    const DEFAULT_MAX_IDX = 3;
+
+    /** 默认档自适应（09-17 反馈改）：从低到高取第一个「全书字数 ≤ 档位×6」的档——
+     *  300 万字巨书→50 万档（=旧写死默认的语义）、43 万字中型书→10 万档，首开即见
+     *  卷列表而非空态（旧写死 50 万对中型书必空态，被用户误读成「预览坏了」）。
+     *  小书（<10 万）落最低档仍 1 卷，走空态文案兜底；实际卷数以预览为准（标题
+     *  边界可能比 ceil(total/档位) 多卷，×6 只是选档近似）。 */
+    function defaultTierIdx(total: number): number {
+        for (let i = 0; i < MAX_TIERS.length; i++) {
+            if (total <= MAX_TIERS[i] * 6) return i;
+        }
+        return MAX_TIERS.length - 1;
+    }
 
     let blocks = $state<VolBlockT[]>([]);
     let selectedLevels = $state<string[]>([]);
-    let maxIdx = $state(DEFAULT_MAX_IDX);
+    let maxIdx = $state(MAX_TIERS.length - 1);
     let vols = $state<VolPlanT[]>([]);
     let loading = $state(true);
     let busy = $state(false);
@@ -54,6 +64,7 @@
             if (raw == null) throw new Error("getChildBlocks null");
             blocks = childBlocksToVolBlocks(raw);
             totalLen = blocks.reduce((s, b) => s + b.count, 0);
+            maxIdx = defaultTierIdx(totalLen);
             // 默认=最粗实存级（h1 有则 ["1"]——小说卷级；粗级先切、超限自动下切）
             const lv = countHeadingLevels(blocks).map(s => s.level);
             selectedLevels = lv.length > 0
@@ -138,10 +149,18 @@
                 </div>
             </section>
 
+            <!-- 破坏性后果警示恒可见：置卷预览卡上方（勿放内容流末尾——7 卷态 body
+                 内滚会把它裁出可视区，vision P1 两轮实锤） -->
+            <div class="prog-addbook-warn" role="alert">{tomatoI18n.切分须知}</div>
+
             <section class="prog-card">
                 <div class="prog-card-title">{tomatoI18n.卷预览}</div>
                 {#if vols.length <= 1}
-                    <div class="prog-no-heading">{tomatoI18n.无需分卷}</div>
+                    <div class="prog-no-heading">
+                        {tomatoI18n.无需分卷
+                            .replace("{t}", String(totalLen))
+                            .replace("{m}", String(MAX_TIERS[maxIdx] / 10000))}{#if totalLen > MAX_TIERS[0]}{tomatoI18n.无需分卷调细提示}{/if}
+                    </div>
                 {:else}
                     <div class="vol-list">
                         {#each vols as v, i (i)}
@@ -156,8 +175,6 @@
                     </div>
                 {/if}
             </section>
-
-            <div class="prog-addbook-warn" role="alert">{tomatoI18n.切分须知}</div>
         {/if}
 
         <div class="footer">
@@ -317,12 +334,14 @@
         color: var(--b3-theme-on-surface);
         opacity: 0.64;
     }
-    /* 卷预览列表：平铺直读（信息平铺不藏 hover），超限卷 warning 色行内标黄 */
+    /* 卷预览列表：平铺直读（信息平铺不藏 hover），超限卷 warning 色行内标黄。
+       max-height 260=8 卷内零内滚（行 ~33px；09-17 反馈改自适应默认后中型书首开
+       即 6~8 卷，220 时第 7 卷半截+汇总行被折出首屏，vision P1） */
     .vol-list {
         display: flex;
         flex-direction: column;
         gap: 4px;
-        max-height: 220px;
+        max-height: 260px;
         overflow-y: auto;
     }
     .vol-row {
