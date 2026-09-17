@@ -3,20 +3,20 @@
 // （⌥= 快捷键/命令面板，splitInPlaceCommand 态位守卫同口径）。与摘抄断句（getDigestMd
 // split 分支）的差异=零产物语义——不摘抄、不产 * 回链、不挂渐进属性，句子块 markdown
 // 通道插回原位后删原块（每块两个事务）。⚠️API 事务不进前端 undo 栈（思源行为，e2e 实测
-// 焦点在编辑器 ⌘Z 也不撤，与重插清空同族）——恢复通道=文档历史，改的是用户原文档
-// 故只在含行内样式时 confirm 警告。书态浮条不给此钮（README 初版警告：分片后改原书
+// 焦点在编辑器 ⌘Z 也不撤，与重插清空同族）——恢复通道=文档历史。09-17 □1 起取文通道
+// =块 kramdown：行内样式/图片/链接随句保留（textContent 通道丢标记=旧根因），样式
+// 警告 confirm 随之退役。书态浮条不给此钮（README 初版警告：分片后改原书
 // 会让渐进找不到块）。0914 □5 起分片放开（鸟：重插必然全断，要只断选中几段）——挂
 // 闪卡的段落护卡拦截；写作槽仍拒（拆槽内块断素材胶囊血缘）。Pro 口径=断句整体付费
 // （splitAndInsert 同款兜底门禁+toast 引导）。
-import { confirm, IProtyle } from "siyuan";
+import { IProtyle } from "siyuan";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { getBlockOwnEditableText } from "../../sy-tomato-plugin/src/libs/domUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
-import { hasInlineStyles, isSplittableInPlace, splitInPlaceSentences } from "./splitInPlaceCore";
+import { isSplittableInPlace, splitInPlaceSentences, stripBlockIAL } from "./splitInPlaceCore";
 import { progStorage } from "./ProgressiveStorage";
 import { invalidateRevTrace } from "./revTrace";
 import { lockWithLease } from "./lockLease";
@@ -113,58 +113,68 @@ export async function splitInPlaceRun(protyle: IProtyle, blocked?: Set<string>) 
             await siyuan.pushMsg(tomatoI18n.请先选择要断句的块);
             return;
         }
-        // 收集阶段同步完成（DOM 只在此时读，事务删除后失活无害）：非 p 块与单句块跳过；
+        // 收集阶段完成（DOM 只在此时读，事务删除后失活无害）：非 p 块与单句块跳过；
         // 护卡档（0914 □5）：blocked 命中的块跳过并计数（toast 交代，静默跳过=用户
         // 以为断完了回头找不到半拆现场）
         const plans: SplitPlan[] = [];
-        let styled = false;
         let cardSkipped = 0;
+        let readFail = 0;
         for (let i = 0; i < s.ids.length; i++) {
             if (blocked?.has(s.ids[i])) { cardSkipped++; continue; }
             const el = s.selected[i];
             if (!el || !isSplittableInPlace(el.getAttribute("data-type"))) continue;
-            const text = getBlockOwnEditableText(el);
+            // 取文通道=块 kramdown（09-17 □1）：textContent 丢行内标记=样式静默丢失
+            // 根因（closeInlineMarks 空转+字面检测恒 false）；kramdown 含存储形态标记
+            // （**/<u>/<span data-type=…>），引擎链自动接管。读失败计数跳过不降级
+            // textContent 旧通道（review P2-2：静默跳过让部分失败看起来全成功）；
+            // kramdown 读回窗口坑不适用（本链只读不先写），SQL markdown 列有索引
+            // 延迟+形态差异亦不用
+            const kd = await siyuan.getBlockKramdown(s.ids[i]).catch(() => null);
+            if (!kd) { readFail++; continue; }
+            const text = stripBlockIAL(kd.kramdown);
             const sentences = splitInPlaceSentences(text);
             if (sentences.length <= 1) continue;
-            if (!styled) styled = hasInlineStyles(text);
             plans.push({ id: s.ids[i], sentences });
         }
         if (plans.length === 0) {
             await siyuan.pushMsg(cardSkipped > 0 ? tomatoI18n.选中段落都挂闪卡 : tomatoI18n.没有可断句的内容);
             return;
         }
-        const run = async () => {
-            // styled-confirm 悬置窗内连按会叠第二笔收集，迟到确认的那笔块可能已被
-            // 先跑的一笔删掉——执行前重筛存活（亡块跳过，全亡静默收场）
-            const live: SplitPlan[] = [];
-            for (const p of plans) {
-                if (await siyuan.getBlockAttrs(p.id).catch(() => null)) live.push(p);
-            }
-            if (live.length === 0) return;
-            let made = 0;
-            for (const p of live) {
-                await siyuan.insertBlockAfter(p.sentences.join("\n\n"), p.id, "markdown");
-                await siyuan.deleteBlock(p.id);
-                made += p.sentences.length;
-            }
-            // revtrace「拆装不算修订」：断句=插新句块+删原块，句子块 updated=断句时刻
-            // 会整批误报「刚改」——推基线到操作后（句子块≤基线全无色）+作废 updated
-            // 快照缓存。未纳入文档 bump 自动 no-op（首次 enroll 必晚于此刻，本就无色）
-            const docID = protyle?.block?.rootID ?? "";
-            if (docID) {
-                await progStorage.bumpRevTraceBaseline(docID);
-                invalidateRevTrace(docID);
-            }
-            await siyuan.pushMsg(cardSkipped > 0
-                ? tomatoI18n.断句完成N块M句跳K段(live.length, made, cardSkipped)
-                : tomatoI18n.断句完成N块M句(live.length, made), 2500);
-        };
-        // 断句产物是纯文本句子：原文里的行内样式会以字面量保留，含样式块先警告；
-        // confirm 不 await（lock body 即返放锁），cb 里 catch 防 HTTP 失败成 unhandled
-        if (styled) {
-            confirm(tomatoI18n.断句样式警告标题, tomatoI18n.断句样式警告内容, () => { void run().catch(() => { }); });
-        } else {
-            await run();
+        // 执行前重筛存活（收集期 await 读窗内他窗删块的防御，全亡静默收场）
+        const live: SplitPlan[] = [];
+        for (const p of plans) {
+            if (await siyuan.getBlockAttrs(p.id).catch(() => null)) live.push(p);
         }
+        if (live.length === 0) return;
+        let made = 0;
+        let done = 0;
+        let insFail = 0;
+        for (const p of live) {
+            // 插失败不删原块（review P1-1）：siyuan.call 对 code!=0 不 reject 而 resolve
+            // null，不检查就 delete=插入失败静默丢原块（API 事务不进 undo 栈+块事务
+            // 历史 30 分钟批，confirm 退役后此处是数据最后防线）
+            const ins = await siyuan.insertBlockAfter(p.sentences.join("\n\n"), p.id, "markdown");
+            if (!ins) { insFail++; continue; }
+            await siyuan.deleteBlock(p.id);
+            made += p.sentences.length;
+            done++;
+        }
+        // revtrace「拆装不算修订」：断句=插新句块+删原块，句子块 updated=断句时刻
+        // 会整批误报「刚改」——推基线到操作后（句子块≤基线全无色）+作废 updated
+        // 快照缓存。未纳入文档 bump 自动 no-op（首次 enroll 必晚于此刻，本就无色）
+        const docID = protyle?.block?.rootID ?? "";
+        if (docID) {
+            await progStorage.bumpRevTraceBaseline(docID);
+            invalidateRevTrace(docID);
+        }
+        // 失败计数优先于护卡文案（「原文未动」是数据安全信息；两者同现的罕见态挂卡
+        // 文案让位）；纯网络异常走 throw 由 lockWithLease 吞，安全向=插后才删、中断
+        // 只会重不会丢
+        const failTotal = readFail + insFail;
+        await siyuan.pushMsg(failTotal > 0
+            ? tomatoI18n.断句完成N块M句失败K段(done, made, failTotal)
+            : cardSkipped > 0
+                ? tomatoI18n.断句完成N块M句跳K段(done, made, cardSkipped)
+                : tomatoI18n.断句完成N块M句(done, made), 2500);
     });
 }

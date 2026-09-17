@@ -8,7 +8,16 @@
 // 开 tag 无需空白即成块，恒防；3+ 连续 -*_ 是分割线（裸片段+空反链时成块）。
 // 顺序前提：两段 replace 靠「数字类与符号类首字符不相交」保证互不二次处理——LEAD 若
 // 将来加入其他数字开头形态，须先重构此互斥约定（review P2-3）。
-const LEAD_ESCAPE_RE = /^(?:>|#{1,6}(?:\s|$)|[*+-](?:\s|$)|\d{1,9}[.)](?:\s|$)|```|~~~|<[a-zA-Z!\/]|[-*_]{3,})/;
+// HTML 开 tag 收窄（09-17 就地断句保样式 □1）：旧形态 `<[a-zA-Z!\/]` 把片首行内存储
+// tag（<span data-type=…>/<u>/<mark>…）一并转义=字面残渣——closeInlineMarks 跨句补全
+// 的头补开标记就是这个形态（回填原文含 style/data-type 属性），kramdown 取文通道
+// 下必现。收窄为 CommonMark type 6 块级 tag 名单+HTML 注释恒防；行内 tag 不在名单
+// =CommonMark 语义不构成 HTML 块（type 7 须独占整行，断句片恒带正文）。dev 6808
+// 实测锚：片首 <span data-type=…>/<u> Lute 解析回行内样式无损、转义 \< 产 backslash
+// 字面节点。review P2-1 加固：名单补 type 1 延续 tag（script/style/pre/textarea）+
+// i flag（type 6 匹配本就大小写不敏感；3.8.4 实测大写 <DIV>/<?php 片首落段落无损，
+// 此为防内核升级行为漂移的零成本防线，正则其余分支无字母大小写敏感项）。
+const LEAD_ESCAPE_RE = /^(?:>|#{1,6}(?:\s|$)|[*+-](?:\s|$)|\d{1,9}[.)](?:\s|$)|```|~~~|<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|pre|script|section|source|style|summary|table|tbody|td|textarea|tfoot|th|thead|title|tr|track|ul)(?:[\s/>]|$)|<!--|[-*_]{3,})/i;
 
 export function escapeLead(text: string): string {
     if (!LEAD_ESCAPE_RE.test(text)) return text;

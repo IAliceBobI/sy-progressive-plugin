@@ -298,9 +298,16 @@ function packSegments(segs: VolBlock[][], maxChars: number): VolBlock[][] {
     return vols;
 }
 
-/** 卷名=首标题块文本（截 24 字）；无标题段=首块 content 前缀；空序列=空串（调用方兜底） */
-function planTitle(blocks: VolBlock[]): string {
-    const first = blocks.find(b => b.type === "h") ?? blocks[0];
+/** 卷名=卷内第一个**已勾选切分级**的标题（截 24 字；09-17 □2：前置目录/序言等更浅
+ *  级标题被贪心并进首卷时不再抢名——「卷01·目 录」诱发用户「第一编未出现」误解）；
+ *  整卷无勾选级标题（纯前置段打包/书尾段）=回退现状取卷内第一个标题；无标题段=首块
+ *  content 前缀；空序列=空串（调用方兜底）。subType 形态=getChildBlocks 实测
+ *  "h1".."h6"（h 前缀，HeadingGroup.init 同款 map）。 */
+function planTitle(blocks: VolBlock[], levels: string[]): string {
+    const heads = new Set(levels.map(l => `h${l}`));
+    const first = blocks.find(b => b.type === "h" && heads.has(b.subType))
+        ?? blocks.find(b => b.type === "h")
+        ?? blocks[0];
     const raw = first?.content?.trim() ?? "";
     return raw.length > 24 ? raw.slice(0, 24) + "…" : raw;
 }
@@ -310,11 +317,11 @@ export async function splitIntoVols(blocks: VolBlock[], levels: string[], maxCha
     if (blocks.length === 0) return [];
     if (levels.length === 0 || charCount(blocks) <= maxChars) {
         const cc = charCount(blocks);
-        return [{ title: planTitle(blocks), blocks, charCount: cc, overLimit: false }];
+        return [{ title: planTitle(blocks, levels), blocks, charCount: cc, overLimit: false }];
     }
     const segs = await flattenSegments(blocks, levels, maxChars, 0);
     return packSegments(segs, maxChars).map(vol => ({
-        title: planTitle(vol), blocks: vol,
+        title: planTitle(vol, levels), blocks: vol,
         charCount: charCount(vol), overLimit: charCount(vol) > maxChars,
     }));
 }

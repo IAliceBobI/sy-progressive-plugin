@@ -5906,30 +5906,6 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
-    public get 断句样式警告标题() {
-        switch (this.lang) {
-            case "zh_CN": return "断句后将转为纯文本";
-            case "zh_CHT": return "斷句後將轉為純文字";
-            case "es_ES": return "La división convertirá a texto sin formato";
-            case "fr_FR": return "La scission convertira en texte brut";
-            case "ja_JP": return "分割後はプレーンテキストになります";
-            case "en_US":
-            default: return "Splitting will convert to plain text";
-        }
-    }
-
-    public get 断句样式警告内容() {
-        switch (this.lang) {
-            case "zh_CN": return "选中块含行内样式（加粗/高亮/链接等），拆开后的句子将以纯文本保留，样式不保留。继续？";
-            case "zh_CHT": return "選中塊內行內樣式（粗體/高亮/連結等），拆開後的句子將以純文字保留，樣式不保留。繼續？";
-            case "es_ES": return "Los bloques seleccionados contienen estilos en línea (negrita/resaltado/enlaces); las frases resultantes conservarán el texto sin formato, no los estilos. ¿Continuar?";
-            case "fr_FR": return "Les blocs sélectionnés contiennent des styles en ligne (gras/surlignage/liens) ; les phrases résultantes garderont le texte brut, pas les styles. Continuer ?";
-            case "ja_JP": return "選択ブロックにインライン装飾（太字/ハイライト/リンク等）があります。分割後の文はプレーンテキストになり、装飾は失われます。続けますか？";
-            case "en_US":
-            default: return "Selected blocks contain inline styles (bold/highlight/links); resulting sentences keep plain text, not the styles. Continue?";
-        }
-    }
-
     // ===== 就地断句命令通道态位守卫（0914 □4，⌥= 快捷键）：书/分片文档引导拒绝 =====
     public get 原书不能就地断句() {
         switch (this.lang) {
@@ -8813,6 +8789,18 @@ export class TomatoI18n extends TomatoI18nABC {
             case "ja_JP": return "エクスポート先フォルダー";
             case "en_US":
             default: return "Export folder";
+        }
+    }
+    /** 失效引用防线提示（09-17）：源文件缺失被跳过时轮末告知用户，不静默吞 */
+    public 导出跳过x个失效资源引用(x: number) {
+        switch (this.lang) {
+            case "zh_CN": return `导出完成：跳过 ${x} 个失效资源引用（源文件已不在 assets，引用保留原样）`;
+            case "zh_CHT": return `匯出完成：跳過 ${x} 個失效資源引用（來源檔案已不在 assets，引用保留原樣）`;
+            case "es_ES": return `Exportación completada: se omitieron ${x} referencias de recursos no válidas (el archivo ya no está en assets)`;
+            case "fr_FR": return `Export terminé : ${x} références de ressources invalides ignorées (fichier absent des assets)`;
+            case "ja_JP": return `エクスポート完了：無効なリソース参照 ${x} 件をスキップしました（ファイルが assets に存在しません）`;
+            case "en_US":
+            default: return `Export done: skipped ${x} broken asset references (source file missing from assets)`;
         }
     }
     public get 输出选项() {
@@ -11774,6 +11762,21 @@ export class TomatoI18n extends TomatoI18nABC {
             case "it_IT": return `Divisione completata: ${blocks} blocchi, ${sentences} frasi (${skipped} paragrafi con carte saltati)`;
             case "en_US":
             default: return `Split done: ${blocks} blocks, ${sentences} sentences (${skipped} card-bound paragraphs skipped)`;
+        }
+    }
+
+    /** 断句部分失败（review P1-1/P2-2）：kramdown 读失败+插失败合并计数——原文未动是
+     *  数据安全信息，优先级高于护卡跳过文案（两者同现的罕见态挂卡文案让位）。 */
+    public 断句完成N块M句失败K段(blocks: number, sentences: number, failed: number) {
+        switch (this.lang) {
+            case "zh_CN": return `断句完成：${blocks} 块 ${sentences} 句（${failed} 段处理失败，原文未动，可重试）`;
+            case "zh_CHT": return `斷句完成：${blocks} 塊 ${sentences} 句（${failed} 段處理失敗，原文未動，可重試）`;
+            case "ja_JP": return `分割完了：${blocks} ブロック ${sentences} 文（${failed} 段の処理に失敗、原文は変更せず、再試行できます）`;
+            case "es_ES": return `División completa: ${blocks} bloques, ${sentences} frases (${failed} párrafos fallidos, original intacto, reintente)`;
+            case "fr_FR": return `Découpage terminé : ${blocks} blocs, ${sentences} phrases (${failed} paragraphes en échec, original intact, réessayez)`;
+            case "it_IT": return `Divisione completata: ${blocks} blocchi, ${sentences} frasi (${failed} paragrafi falliti, originale intatto, riprovare)`;
+            case "en_US":
+            default: return `Split done: ${blocks} blocks, ${sentences} sentences (${failed} paragraphs failed, originals untouched, retry)`;
         }
     }
 
