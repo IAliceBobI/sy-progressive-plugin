@@ -8161,6 +8161,56 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return ". For smaller volumes: lower the cap or check deeper heading levels";
         }
     }
+    // ============ □4 结构切分模式（09-17 分卷帖鸟诉求：一编一卷/每 N 个标题一卷） ============
+    public get 切分方式() {
+        switch (this.lang) {
+            case "zh_CN": return "切分方式";
+            case "zh_CHT": return "切分方式";
+            case "en_US":
+            default: return "Split by";
+        }
+    }
+    public get 按体量() {
+        switch (this.lang) {
+            case "zh_CN": return "按体量";
+            case "zh_CHT": return "按體量";
+            case "en_US":
+            default: return "Size";
+        }
+    }
+    public get 按结构() {
+        switch (this.lang) {
+            case "zh_CN": return "按结构";
+            case "zh_CHT": return "按結構";
+            case "en_US":
+            default: return "Structure";
+        }
+    }
+    public get 每卷标题数() {
+        switch (this.lang) {
+            case "zh_CN": return "每卷标题数";
+            case "zh_CHT": return "每卷標題數";
+            case "en_US":
+            default: return "Headings per volume";
+        }
+    }
+    public get 结构模式提示() {
+        switch (this.lang) {
+            case "zh_CN": return "每卷固定段数，N=1 即一编一卷；前置内容（目录、序言）自动单独成卷；超参考体量仅标黄，不按字数拆";
+            case "zh_CHT": return "每卷固定段數，N=1 即一編一卷；前置內容（目錄、序言）自動單獨成卷；超參考體量僅標黃，不按字數拆";
+            case "en_US":
+            default: return "A fixed number of sections per volume (N=1 = one part per volume); leading front-matter (TOC, prefaces) becomes its own volume; oversized volumes are only tinted, never split by char count";
+        }
+    }
+    /** {c}=所选级标题总数 {n}=每卷标题数——结构模式的无需分卷空态 */
+    public get 无需分卷结构() {
+        switch (this.lang) {
+            case "zh_CN": return "全书共 {c} 个所选标题，每 {n} 个一卷只够 1 卷，无需分卷。想拆开：调小每卷标题数";
+            case "zh_CHT": return "全書共 {c} 個所選標題，每 {n} 個一卷只夠 1 卷，無需分卷。想拆開：調小每卷標題數";
+            case "en_US":
+            default: return "Only {c} headings at the selected level(s) — {n} per volume still fits in one, no split needed. To split: lower headings per volume";
+        }
+    }
     public get 切分中() {
         switch (this.lang) {
             case "zh_CN": return "切分中…";
@@ -9178,6 +9228,14 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "卡片末尾追加製卡時間與原文標題路徑，便於回溯出處";
             case "en_US":
             default: return "Append the card time and the source doc's title path to the end of each card for provenance";
+        }
+    }
+    public get tip设置卡片来源路径() {
+        switch (this.lang) {
+            case "zh_CN": return "复习界面与卡片文档里，卡片块顶部的「文档>小节」层级串（默认关闭；与卡片末尾的时间路径互不影响）";
+            case "zh_CHT": return "複習界面與卡片文檔裡，卡片塊頂部的「文檔>小節」層級串（默認關閉；與卡片末尾的時間路徑互不影響）";
+            case "en_US":
+            default: return "The \"doc > section\" hierarchy line above the card block in the review UI and card docs (off by default; independent of the end-of-card time path)";
         }
     }
     public get tip设置分片卡链接() {
@@ -10413,6 +10471,80 @@ export class TomatoI18n extends TomatoI18nABC {
             case "ja_JP": return "構造ビューに戻る";
             case "en_US":
             default: return "Back to structure view";
+        }
+    }
+    // treemap 战役 □3：三档下拉菜单文案（结构/方块/全量）+ 下钻面包屑
+    public get 结构视图() {
+        switch (this.lang) {
+            case "zh_CN": return "结构视图";
+            case "zh_CHT": return "結構視圖";
+            case "ja_JP": return "構造ビュー";
+            case "en_US":
+            default: return "Structure view";
+        }
+    }
+    public get 方块总览() {
+        switch (this.lang) {
+            case "zh_CN": return "方块总览";
+            case "zh_CHT": return "方塊總覽";
+            case "ja_JP": return "ブロック概観";
+            case "en_US":
+            default: return "Block overview";
+        }
+    }
+    // □5 标记模式菜单项（陆杰「只看标记」——treemap 家族数据过滤变体）
+    public get 只看标记() {
+        switch (this.lang) {
+            case "zh_CN": return "只看标记";
+            case "zh_CHT": return "只看標記";
+            case "ja_JP": return "マークのみ表示";
+            case "en_US":
+            default: return "Marks only";
+        }
+    }
+    public get 引用聚焦() {
+        switch (this.lang) {
+            case "zh_CN": return "引用聚焦";
+            case "zh_CHT": return "引用聚焦";
+            case "ja_JP": return "参照フォーカス";
+            case "en_US":
+            default: return "Reference focus";
+        }
+    }
+    public get 它引用的() {
+        switch (this.lang) {
+            case "zh_CN": return "它引用的";
+            case "zh_CHT": return "它引用的";
+            case "ja_JP": return "参照先";
+            case "en_US":
+            default: return "References";
+        }
+    }
+    public get 引用它的() {
+        switch (this.lang) {
+            case "zh_CN": return "引用它的";
+            case "zh_CHT": return "引用它的";
+            case "ja_JP": return "参照元";
+            case "en_US":
+            default: return "Referenced by";
+        }
+    }
+    public get 取消() {
+        switch (this.lang) {
+            case "zh_CN": return "取消";
+            case "zh_CHT": return "取消";
+            case "ja_JP": return "キャンセル";
+            case "en_US":
+            default: return "Cancel";
+        }
+    }
+    public get 方块档暂不支持定位() {
+        switch (this.lang) {
+            case "zh_CN": return "方块总览暂不支持定位，请先切换到结构视图";
+            case "zh_CHT": return "方塊總覽暫不支援定位，請先切換到結構視圖";
+            case "ja_JP": return "ブロック概観では定位できません。構造ビューに切り替えてください";
+            case "en_US":
+            default: return "Location is not supported in block overview yet; switch to structure view first";
         }
     }
     public get 徽标段字() {
@@ -15331,6 +15463,23 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "桌面端以懸浮球+懸浮面板取代底部面板與入口條；關閉後恢復底部形態。";
             case "en_US":
             default: return "On desktop, replaces the bottom panel and entry bar with a floating ball + panel; turn off to restore the bottom layout.";
+        }
+    }
+    /** 球驻留开关（09-18）：开=共存模式（面板展开球留驻、再点球收面板）；关=旧「面板开球藏」 */
+    public get 面板展开时保留悬浮球() {
+        switch (this.lang) {
+            case "zh_CN": return "面板展开时保留悬浮球";
+            case "zh_CHT": return "面板展開時保留懸浮球";
+            case "en_US":
+            default: return "Keep the floating ball visible while the panel is open";
+        }
+    }
+    public get 面板展开时保留悬浮球说明() {
+        switch (this.lang) {
+            case "zh_CN": return "开：面板展开时球仍显示，再点球收起面板；关：面板展开时隐藏球（旧行为）。要长期只留面板可用下方命令隐藏球，⌘⌥B 开合面板。";
+            case "zh_CHT": return "開：面板展開時球仍顯示，再點球收起面板；關：面板展開時隱藏球（舊行為）。要長期只留面板可用下方命令隱藏球，⌘⌥B 開合面板。";
+            case "en_US":
+            default: return "On: the ball stays visible while the panel is open; click it again to collapse. Off: the ball hides while the panel is open (legacy). To keep only the panel, hide the ball with the command below and toggle the panel with ⌘⌥B.";
         }
     }
     public get 展开或收起悬浮反链() {

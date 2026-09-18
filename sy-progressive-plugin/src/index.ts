@@ -19,7 +19,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, readCurveReadingPoint, readCurvePlainDocs,
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, flashcardShowPath, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, readCurveSweepMins, readCurveTakeover, readCurveReadingPoint, readCurvePlainDocs,
     readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
@@ -150,6 +150,10 @@ function loadStore(plugin: BaseTomatoPlugin) {
     writingQuota.load(plugin);
     cardUnderPiece.load(plugin);
     cardAppendTime.load(plugin);
+    // 卡片顶部来源层级路径显示总闸（09-17 群反馈）：body 类即 CSS 总闸（index.scss 两条
+    // div[custom-*ref/origin*-hpath]::before），markOriginTextBG 同款——load 后订阅，改值实时生效
+    flashcardShowPath.load(plugin);
+    flashcardShowPath.subscribe(v => document.body.classList.toggle("prog-card-path-on", !!v));
     mobileTopBar.load(plugin);
     initProgFloatBtnsDisable.load(plugin);
     floatbarMainBtns.load(plugin);

@@ -41,13 +41,15 @@ export function buildTreeIndex(rows: Block[]): TreeIndex {
  * level="N"：标题层级 ≥N 且有图内子节点的标题；level="all"：空集。
  * 叶子标题（无子树）不进集——空角标点击无反应（e2e 实锤）；文档根不折叠。
  */
-export function initialCollapsedRows(rows: Block[], level: ExpandLevel): string[] {
+export function initialCollapsedRows(rows: Block[], level: ExpandLevel, base = 1): string[] {
     const tree = buildTreeIndex(rows);
     const minHeading = level === "all" ? 99 : parseInt(level, 10);
     const out: string[] = [];
     for (const r of rows) {
         if (r.type === "h" && r.subtype?.startsWith("h")) {
-            const lv = parseInt(r.subtype.slice(1), 10);
+            // 相对层级=绝对 hN 平移 base-1（文档最小标题级归一化：H2 起步文档 base=2
+            // 时章=h2 不再被默认 level=2 折掉——treemap 战役 □2 病灶③）
+            const lv = parseInt(r.subtype.slice(1), 10) - base + 1;
             if (lv >= minHeading && (tree.childrenOf.get(r.id)?.length ?? 0) > 0) out.push(r.id);
         }
     }

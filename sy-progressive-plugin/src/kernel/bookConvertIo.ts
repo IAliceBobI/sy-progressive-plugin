@@ -262,7 +262,7 @@ async function doConvert(bookID: string, opts: ConvertOptions): Promise<ConvertA
     return {
         bookID,
         volCount: volIDs.length,
-        vols: plan.map((p, i) => ({ id: volIDs[i], name: p.title || `卷${i + 1}`, pieceCount: perVol[i] ?? 0 })),
+        vols: plan.map((p, i) => ({ id: volIDs[i], name: (p.title || `卷${i + 1}`) + (p.suffix ?? ""), pieceCount: perVol[i] ?? 0 })),
         pieceCount: groups.length,
         piecesRemoved,
         warning: "前端插件持有 books.json 内存缓存，转完请让用户 F5 或重载插件（防旧缓存覆盖注册）；物理片不预建，读书出场逐片生成",

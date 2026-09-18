@@ -1,15 +1,16 @@
 @use "sass:map";
 
-// ref path of original
-.protyle-wysiwyg div[custom-origin-hpath]:not([custom-prog-origin-text])::before {
+// ref path of original / ref path（09-17 群反馈 MOUQIN：制卡后层级串太长无处可关）：
+// 默认关闭，flashcardShowPath 开关经 body.prog-card-path-on 总闸（index.ts 订阅挂摘，
+// markOriginTextBG 同款）。:not([custom-prog-origin-text]) 恒排除摘抄副本——本组只管卡片
+body.prog-card-path-on .protyle-wysiwyg div[custom-origin-hpath]:not([custom-prog-origin-text])::before {
   content: attr(custom-origin-hpath);
   font-size: 80%;
   color: var(--b3-font-color2);
   padding-left: 15px;
 }
 
-// ref path
-.protyle-wysiwyg div[custom-ref-hpath]:not([custom-origin-hpath]):not([custom-prog-origin-text])::before {
+body.prog-card-path-on .protyle-wysiwyg div[custom-ref-hpath]:not([custom-origin-hpath]):not([custom-prog-origin-text])::before {
   content: attr(custom-ref-hpath);
   font-size: 80%;
   color: var(--b3-font-color3);

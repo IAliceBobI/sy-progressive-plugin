@@ -6,12 +6,13 @@
     // 卡体点击=跳原文块（OpenSyFile2 禁聚焦通道）；勾选框与跳转分区不抢事件。
     import { onMount } from "svelte";
     import { tomatoI18n } from "./tomatoI18n";
-    import { resolveOverviewScope, filterByColors, type OverviewData, type OverviewItem } from "./libs/annoOverview";
+    import { resolveOverviewScope, filterByColors, markVarCss, type OverviewData, type OverviewItem } from "./libs/annoOverview";
     import { collectSelected, type SelectedItem } from "./libs/annoCollect";
     import { annoTextToHtml } from "./libs/annoKramdown";
     import { fmtAnnoTime } from "./libs/annoPanelList";
     import { commentBox } from "./CommentBox";
     import { OpenSyFile2 } from "./libs/docUtils";
+    import { debugLog } from "./libs/logUtils";
 
     interface Props {
         seed: { bookID?: string; docID?: string };
@@ -122,6 +123,7 @@
                     markVar: it.markVar,
                     entry: it.entry,
                 }));
+            debugLog("anno_overview", `doCollect selected=${selected.length} sel=${sel.length} withVar=${sel.filter((s) => s.markVar).length}`, "anno");
             await collectSelected(sel, dest, data.scopeName);
         } finally {
             collecting = false;
@@ -191,7 +193,7 @@
                     {#if c.value === ""}
                         <span class="tomato-anno-ov__dot tomato-anno-ov__dot--none"></span>
                     {:else}
-                        <span class="tomato-anno-ov__dot" style="background: color-mix(in srgb, var({c.value}) 60%, var(--b3-theme-on-surface));"></span>
+                        <span class="tomato-anno-ov__dot" style="--ov-dot-color: {markVarCss(c.value)};"></span>
                     {/if}
                     {c.count}
                 </button>
@@ -209,7 +211,10 @@
                         >{g.meta.name || "…"}</button>
                         <span class="tomato-anno-ov__gcount" aria-label={tomatoI18n.共N条(g.items.length)}>{g.items.length}</span>
                     </div>
-                    {#each g.items as it (it.key)}
+                    {#each g.items as it, i (it.key)}
+                        {#if it.section && it.sectionID !== g.items[i - 1]?.sectionID}
+                            <div class="tomato-anno-ov__sec" title={it.section}><span class="tomato-anno-ov__sec-t">{it.section}</span></div>
+                        {/if}
                         <div class="tomato-anno-ov__card" class:tomato-anno-ov__card--sel={selSet.has(it.key)}>
                             <label class="tomato-anno-ov__checkwrap">
                                 <input
@@ -231,14 +236,14 @@
                             >
                                 {#if it.kind === "anno" && it.entry!.text.replace(/[\s\u200b]/g, "") !== ""}
                                     <div class="tomato-anno-ov__meta">
-                                        {#if it.markVar}<span class="tomato-anno-ov__dot" style="background: color-mix(in srgb, var({it.markVar}) 60%, var(--b3-theme-on-surface));"></span>{:else}<span class="tomato-anno-ov__dot tomato-anno-ov__dot--placeholder"></span>{/if}
+                                        {#if it.markVar}<span class="tomato-anno-ov__dot" style="--ov-dot-color: {markVarCss(it.markVar)};"></span>{:else}<span class="tomato-anno-ov__dot tomato-anno-ov__dot--placeholder"></span>{/if}
                                         <span class="tomato-anno-ov__time">{fmtAnnoTime(it.entry!.time)}</span>
                                     </div>
                                     <div class="tomato-anno-ov__text">{@html annoTextToHtml(it.entry!.text)}</div>
                                     {#if it.quote}<div class="tomato-anno-ov__quote">{cut(it.quote)}</div>{/if}
                                 {:else}
                                     <div class="tomato-anno-ov__mark"
-                                        style={it.markVar ? `--ov-mark: var(${it.markVar});` : ""}
+                                        style={it.markVar ? `--ov-mark: ${markVarCss(it.markVar)};` : ""}
                                     >{cut(it.quote)}</div>
                                 {/if}
                             </div>
@@ -372,6 +377,13 @@
         height: 10px;
         border-radius: 999px;
         border: 1px solid var(--b3-border-color);
+        /* 着色 dot 公式在此（inline 只喂 --ov-dot-color）——暗色分支混白提亮：
+           暗主题色板源色深（bg8=#3a0c09 量级）×on-surface 中灰（#9aa0a6）=1.6:1
+           接近不可辨（vision P1 实测）；45% 源色+55% 白 → bg8≈#a69290 ≈4.7:1 */
+        background: color-mix(in srgb, var(--ov-dot-color) 60%, var(--b3-theme-on-surface));
+    }
+    :global(html[data-theme-mode="dark"]) .tomato-anno-ov__dot {
+        background: color-mix(in srgb, var(--ov-dot-color) 45%, white);
     }
     .tomato-anno-ov__dot--placeholder {
         background: transparent;
@@ -428,6 +440,35 @@
         opacity: 0.85;
     }
 
+    /* 二级标题节头（anno-fix □4 微信读书式分节）：弱于组头一级（组=文档、节=h2）。
+       省略号挂内层 span（flex 容器上 text-overflow 静默不生效——踩坑表同族，vision P2-1） */
+    .tomato-anno-ov__sec {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin: 2px 10px 0;
+        padding: 4px 0 2px;
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.56;
+    }
+    .tomato-anno-ov__sec-t {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .tomato-anno-ov__sec::before {
+        content: "";
+        flex: none;
+        width: 3px;
+        height: 10px;
+        border-radius: 2px;
+        background: var(--b3-theme-primary-lighter, var(--b3-theme-primary));
+        opacity: 0.8;
+    }
+
     /* 卡片：CommentBox .tomato-anno-item 卡族视觉对齐（本组件 scoped 自持副本） */
     .tomato-anno-ov__card {
         display: flex;
@@ -450,6 +491,16 @@
         padding: 2px 5px 5px 2px;
         margin: -2px 0 -5px -2px; /* 热区外扩到 24px 档不顶卡内边距（vision 终审 P2-1 修） */
         cursor: pointer;
+        /* 复选框 hover 显隐（anno-fix □4 陆杰「常显影响观感」）：默认隐藏（占位不动防
+           布局跳），hover 卡片显现，已选中态常显（否则看不到勾了哪些）；opacity 通道
+           保持触屏选中态与键盘可达性（focus-visible 亦显） */
+        opacity: 0;
+        transition: opacity 0.12s ease-out;
+    }
+    .tomato-anno-ov__card:hover .tomato-anno-ov__checkwrap,
+    .tomato-anno-ov__card--sel .tomato-anno-ov__checkwrap,
+    .tomato-anno-ov__checkwrap:focus-within {
+        opacity: 1;
     }
     .tomato-anno-ov__check {
         flex: none;
@@ -505,7 +556,9 @@
         opacity: 0.6;
         word-break: break-word;
     }
-    /* 划线卡：mark 底色染 18%（CSS 变量名直引，明暗随主题） */
+    /* 划线卡：mark 底色染 18%（CSS 变量名直引，明暗随主题）。暗色分支先混白再染：
+       暗主题色板源色深（bg8 量级）×transparent 直染=轮廓消失（vision P1 实测 1.03:1），
+       内层 40% 混白提亮后 18% 弱染，色编码在暗色下可读 */
     .tomato-anno-ov__mark {
         font-size: 13px;
         line-height: 1.7;
@@ -515,6 +568,10 @@
         padding: 1px 3px 1px 6px;
         border-left: 3px solid color-mix(in srgb, var(--ov-mark, var(--b3-border-color)) 75%, var(--b3-theme-on-surface));
         background: color-mix(in srgb, var(--ov-mark, var(--b3-theme-surface-light)) 38%, transparent);
+    }
+    :global(html[data-theme-mode="dark"]) .tomato-anno-ov__mark {
+        border-left-color: color-mix(in srgb, var(--ov-mark, var(--b3-border-color)) 50%, white);
+        background: color-mix(in srgb, color-mix(in srgb, var(--ov-mark, var(--b3-theme-surface-light)) 40%, white) 18%, transparent);
     }
 
     /* 底栏：sticky 钉底（BookCardsPopover deck-wrap 同款防滚出视野） */

@@ -5,6 +5,7 @@
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import {
         cardAppendTime,
+        flashcardShowPath,
         cardLanding,
         cardUnderPiece,
         flashcardAddOriginRef,
@@ -68,6 +69,17 @@
             bind:checked={$cardAppendTime}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置制卡时间}>{tomatoI18n.制卡后追加时间与标题路径}</span>
+    </div>
+
+    <!-- 卡顶来源路径显示（09-17 群反馈 MOUQIN）：默认关——复习界面/卡片文档里卡片块顶部的
+         「文档>小节」层级串；与上行末尾时间路径互不影响 -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$flashcardShowPath}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置卡片来源路径}>{tomatoI18n.卡片上方显示来源路径}</span>
     </div>
 
     <div>

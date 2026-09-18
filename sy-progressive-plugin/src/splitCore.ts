@@ -221,8 +221,11 @@ export async function computePieceIndexVolsCore(
 /** 卷块=WordCountType + content/markdown（卷名与正文拼接的原料） */
 export interface VolBlock { id: string; count: number; type: string; subType: string; content: string; markdown: string }
 
-/** 切卷计划的一卷：title=首标题文本（截 24 字），overLimit=无更深级可下切的超限卷 */
-export interface VolPlan { title: string; blocks: VolBlock[]; charCount: number; overLimit: boolean }
+/** 切卷计划的一卷：title=首标题文本（截 24 字），suffix=多标题卷计数角标（□6，
+ *  「 等2编」，单标题卷空串——独立字段不并进 title：volDocTitle 拼在截断之后角标
+ *  永不被截；可选仅为兼容外部构造的 plan 字面量，出口恒有值），overLimit=无更深级
+ *  可下切的超限卷 */
+export interface VolPlan { title: string; suffix?: string; blocks: VolBlock[]; charCount: number; overLimit: boolean }
 
 /** getChildBlocks 行 → 卷块（滤双空块，口径同 childBlocksToWordCount：空 alt 图片
  *  content 空但 markdown 有值须保留）。null 入参=API 失败抛错（≠真空文档的 []）。 */
@@ -298,6 +301,31 @@ function packSegments(segs: VolBlock[][], maxChars: number): VolBlock[][] {
     return vols;
 }
 
+/** 结构模式分卷（09-17 □4）：前置段（首段不以勾选级标题开头=第一个断点前的内容，
+ *  如目录/序言）独立成卷且不占 N 分组位；其余每 n 段一卷（n<1 钳 1）。HeadingGroup
+ *  分段保证除首段外每段都以勾选级标题开头——前置判定只看 segs[0][0]。 */
+function chunkSegments(segs: VolBlock[][], levels: string[], n: number): VolBlock[][] {
+    if (segs.length === 0) return [];
+    const heads = new Set(levels.map(l => `h${l}`));
+    const vols: VolBlock[][] = [];
+    let rest = segs;
+    const first = rest[0][0];
+    if (!(first.type === "h" && heads.has(first.subType))) {
+        vols.push(rest[0]);
+        rest = rest.slice(1);
+    }
+    const step = n >= 1 ? n : 1;
+    for (let i = 0; i < rest.length; i += step) {
+        vols.push(rest.slice(i, i + step).flat());
+    }
+    return vols;
+}
+
+/** 切分模式参数（可选，不传=体量模式）：structure=结构优先，n=每 n 个切分段一卷
+ *  （勾单级即「每 n 个该级标题」，n=1 为一编一卷）。kernel doConvert 等既有调用
+ *  不传走原路径，契约零波及。 */
+export interface SplitVolOpts { mode?: "size" | "structure"; n?: number }
+
 /** 卷名=卷内第一个**已勾选切分级**的标题（截 24 字；09-17 □2：前置目录/序言等更浅
  *  级标题被贪心并进首卷时不再抢名——「卷01·目 录」诱发用户「第一编未出现」误解）；
  *  整卷无勾选级标题（纯前置段打包/书尾段）=回退现状取卷内第一个标题；无标题段=首块
@@ -312,26 +340,61 @@ function planTitle(blocks: VolBlock[], levels: string[]): string {
     return raw.length > 24 ? raw.slice(0, 24) + "…" : raw;
 }
 
-/** 主入口：blocks 全书块序列（childBlocksToVolBlocks 产物），levels=["1".."6"] 子集 */
-export async function splitIntoVols(blocks: VolBlock[], levels: string[], maxChars: number): Promise<VolPlan[]> {
+/** □6 多标题卷计数角标：贪心合并/结构 N>1 的卷只显首编名，诱发「第六编不见了」
+ *  误解（vision 评审员实测误判）。计数=卷内勾选级标题**块数**（非段数——连续同级
+ *  标题分计，如实呈现「标题被拆成两块」的数据形态），<2 不加（单标题卷/纯前置段卷
+ *  零噪声）；量词从首个勾选级标题提取（「第X编/章/节/部/回/篇/卷」，数字形态中英皆
+ *  可），提取不到或勾选混级（1 编 h1+2 章 h2 单点量词会失真）退「个」。体量/结构两
+ *  模式同一出口生效。 */
+function planSuffix(blocks: VolBlock[], levels: string[]): string {
+    const heads = new Set(levels.map(l => `h${l}`));
+    const hit = blocks.filter(b => b.type === "h" && heads.has(b.subType));
+    if (hit.length < 2) return "";
+    const m = (hit[0].content ?? "").trim().match(/^第[0-9一二三四五六七八九十百千零两]+([编章节部回篇卷])/);
+    const sameLevel = new Set(hit.map(b => b.subType)).size === 1;
+    return ` 等${hit.length}${sameLevel && m ? m[1] : "个"}`;
+}
+
+/** 主入口：blocks 全书块序列（childBlocksToVolBlocks 产物），levels=["1".."6"] 子集。
+ *  opts.mode="structure"=结构优先（原级分段每 n 段一卷、前置独立、不 deepen 下切，
+ *  maxChars 退为参考线只标 overLimit 不拆卷）；不传/size=体量模式（贪心打包原行为）。 */
+export async function splitIntoVols(
+    blocks: VolBlock[], levels: string[], maxChars: number, opts?: SplitVolOpts,
+): Promise<VolPlan[]> {
     if (blocks.length === 0) return [];
+    if (opts?.mode === "structure") {
+        // 原级分段（flattenSegments 同款 HeadingGroup 透传，不递归 deepen）；levels 空
+        // 无断点=整书一卷（与体量模式兜底同形，overLimit 按参考线标记）
+        const segs = levels.length === 0 ? [blocks]
+            : (await new HeadingGroup(blocks, levels, "").init()).split() as VolBlock[][];
+        return chunkSegments(segs, levels, opts.n ?? 1).map(vol => ({
+            title: planTitle(vol, levels), suffix: planSuffix(vol, levels), blocks: vol,
+            charCount: charCount(vol), overLimit: charCount(vol) > maxChars,
+        }));
+    }
     if (levels.length === 0 || charCount(blocks) <= maxChars) {
         const cc = charCount(blocks);
-        return [{ title: planTitle(blocks, levels), blocks, charCount: cc, overLimit: false }];
+        return [{ title: planTitle(blocks, levels), suffix: planSuffix(blocks, levels), blocks, charCount: cc, overLimit: false }];
     }
     const segs = await flattenSegments(blocks, levels, maxChars, 0);
     return packSegments(segs, maxChars).map(vol => ({
-        title: planTitle(vol, levels), blocks: vol,
+        title: planTitle(vol, levels), suffix: planSuffix(vol, levels), blocks: vol,
         charCount: charCount(vol), overLimit: charCount(vol) > maxChars,
     }));
 }
 
-/** 卷文档名：两位序号前缀保唯一+防重名；title 兜底截 24 字（落盘名的最终出口，
- *  planTitle 展示层已截，双截无害——防长标题从旁路进落盘名） */
-export function volDocTitle(idx: number, plan: VolPlan): string {
+/** 卷文档名主段（不含角标）：两位序号前缀保唯一+防重名；title 兜底截 24 字。展示层
+ *  拆段渲染角标（Dialog 用 base+badge span 次要化），落盘名走 volDocTitle 纯文本拼接。 */
+export function volDocBaseTitle(idx: number, plan: VolPlan): string {
     const raw = plan.title || "未命名";
     const t = raw.length > 24 ? raw.slice(0, 24) + "…" : raw;
     return `卷${String(idx + 1).padStart(2, "0")}·${t}`;
+}
+
+/** 卷文档名（落盘/响应出口）：主段+□6 角标纯文本拼接（角标拼在 24 字截断之后永不被
+ *  截）。 */
+export function volDocTitle(idx: number, plan: VolPlan): string {
+    return `${volDocBaseTitle(idx, plan)}${plan.suffix ?? ""}`;
 }
 
 /** 卷文档正文：块 markdown 空行拼接。已知限制：块 IAL/custom 属性不随行（markdown

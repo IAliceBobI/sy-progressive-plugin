@@ -5,6 +5,6 @@
 // 纯逻辑核已迁 splitCore.ts（kernel 共用单一事实源，零 siyuan/window 依赖）；
 // 本文件=re-export 壳保持旧 import 路径有效。行为锁定=tests/unit/splitVols.test.ts。
 export {
-    childBlocksToVolBlocks, splitIntoVols, volDocTitle, volDocMarkdown,
+    childBlocksToVolBlocks, splitIntoVols, volDocBaseTitle, volDocTitle, volDocMarkdown,
     type VolBlock, type VolPlan,
 } from "./splitCore";

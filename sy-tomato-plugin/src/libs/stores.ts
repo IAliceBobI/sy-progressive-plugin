@@ -680,6 +680,9 @@ export const back_link_goto_bottom_btn = settingFactory("back_link_goto_bottom_b
 // □4 悬浮反链总开关（bkfloat 2026-09-17，默认开）：桌面端把底部反链升级为悬浮球+悬浮面板。
 // 结构性键（storageHotReload 已登记）：BackLinkBottomBox.onload 期注册读死，改动须整插件重载生效
 export const back_link_float = settingFactory("back_link_float", true, STORAGE_SETTINGS, null as TSK);
+// 面板展开时球驻留（09-18 bear 需求，默认开）：共存模式——开面板球不隐藏，再点球收面板；
+// 关=旧互斥行为「面板开球藏」。非结构性键：BkFloat 订阅本 store 即改即生效（含他端热更）
+export const back_link_float_ball_stay = settingFactory("back_link_float_ball_stay", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_concept_fold = settingFactory("back_link_concept_fold", true, STORAGE_SETTINGS, null as TSK);
 export const back_link_copy = settingFactory("back_link_copy", false, STORAGE_SETTINGS, null as TSK);
 export const back_link_move_to_dailynote = settingFactory("back_link_move_to_dailynote", true, STORAGE_SETTINGS, null as TSK);
@@ -989,6 +992,9 @@ export const readCurveCadPlain = settingFactory("readCurveCadPlain", 0, STORAGE_
 export const writingQuota = settingFactory("writingQuota", 1, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardUnderPiece = settingFactory("cardUnderPiece", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardAppendTime = settingFactory("cardAppendTime", false, STORAGE_Prog_SETTINGS, null as TSK);
+// 卡片顶部来源层级路径显示（09-17 群反馈 MOUQIN：制卡后层级串太长无处可关）——默认关，
+// 渲染端=index.scss 两条 ::before 规则的 body.prog-card-path-on 总闸（渐进 index.ts 订阅挂摘）
+export const flashcardShowPath = settingFactory("flashcardShowPath", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const mobileTopBar = settingFactory("mobileTopBar", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const initProgFloatBtnsDisable = settingFactory("initProgFloatBtnsDisable", false, STORAGE_Prog_SETTINGS, null as TSK);
 // 片态浮条首行勾选集（设置面板「浮条」区 checkbox 清单，□10 方案 B：勾=站首行大钮，

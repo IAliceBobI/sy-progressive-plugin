@@ -268,6 +268,23 @@ export abstract class TomatoI18nABC7 extends TomatoI18nABC8 {
                 return "After card creation, append time and title path";
         }
     }
+    public get 卡片上方显示来源路径() {
+        switch (this.lang) {
+            case "zh_CN":
+                return "卡片上方显示来源路径";
+            case "es_ES":
+                return "Mostrar la ruta de origen encima de la tarjeta";
+            case "fr_FR":
+                return "Afficher le chemin d'origine au-dessus de la carte";
+            case "ja_JP":
+                return "カードの上部に出典パスを表示";
+            case "zh_CHT":
+                return "卡片上方顯示來源路徑";
+
+            default:
+                return "Show the source path above the card";
+        }
+    }
     public get 已摘抄块显示背景色() {
         switch (this.lang) {
             case "zh_CN":

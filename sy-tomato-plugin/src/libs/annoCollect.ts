@@ -94,11 +94,13 @@ export const ANNO_COLLECTED_ATTR = "custom-tomato-anno-collected";
  *  mark 通道（含多属性 IAL）/批注劈段锚自带样式 IAL 全形态同源；锚不在任何彩字区间 →
  *  null=该条导出无色。旧邻域配对防串色逻辑由区间解析天然覆盖（区间即配对边界）。 */
 export { markVarOfAnchor } from "./annoColorVar";
+import { markVarCss } from "./annoColorVar";
 
 /** 引文 mark 包裹：写通道=行内 span 形态（Md2BlockDOM 实测认 span 不认 ==…=={: style} IAL
- *  后缀——后者是 getBlockKramdown 的输出形态，解析方向不回灌；读通道见 markVarOfAnchor） */
+ *  后缀——后者是 getBlockKramdown 的输出形态，解析方向不回灌；读通道见 markVarOfAnchor）。
+ *  markVar 值域 □5 起含自定义字面色值（hex/rgb）——var() 包裹统一过 markVarCss */
 function markWrap(text: string, markVar: string | undefined): string {
-    return markVar ? `<span data-type="mark" style="background-color: var(${markVar});">${text}</span>` : text;
+    return markVar ? `<span data-type="mark" style="background-color: ${markVarCss(markVar)};">${text}</span>` : text;
 }
 
 /** 引述块文案（保形多段）：整条 500 码点截断对齐 anno-note 锚快照语义（防巨块收集膨胀）；
@@ -186,18 +188,28 @@ export function clipStructQuote(joined: string): string {
     return cps.length > QUOTE_STRUCT_CLIP ? cps.slice(0, QUOTE_STRUCT_CLIP).join("") + "…" : joined;
 }
 
+/** 引文段引述化（anno-fix □3 形态重定，bear 拍板「竖线+原文结构兼得」）：宿主序列
+ *  并块后的每行加 `> ` 前缀、空行转 `>` 空前缀行（块间分隔收进同一引述块多段——
+ *  微信读书式一条竖线；`> 1. x` 引述内嵌列表 6811 实测验落盘 ✓，引述块宿主→`> >` 嵌套） */
+function quoteizeLines(md: string): string {
+    return md
+        .split("\n")
+        .map((l) => (l.trim() === "" ? ">" : `> ${l}`))
+        .join("\n");
+}
+
 /** 有想法的批注 → 纵向 sb 卡：想法段（kramdown 原样可多段）+ 追加行时间线 + 原文引文
- *  （□3 A 案整块语义：结构化引文=宿主序列原样块（quote 字面拼接，保块型/列表/行内样式，
- *  尾锚接末块最后内容行）；拉取失败兜底=纯文本引述块包装（旧形态+颜色重放）） */
+ *  （□3 A 案整块语义：结构化引文=宿主序列逐块快照引述化（竖线+块型兼得，尾锚接末块
+ *  最后内容行）；拉取失败兜底=纯文本引述块包装（旧形态+颜色重放）） */
 function annoSbMarkdown(it: { hostID: string; blockContent: string; entry: TomatoAnnotation }, opts: SectionOpts): string {
     const parts: string[] = [it.entry.text];
     for (const r of it.entry.replies ?? []) parts.push(`${fmtAnnoTime(r.time)} ${r.text}`);
     const anchorTail = opts.anchor ? ` ((${it.hostID} "*"))` : "";
     const qb = itemQuoteBlocks(it, opts.hostInfo);
     if (qb) {
-        // 护栏先于尾锚（截断保内容、锚永远在场），appendQuoteTail 再在末内容行挂锚
-        const joined = appendQuoteTail(clipStructQuote(joinHostQuoteBlocks(qb)), anchorTail);
-        if (joined.trim() !== "") parts.push(joined);
+        // 护栏先于尾锚（截断保内容、锚永远在场），appendQuoteTail 再在末内容行挂锚，最后引述化
+        const joined = quoteizeLines(appendQuoteTail(clipStructQuote(joinHostQuoteBlocks(qb)), anchorTail));
+        if (joined.trim() !== "" && joined !== ">") parts.push(joined);
     } else {
         const quote = quoteBlockMarkdown(itemQuoteText(it, opts.hostInfo), opts.hostInfo?.get(it.entry.id)?.markVar, anchorTail);
         if (quote) parts.push(quote);
@@ -205,23 +217,45 @@ function annoSbMarkdown(it: { hostID: string; blockContent: string; entry: Tomat
     return `{{{row\n${parts.join("\n\n")}\n}}}\n{: ${ANNO_COLLECTED_ATTR}="${it.entry.id}"}`;
 }
 
-/** 纯划线（无想法）条目 → 无序列表行：`- > 引文`；整组聚合一个列表块（陆杰「逐条」）。
- *  □6 review P1-1：折叠源 **sel 优先**——「划的那句话」是纯划线行的语义本体（整段头部
- *  投影=划线位置信号丢失）；结构化投影只在 sel 缺位（历史条目无快照）时用。markWrap 色
- *  重放两路都生效（折叠形态不带样式，颜色重放是纯划线行唯一上色通道） */
+/** 纯划线（无想法）条目 → 无序列表行容器 + 项内引述块多段：`- > 段1\n  >\n  > 段2`。
+ *  anno-fix □3 形态重定：**保留原文分段不再单行折叠**（推翻 □6 review P1-1 的折叠形态；
+ *  「sel 优先」源选择语义保持——划的那句话是纯划线行的语义本体，结构化投影只在 sel
+ *  缺位时用）。markWrap 色重放逐段生效；总量护栏沿 clipFlatText 100 码点（多段累计，
+ *  防分段绕限）。整组聚合一个列表块（陆杰「逐条」，项内多段落盘形态 6811 实验 B1 验证）。 */
 function plainListItems(items: { hostID: string; blockContent: string; entry: TomatoAnnotation }[], opts: SectionOpts): string | null {
     const lines: string[] = [];
     for (const it of items) {
         const selTxt = it.entry.sel?.txt;
         const qb = itemQuoteBlocks(it, opts.hostInfo);
-        const snippet = selTxt
-            ? clipFlatText(selTxt)
+        const splitParas = (s: string) => s.split(/\n+/).map((x) => x.trim()).filter((x) => x !== "");
+        const paras: string[] = selTxt != null && selTxt !== ""
+            ? splitParas(selTxt)
             : qb
-              ? clipFlatText(qb.map(flattenQuoteBlock).filter((s) => s !== "").join("\n"))
-              : clipFlatText(itemQuoteText(it, opts.hostInfo));
-        if (!snippet) continue;
+              ? qb.map(flattenQuoteBlock).filter((s) => s !== "")
+              : splitParas(itemQuoteText(it, opts.hostInfo));
+        if (paras.length === 0) continue;
+        // 总量护栏：段累计 100 码点（clipFlatText 同限），超限截断缀 …（缀前段尾，省略号不独立成段）
+        let budget = 100;
+        const kept: string[] = [];
+        for (const p of paras) {
+            const cps = [...p];
+            if (cps.length > budget) {
+                const head = cps.slice(0, Math.max(budget, 0)).join("");
+                if (head !== "") kept.push(head + "…");
+                else if (kept.length > 0) kept[kept.length - 1] += "…";
+                else kept.push("…");
+                break;
+            }
+            kept.push(p);
+            budget -= cps.length;
+        }
         const anchorTail = opts.anchor ? ` ((${it.hostID} "*"))` : "";
-        lines.push(`- > ${markWrap(snippet, opts.hostInfo?.get(it.entry.id)?.markVar)}${anchorTail}`);
+        const markVar = opts.hostInfo?.get(it.entry.id)?.markVar;
+        // 锚追在 wrap 外（与 quoteBlockMarkdown 一致）：span 内的 ((id "*")) 不保证被
+        // Md2BlockDOM 解析为 block-ref（Lute 双通道坑，reasoning review P1-1）
+        const wrapped = kept.map((p) => markWrap(p, markVar));
+        wrapped[wrapped.length - 1] += anchorTail;
+        lines.push(wrapped.map((p, i) => (i === 0 ? `- > ${p}` : `  > ${p}`)).join("\n  >\n"));
     }
     return lines.length > 0 ? lines.join("\n") : null;
 }
@@ -848,11 +882,14 @@ export interface SelectedPlan {
 }
 
 /** 选择集 → 装配计划：保选择序按 docID 分组（Map 键序=首见序）；伪条目 id 与 hostInfo
- *  单遍同源；无 sel 真条目（块级）引文走 quoteText；节键=day|sel:hash8(排序 keys)。 */
+ *  单遍同源；无 sel 真条目（块级）引文走 quoteText；节键=day|sel:hash8(排序 keys)。
+ *  colorOn=颜色同步开关（annoCollectColor，与 runCollect 链 annotateHostInfo 的 colorOn
+ *  语义对齐）：OFF=markVar 不进 hostInfo（markWrap 落裸文本），quoteText 引文不受影响。 */
 export function selectedCollectPlan(
     items: SelectedItem[],
     scopeName: string,
     now: number,
+    colorOn: boolean = true,
 ): SelectedPlan {
     const byDoc = new Map<string, { docName: string; items: SelectedItem[] }>();
     for (const it of items) {
@@ -867,7 +904,7 @@ export function selectedCollectPlan(
         items: g.items.map((it, i) => {
             const entry = it.entry ?? { id: `marksel-${hash8(it.key)}-${i}`, text: "", time: now, sel: { txt: it.quote } };
             const rec: { markVar?: string; quoteText?: string } = {};
-            if (it.markVar) rec.markVar = it.markVar;
+            if (colorOn && it.markVar) rec.markVar = it.markVar;
             if (!entry.sel?.txt && it.quote) rec.quoteText = it.quote;
             if (rec.markVar || rec.quoteText) hostInfo.set(entry.id, rec);
             // 选择集链不消费 hostCount（收集面只用 hostID 定锚），伪条目语义自洽填 1
@@ -889,7 +926,10 @@ export function selectedCollectPlan(
  */
 export async function collectSelected(items: SelectedItem[], dest: "daily" | "file", scopeName: string): Promise<void> {
     if (items.length === 0) return;
-    const plan = selectedCollectPlan(items, scopeName, Date.now());
+    // 颜色同步开关接线（与 runCollect L716 同款读取——选择集链此前漏读导致总览收集关不掉色）
+    const colorOn = annoCollectColor.get();
+    debugLog("anno_collect", `selected enter items=${items.length} colorOn=${colorOn} itemsWithVar=${items.filter((i) => i.markVar).length}`, "anno");
+    const plan = selectedCollectPlan(items, scopeName, Date.now(), colorOn);
     if (plan.multi && !lastVerifyResult() && !isMe()) {
         const { openUnlockDialog } = await import("../unlockDialog");
         openUnlockDialog({ product: "tomato" });
