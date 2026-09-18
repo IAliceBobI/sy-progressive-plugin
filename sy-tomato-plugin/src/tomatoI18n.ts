@@ -9232,10 +9232,10 @@ export class TomatoI18n extends TomatoI18nABC {
     }
     public get tip设置卡片来源路径() {
         switch (this.lang) {
-            case "zh_CN": return "复习界面与卡片文档里，卡片块顶部的「文档>小节」层级串（默认关闭；与卡片末尾的时间路径互不影响）";
-            case "zh_CHT": return "複習界面與卡片文檔裡，卡片塊頂部的「文檔>小節」層級串（默認關閉；與卡片末尾的時間路徑互不影響）";
+            case "zh_CN": return "卡片块顶部的来源层级串三档：不显示（默认）/只显示文章名/完整层级（相邻同名段自动去重）；已有的卡片即时生效不用重制，与卡片末尾的时间路径互不影响";
+            case "zh_CHT": return "卡片塊頂部的來源層級串三檔：不顯示（默認）/只顯示文章名/完整層級（相鄰同名段自動去重）；已有的卡片即時生效不用重製，與卡片末尾的時間路徑互不影響";
             case "en_US":
-            default: return "The \"doc > section\" hierarchy line above the card block in the review UI and card docs (off by default; independent of the end-of-card time path)";
+            default: return "Three levels for the source hierarchy line above the card: don't show (default) / article name only / full hierarchy (adjacent duplicate segments merged); applies to existing cards instantly, independent of the end-of-card time path";
         }
     }
     public get tip设置分片卡链接() {

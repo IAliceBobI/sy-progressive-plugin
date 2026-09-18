@@ -71,14 +71,18 @@
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置制卡时间}>{tomatoI18n.制卡后追加时间与标题路径}</span>
     </div>
 
-    <!-- 卡顶来源路径显示（09-17 群反馈 MOUQIN）：默认关——复习界面/卡片文档里卡片块顶部的
-         「文档>小节」层级串；与上行末尾时间路径互不影响 -->
+    <!-- 卡顶来源路径三态（09-17 MOUQIN 反馈→09-18 精简档）：复习界面/卡片文档里卡片块顶部
+         的层级串——off 不显示（默认）/ lite 只显文章名（首段）/ full 完整层级（相邻同名段
+         去重）；旧 boolean 存量迁移见 index.ts loadStore；脏值兜底占位同 cardLanding 行款 -->
     <div>
-        <input
-            type="checkbox"
-            class="b3-switch"
-            bind:checked={$flashcardShowPath}
-        />
+        <select class="b3-select" style="min-width: 160px" bind:value={$flashcardShowPath}>
+            <option value="off">{tomatoI18n.路径显示不显示}</option>
+            <option value="lite">{tomatoI18n.路径显示只文章名}</option>
+            <option value="full">{tomatoI18n.路径显示完整层级}</option>
+            {#if !["off", "lite", "full"].includes($flashcardShowPath)}
+                <option value={$flashcardShowPath}>{$flashcardShowPath} {tomatoI18n.已失效请重新选择}</option>
+            {/if}
+        </select>
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置卡片来源路径}>{tomatoI18n.卡片上方显示来源路径}</span>
     </div>
 

@@ -992,9 +992,12 @@ export const readCurveCadPlain = settingFactory("readCurveCadPlain", 0, STORAGE_
 export const writingQuota = settingFactory("writingQuota", 1, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardUnderPiece = settingFactory("cardUnderPiece", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const cardAppendTime = settingFactory("cardAppendTime", false, STORAGE_Prog_SETTINGS, null as TSK);
-// 卡片顶部来源层级路径显示（09-17 群反馈 MOUQIN：制卡后层级串太长无处可关）——默认关，
-// 渲染端=index.scss 两条 ::before 规则的 body.prog-card-path-on 总闸（渐进 index.ts 订阅挂摘）
-export const flashcardShowPath = settingFactory("flashcardShowPath", false, STORAGE_Prog_SETTINGS, null as TSK);
+// 卡片顶部来源层级路径显示（09-17 MOUQIN 群反馈→09-18 三态化）：值域 "off"|"lite"|"full"
+// （lite=只显首段书名、full=相邻同名去重的完整串——权威定义在渐进 cardPathRender.ts 的
+// CardPathMode，此处 string 防共享库反向依赖渐进模块）；旧 boolean 存量由渐进 loadStore
+// 迁移（false→off、true→full）。渲染端=index.scss ::before content var(--card-path)
+// + body.prog-card-path-on 总闸（渐进 index.ts 订阅挂摘并驱动 JS 逐块写变量）
+export const flashcardShowPath = settingFactory("flashcardShowPath", "off", STORAGE_Prog_SETTINGS, null as TSK);
 export const mobileTopBar = settingFactory("mobileTopBar", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const initProgFloatBtnsDisable = settingFactory("initProgFloatBtnsDisable", false, STORAGE_Prog_SETTINGS, null as TSK);
 // 片态浮条首行勾选集（设置面板「浮条」区 checkbox 清单，□10 方案 B：勾=站首行大钮，

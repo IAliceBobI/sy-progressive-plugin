@@ -50,13 +50,17 @@ export function weightOfLeaf(b: Block): number {
     return b.length ?? (b.content ?? "").length;
 }
 
-/** 内部布局树节点：容器与叶子统一形态，weight 自底向上合计 */
+/** 内部布局树节点：容器与叶子统一形态，weight 自底向上合计。
+ *  type/row 供容器自重口径（graphbox-listfix：列表项 i 的项文本在 DOM 通道被
+ *  shortenList 吸收进自身 content——不算自重则纯列表子树零权重整族剪枝） */
 interface TNode {
     id: string;
     isLeaf: boolean;
     weight: number;
     depth: number;
     children: TNode[];
+    type: string;
+    row?: Block;
 }
 
 export function computeTreemap(
@@ -102,7 +106,7 @@ export function computeTreemap(
         return hit;
     };
     const nodes = new Map<string, TNode>();
-    const rootNode: TNode = { id: rootID, isLeaf: false, weight: 0, depth: 0, children: [] };
+    const rootNode: TNode = { id: rootID, isLeaf: false, weight: 0, depth: 0, children: [], type: "d", row: rootRow };
     nodes.set(rootID, rootNode);
     // 容器挂父分组 → 从树顶 DFS 建树（depth 天然递增；下钻 rootID 时树外容器不可达
     // 不建节点——其 directLeaves 挂载循环查 nodes 剔除，防 undefined.children）
@@ -115,7 +119,7 @@ export function computeTreemap(
     }
     const linkChildren = (cid: string, depth: number) => {
         for (const c of childContainers.get(cid) ?? []) {
-            const n: TNode = { id: c, isLeaf: false, weight: 0, depth, children: [] };
+            const n: TNode = { id: c, isLeaf: false, weight: 0, depth, children: [], type: byId.get(c)?.type ?? "", row: byId.get(c) };
             nodes.set(c, n);
             nodes.get(cid)!.children.push(n);
             linkChildren(c, depth + 1);
@@ -134,7 +138,7 @@ export function computeTreemap(
             const w = leafWeight(lf);
             if (w <= 0) continue;
             seenLeafIds.add(lf.id);
-            const n: TNode = { id: lf.id, isLeaf: true, weight: w, depth: owner.depth + 1, children: [] };
+            const n: TNode = { id: lf.id, isLeaf: true, weight: w, depth: owner.depth + 1, children: [], type: lf.type, row: lf };
             owner.children.push(n);
         }
     }
@@ -145,7 +149,12 @@ export function computeTreemap(
     const calc = (n: TNode): number => {
         if (n.isLeaf) return n.weight;
         n.children = n.children.filter(c => calc(c) > 0);
-        n.weight = n.children.reduce((s, c) => s + c.weight, 0);
+        // graphbox-listfix：列表项容器自重=自身字数（DOM 通道项文本吸收进 i.content，
+        // 不算则无直属叶子的纯列表子树零权重剪光；SQL 通道项内 p 已计叶子、自身=项
+        // 文本行不 double——标题/引述容器不含自重，□1「面积=字数」口径不回归）
+        const own = n.type === "i" && n.row ? leafWeight(n.row) : 0;
+        n.weight = n.children.reduce((s, c) => s + c.weight, 0) + own;
+        if (n.children.length === 0 && own > 0) n.isLeaf = true; // 叶容器：无子可钻按 leaf 落矩形
         if (n.weight <= 0 && emptyW > 0 && n.depth === 1) {
             n.weight = emptyW;
             n.children = [];
@@ -236,7 +245,11 @@ function place(n: TNode, x: number, y: number, w: number, h: number, out: Treema
         return;
     }
     out.push({ id: n.id, kind: "container", depth: n.depth, x, y, w, h, weight: n.weight });
-    layoutChildren(n.children, x, y, w, h, out, minLeafPx);
+    // graphbox-listfix（vision P1 标签叠影）：容器内缩出标签条区域（顶部 ~20px）再铺
+    // 子树——否则嵌套链「子矩形占满父矩形」（squarify 天性），深层列表拍平成边线+
+    // 父子标签同锚点叠印。矮容器（<40px）不缩防子区域挤没（showLabel 同款不渲染标签）
+    const inset = h >= 40 ? 20 : 0;
+    layoutChildren(n.children, x, y + inset, w, h - inset, out, minLeafPx);
 }
 
 // ---- treemap □4：引用聚焦匹配（纯函数）----

@@ -1,17 +1,18 @@
 @use "sass:map";
 
-// ref path of original / ref path（09-17 群反馈 MOUQIN：制卡后层级串太长无处可关）：
-// 默认关闭，flashcardShowPath 开关经 body.prog-card-path-on 总闸（index.ts 订阅挂摘，
-// markOriginTextBG 同款）。:not([custom-prog-origin-text]) 恒排除摘抄副本——本组只管卡片
+// ref path of original / ref path（09-17 MOUQIN 反馈→09-18 三态精简档 off/lite/full）：
+// content 取 --card-path（渐进 cardPathRender 逐块写的 JSON 字符串字面量——attr() 切不出
+// 「只显首段」也去不了同名重段；JS 未跑到的块落 "" 空串兜底，不闪原串）。两色不变
+// （origin=color2 / ref=color3），body.prog-card-path-on 总闸与摘抄副本 :not 排除照旧
 body.prog-card-path-on .protyle-wysiwyg div[custom-origin-hpath]:not([custom-prog-origin-text])::before {
-  content: attr(custom-origin-hpath);
+  content: var(--card-path, "");
   font-size: 80%;
   color: var(--b3-font-color2);
   padding-left: 15px;
 }
 
 body.prog-card-path-on .protyle-wysiwyg div[custom-ref-hpath]:not([custom-origin-hpath]):not([custom-prog-origin-text])::before {
-  content: attr(custom-ref-hpath);
+  content: var(--card-path, "");
   font-size: 80%;
   color: var(--b3-font-color3);
   padding-left: 15px;

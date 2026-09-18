@@ -62,6 +62,9 @@ export interface OverviewItem {
     kind: "anno" | "mark";
     /** 宿主块（跳转定位用） */
     hostID: string;
+    /** 跨块批注全部宿主（首宿主=hostID；annofix-0918 □2 收集保真——选择集链按宿主序列
+     *  拉结构化引文）；单块条目缺省（hostID 即全部） */
+    hostIDs?: string[];
     /** 所在文档（root，分组键） */
     docID: string;
     /** 划线色变量；缺=无色（未划线的批注） */
@@ -105,24 +108,39 @@ export function overviewItemsFromRows(annoRows: OverviewAnnoRow[], markRows: Ove
     const items: OverviewItem[] = [];
     const seen = new Set<string>();
     const byBlock = new Map<string, { docID: string; kd: string }>();
+    // 宿主序列先全量收集再产出（collectGroups 双遍同款——首见即产出会把后续宿主漏出
+    // hostIDs；到达序，收集链 annotateHostInfo 内部按文档序重排）
+    const hostsOfAnno = new Map<string, string[]>();
+    const parsedAnnos: { r: OverviewAnnoRow; intervals: ReturnType<typeof parseColorIntervals>; entries: TomatoAnnotation[] }[] = [];
     for (const r of annoRows ?? []) {
         if (r?.id == null || r.id === "") continue;
         byBlock.set(r.id, { docID: typeof r.r === "string" ? r.r : "", kd: typeof r.md === "string" ? r.md : "" });
         const intervals = parseColorIntervals(r.md);
-        for (const entry of parseAnnotations(r.v)) {
+        const entries = parseAnnotations(r.v);
+        for (const entry of entries) {
+            const hs = hostsOfAnno.get(entry.id) ?? [];
+            hs.push(r.id);
+            hostsOfAnno.set(entry.id, hs);
+        }
+        parsedAnnos.push({ r, intervals, entries });
+    }
+    for (const { r, intervals, entries } of parsedAnnos) {
+        for (const entry of entries) {
             if (seen.has(entry.id)) continue;
             seen.add(entry.id);
             const hit = intervals.find((iv) => iv.annoIDs.includes(entry.id));
             const quote = entry.sel?.txt || hit?.text || (r.md ? hostQuoteText(r.md) : "");
+            const hosts = hostsOfAnno.get(entry.id) ?? [r.id];
             const it: OverviewItem = {
                 key: `anno:${entry.id}`,
                 kind: "anno",
-                hostID: r.id,
+                hostID: hosts[0],
                 docID: byBlock.get(r.id)!.docID,
                 quote,
                 order: 0,
                 entry,
             };
+            if (hosts.length > 1) it.hostIDs = hosts;
             if (hit) it.markVar = hit.markVar;
             items.push(it);
         }

@@ -1,13 +1,14 @@
 // progressive 插件的全局状态声明（原位于 tomato 的 BaseTomatoPlugin.ts，迁回本插件）
 // TomatoSettings/WordCountType/BookInfo/AsList 均为 ambient 全局类型，
 // 分别定义于 ../sy-tomato-plugin/src/types/utils.d.ts 与 ./utils.d.ts（tsconfig 已包含）
-import type { DigestsToPoolResult } from "../writeBook";
+import type { DigestsMovePoolResult, DigestsToPoolResult } from "../writeBook";
 
 declare global {
     interface Window {
         // □3 正式 JS API（用户控制台调用通道；不受 PROG_DEBUG 门禁，见 index.ts）
         syProgressive?: {
             copyDigestsToPool: (bookID: string, digestDocIDs: string[]) => Promise<DigestsToPoolResult>;
+            moveDigestsToPool: (bookID: string, digestDocIDs: string[]) => Promise<DigestsMovePoolResult>;
         };
         // 调试通道，默认不挂（□4 门禁：localStorage PROG_DEBUG=1 才挂，见 index.ts）
         prog_zZmqus5PtYRi?: {

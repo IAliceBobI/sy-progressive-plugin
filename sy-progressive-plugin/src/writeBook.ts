@@ -387,10 +387,17 @@ export async function feedBlocksToPool(targetBookID: string, sourceDocID: string
  *  与 ct 随行（已读的不复活、排序键不变）。子文档随整树搬（物理 move 无孤儿风险）。
  *  返回 1；源已在目标书池返回 0（幂等，菜单层 excludeBookID 已拦常态点击） */
 export async function moveDigestToPool(targetBookID: string, digestDocID: string): Promise<number> {
-    const attrs = await siyuan.getBlockAttrs(digestDocID);
+    let attrs = await siyuan.getBlockAttrs(digestDocID);
+    // getBlockAttrs 单发空读闪烁（cache×BlockTree 竞态，踩坑索引）——批量壳逐篇
+    // moveDocs+setBlockAttrs 搅树，下一篇首读易落竞态窗：空读 150ms 复检一次再判
+    // 「非摘抄」，防真摘抄被误标 skipped（copyToPool 同款同修）
+    if (!attrs?.["custom-pdigest-ctime"]) {
+        await new Promise(r => setTimeout(r, 150));
+        attrs = await siyuan.getBlockAttrs(digestDocID);
+    }
     const ctime = attrs?.["custom-pdigest-ctime"] ?? "";
     const fromBookID = parseBookIDFromCtime(ctime);
-    if (!fromBookID) throw new Error("moveToPool: not a digest doc");
+    if (!fromBookID) throw new Error(`moveToPool: ${NOT_A_DIGEST_MSG}`);
     if (fromBookID === targetBookID) return 0;
     // matfeed □4：写作书池夹档跟设置（true=新建挂书下，已有夹按 IAL 原位认回不受影响）
     const dirID = await progStorage.ensureDigestDir(targetBookID, writingPoolUnderBook.get());
@@ -398,6 +405,9 @@ export async function moveDigestToPool(targetBookID: string, digestDocID: string
     const from = await docBoxPath(digestDocID);
     const to = await docBoxPath(dirID);
     if (!from.box || !from.path || !to.box || !to.path) throw new Error("moveToPool: path missing");
+    // 形态守卫前移到零副作用阶段（review P2-1）：脏 ctime（缺 # 段等）在 moveDocs 前
+    // 爆=failed 修好可重试；搬后才爆=物理在目标夹+IAL 归旧书的搁浅态、重试永远再抛
+    const newCtime = retargetCtime(ctime, targetBookID);
     // 顺序不可倒（reasoning P2-6 反证）：必须先 move 后重写 ctime——倒序的失败态（ctime
     // 已迁、物理未迁）会被下方 fromBookID===targetBookID 幂等短路永远搬不动；正序的失败
     // 态（物理已迁、ctime 归属旧书）可重试自愈——内核对「移到自身父目录」幂等 return，
@@ -405,7 +415,7 @@ export async function moveDigestToPool(targetBookID: string, digestDocID: string
     await siyuan.moveDocs([from.path], to.path, to.box);
     debugLog("matfeed", `moveToPool moved doc=${digestDocID} to book=${targetBookID} dir=${dirID}（ctime 重写前——若此后无「done」行=半搬态，重试自愈）`);
     await siyuan.setBlockAttrs(digestDocID, {
-        "custom-pdigest-ctime": retargetCtime(ctime, targetBookID),
+        "custom-pdigest-ctime": newCtime,
         "custom-pdigest-index": `${targetBookID}#0000000000`,
     } as any);
     debugLog("matfeed", `moveToPool done doc=${digestDocID} book=${targetBookID}`);
@@ -420,7 +430,13 @@ export async function moveDigestToPool(targetBookID: string, digestDocID: string
  *  需求，需者再提）。标题=源标题（同夹重名缀 ct 防默认劫持），尾卡照挂（收束动作在位）。
  *  返回 1；无实质内容块返回 0（菜单层 toast 无内容） */
 export async function copyDigestToPool(targetBookID: string, digestDocID: string): Promise<number> {
-    const attrs = (await siyuan.getBlockAttrs(digestDocID)) ?? {};
+    let attrs = (await siyuan.getBlockAttrs(digestDocID)) ?? {};
+    // 空读闪烁复检（同 moveDigestToPool：批量壳搅树后下一篇首读易落竞态窗，150ms 再读
+    // 一次才判「非摘抄」）
+    if (!attrs["custom-pdigest-ctime"]) {
+        await new Promise(r => setTimeout(r, 150));
+        attrs = (await siyuan.getBlockAttrs(digestDocID)) ?? {};
+    }
     const ctime = attrs["custom-pdigest-ctime"] ?? "";
     if (!parseBookIDFromCtime(ctime)) throw new Error(`copyToPool: ${NOT_A_DIGEST_MSG}`);
     const kds: string[] = [];
@@ -501,6 +517,57 @@ export async function copyDigestsToPool(
     log(`完成：成功 ${res.copied} / 跳过 ${res.skipped.length} / 失败 ${res.failed.length}（共 ${res.total}）`);
     if (res.failed.length) log("有失败篇：重试请只传返回值 failed 里的 id（复制非幂等，整批重跑会双份）");
     debugLog("matfeed", `copyDigestsToPool book=${targetBookID} copied=${res.copied} skipped=${res.skipped.length} failed=${res.failed.length}`, "progressive");
+    return res;
+}
+
+/** 素材批量换籍结果：moved=成功换籍数；skipped=输入问题（已在目标书池〔幂等〕/非摘抄
+ *  文档）；failed=链路错误（池夹未就绪/路径缺失等）。 */
+export interface DigestsMovePoolResult {
+    total: number;
+    moved: number;
+    skipped: { id: string; reason: string }[];
+    failed: { id: string; error: string }[];
+}
+
+/** 素材批量换籍批量壳（群反馈 650189：批量移动进写作书素材池；正式 API 挂
+ *  window.syProgressive.moveDigestsToPool，见 index.ts）。copyDigestsToPool 同款壳换
+ *  executor=moveDigestToPool。与复制版的语义差异：move 幂等——单篇返回 0=源已归目标
+ *  书，归 skipped「已在目标书池」，失败后整批重跑无害（无须像 copy 只挑 failed 的 id
+ *  重试）；批内 id 去重（不去重则首条之后全落幂等 skipped，计数虚胖）。单批上限 100；
+ *  串行防写盘风暴；进度逐篇 console.log（用户在控制台调用，这是 API 的回报输出非运行
+ *  时埋点，不走 debugLog 门控）。executor/log 注入供单测，默认绑单篇真链路
+ *  moveDigestToPool。 */
+export async function moveDigestsToPool(
+    targetBookID: string, digestDocIDs: string[],
+    execOne: (bookID: string, docID: string) => Promise<number> = moveDigestToPool,
+    log: (line: string) => void = (l) => console.log(`[moveDigestsToPool] ${l}`),
+): Promise<DigestsMovePoolResult> {
+    if (digestDocIDs.length > 100) {
+        throw new Error(`moveDigestsToPool: 单批上限 100 篇（本次 ${digestDocIDs.length}），请分批调用`);
+    }
+    const ids = [...new Set(digestDocIDs)];
+    const res: DigestsMovePoolResult = { total: ids.length, moved: 0, skipped: [], failed: [] };
+    if (ids.length < digestDocIDs.length) log(`已去重 ${digestDocIDs.length - ids.length} 篇重复 id`);
+    for (const [i, id] of ids.entries()) {
+        const n = i + 1;
+        try {
+            const r = await execOne(targetBookID, id);
+            if (r === 1) { res.moved++; log(`${n}/${res.total} ✓ ${id}`); }
+            else { res.skipped.push({ id, reason: "已在目标书池" }); log(`${n}/${res.total} - 跳过（已在目标书池，幂等） ${id}`); }
+        } catch (e) {
+            const msg = String((e as Error)?.message ?? e);
+            if (msg.includes(NOT_A_DIGEST_MSG)) {
+                res.skipped.push({ id, reason: "非摘抄文档" });
+                log(`${n}/${res.total} - 跳过（非摘抄文档） ${id}`);
+            } else {
+                res.failed.push({ id, error: msg });
+                log(`${n}/${res.total} ✗ 失败 ${id}: ${msg}`);
+            }
+        }
+    }
+    log(`完成：换籍 ${res.moved} / 跳过 ${res.skipped.length} / 失败 ${res.failed.length}（共 ${res.total}）`);
+    if (res.failed.length) log("有失败篇：换籍幂等，整批重跑安全（已在目标书的自动跳过，不会重复搬）");
+    debugLog("matfeed", `moveDigestsToPool book=${targetBookID} moved=${res.moved} skipped=${res.skipped.length} failed=${res.failed.length}`, "progressive");
     return res;
 }
 

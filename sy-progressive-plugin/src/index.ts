@@ -1,4 +1,5 @@
 import { Dialog, Setting } from "siyuan";
+import { applyCardPathMode } from "./cardPathRender";
 import { openChangelogDialog } from "../../sy-tomato-plugin/src/libs/changelogDialog";
 import changelog2025 from "./changelog/2025.json";
 import changelog2026 from "./changelog/2026.json";
@@ -59,7 +60,7 @@ import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
 import { invalidateBookStatusCache } from "./bookStatus";
 import { registerTailCardRender } from "./tailCardRender";
 import { registerVisitNoteRender } from "./visitNoteRender";
-import { copyDigestsToPool } from "./writeBook";
+import { copyDigestsToPool, moveDigestsToPool } from "./writeBook";
 import { split就地断句, splitInPlaceCommand } from "./splitInPlace";
 
 // 更新日志按年拆分存储（src/changelog/<年>.json，当年文件追加、往年冻结），此处组装倒序全集
@@ -150,10 +151,17 @@ function loadStore(plugin: BaseTomatoPlugin) {
     writingQuota.load(plugin);
     cardUnderPiece.load(plugin);
     cardAppendTime.load(plugin);
-    // 卡片顶部来源层级路径显示总闸（09-17 群反馈）：body 类即 CSS 总闸（index.scss 两条
-    // div[custom-*ref/origin*-hpath]::before），markOriginTextBG 同款——load 后订阅，改值实时生效
+    // 卡片顶部来源路径三态（09-17 MOUQIN 反馈→09-18 精简档）：off/lite/full——旧 boolean
+    // 存量迁移（false→off、true→full），渲染链=body.prog-card-path-on 总闸 + cardPathRender
+    // 逐块写 --card-path（index.scss ::before content var()），改值实时生效
     flashcardShowPath.load(plugin);
-    flashcardShowPath.subscribe(v => document.body.classList.toggle("prog-card-path-on", !!v));
+    {
+        const raw: unknown = flashcardShowPath.get();
+        const norm = raw === true ? "full" : raw === false || raw == null ? "off"
+            : raw === "lite" || raw === "full" ? raw : "off";
+        if (norm !== raw) flashcardShowPath.set(norm as never);
+    }
+    flashcardShowPath.subscribe(v => applyCardPathMode(v));
     mobileTopBar.load(plugin);
     initProgFloatBtnsDisable.load(plugin);
     floatbarMainBtns.load(plugin);
@@ -206,10 +214,11 @@ export default class ThePlugin extends BaseTomatoPlugin {
         } else {
             delete window.prog_zZmqus5PtYRi // 清前次调试残留（window 跨插件 reload 存活，不清则关闸后旧通道仍带废引用常驻）
         }
-        // □3 正式 JS API（群反馈 650189 批量入素材池）：window.syProgressive——用户控制台
-        // 调用通道，不受 PROG_DEBUG 门禁。reload 重跑模块顶层=整对象重赋值（旧引用指向
-        // 旧模块闭包仍可跑完当次调用，新调用拿新实例；prog_zZmqus5PtYRi 同款容忍语义）
-        window.syProgressive = { copyDigestsToPool };
+        // □3 正式 JS API（群反馈 650189 批量入素材池/批量换籍）：window.syProgressive——
+        // 用户控制台调用通道，不受 PROG_DEBUG 门禁。reload 重跑模块顶层=整对象重赋值（旧
+        // 引用指向旧模块闭包仍可跑完当次调用，新调用拿新实例；prog_zZmqus5PtYRi 同款容忍
+        // 语义）
+        window.syProgressive = { copyDigestsToPool, moveDigestsToPool };
 
         this.taskCfg = this.loadData(STORAGE_Prog_SETTINGS).then(cfg => {
             this.settingCfg = cfg;

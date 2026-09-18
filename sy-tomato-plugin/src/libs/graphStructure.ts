@@ -367,9 +367,16 @@ export function structureRowsFromOutline(
         }
         return 1e9;
     };
-    const ordered = order?.size
-        ? [...(blocks as LightBlockRow[])].sort((a, b) => blockPos(a.id) - blockPos(b.id) || (a.id < b.id ? -1 : 1))
-        : blocks; // 无锚=传序（调用方排好；锚拉失败的兜底日志在接线层 catch——review P2-2 折衷）
+    // 双通道行（SQL 轻行/DOM 全量 rows）数据同构，统一按轻行消费（Block 的可选字段
+    // 都是物理在场的——id/type/subtype/parent_id 读写两侧一致）
+    // graphbox-listfix：tie-break 去掉 id 时间戳兜底改保传入序（sort 稳定）——嵌套块的
+    // blockPos 爬到宿主锚位即并列（DOM 通道 l 壳行已滤时甚至全落尾部），按 id 序排会把
+    // 子项排到父项前（挂链虽已免疫，但 rows/links 构建序=y 脑图文档序仍乱——vision
+    // 实锤深层项序不符文档序）。传入序=DOM DFS 物理序（真文档序）；SQL 通道传序=查询
+    // 返回序（无锚时同现状容忍）
+    const ordered: LightBlockRow[] = order?.size
+        ? [...(blocks as LightBlockRow[])].sort((a, b) => blockPos(a.id) - blockPos(b.id))
+        : (blocks as LightBlockRow[]); // 无锚=传序（调用方排好；锚拉失败的兜底日志在接线层 catch——review P2-2 折衷）
     const blockById = new Map((blocks as LightBlockRow[]).map(r => [r.id, r]));
 
     // outline 树 DFS 展开（=文档序标题序列）；blocks/children 双通道都走（真样本顶层用
@@ -395,30 +402,83 @@ export function structureRowsFromOutline(
     const doc: Block = { id: docID, type: "d", content: docName, subtype: "", root_id: docID, parent_id: docID, docName: "" };
 
     // 叶子归属：ordered 全块序，标题行推进锚（容器内标题不在 outline=不推进）；叶子=
-    // 非 d/h/l/s/b 的行（p/i/c/t…全进徽标）；退化容器（s/b/l 壳与非 outline 标题）不进
+    // 非 d/h/l/s/b/i 的行（p/c/t…全进徽标）；退化容器（s/b/l 壳与非 outline 标题）不进
     // 徽标聚合但记入 containerOfLeaf——供引用边端点重定向（引述/超级块是常见 ref 目标，
     // review P1-1：不记则整条边静默蒸发）。**注意：containerOfLeaf 键 ⊄ 叶子**（消费方=
     // redirectLinksToContainers 与日志）。同 id 重复物理行只计首次（blocks 表偶发脏行，
     // 防 keyed each 重复 key 冻结——review P2-1）。directLeaves 透传 length（treemap □1
     // weightOfLeaf 消费）
+    //
+    // graphbox-listfix（2026-09-18 bear 反馈）：列表项 i 容器化进树（嵌套层级=缩进层次，
+    // 纯列表文档不再塌 [doc] 孤点）；挂链=沿 parent 爬穿透 l 壳/退化壳（s/b）到容器集
+    // 成员（已挂 i/标题），爬到 doc 挂章节锚（文档序前驱标题——sb 内列表穿透退化壳跟
+    // sb 内段落同锚语义）。**i 集先全量预收集再挂链**：ordered 处理序无父子拓扑保证
+    // （DOM 通道 l 壳行已滤→嵌套 i 的 blockPos 爬不到物理锚全落尾部按 id 时间戳序、
+    // SQL 通道同壳内 id 序也乱——6810 实锤：父 i 未处理=不在容器集，子 i 爬穿到 doc
+    // 平铺挂锚=层级丢失）；预收集后挂链免疫处理序，父 i 恒在集。项内文本块（SQL 形态
+    // 在场；DOM 形态已被 shortenList 吸收）归所属 i 的徽标。
     const info: StructureInfo = { containers: new Set([docID, ...outlineIds]), containerOfLeaf: new Map(), directLeaves: new Map(), leafAgg: new Map() };
-    let anchor = docID;
+    const seenRows = new Set<string>();
     for (const r of ordered) {
-        if (r.id === docID || info.containerOfLeaf.has(r.id)) continue;
+        // 预收集条件与主循环一致：去重+本档（跨文档行无挂链资格；root_id 判定同下）
+        if (r.id === docID || seenRows.has(r.id)) continue;
+        seenRows.add(r.id);
+        const rid = (r as Block).root_id;
+        if (rid && rid !== docID) continue;
+        if (r.type === "i") info.containers.add(r.id);
+    }
+    const mountOf = (id: string): string => {
+        const seen = new Set<string>();
+        let pid = parentOfAll.get(id) ?? "";
+        while (pid && pid !== id && !seen.has(pid)) {
+            if (info.containers.has(pid)) return pid;
+            seen.add(pid);
+            pid = parentOfAll.get(pid) ?? "";
+        }
+        return docID;
+    };
+    const addLeaf = (r: LightBlockRow, owner: string) => {
+        const leaf: Block = { id: r.id, type: r.type, subtype: r.subtype, content: r.content ?? "", root_id: docID, parent_id: r.parent_id, docName: "", length: r.length };
+        info.containerOfLeaf.set(r.id, owner);
+        (info.directLeaves.get(owner) ?? info.directLeaves.set(owner, []).get(owner)!).push(leaf);
+        const agg = info.leafAgg.get(owner) ?? { leaves: 0, chars: 0 };
+        agg.leaves++;
+        agg.chars += r.length ?? (r.content ?? "").length;
+        info.leafAgg.set(owner, agg);
+    };
+    const climbMemo = new Map<string, string | undefined>();
+    const climb = (id: string, seen: Set<string>): string | undefined => {
+        if (climbMemo.has(id)) return climbMemo.get(id);
+        if (seen.has(id)) return undefined;
+        seen.add(id);
+        if (info.containers.has(id)) return id;
+        const p = parentOfAll.get(id);
+        const hit = p ? climb(p, seen) : undefined;
+        climbMemo.set(id, hit);
+        return hit;
+    };
+    let anchor = docID;
+    const processed = new Set<string>();
+    for (const r of ordered) {
+        if (r.id === docID || processed.has(r.id)) continue;
+        processed.add(r.id);
         const rid = (r as Block).root_id;
         if (rid && rid !== docID) continue; // DOM 通道跨文档端点行防御
         if (outlineIds.has(r.id)) { anchor = r.id; continue; }
+        if (r.type === "i") {
+            const owner = mountOf(r.id);
+            const parent = owner === docID ? anchor : owner;
+            rows.push({ id: r.id, type: "i", subtype: r.subtype ?? "", content: r.content ?? "", root_id: docID, parent_id: parent, docName: "" });
+            links.push({ block_id: parent, def_block_id: r.id, content: "" });
+            continue;
+        }
         if (r.type === "h" || r.type === "l" || r.type === "s" || r.type === "b") {
             info.containerOfLeaf.set(r.id, anchor);
             continue;
         }
-        const leaf: Block = { id: r.id, type: r.type, subtype: r.subtype, content: r.content ?? "", root_id: docID, parent_id: r.parent_id, docName: "", length: r.length };
-        info.containerOfLeaf.set(r.id, anchor);
-        (info.directLeaves.get(anchor) ?? info.directLeaves.set(anchor, []).get(anchor)!).push(leaf);
-        const agg = info.leafAgg.get(anchor) ?? { leaves: 0, chars: 0 };
-        agg.leaves++;
-        agg.chars += r.length ?? (r.content ?? "").length;
-        info.leafAgg.set(anchor, agg);
+        // 叶子归属：容器链命中（项内文本归 i；sb 内段落穿退化壳到 doc）退前驱章节锚
+        const owner = climb(r.id, new Set());
+        addLeaf(r, owner && owner !== docID ? owner : anchor);
     }
     return { rows: [doc, ...rows], links, info };
 }

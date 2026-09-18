@@ -47,7 +47,7 @@
     import { pickGraphChannel } from "./libs/graphSkeleton";
     import {
         buildTreeIndex, initialCollapsedRows, computeVisible, filterEdges, expandAncestors,
-        serializeCollapsed, parseCollapsed, type ExpandLevel, type GraphEdgeSpec, type RenderEdge,
+        serializeCollapsed, parseCollapsed, mergeCollapsedOnRefresh, type ExpandLevel, type GraphEdgeSpec, type RenderEdge,
     } from "./libs/graphCollapse";
     import {
         normalizeLayoutForm, rankdirOf, isTextVertical, migrateIsVertical, nextLayoutForm,
@@ -490,9 +490,15 @@
     // 「隐藏结构连线」开关不适用）。折叠态=容器树默认展开层级推导（会话态不持久化，
     // 与全量档的 custom-graph-collapsed 键语义分开，第一版不混用）
     async function applyStructureView(rows: Block[], links: Ref[], docID: string, info: StructureInfo) {
+        // graphbox-listfix：同文档刷新（改原文→ws 回流）保留会话折叠/徽标展开态——
+        // 否则图塌回默认推导小簇+refreshOnly 旧视口 → 「图找不着」（主实例 09:29 实锤
+        // 30 秒内三次手动重开徽标）。切文档=全新推导。上轮态在 allRows 重赋值前取
+        const sameDoc = structDocID === docID;
+        const prevCollapsed = sameDoc ? collapsedSet : new Set<string>();
+        const prevAlive = new Set(allRows.map(r => r.id));
+        const prevLeafShow = sameDoc ? leafShowContainers : new Set<string>();
         structInfo = info;
         structDocID = docID;
-        leafShowContainers = new Set();
         const keep = new Set<string>(info.containers);
         for (const r of rows) {
             // 跨文档端点行（引用边另一头的块，root_id≠本档）恒保留为节点——
@@ -501,7 +507,8 @@
         }
         const structRows = rows.filter(r => keep.has(r.id));
         // □3 vision 方案 A：DOM 通道顶层容器（shortenList 挂回 doc 的列表项/sb/引述）章节
-        // 领地重挂——树形与 SQL 通道对齐，默认展开层级才能压住列表项（默认只显章/节列）
+        // 领地重挂——树形与 SQL 通道对齐，默认展开层级才能压住列表项（默认只显章/节列）。
+        // listfix：骨架层 i 已挂章节锚（parent_id≠根），重挂天然跳过
         const anchors = chapterAnchorMap(structRows, docID);
         if (anchors.size) {
             const doc = structRows.find(r => r.id === docID);
@@ -535,7 +542,13 @@
             // review P2-5：限本档标题（跨文档端点标题行混入会把 base 拉回 1 抵消归一化）
             if (r.type === "h" && r.root_id === docID && r.subtype?.startsWith("h")) minHeadingLv = Math.min(minHeadingLv, parseInt(r.subtype.slice(1), 10) || 1);
         }
-        collapsedSet = new Set(initialCollapsedRows(structRows, normalizeExpandLevel(graphDefaultExpandLevel.get()), minHeadingLv === 9 ? 1 : minHeadingLv));
+        const defaults = initialCollapsedRows(structRows, normalizeExpandLevel(graphDefaultExpandLevel.get()), minHeadingLv === 9 ? 1 : minHeadingLv);
+        const curAlive = new Set(structRows.map(r => r.id));
+        collapsedSet = sameDoc
+            ? mergeCollapsedOnRefresh(prevCollapsed, defaults, prevAlive, curAlive)
+            : new Set(defaults);
+        // 徽标展开态同款保留：展开的容器仍在本档容器集才留（删块自然清退）
+        leafShowContainers = new Set([...prevLeafShow].filter(id => info.containers.has(id)));
         applyCollapsedView();
         structVersion++;
     }

@@ -217,11 +217,12 @@ function annoSbMarkdown(it: { hostID: string; blockContent: string; entry: Tomat
     return `{{{row\n${parts.join("\n\n")}\n}}}\n{: ${ANNO_COLLECTED_ATTR}="${it.entry.id}"}`;
 }
 
-/** 纯划线（无想法）条目 → 无序列表行容器 + 项内引述块多段：`- > 段1\n  >\n  > 段2`。
- *  anno-fix □3 形态重定：**保留原文分段不再单行折叠**（推翻 □6 review P1-1 的折叠形态；
- *  「sel 优先」源选择语义保持——划的那句话是纯划线行的语义本体，结构化投影只在 sel
- *  缺位时用）。markWrap 色重放逐段生效；总量护栏沿 clipFlatText 100 码点（多段累计，
- *  防分段绕限）。整组聚合一个列表块（陆杰「逐条」，项内多段落盘形态 6811 实验 B1 验证）。 */
+/** 纯划线（无想法）条目 → 顶层无序列表项+跨段子块：`- 段1\n\n  段2`（annofix-0918 □3
+ *  形态重定，图 E=陆杰 mock：一条划线一个顶层 li 零包装，跨段内容=li 内独立段落子块
+ *  ——6813 实测形态契约：空行+缩进=新子块，缩进续行=软换行同段；旧形态「列表项内引述块
+ *  双层壳」（`- > 段`）退役）。「sel 优先」源选择语义保持——划的那句话是纯划线行的语义
+ *  本体，结构化投影只在 sel 缺位时用。markWrap 色重放逐段生效；总量护栏对齐结构化档
+ *  QUOTE_STRUCT_CLIP（2000 码点——结构保真语义下 100 折叠档退役，多段累计防分段绕限）。 */
 function plainListItems(items: { hostID: string; blockContent: string; entry: TomatoAnnotation }[], opts: SectionOpts): string | null {
     const lines: string[] = [];
     for (const it of items) {
@@ -234,8 +235,8 @@ function plainListItems(items: { hostID: string; blockContent: string; entry: To
               ? qb.map(flattenQuoteBlock).filter((s) => s !== "")
               : splitParas(itemQuoteText(it, opts.hostInfo));
         if (paras.length === 0) continue;
-        // 总量护栏：段累计 100 码点（clipFlatText 同限），超限截断缀 …（缀前段尾，省略号不独立成段）
-        let budget = 100;
+        // 总量护栏：段累计 QUOTE_STRUCT_CLIP 码点（结构化档），超限截断缀 …（缀前段尾，省略号不独立成段）
+        let budget = QUOTE_STRUCT_CLIP;
         const kept: string[] = [];
         for (const p of paras) {
             const cps = [...p];
@@ -255,7 +256,8 @@ function plainListItems(items: { hostID: string; blockContent: string; entry: To
         // Md2BlockDOM 解析为 block-ref（Lute 双通道坑，reasoning review P1-1）
         const wrapped = kept.map((p) => markWrap(p, markVar));
         wrapped[wrapped.length - 1] += anchorTail;
-        lines.push(wrapped.map((p, i) => (i === 0 ? `- > ${p}` : `  > ${p}`)).join("\n  >\n"));
+        // 形态契约：首段=li 文本，后续段=空行+两空格缩进子块（6813 实测落盘=独立 p 子块）
+        lines.push(wrapped.map((p, i) => (i === 0 ? `- ${p}` : `  ${p}`)).join("\n\n"));
     }
     return lines.length > 0 ? lines.join("\n") : null;
 }
@@ -695,8 +697,12 @@ async function annotateHostInfo(groups: AnnoCollectGroup[], colorOn: boolean): P
             }
             const rec: { markVar?: string; quoteBlocks?: string[] } = {};
             if (colorOn) {
-                const v = markVarOfAnchor(kdOf.get(fetchIDOf.get(hosts[0]) ?? "") ?? "", it.entry.id);
-                if (v) rec.markVar = v;
+                // 跨块锚防漏（annofix-0918 □3 review 加固）：锚不在文档序首宿主的形态
+                // 首查即空 → 全宿主逐块反查，首个命中即用（数据已全量拉取，纯遍历无新请求）
+                for (const h of hosts) {
+                    const v = markVarOfAnchor(kdOf.get(fetchIDOf.get(h) ?? "") ?? "", it.entry.id);
+                    if (v) { rec.markVar = v; break; }
+                }
             }
             const qb: string[] = [];
             const seenFetch = new Set<string>();
@@ -863,6 +869,9 @@ export interface SelectedItem {
     markVar?: string;
     /** 批注条目本体；缺=纯 mark 划线（伪条目通道） */
     entry?: TomatoAnnotation;
+    /** 跨块条目全部宿主（annofix-0918 □2 总览保真：结构化引文按宿主序列逐块拉取；
+     *  缺=单宿主（hostID）。总览数据层跨块去重时收集，选择集链透传给 annotateHostInfo */
+    hostIDs?: string[];
 }
 
 /** djb2 → 8 位十六进制（选择集幂等键的短哈希；碰撞=两不同选择共用节，可接受的退化） */
@@ -907,8 +916,15 @@ export function selectedCollectPlan(
             if (colorOn && it.markVar) rec.markVar = it.markVar;
             if (!entry.sel?.txt && it.quote) rec.quoteText = it.quote;
             if (rec.markVar || rec.quoteText) hostInfo.set(entry.id, rec);
-            // 选择集链不消费 hostCount（收集面只用 hostID 定锚），伪条目语义自洽填 1
-            return { hostID: it.hostID, hostCount: 1, blockContent: "", entry };
+            // 选择集链不消费 hostCount（收集面只用 hostID 定锚），伪条目语义自洽填 1；
+            // hostIDs 跨块全量透传（□2：真批注条目 annotateHostInfo 按宿主序列拉结构化引文）
+            return {
+                hostID: it.hostID,
+                hostCount: 1,
+                ...(it.hostIDs?.length ? { hostIDs: it.hostIDs } : {}),
+                blockContent: "",
+                entry,
+            };
         }),
     }));
     const attrValue = collectKeyValue(dayStamp(d), `sel:${hash8([...items].map((i) => i.key).sort().join("|"))}`);
@@ -930,6 +946,23 @@ export async function collectSelected(items: SelectedItem[], dest: "daily" | "fi
     const colorOn = annoCollectColor.get();
     debugLog("anno_collect", `selected enter items=${items.length} colorOn=${colorOn} itemsWithVar=${items.filter((i) => i.markVar).length}`, "anno");
     const plan = selectedCollectPlan(items, scopeName, Date.now(), colorOn);
+    // □2 总览链结构化引文（annofix-0918）：真批注条目按宿主序列逐块拉 kramdown 快照
+    // （侧边栏链 annotateHostInfo 同源能力——升层/文档序重排/同容器去重全继承）；伪条目
+    // （纯划线）sel 优先拍板不拉。合并语义=结构化 rec 键覆盖（quoteBlocks 在=引述块保块型），
+    // 拉取失败逐条缺位=selectedCollectPlan 已填的 quoteText/markVar 兜底链照走。
+    const annoOnly = plan.groups
+        .map((g) => ({ ...g, items: g.items.filter((it) => it.entry && it.entry.text.replace(/[\s\u200b]/g, "") !== "") }))
+        .filter((g) => g.items.length > 0);
+    if (annoOnly.length > 0) {
+        try {
+            const structInfo = await annotateHostInfo(annoOnly, colorOn);
+            for (const [id, rec] of structInfo) {
+                plan.hostInfo.set(id, { ...plan.hostInfo.get(id), ...rec });
+            }
+        } catch (e) {
+            console.warn("[tomato anno] selected struct quote failed:", e); // 整体失败=纯文本兜底，收集主链不受影响
+        }
+    }
     if (plan.multi && !lastVerifyResult() && !isMe()) {
         const { openUnlockDialog } = await import("../unlockDialog");
         openUnlockDialog({ product: "tomato" });
