@@ -56,6 +56,9 @@ export interface FleetActions {
     /** □3 回访频率：书级档位（书 IAL+在册 grow 卡批量跟随，readCurve setBookVisitFreq；
      *  f="l"|"m"|"h"=VisitFreq 字面联合——fleet 基座层不反向依赖曲线模块，形状同源维护） */
     setVisitFreq(bookID: string, f: "l" | "m" | "h"): any;
+    /** rollerquota □3 入口①：读完书重置阅读进度（point 归零，分片/摘抄/复习记录不动）
+     *  并立即出片 */
+    resetReadingPoint(bookID: string): any;
 }
 
 export const FLEET_DOCK_TYPE = "prog-fleet-dock";

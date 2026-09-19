@@ -21,7 +21,7 @@ import DigestAllDialogSvelte from "./DigestAllDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
-import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, rollerTodayGate } from "./roller";
+import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, rollerTodayGate, rollerTodaysFullIDs, activeFullIDs } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
 import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, retirePieceCard, sweepReadCurve } from "./readCurve";
@@ -180,7 +180,13 @@ class Progressive {
                     }
                 });
             }
-            if (ProgressiveJumpMenu.get()) {
+            // rollerquota □3 入口②备用通道：open-menu-content（3.8.4 右键块实测只走
+            // click-blockicon，本事件不再发——留作旧内核/其他形态兼容）。机制=既有
+            // readThisPiece（gotoBlock 钉 point 到右键块所在片+立即出片）。
+            // □3 review P1：完读态互斥与块柄通道同款对齐——读完书隐藏「跳到分片」只出
+            // 「从这里开始学」（同动作双项=噪音，且「跳到分片」文案在完读语境误导）
+            const finished = this.finishedAutoBookOfDoc((detail.protyle as any)?.block?.rootID ?? "");
+            if (ProgressiveJumpMenu.get() && !finished) {
                 menu.addItem({
                     icon: Progressive跳到分片或回到原文.icon,
                     label: Progressive跳到分片或回到原文.langText(),
@@ -189,6 +195,18 @@ class Progressive {
                         this.readThisPiece();
                     },
                 });
+            }
+            if (finished) {
+                const nodeID = (detail.element as HTMLElement | undefined)?.getAttribute?.("data-node-id") ?? "";
+                if (nodeID) {
+                    menu.addItem({
+                        icon: "iconProgPlay",
+                        label: tomatoI18n.从这里开始学,
+                        click: () => {
+                            this.readThisPiece(nodeID);
+                        },
+                    });
+                }
             }
             // □11 盘点整改 A 类：右键「开始学习」退役——火苗点击=startReading 全局出片 +
             // 书态 ▶ + 🔄 三重覆盖，右键不再重复占位
@@ -469,6 +487,21 @@ class Progressive {
         });
     }
 
+    /** rollerquota □3 入口②出现条件：文档=注册的自动分片阅读书且已读完（同步判定，
+     *  emitToPlugins 窗口禁 await——索引长度走内存缓存 peek，冷启动未载=判不出=不显示）。
+     *  读完态出「从这里开始学」＝显性化「右键块会把断点钉到所在片」（该机制原有，藏
+     *  在「跳到分片」词条里）+读完态引导（bear 三入口拍板②）；在读书不提前曝光（导航
+     *  语义由「跳到分片」承担）。手动书/写作书无 point 概念（守卫） */
+    private finishedAutoBookOfDoc(rootID: string): boolean {
+        const bookID = rootID ? progStorage.docBookID(rootID) : undefined;
+        if (!bookID) return false;
+        const info = progStorage.peekBookInfo(bookID);
+        if (!info || info.manualMode || info.writing) return false;
+        const len = progStorage.peekBookIndexLength(bookID);
+        if (len == null || len <= 0) return false;
+        return (info.point ?? 0) >= len;
+    }
+
     blockIconEvent(detail: IEventBusMap["click-blockicon"]) {
         if (!this.plugin) return;
         const menu = detail.menu;
@@ -477,15 +510,33 @@ class Progressive {
         // 原记载 open-menu-blockicon 自带 blockId 系误记），从首个块元素取 id——点哪块
         // 跳哪块，消掉「按全局选中块跳」的错位（□8-B）
         if (blockIconMenu.get()) {
-            menu.addItem({
-                icon: Progressive跳到分片或回到原文.icon,
-                label: Progressive跳到分片或回到原文.langText(),
-                accelerator: Progressive跳到分片或回到原文.m,
-                click: () => {
-                    const el = detail.blockElements?.[0];
-                    this.readThisPiece(el?.getAttribute(DATA_NODE_ID) || undefined);
-                }
-            });
+            // rollerquota □3 review P1：完读态互斥——「跳到分片」与「从这里开始学」动作同链
+            // （都 readThisPiece 钉断点），同菜单双项=噪音且「跳到分片」文案在读完书语境误导
+            // （旧内核 open-menu-content 备用通道同款互斥，两通道行为对齐）；在读书不提前
+            // 曝光新项（导航语义由「跳到分片」承担，见 finishedAutoBookOfDoc 注释）
+            if (this.finishedAutoBookOfDoc((detail.protyle as any)?.block?.rootID ?? "")) {
+                // rollerquota □3 入口②：3.8.4 实测右键块（含内容区）只 emit click-blockicon
+                // 不 emit open-menu-content（BlockEditor 09-16 块柄通道备注同源）——②主战场
+                // 在此。读完书才出（见 finishedAutoBookOfDoc 注释）
+                menu.addItem({
+                    icon: "iconProgPlay",
+                    label: tomatoI18n.从这里开始学,
+                    click: () => {
+                        const el = detail.blockElements?.[0];
+                        this.readThisPiece(el?.getAttribute(DATA_NODE_ID) || undefined);
+                    }
+                });
+            } else {
+                menu.addItem({
+                    icon: Progressive跳到分片或回到原文.icon,
+                    label: Progressive跳到分片或回到原文.langText(),
+                    accelerator: Progressive跳到分片或回到原文.m,
+                    click: () => {
+                        const el = detail.blockElements?.[0];
+                        this.readThisPiece(el?.getAttribute(DATA_NODE_ID) || undefined);
+                    }
+                });
+            }
         }
     }
 
@@ -599,6 +650,21 @@ class Progressive {
             return;
         }
         await this.splitVolsDialog(docID);
+    }
+
+    /** rollerquota □3 入口①：读完书重新阅读——point 归零（resetBookReadingPoint）+ 立即
+     *  出片。分片索引（含手动调整）/摘抄/复习曲线/当日阅读账全不动：当天该书已读满时
+     *  滚筒侧仍剔（todaysFullIDs 按当日账），手动直达可读（gateCheck 只拦「越过当日锚
+     *  开新片」，重置到早片恒不拦）——「新轮子当天可手动读、明天回轮转」。手动书/写作
+     *  书无 point 概念，入口侧已拦（rereadMenuEligible），此处再守卫一道防旁路调用 */
+    async resetBookForReread(bookID: string) {
+        // review P2：peek（同步、免自增注册）——booksInfo 单数版对未注册 id 会 defaultBookInfo
+        // 落键+time=now，旁路调用不存在的书反而制造脏书键（正是 peekBookInfo 注释描述的危害）
+        const info = progStorage.peekBookInfo(bookID);
+        if (!info || info.manualMode || info.writing) return;
+        await progStorage.resetBookReadingPoint(bookID);
+        notifyFleetChanged();
+        await this.startToLearnWithLock(bookID);
     }
 
     async readThisPiece(blockID?: string) {
@@ -922,6 +988,13 @@ class Progressive {
                 // □2 后手动书有未锤摘抄即在册可读——能落到这=所有手动书都 0 摘抄
                 // （或全锤），给「先摘一次」对症指引，不再误报「您还没添加任何文档」
                 await siyuan.pushMsg(tomatoI18n.手动书摘抄一次后进入轮转);
+            } else if (activeFullIDs(await rollerTodaysFullIDs(), progStorage.booksInfos()).size > 0) {
+                // rollerquota □1：达量书已在选书口剔除——能落到这且活跃达量集非空=有
+                // ok 书但全因「今日已达量」被剔，给全满额对症提示（排写作书分支前：达量
+                // 是当天阅读状态，比「只剩写作书」的长期指引更贴合刚点的轮转动作）。
+                // activeFullIDs 过滤归档/忽略/已删书的当日 b 残留（review P1-1：读满后
+                // 当天归档的书不该触发「明天再来」，吞掉空书架引导）
+                await siyuan.pushMsg(tomatoI18n.今日轮转书已全部读满);
             } else if (Object.values(progStorage.booksInfos()).some(i => i?.writing && !i.ignored && !i.archived)) {
                 // 火苗分家（bear 2026-09-15）：写作书整体退出阅读滚筒——只剩写作书时
                 // 给「去写作火苗」对症指引，不再误报「您还没添加任何文档」
@@ -1050,7 +1123,10 @@ class Progressive {
             return;
         }
         if (point >= bookIndex.length) {
-            await siyuan.pushMsg(tomatoI18n.已经是最后一页了);
+            // rollerquota □3：完读态死胡同出口——旧「已经是最后一页了」纯 toast 无路可走
+            //（用户650189 实历：只能重新加书，丢手动分片与摘抄定位）。confirm 走入口①同款
+            // 重置链（resetBookForReread 内含守卫；此处已过 manual/writing 分叉必放行）
+            confirm("", tomatoI18n.本书已读完重新阅读吗, () => void this.resetBookForReread(bookID));
             return;
         } else if (point < 0) {
             await siyuan.pushMsg(tomatoI18n.已经是第一页了);
@@ -1446,19 +1522,20 @@ class Progressive {
     /**
      * 片态浮条「回原书」（2026-08-31 升级，原=仅打开原书文档）：按文档序取片内首个带
      * custom-progref 的块定位跳原文位置——⌥⇧W 回程同款块级体验且免选块；旧片无 progref
-     * /SQL 落空回落打开原书文档本身。attributes 表无序，序从 blocks.sort 带出。
-     * 开启「显示上一分片最后块」时片首的 previous 副本同样带 progref（copyBlock 对 mark
-     * 块统一打标）——不排除会跳到上一片末尾而非本片开头（2026-08-31 跳转链路体检修）。
+     * /查询落空回落打开原书文档本身。走 getChildBlocks 真文档序逐块 IAL 直读（09-19 修：
+     * attributes 表无可排的文档序列——blocks.sort 是类型常量，旧 order by b.sort 实取
+     * 片内任意句；新通道零索引延迟）。「显示上一分片最后块」的片首 previous 副本带
+     * progref（copyBlock 对 mark 块统一打标）——按属性跳过，恒落本片开头。
      */
     async returnToOriginFromPiece(noteID: string, bookID: string) {
         let refID = "";
         try {
-            const row = await siyuan.sqlOne(
-                `select a.value as ref from blocks b join attributes a on a.block_id = b.id and a.name = '${RefIDKey}'` +
-                ` where b.root_id = '${noteID}' and b.id not in` +
-                ` (select block_id from attributes where name = '${PROG_PIECE_PREVIOUS}' and root_id = '${noteID}')` +
-                ` order by b.sort limit 1`);
-            refID = (row as any)?.ref ?? "";
+            for (const kid of await siyuan.getChildBlocks(noteID)) {
+                const attrs = await siyuan.getBlockAttrs(kid.id);
+                if (attrs?.[PROG_PIECE_PREVIOUS]) continue;
+                refID = (attrs?.[RefIDKey] ?? "").trim();
+                if (refID) break;
+            }
         } catch { /* 查询异常回落打开原书 */ }
         await this.openOriginBook(bookID, refID);
     }
@@ -1467,6 +1544,13 @@ class Progressive {
      * □16 摘抄态回原书智能链（形态一：单动作不加新按钮）：块级 progref → 片/任意文档
      * parent → 片序号键重切同片（静默重建+toast，confirm 反而打断心流）→ 兜底跳书。
      * 决策逻辑纯函数在 originTrace.resolveOriginTarget（有单测）。
+     * 无选中兜底（650189 09-19）：选中空时按文档序取首个带 progref 的内容块定位书原文
+     * 块——裸点路径胶囊/回分片钮从「只开片文档」升级为落原文位置。文档序走 getChildBlocks
+     * 真序（review P1 实证：attributes 表无可排的文档序——摘抄建档=createDocWithMd 同秒
+     * 整建、块 id 后缀随机，order by block_id 实取段内随机句）+逐块 IAL 直读零索引延迟
+     * （刚建档立点胶囊不受 attributes 索引窗影响）。getDigestMd 各来源态均写 progref，
+     * 兜底命中面覆盖札记/直摘/再摘抄（再摘抄 progref 继承父档直指书原文块=跳过父摘抄直达
+     * 书，「回原文」语义一致）；零命中（手动删标/极老档）链路照旧。
      */
     async openOriginFromDigest(digestDocID: string, selectedIDs: string[]) {
         let refID = "";
@@ -1474,6 +1558,14 @@ class Progressive {
             const attrs = await siyuan.getBlockAttrs(id);
             refID = attrs?.[RefIDKey] ?? "";
             if (refID) break;
+        }
+        if (!refID && selectedIDs.length === 0) {
+            try {
+                for (const kid of await siyuan.getChildBlocks(digestDocID)) {
+                    refID = ((await siyuan.getBlockAttrs(kid.id))?.[RefIDKey] ?? "").trim();
+                    if (refID) break; // 命中即停：摘抄内容块绝大多数带 progref，平均 1~2 次
+                }
+            } catch { /* 查询异常链路照旧（refID 空落片） */ }
         }
         const docAttrs = await siyuan.getBlockAttrs(digestDocID);
         const refExists = refID ? await siyuan.checkBlockExist(refID) : false;

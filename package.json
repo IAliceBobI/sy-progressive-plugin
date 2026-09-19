@@ -1,6 +1,6 @@
 {
   "name": "sy-progressive-plugin",
-  "version": "3.19.0",
+  "version": "3.20.0",
   "description": "思源笔记渐进学习插件：摘抄/分片渐进、闪卡、多行挖空",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "Progressive Writing"
   ],
   "author": "IAliceBobI",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/IAliceBobI/sy-progressive-plugin.git"

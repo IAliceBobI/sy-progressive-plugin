@@ -6,6 +6,7 @@
 import { Menu, showMessage } from "siyuan";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import type { FleetActions } from "./fleet";
+import { rereadMenuEligible } from "./fleetData";
 import { bookVisitFreq } from "./readCurve";
 
 /** 键盘触发（clientX/Y=0）时菜单落屏幕中间（reviewMenu menuPos 同款） */
@@ -18,7 +19,7 @@ function menuPos(ev: { clientX: number; clientY: number }) {
 
 export async function openBookMenu(
     ev: { clientX: number; clientY: number },
-    book: { bookID: string; name: string; pinned: boolean; paused?: boolean },
+    book: { bookID: string; name: string; pinned: boolean; paused?: boolean; finished?: boolean; manual?: boolean; writing?: boolean },
     actions: FleetActions,
 ) {
     const freq = await bookVisitFreq(book.bookID);
@@ -30,6 +31,16 @@ export async function openBookMenu(
             icon: "iconPlay",
             label: tomatoI18n.继续阅读,
             click: () => void actions.ignoreBook(book.bookID),
+        });
+    }
+    // rollerquota □3 入口①：读完的书右键「重新阅读（从头）」——point 归零即回轮转池。
+    // 只对读完的自动分片书曝光（在读书的回位由入口②③承担，不提前曝光破坏性重置）；
+    // 紧跟暂停块置顶=读完书的最高频动作（对齐暂停态「继续阅读」置顶同款理由）
+    if (rereadMenuEligible({ finished: !!book.finished, manual: !!book.manual, writing: !!book.writing })) {
+        menu.addItem({
+            icon: "iconProgRefresh",
+            label: tomatoI18n.重新阅读从头,
+            click: () => void actions.resetReadingPoint(book.bookID),
         });
     }
     // vision P1-1：全项补图标（与 readCardMenu 全项带图标惯例对齐，图标名经

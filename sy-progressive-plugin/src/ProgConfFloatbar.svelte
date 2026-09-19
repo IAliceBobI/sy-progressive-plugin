@@ -40,6 +40,8 @@
         recite: () => tomatoI18n.仿写本片,
         // □29 本书摘抄清单（片态复用书态 traceUp 浮层；label 沿浮条短标签）
         traceUp: () => tomatoI18n.本书摘抄,
+        // rollerquota □3 入口③：重置到这个分片（label 沿浮条短标签）
+        resetHere: () => tomatoI18n.重置到此片,
         // 高级 14（□14c 起可勾上首行；label 沿 □10 短标签）
         card: () => tomatoI18n.制卡,
         cardHere: () => tomatoI18n.原地制卡短,
@@ -76,6 +78,7 @@
         map: () => tomatoI18n.tip路线指引,
         recite: () => tomatoI18n.tip仿写本片, // 片态语义（digest 态「送进仿写」不进此池）
         traceUp: () => tomatoI18n.tip本书摘抄, // □29 片态复用（原书态浮层，选中块定位当前片）
+        resetHere: () => tomatoI18n.tip重置到这个分片, // rollerquota □3（回看旧片后钉住续读）
         card: () => tomatoI18n.tip制卡,
         cardHere: () => tomatoI18n.tip原地制卡,
         cardDailyN: () => tomatoI18n.tip制卡无引用,

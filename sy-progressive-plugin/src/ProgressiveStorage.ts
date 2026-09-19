@@ -284,6 +284,15 @@ export class ProgressiveStorage {
         return this.booksInfos()[docID] ?? null;
     }
 
+    /** 同步窥索引长度（内存缓存直读；未载入返回 null）：emitToPlugins 同步窗口内判
+     *  「书已读完」用（rollerquota □3 入口②出现条件）。冷启动未读过索引的书=判不出
+     *  读完=不显示（读完书的会话内索引必已入缓存，边缘可接受） */
+    peekBookIndexLength(bookID: string): number | null {
+        const idx = this.plugin?.data?.[bookCacheKey(bookID)];
+        if (!Array.isArray(idx)) return null;
+        return idx.filter(i => i?.length > 0).length;
+    }
+
     // ============ v5 prog-data 锚定链 ============
     // 根目录：storage ID + IAL 双锚（换设备/清存储靠 IAL 认回）；
     // digest 夹/札记匣：无 storage ID，认回=IAL 全库搜 + 刚建缓存（□1：索引延迟窗口

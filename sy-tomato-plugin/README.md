@@ -1,6 +1,6 @@
 # Tomato Toolbox
 
-The all-in-one productivity toolbox for SiYuan — one plugin slot for a whole note-taking workflow, fully open source.
+The all-in-one productivity toolbox for SiYuan — one plugin slot for a whole note-taking workflow.
 
 ## Highlights
 
@@ -95,9 +95,18 @@ One rule of thumb: **everything you need to read, annotate, memorize and stay fo
 - 💬 [QQ Group](https://pd.qq.com/s/r3jz0g16) (Chinese) — feedback and feature requests
 - 💬 [Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=f08gff0c-d6b0-4a0d-8323-c8a0553e4fff&qr_code=true) (Chinese) — feedback and feature requests
 - 📱 Scan to join: ![Group QR codes (left: QQ Channel, right: Feishu)](group-qr.png)
-- 🔓 [Open-source repo](https://github.com/IAliceBobI/sy-tomato-plugin) — what you see is what's compiled: built by GitHub Actions
+- 📦 [Source repository](https://github.com/IAliceBobI/sy-tomato-plugin) — what you see is what's compiled: release packages are built remotely by GitHub Actions from source
 
 📊 SiYuan Marketplace: 141,000+ downloads
+
+## License
+
+All released versions up to v5.15.1 remain under the MIT License. **Starting with the next release, this plugin ships under a proprietary license** (see [LICENSE](LICENSE)):
+
+- **Personal use stays free** — nothing changes for individual users
+- Redistribution, re-packaging and distributing modified copies are not allowed
+- Removing or bypassing the activation check is not allowed
+- Commercial use (charging users, paid services, use inside a company) needs written permission — reach out via the [Feishu group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=f08gff0c-d6b0-4a0d-8323-c8a0553e4fff&qr_code=true) or GitHub issues
 
 ## Support the Author
 

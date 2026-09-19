@@ -226,9 +226,10 @@ export const PIECE_MAIN_POOL = ["digest", "cards", "swap", "next", "prev", "orig
  * □14c 片态恒低频段（buildFlatCells 的 always 段独立成常量供设置面板池复用）。
  * □11 增 map（🗺 路线指引浮层，四态通用低频）；□27 增 recite（✍仿写本片——副本练习，
  * 恒可见不做未装过滤，未装点击 toast 引导=导流语义，同 □26 书态页脚口径）；
- * □29 增 traceUp（📋本书摘抄清单，片态复用书态浮层——用户点名「分篇也要能看」）。
+ * □29 增 traceUp（📋本书摘抄清单，片态复用书态浮层——用户点名「分篇也要能看」）；
+ * rollerquota □3 增 resetHere（📍重置到这个分片——回看旧片后钉住续读，入口③）。
  */
-export const PIECE_LOW_POOL = ["contents", "refill", "clean", "delExit", "ignore", "map", "traceUp", "recite"];
+export const PIECE_LOW_POOL = ["contents", "refill", "clean", "delExit", "ignore", "map", "traceUp", "recite", "resetHere"];
 
 /**
  * □14c 高级四组 14 项 id（设置面板池复用；顺序 = 制卡|收集|移动|提取整理 组语义序）。
@@ -258,6 +259,9 @@ const EXTRA_MAIN: FloatButtonSpec[] = [
     // digest 态 recite=把摘抄送进仿写（SCENE），片态=本片副本开练，dispatch 层按 kind 分流
     { id: "recite", icon: "iconProgSend", kind: "normal", group: "scene" },
     { id: "traceUp", icon: "iconProgTraceUp", kind: "normal", group: "scene" }, // □11 原文侧追溯浮层（书态）
+    // rollerquota □3 入口③：钉 point 到当前片（经文件树/搜索/反链等非浮条通道翻到旧片时
+    // 用；prev 回看自身就写 point-1）。icon 同入口① iconProgRefresh（重置家族同一图形语言）
+    { id: "resetHere", icon: "iconProgRefresh", kind: "normal", group: "scene" },
     // 高级 14（组语义序同 ADV_POOL）
     { id: "card", icon: "iconProgCardAdd", kind: "normal", group: "scene" },
     { id: "cardHere", icon: "iconProgCardHere", kind: "normal", group: "scene" },
@@ -421,7 +425,7 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[]; 
                 ...PIECE_LOW_POOL.filter(id => !inMain.has(id)),
             ];
         }
-        return ["contents", "refill", "clean", ...PIECE_TRAY_POOL, "delExit", "ignore", "map", "traceUp", "recite"];
+        return ["contents", "refill", "clean", ...PIECE_TRAY_POOL, "delExit", "ignore", "map", "traceUp", "recite", "resetHere"];
     }
     if (kind === "book") {
         // 书/摘抄态 mainIds（650189 第二轮，2026-09-10）：池内未进首行的一律落平铺区

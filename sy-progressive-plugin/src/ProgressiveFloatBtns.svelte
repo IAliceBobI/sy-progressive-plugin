@@ -425,6 +425,9 @@
         matFlip: () => tip3(tomatoI18n.翻素材, tomatoI18n.tip翻素材),
         matDel: () => tip3(tomatoI18n.删除素材, tomatoI18n.tip删除素材),
         matOut: () => tip3(tomatoI18n.转出为摘抄, tomatoI18n.tip转出为摘抄),
+        // rollerquota □3 入口③：把续读位置（books.json point）钉到当前片。生效场景=经
+        // 文件树/搜索/反链等非浮条通道翻到旧片（prev 回看自身就写 point-1，勿须本钮）
+        resetHere: () => tip3(tomatoI18n.重置到这个分片, tomatoI18n.tip重置到这个分片),
     };
     const FLAT_ICONS: Record<string, string> = {
         digest: "iconProgScissors",
@@ -458,6 +461,7 @@
         matFlip: "iconProgShuffle",
         matDel: "iconTrashcan",
         matOut: "iconProgDigestToHub",
+        resetHere: "iconProgRefresh",
     };
     // 平铺区图标取值（reasoning review P1-1）：next 跨态异义——digest=纯浏览下一条
     //（iconProgFFast，SCENE.digest 同款；iconProgNext 是「删后前进」形会误导「会删」）
@@ -498,6 +502,7 @@
         matFlip: () => tomatoI18n.翻素材,
         matDel: () => tomatoI18n.删除素材,
         matOut: () => tomatoI18n.转出为摘抄,
+        resetHere: () => tomatoI18n.重置到此片, // rollerquota □3 入口③短标签（2-6 字规格；全名在 FLAT_TIPS）
     };
     // □11 三行制：子排名沿用单字短名，用法句补齐（card 与高级组同 id 不同义，各自 getter；
     // multi/dialog 随三 tab Dialog 退役摘除）。key 走 DigSubrankId 精确匹配（□3 review
@@ -1096,6 +1101,18 @@
             case "splitinplace": // onDig（whole=浮条身份整摘；splitinplace=选中块就地断句，Pro 门禁在执行层）
                 await onDig(id);
                 break;
+            case "resetHere": // rollerquota □3 入口③（EXTRA_MAIN 池钮，首行/平铺两路分发）：钉
+                // point 到当前片（经文件树/搜索/反链等非浮条通道翻到旧片时用——prev 回看自身
+                // 就写 point-1，本钮在 prev 后点击是同值 no-op）。纯写 books.json 不碰分片/摘抄/当日账；
+                // 写作书无阅读进度（同删除族守卫理由：概念不适用，指路文案非拦截错误）
+                if (isWritingPiece) {
+                    await siyuan.pushMsg(tomatoI18n.写作书没有阅读进度, 2500);
+                    break;
+                }
+                await progStorage.gotoBlock($bookID, $point);
+                notifyFleetChanged();
+                await siyuan.pushMsg(tomatoI18n.已重置到这个分片);
+                break;
             case "nextPure": // 托盘动作勾上首行后走首行入口，同平铺区低频通道
             case "delBack":
             case "quit":
@@ -1280,7 +1297,7 @@
      *  与 whole/splitinplace（09-12 freepool 扩容，free 态池钮）同理并入——池钮落
      *  平铺区一律走首行动作（onBtn 有全量 case） */
     const FLAT_POOL_IDS = new Set([...PIECE_MAIN_POOL, ...PIECE_TRAY_POOL, "recite",
-        "revisit", "tree", "summary", "continue", "toPiece", "archive", "whole", "splitinplace"]);
+        "revisit", "tree", "summary", "continue", "toPiece", "archive", "whole", "splitinplace", "resetHere"]);
     function onFlat(id: string, ev?: MouseEvent) {
         if (FLAT_POOL_IDS.has(id)) {
             void onBtn(id, ev);

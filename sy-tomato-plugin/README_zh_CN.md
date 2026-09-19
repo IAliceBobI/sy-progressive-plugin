@@ -1,6 +1,6 @@
 # 番茄工具箱 Tomato Toolbox
 
-思源笔记的全能效率工具箱——一个插件位，装下一整套笔记工作流，全部开源。
+思源笔记的全能效率工具箱——一个插件位，装下一整套笔记工作流。
 
 ## 核心亮点
 
@@ -95,9 +95,13 @@
 - 💬 [QQ 交流群](https://pd.qq.com/s/r3jz0g16)——反馈、催更、蹲新功能
 - 💬 [飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=f08gff0c-d6b0-4a0d-8323-c8a0553e4fff&qr_code=true)——反馈、催更、蹲新功能
 - 📱 扫码进群：![群二维码（左 QQ 频道，右飞书群）](group-qr.png)
-- 🔓 [开源仓库](https://github.com/IAliceBobI/sy-tomato-plugin)——代码即产物，GitHub Actions 在线编译，所见即所得
+- 📦 [源码仓库](https://github.com/IAliceBobI/sy-tomato-plugin)——代码即产物，发布包由 GitHub Actions 从源码在线编译，所见即所得
 
 📊 思源集市下载 141,000+
+
+## 许可
+
+**自下一个版本起，本插件改用专有许可**（见 [LICENSE](LICENSE)）：**个人使用仍然免费**，个人用户无任何变化；禁止再分发、改包分发与绕过激活校验；商用（向使用者收费、付费服务、企业内部使用）需书面授权——[飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=f08gff0c-d6b0-4a0d-8323-c8a0553e4fff&qr_code=true)或 GitHub Issues 联系。v5.15.1 及更早的历史版本仍按发布时的 MIT 许可提供。
 
 ## 支持作者
 

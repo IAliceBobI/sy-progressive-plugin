@@ -57,6 +57,9 @@ export interface RollerDeps {
     finishedIDs(): Promise<Set<string>>;
     /** 书籍状态判定链的 ⏸闭笔记本/⚠丢失 集（2026-08-28；可选=纯引擎单测免注入） */
     invisibleIDs?(): Promise<Set<string>>;
+    /** 今日已达量书集合（rollerquota □1）：选书口剔除——闸在出片口不拦选书，读满的书
+     *  仍被轮到=静默重开旧片零提示（用户分不清读没读过）；可选=纯引擎单测免注入 */
+    todaysFullIDs?(): Promise<Set<string>>;
     getTodayStr(): string;
     /** 设置档位（1/3/5 默认 3） */
     getQuota(): number;
@@ -94,6 +97,34 @@ export function pickNextBook(ro: ReadingOrder, readable: Set<string>): string | 
         if (readable.has(bookID)) return bookID;
     }
     return null;
+}
+
+/** 当日达量书集合（纯）：粗条件 reads>=quota 不含锚——选书口语义=「今天不再轮到你」，
+ *  重开当前片的锚语义留给开片闸 gateBlocked（主动点书卡续读不受影响）；quota 由调用方
+ *  取当前设置（中途调档按新档判，与 gateCheck 同源）；exempt=手动书豁免集（轮转路径
+ *  markReadSafe 无锚、b 计数无上限，剔除反而改变「轮到=回阅读点续读」既有语义，
+ *  对齐 gateCheck 对 manualMode 直接放行） */
+export function fullBookIDsFrom(data: DayLogData, quota: number, exempt: Set<string>): Set<string> {
+    const full = new Set<string>();
+    for (const [id, reads] of Object.entries(data.b)) {
+        if (!exempt.has(id) && reads >= quota) full.add(id);
+    }
+    return full;
+}
+
+/** 达量集 ∩ 活跃书（未忽略/未归档/非写作/未删；review P1-1）——全满额提示判定专用：
+ *  归档/忽略/已删书的当日 b 残留不该触发「明天再来」（它们明天也不会轮到，吞掉
+ *  空书架引导）；nextBook 消费侧无需此过滤（那些书已被各自排除集并集剔除） */
+export function activeFullIDs(
+    full: Set<string>,
+    infos: Record<string, { ignored?: boolean; archived?: string; writing?: boolean }>,
+): Set<string> {
+    const active = new Set<string>();
+    for (const id of full) {
+        const i = infos[id];
+        if (i && !i.ignored && !i.archived && !i.writing) active.add(id);
+    }
+    return active;
 }
 
 export function incrementDay(data: DayLogData, bookID: string, quota: number, point?: number): DayLogData {
@@ -164,6 +195,7 @@ export async function nextBook(deps: RollerDeps): Promise<string | null> {
         ...await deps.archivedIDs(),
         ...await deps.finishedIDs(),
         ...(deps.invisibleIDs ? await deps.invisibleIDs() : []),
+        ...(deps.todaysFullIDs ? await deps.todaysFullIDs() : []),
     ]);
     const readable = new Set(merged.order.filter(id => !unreadable.has(id)));
     const pick = pickNextBook(merged, readable);
@@ -251,7 +283,42 @@ function parseDayLogData(raw: string): DayLogData {
     return { q: 3, b: {} };
 }
 
+/** 当日达量集进程级缓存（makeRollerDeps 每次新建，memo 只能挂模块级；见 todaysFullIDsImpl 注释） */
+let fullCache: { at: number; v: Set<string> } | null = null;
+
 function makeRollerDeps(): RollerDeps {
+    // 当日块按值查（findDayBlock 与 todaysFullIDs 共用）
+    const findDayBlockByDate = async (date: string): Promise<string> => {
+        const rows = await siyuan.sqlAttr(
+            `select * from attributes where name="${constants.PLOG_DATE}" and value="${date}" limit 1`);
+        return rows?.at(0)?.block_id ?? "";
+    };
+    // 今日达量书集合（rollerquota □1）：rollerTodayGate 同款直读链+防撞窗（当日块刚建
+    // 800ms 内 findDayBlock 可能 miss，miss=今日零读、闸偏松方向）；手动书豁免对齐
+    // gateCheck；quota 取当前设置（与出片闸同源，中途调档按新档判）。
+    // 1s TTL memo（review P1-2）：nextBook 与 startToLearn 全满额分支毫秒级两次调用
+    // 共享一次读（无当日块时双 800ms 防撞睡=空书架用户每次点轮转固定 +1.6s）；陈旧面
+    // =1s 内记账后重读旧值——出片闸 gateCheck 兜底且窗口极窄，无害
+    const todaysFullIDsImpl = async (): Promise<Set<string>> => {
+        if (fullCache && Date.now() - fullCache.at < 1000) return fullCache.v;
+        const date = todayStr();
+        let blockID = await findDayBlockByDate(date);
+        if (!blockID) {
+            await new Promise(r => setTimeout(r, 800));
+            blockID = await findDayBlockByDate(date);
+            if (!blockID) {
+                fullCache = { at: Date.now(), v: new Set<string>() };
+                return fullCache.v;
+            }
+        }
+        const attrs = await siyuan.getBlockAttrs(blockID);
+        const data = parseDayLogData(attrs?.[constants.PLOG_DATA] ?? "");
+        const manual = new Set(Object.entries(progStorage.booksInfos())
+            .filter(([, v]) => v.manualMode).map(([k]) => k));
+        const v = fullBookIDsFrom(data, Number(dailyQuota.get()) || 3, manual);
+        fullCache = { at: Date.now(), v };
+        return v;
+    };
     return {
         loadOrder: () => progStorage.loadReadingOrder(),
         saveOrder: (ro) => progStorage.saveReadingOrder(ro),
@@ -296,11 +363,8 @@ function makeRollerDeps(): RollerDeps {
         },
         getTodayStr: todayStr,
         getQuota: () => Number(dailyQuota.get()) || 3,
-        findDayBlock: async (date) => {
-            const rows = await siyuan.sqlAttr(
-                `select * from attributes where name="${constants.PLOG_DATE}" and value="${date}" limit 1`);
-            return rows?.at(0)?.block_id ?? "";
-        },
+        findDayBlock: findDayBlockByDate,
+        todaysFullIDs: todaysFullIDsImpl,
         readDayBlockData: async (blockID) => {
             const attrs = await siyuan.getBlockAttrs(blockID);
             return parseDayLogData(attrs?.[constants.PLOG_DATA] ?? "");
@@ -361,6 +425,12 @@ function makeRollerDeps(): RollerDeps {
 /** 便捷入口（UI 层接线用；deps 每次现取，避免模块加载序问题） */
 export async function rollerNextBook(): Promise<string> {
     return (await nextBook(makeRollerDeps())) ?? "";
+}
+
+/** 今日达量书集合（UI 层接线用；startToLearn 全满额对症提示判定——消费侧用
+ *  activeFullIDs 过滤出活跃交集后判空，归档/忽略残留勿触发提示） */
+export async function rollerTodaysFullIDs(): Promise<Set<string>> {
+    return makeRollerDeps().todaysFullIDs!();
 }
 
 export async function rollerMarkRead(bookID: string, point?: number): Promise<void> {

@@ -176,7 +176,7 @@ async function getDue(input: Record<string, any>) {
       const summary = summarizeDebt(await loadAllDays(), dayStr, quotaToday);
       pieces.debt = summary.debt;
       pieces.debtState = summary.state; // ok=无欠债/warn=欠债<2×档位/over=欠债≥2×档位
-      const next = await simulateNextBooks(quotaToday - readToday);
+      const next = await simulateNextBooks(quotaToday - readToday, dayData, quotaToday);
       if (next.length) pieces.nextBooks = next;
     }
   }
@@ -187,12 +187,18 @@ async function getDue(input: Record<string, any>) {
       items,
     },
     pieces,
-    hint: "revisit=到期重访（think=块级思考/pdigest=文档级复访；id 可跳转：think 为块 id、pdigest 为摘抄文档 id）；pieces=渐进阅读片队列（quotaToday=今日档位/readToday=今日已读/debt=累积欠债/nextBooks=滚筒接下来会轮到的书·只读模拟非精确承诺，不含手动分片书与写作书——前端滚筒已纳入手动书，本模拟面未跟随）",
+    hint: "revisit=到期重访（think=块级思考/pdigest=文档级复访；id 可跳转：think 为块 id、pdigest 为摘抄文档 id）；pieces=渐进阅读片队列（quotaToday=今日档位/readToday=今日已读/debt=累积欠债/nextBooks=滚筒接下来会轮到的书·只读模拟非精确承诺，不含手动分片书与写作书——前端滚筒已纳入手动书，本模拟面未跟随；当日读满档位的书同样不再列入，与前端选书口一致）",
   });
 }
 
-/** 滚筒只读模拟：从 lastServed 起模拟轮转 n 次会推出的书（不写 reading-order.json） */
-async function simulateNextBooks(n: number): Promise<{ bookID: string; title: string; point: number; unread: number }[]> {
+/** 滚筒只读模拟：从 lastServed 起模拟轮转 n 次会推出的书（不写 reading-order.json）。
+ *  dayData/quotaToday 由调用点传入（当日账）：当日读满档位的书不再列入（rollerquota
+ *  □1，与前端选书口剔除同语义——kernel 面用手动/写作双排除本就不含两类豁免书） */
+async function simulateNextBooks(
+  n: number,
+  dayData: { q: number; b: { [bookID: string]: number } } | null,
+  quotaToday: number,
+): Promise<{ bookID: string; title: string; point: number; unread: number }[]> {
   if (n <= 0) return [];
   const count = Math.min(n, 5);
   const infos = await readBooksInfos();
@@ -210,9 +216,13 @@ async function simulateNextBooks(n: number): Promise<{ bookID: string; title: st
   for (const [id, info] of entries) {
     pieceCounts.set(id, (info.writing || info.manualMode) ? 0 : (await readBookIndex(id)).length);
   }
+  // 当日达量集（粗条件 reads>=quota；quotaToday=当日块 q 快照，与前端「当前设置」
+  // 口径在当日未记账时略有偏差——模拟面非精确承诺，hint 已声明）
+  const full = new Set(Object.entries(dayData?.b ?? {})
+    .filter(([, reads]) => reads >= quotaToday).map(([id]) => id));
   const readable = new Set(entries.filter(([id, info]) =>
     titles.has(id) && !info.ignored && !info.archived && !info.writing && !info.manualMode
-    && !isFinished(info.point ?? 0, pieceCounts.get(id) ?? 0),
+    && !isFinished(info.point ?? 0, pieceCounts.get(id) ?? 0) && !full.has(id),
   ).map(([id]) => id));
   const merged = mergeMissingBooks(ro, [...pieceCounts.keys()]);
   const out: { bookID: string; title: string; point: number; unread: number }[] = [];

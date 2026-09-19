@@ -228,6 +228,13 @@ export function buildFleetBooks(args: {
     return books;
 }
 
+/** rollerquota □3 入口①：书卡右键「重新阅读（从头）」出现条件——只对读完的自动
+ *  分片书曝光（在读书的「回到任意位置」由入口②③承担，提前曝光破坏性重置易误触）；
+ *  手动书无 point 概念、写作书 finished 位=素材/槽终态语义，均不适用 */
+export function rereadMenuEligible(b: Pick<FleetBook, "finished" | "manual" | "writing">): boolean {
+    return b.finished && !b.manual && !b.writing;
+}
+
 /** 书卡关键字过滤（舰队管理 □1 搜索框）：书名大小写不敏感包含匹配，
  *  纯视觉过滤不动滚筒序/沉底序；空/纯空白关键字原样返回 */
 export function filterFleetBooks(books: FleetBook[], kw: string): FleetBook[] {

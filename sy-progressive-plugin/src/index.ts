@@ -25,6 +25,7 @@ import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExp
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
+import { installReadonlyHotkeyBridge, uninstallReadonlyHotkeyBridge } from "../../sy-tomato-plugin/src/libs/readonlyHotkey";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import SettingsSvelte from "./Settings.svelte"
 import ReviewPlanDialog from "./ReviewPlanDialog.svelte"
@@ -344,6 +345,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
     }
 
     onunload(): void {
+        uninstallReadonlyHotkeyBridge(this); // readonlyfix □5：只读态快捷键兜底桥 teardown 正轨（首行——纯拆卸零依赖，后面步骤抛错不致泄漏监听器）
         prog.onunload();
         onunloadFleet();
         closeFloatPopover(); // □11 浮层命令式挂载在 body——卸载不清理会残留+同屏双浮层（review P1）
@@ -450,6 +452,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
     }
 
     async onload() {
+        // readonlyfix □5：只读态快捷键兜底桥——内核两路派发在只读态皆死（根因见
+        // libs/readonlyHotkeyCore.ts 文件头）。首行安装：handler LIVE 读 plugin.commands，
+        // 命令后注册也照常命中；放最前=后续任一步抛错桥仍在（半死形态加固）
+        installReadonlyHotkeyBridge(this);
         this.addIcons(ICONS);
         this.addIcons(PROG_FLOAT_ICONS);
         initDigestMarker(this);
@@ -615,6 +621,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
             setVisitFreq: async (bookID, f) => {
                 await setBookVisitFreq(bookID, f);
             },
+            // rollerquota □3 入口①：书卡右键「重新阅读（从头）」（守卫+重置+出片都在
+            // Progressive.resetBookForReread 内）
+            resetReadingPoint: (bookID) => prog.resetBookForReread(bookID),
         };
         initFleet(this, fleetActions);
     }
