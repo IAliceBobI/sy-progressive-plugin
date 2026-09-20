@@ -8,7 +8,10 @@
 // 在数据预处理层把链子树整链合并为 ¶ 大节点（永不多节点化），本文件只管标题/子树折叠；
 // expandSubtree（「展开全部段落」菜单的底座）随 ¶ 展开族退役一并删除。
 
-export type ExpandLevel = "1" | "2" | "3" | "all";
+// graphmind □4（2026-09-19）：档位口径=「显示到第 N 级标题」（N=1..6，h1~h6 大纲心智）。
+// ExpandLevel 本体仍是折叠口径（level="N"=折叠相对级 ≥N 的标题——initialCollapsedRows
+// 语义与单测钉死不动），「显示到 N 级 ⇔ 折叠档 N」换算走 showLevelToExpandLevel。
+export type ExpandLevel = "1" | "2" | "3" | "4" | "5" | "6" | "all" | "headings";
 
 export interface TreeIndex {
     byId: Map<string, Block>;
@@ -39,13 +42,16 @@ export function buildTreeIndex(rows: Block[]): TreeIndex {
 /**
  * 初始折叠集（按 rows 出现序，确定性；期7 起只按标题层级，段落链已改走 ¶ 合并通道）：
  * level="N"：标题层级 ≥N 且有图内子节点的标题；level="all"：空集。
+ * level="headings"（graphmind □2 新默认）：展开到文档最深标题级——标题全不折
+ * （骨架全显、段落收徽章），与 all 的分野=列表容器仍默认折叠（bear 拍板
+ * 「列表不在展开范围」不随默认档抬升）。
  * 叶子标题（无子树）不进集——空角标点击无反应（e2e 实锤）；文档根不折叠。
  * graphbox-listfix（2026-09-18 bear 拍板「列表不在展开范围也可以」）：非标题容器
  * （结构态=列表项 i）默认折叠——层级可见靠展开 toggle（+N 角标），all 同样全展开。
  */
 export function initialCollapsedRows(rows: Block[], level: ExpandLevel, base = 1): string[] {
     const tree = buildTreeIndex(rows);
-    const minHeading = level === "all" ? 99 : parseInt(level, 10);
+    const minHeading = level === "all" || level === "headings" ? 99 : parseInt(level, 10);
     const out: string[] = [];
     for (const r of rows) {
         if (r.type === "h" && r.subtype?.startsWith("h")) {
@@ -186,6 +192,65 @@ export function expandAncestors(tree: TreeIndex, collapsed: Set<string>, id: str
 /** 持久化序列化：按 id 排序（确定性，文档属性 diff 友好） */
 export function serializeCollapsed(ids: Iterable<string>): string {
     return JSON.stringify([...ids].sort());
+}
+
+// —— graphmind □4：标题级数一键展开收缩（共识#5）——
+
+/** 文档实际标题级范围（「显示到第几级」选择器的档位检测）：
+ *  仅统计本档标题（root_id===docID——跨文档端点行混入不参与，review P2-5 同款防线），
+ *  base=最小绝对级（H2 起步文档归一化锚：相对 1 级=章），max=最大绝对级；
+ *  无标题（或 docID 空）→ null（调用方隐藏选择器/退 headings 档）。 */
+export function headingRangeOf(rows: Block[], docID: string): { base: number; max: number } | null {
+    if (!docID) return null;
+    let base = 9, max = 0;
+    for (const r of rows) {
+        if (r.type === "h" && r.root_id === docID && r.subtype?.startsWith("h")) {
+            const lv = parseInt(r.subtype.slice(1), 10) || 0;
+            if (lv >= 1 && lv <= 6) {
+                base = Math.min(base, lv);
+                max = Math.max(max, lv);
+            }
+        }
+    }
+    return max === 0 || base === 9 ? null : { base, max };
+}
+
+/** 「显示到第 N 级」→ 折叠档换算（graphmind □4 P0 修正口径）：initialCollapsedRows
+ *  语义=「层级 ≥L 且有子树者进折叠集」，而**折叠成员自身可见**（折叠卡形态）、子树全藏——
+ *  故「显示到第 N 级」（h1..h(N-1) 展开+hN 折叠卡、h(N+1)+ 全藏）⇔ 折叠档=L=N 本身
+ *  （首版误写 show+1：折叠 h(N+1) 只藏其子树，h(N+1) 折叠卡仍可见=第 N+1 级泄漏，
+ *  UI 验收 P0「选 N 实显 N+1 级」实锤）。N ≥ 文档最深相对级（maxRel）→ headings 档
+ *  语义（标题全不折、列表容器仍默认折叠——「显示到最深级」=回默认骨架）。 */
+export function showLevelToExpandLevel(show: number, maxRel: number): ExpandLevel {
+    if (show >= maxRel) return "headings";
+    return String(Math.min(Math.max(show, 1), 6)) as ExpandLevel;
+}
+
+/** 设置值 → 折叠档（设置新口径=「显示到第 N 级标题」；headings/all 透传）：
+ *  数字档按文档实际级范围换算；无标题文档退 headings（无标题可折，空推导同语义）。
+ *  旧口径（折叠起点，值 N 实显 N-1 级）存量值的读时迁移见 index.ts 装载段。 */
+export function settingShowLevelToExpand(setting: ExpandLevel, range: { base: number; max: number } | null): ExpandLevel {
+    if (setting === "headings" || setting === "all") return setting;
+    if (!range) return "headings";
+    return showLevelToExpandLevel(parseInt(setting, 10), range.max - range.base + 1);
+}
+
+/** 当前显示到的最深标题相对级（选择器回显=按实际显示态推导，手动折叠后同步实况）：
+ *  可见即计（computeVisible 折叠节点自身可见=该级折叠卡形态，就是「显示到第 N 级」的
+ *  N 级本体——P0 修正口径；「未折叠」过滤是首版错口径配套，会把选 N（折叠 hN）误报 N-1）。
+ *  无标题/无可见标题 → 0（调用方按需钳 1）。 */
+export function visibleHeadingLevel(rows: Block[], collapsed: Iterable<string>, docID: string): number {
+    const range = headingRangeOf(rows, docID);
+    if (!range) return 0;
+    const vis = computeVisible(rows, collapsed);
+    let deepest = 0;
+    for (const r of rows) {
+        if (r.type !== "h" || r.root_id !== docID || !r.subtype?.startsWith("h")) continue;
+        if (!vis.visibleIds.has(r.id)) continue;
+        const lv = parseInt(r.subtype.slice(1), 10) || 0;
+        if (lv >= 1 && lv <= 6) deepest = Math.max(deepest, lv - range.base + 1);
+    }
+    return deepest;
 }
 
 /** 反序列化：坏 JSON / 非字符串数组 → null（调用方按无持久化值重新推导初始折叠集） */

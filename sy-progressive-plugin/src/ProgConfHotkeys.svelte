@@ -21,7 +21,21 @@
         flashBox制卡,
         flashBox原地制卡,
         flashBox制卡并发到dailycard无引用,
+        flashBox多行标记,
     } from "./FlashBox";
+    import {
+        PieceMovingBox移动到上一分片内,
+        PieceMovingBox移动到下一分片内,
+    } from "./PieceMovingBox";
+    import { PieceSummaryBox收集内容到文件 } from "./PieceSummaryBox";
+    import {
+        WC提取所有分片的笔记,
+        WC提取笔记到底部,
+        WC提取笔记,
+        WC去除笔记颜色,
+        WC恢复笔记颜色,
+        WC合并所有分片到新文件,
+    } from "./WritingCompareBox";
 </script>
 
 <div class="settingBox">
@@ -38,6 +52,17 @@
     </div>
     <div>
         {Progressive下一页.langText()}<HotkeyCap hk={Progressive下一页} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <!-- gfloatnav 盘点补漏（09-19）：分片内挪块一对（核心阅读流）+收集到文件（Pro）——
+         命令注册一直在 Quick 卡/浮条里漏带键帽（翻页/制卡三连同款先例） -->
+    <div>
+        {PieceMovingBox移动到上一分片内.langText()}<HotkeyCap hk={PieceMovingBox移动到上一分片内} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {PieceMovingBox移动到下一分片内.langText()}<HotkeyCap hk={PieceMovingBox移动到下一分片内} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {PieceSummaryBox收集内容到文件.langText()}<HotkeyCap hk={PieceSummaryBox收集内容到文件} pluginName="sy-progressive-plugin"></HotkeyCap>
     </div>
     <div>
         {digest执行摘抄.langText()}<HotkeyCap hk={digest执行摘抄} pluginName="sy-progressive-plugin"></HotkeyCap>
@@ -70,5 +95,28 @@
     </div>
     <div>
         {flashBox制卡并发到dailycard无引用.langText()}<HotkeyCap hk={flashBox制卡并发到dailycard无引用} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {flashBox多行标记.langText()}<HotkeyCap hk={flashBox多行标记} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <!-- gfloatnav 盘点补漏（09-19）：写作对比提取整理族六连（Pro）——摘抄-笔记-合并工作流
+         相邻动作，WritingCompareBox 注册一直在浮条/命令面板漏带键帽 -->
+    <div>
+        {WC提取所有分片的笔记.langText()}<HotkeyCap hk={WC提取所有分片的笔记} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {WC提取笔记到底部.langText()}<HotkeyCap hk={WC提取笔记到底部} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {WC提取笔记.langText()}<HotkeyCap hk={WC提取笔记} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {WC去除笔记颜色.langText()}<HotkeyCap hk={WC去除笔记颜色} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {WC恢复笔记颜色.langText()}<HotkeyCap hk={WC恢复笔记颜色} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+    <div>
+        {WC合并所有分片到新文件.langText()}<HotkeyCap hk={WC合并所有分片到新文件} pluginName="sy-progressive-plugin"></HotkeyCap>
     </div>
 </div>

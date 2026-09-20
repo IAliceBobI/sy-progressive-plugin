@@ -3410,6 +3410,19 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Cannot Find the Notebook Corresponding to the Document:";
         }
     }
+    /** fballtail □7：$$dailynote 球在无可用笔记本（全新空间未开笔记本）时的对症提示——
+     *  替代此前裸取 .id 的 TypeError 静默失败（球点击零反馈） */
+    public get 无可用笔记本请先打开() {
+        switch (this.lang) {
+            case "zh_CN": return "没有可用的笔记本，请先打开一个笔记本";
+            case "zh_CHT": return "沒有可用的筆記本，請先打開一個筆記本";
+            case "es_ES": return "No hay libretas disponibles, abra primero una libreta";
+            case "fr_FR": return "Aucun carnet disponible, veuillez d'abord en ouvrir un";
+            case "ja_JP": return "利用可能なノートブックがないため、まずノートブックを開いてください";
+            case "en_US":
+            default: return "No notebook available, please open one first";
+        }
+    }
     public get 未找到文档请等待索引() {
         switch (this.lang) {
             case "zh_CN": return "文档索引还在建立，稍后再试";
@@ -3975,6 +3988,19 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "已回到原書";
             case "en_US":
             default: return "Back to the book";
+        }
+    }
+
+    /** 舰队 lost 卡书名兜底（tailbatch □10）：原书已删、书名回落块 id 时的可读占位 */
+    public get 原书已删除() {
+        switch (this.lang) {
+            case "zh_CN": return "（原书已删除）";
+            case "zh_CHT": return "（原書已刪除）";
+            case "es_ES": return "(libro eliminado)";
+            case "fr_FR": return "(livre supprimé)";
+            case "ja_JP": return "（原書は削除済み）";
+            case "en_US":
+            default: return "(book deleted)";
         }
     }
 
@@ -10577,8 +10603,33 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CN": return "方块总览";
             case "zh_CHT": return "方塊總覽";
             case "ja_JP": return "ブロック概観";
+            case "es_ES": return "Vista de bloques";
+            case "fr_FR": return "Vue par blocs";
             case "en_US":
             default: return "Block overview";
+        }
+    }
+    // graphmind □6（共识#1）视图收敛：full/treemap 入口显隐开关（设置行+说明文案）
+    public get 显示全部视图档位() {
+        switch (this.lang) {
+            case "zh_CN": return "显示全部视图档位";
+            case "zh_CHT": return "顯示全部視圖檔位";
+            case "ja_JP": return "すべてのビューを表示";
+            case "es_ES": return "Mostrar todas las vistas";
+            case "fr_FR": return "Afficher toutes les vues";
+            case "en_US":
+            default: return "Show all view modes";
+        }
+    }
+    public get 显示全部视图档位说明() {
+        switch (this.lang) {
+            case "zh_CN": return "工具栏默认只保留结构/只看标记两档；开启后回显「方块总览/显示全部块」入口";
+            case "zh_CHT": return "工具列預設只保留結構/只看標記兩檔；開啟後重現「方塊總覽/顯示全部塊」入口";
+            case "ja_JP": return "ツールバーは既定で構造/マークのみ。オンにすると「ブロック概観/すべてのブロック」が戻ります";
+            case "es_ES": return "La barra mantiene por defecto solo estructura/marcas; al activarlo se restauran las vistas de bloques";
+            case "fr_FR": return "La barre ne garde par défaut que structure/marques ; l'activer rétablit les vues par blocs";
+            case "en_US":
+            default: return "Toolbar keeps structure/marks only by default; turn on to restore block overview & all-blocks entries";
         }
     }
     // □5 标记模式菜单项（陆杰「只看标记」——treemap 家族数据过滤变体；graphmark 期3
@@ -10653,6 +10704,35 @@ export class TomatoI18n extends TomatoI18nABC {
             case "ja_JP": return "%1 段落 · %2 字、クリックで折りたたみ";
             case "en_US":
             default: return "%1 paras · %2 chars, click to collapse";
+        }
+    }
+    // graphmind □3（2026-09-19）：¶ 合并框双态文案（共识#4——收起=首尾各一段+省略标记，
+    // 块计数并入标记承载、¶×N 徽标收起态退役不重复报数；展开=原文序全段）
+    public get 段落链省略块() {
+        switch (this.lang) {
+            case "zh_CN": return "⋯ %1 块 ⋯";
+            case "zh_CHT": return "⋯ %1 塊 ⋯";
+            case "ja_JP": return "⋯ %1 ブロック ⋯";
+            case "en_US":
+            default: return "… %1 blocks …";
+        }
+    }
+    public get 段落链点击展开() {
+        switch (this.lang) {
+            case "zh_CN": return "已省略 %1 块，点击展开全文";
+            case "zh_CHT": return "已省略 %1 塊，點擊展開全文";
+            case "ja_JP": return "%1 ブロックを省略中、クリックで全文展開";
+            case "en_US":
+            default: return "%1 blocks omitted; click to expand";
+        }
+    }
+    public get 段落链点击收起() {
+        switch (this.lang) {
+            case "zh_CN": return "点击收起，显示首尾段";
+            case "zh_CHT": return "點擊收起，顯示首尾段";
+            case "ja_JP": return "クリックで折りたたんで前後の段落のみ表示";
+            case "en_US":
+            default: return "Click to collapse to first and last paragraphs";
         }
     }
     // graphbox 期3（2026-09-04）：大图缩放提示（「超级块/引述块」复用基类既有 getter 不重定义）；
@@ -10751,12 +10831,22 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
     // graphbox 期2 折叠机制（2026-09-04）：默认展开层级/角标 aria-label
+    // graphmind □4：口径换「显示到第 N 级标题」（旧文案「展开层级」与实现偏一位——值 N 实显 N-1 级）
     public get 默认展开层级() {
         switch (this.lang) {
-            case "zh_CN": return "默认展开层级（按标题层级）";
-            case "zh_CHT": return "預設展開層級（按標題層級）";
+            case "zh_CN": return "默认显示到第几级标题";
+            case "zh_CHT": return "預設顯示到第幾級標題";
             case "en_US":
-            default: return "Default expand level (by heading)";
+            default: return "Default heading level shown";
+        }
+    }
+    // graphmind □4（2026-09-19）：工具栏级数选择器 tooltip/aria（档位=当前文档实际标题级）
+    public get 显示到第几级() {
+        switch (this.lang) {
+            case "zh_CN": return "显示到第几级标题";
+            case "zh_CHT": return "顯示到第幾級標題";
+            case "en_US":
+            default: return "Show headings to level";
         }
     }
     public get 全部展开() {
@@ -10765,6 +10855,16 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "全部";
             case "en_US":
             default: return "All";
+        }
+    }
+    // graphmind □2（2026-09-19）：默认展开层级新默认档（headings=展开到文档最深标题级）
+    public get 展开到标题层() {
+        switch (this.lang) {
+            case "zh_CN": return "标题层（最深）";
+            case "zh_CHT": return "標題層（最深）";
+            case "ja_JP": return "見出し層（最深）";
+            case "en_US":
+            default: return "Headings (deepest)";
         }
     }
     public get 展开此节点() {
@@ -15613,6 +15713,66 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "顯示或隱藏懸浮反鏈球";
             case "en_US":
             default: return "Show or hide floating backlink ball";
+        }
+    }
+
+    // ---- graphfloat □3 悬浮图（2026-09-19）：设置行/命令/球 tooltip 文案（zh+en 一等，其余落英文兜底） ----
+    public get 悬浮图() {
+        switch (this.lang) {
+            case "zh_CN": return "悬浮图";
+            case "zh_CHT": return "懸浮圖";
+            case "en_US":
+            default: return "Floating graph";
+        }
+    }
+    public get 悬浮图说明() {
+        switch (this.lang) {
+            case "zh_CN": return "悬浮球随点随看当前文档的块关系图，⌘⌥⇧E 唤起或收起；左侧 dock 面板不受影响。";
+            case "zh_CHT": return "懸浮球隨點隨看當前文檔的塊關係圖，⌘⌥⇧E 喚起或收起；左側 dock 面板不受影響。";
+            case "en_US":
+            default: return "A floating ball to peek the block graph of the current document; toggle with ⌘⌥⇧E. The dock panel is unaffected.";
+        }
+    }
+    public get 展开或收起悬浮图() {
+        switch (this.lang) {
+            case "zh_CN": return "展开或收起悬浮图";
+            case "zh_CHT": return "展開或收起懸浮圖";
+            case "en_US":
+            default: return "Toggle floating graph panel";
+        }
+    }
+    public get 显示或隐藏悬浮图球() {
+        switch (this.lang) {
+            case "zh_CN": return "显示或隐藏悬浮图球";
+            case "zh_CHT": return "顯示或隱藏懸浮圖球";
+            case "en_US":
+            default: return "Show or hide floating graph ball";
+        }
+    }
+    // ---- gfloatnav（2026-09-19）：图内导航收面板开关（悬浮图当大纲用闭环） ----
+    public get 跳转后收起悬浮图() {
+        switch (this.lang) {
+            case "zh_CN": return "跳转后收起悬浮图";
+            case "zh_CHT": return "跳轉後收起懸浮圖";
+            case "en_US":
+            default: return "Collapse graph after jumping";
+        }
+    }
+    public get 跳转后收起悬浮图说明() {
+        switch (this.lang) {
+            case "zh_CN": return "双击节点、Alt+点击、右键跳转等定位到原文后自动收起面板，重开零加载。";
+            case "zh_CHT": return "雙擊節點、Alt+點擊、右鍵跳轉等定位到原文後自動收起面板，重開零加載。";
+            case "en_US":
+            default: return "Auto-collapse the panel after double-click / Alt-click / context-menu jump to source. Reopening is instant.";
+        }
+    }
+    // ---- gfloatnav 盘点补漏：前缀文档树 Dock 面板键帽行名（与 ⇧⌥G 选区命令区分） ----
+    public get 打开前缀文档树面板() {
+        switch (this.lang) {
+            case "zh_CN": return "打开前缀文档树面板";
+            case "zh_CHT": return "打開前綴文檔樹面板";
+            case "en_US":
+            default: return "Open prefix tree panel";
         }
     }
 }

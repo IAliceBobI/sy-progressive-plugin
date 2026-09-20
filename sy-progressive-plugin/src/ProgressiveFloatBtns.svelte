@@ -23,7 +23,7 @@
     import { notifyFleetChanged } from "./fleetNotify";
     import { digSubrankOpen, floatbarFlatCollapsed, floatbarFlatManifest, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
     import { progPaid } from "./theme";
-    import { collapseFloatBar, expandFloatBar, floatSwapBook, freeFloatOff } from "./ProgressiveBtn";
+    import { collapseFloatBar, expandFloatBar, floatSwapBook, freeFloatOff, progressiveBtnFloating } from "./ProgressiveBtn";
     import { digestProgressiveBox, initDi, digestWholeDoc } from "./DigestProgressiveBox";
     import { queryDigestTree } from "./digestUtils";
     import { openFloatPopover, closeFloatPopover } from "./overlays";
@@ -158,6 +158,9 @@
             ],
     );
     const materialCluster = $derived(isMaterialDoc ? ["matDel", "matOut"] : []);
+    // matflow P2（tailbatch □9）：matDel/matOut in-flight 闸——confirm 回调内整段互斥，
+    // 防连点双发（删除/转出都是不可逆写，双发=对已删文档再操作）
+    let matOpInFlight = false;
     // □3 子排 id 序收单一事实源（digestSubrankIds）：whole（整摘）限片+自由态，自由态
     // 是右键退役后任意文档的整摘兜底；kind 空窗视同 digest 不渲染
     // matflow（0914 □5）：写作槽滤掉 splitinplace——命令层会拦（写作槽不能就地断句），
@@ -937,9 +940,9 @@
         }, {
             title: freeDoc ? tomatoI18n.本文档摘抄清单 : tomatoI18n.本书摘抄清单,
             width: events.isMobile ? "90vw" : undefined,
-            // min() 钳矮视口：固定 700px 在 <700px 窗口把标题栏/关闭钮裁出屏（vision P1-3；
-            // ShowAllBooks 同病属既有缺陷不扩修，新组件不继承）
-            height: events.isMobile ? "180vw" : "min(700px, 90vh)",
+            // matflow P2（tailbatch □9）：高度自适应+70vh 封顶（原固定 700px：清单短时
+            // 也撑满大空窗；矮视口再叠 90vh 钳）——清单内滚由组件根 max-height 链承接
+            height: events.isMobile ? "180vw" : undefined,
         });
     }
 
@@ -1220,8 +1223,10 @@
                 break;
             case "matDel": { // matflow（0914 □2 出口）：当前素材文档删除（confirm 后连本体）
                 const docID = $noteID; // confirm 悬窗期防 $noteID 漂移（P1-2 捕获纪律）
-                if (!docID) break;
+                if (!docID || matOpInFlight) break;
                 confirm("⚠️", tomatoI18n.删除素材确认(1), () => void (async () => {
+                    if (matOpInFlight) return; // matflow P2：confirm 回调双发闸
+                    matOpInFlight = true;
                     try {
                         const n = await removeMaterialDocs([docID]);
                         await siyuan.pushMsg(n > 0 ? tomatoI18n.已删除素材 : tomatoI18n.操作失败请重试, 2500);
@@ -1231,23 +1236,32 @@
                     } catch (e) {
                         console.error("matDel failed", e);
                         await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500);
+                    } finally {
+                        matOpInFlight = false;
                     }
                 })());
                 break;
             }
             case "matOut": { // matflow（0914 □2+□5 两档并存）：当前素材转出为摘抄落总夹
                 const docID = $noteID;
-                if (!docID) break;
+                if (!docID || matOpInFlight) break;
                 confirm("⚠️", tomatoI18n.转出为摘抄确认(1), () => void (async () => {
+                    if (matOpInFlight) return; // matflow P2：confirm 回调双发闸
+                    matOpInFlight = true;
                     try {
                         await transferMaterialOut(docID);
                         await siyuan.pushMsg(tomatoI18n.已转出为摘抄);
-                        // 已非本书素材，浮条退场（重出场=切页签后，已知体验留档）——
-                        // confirm 悬窗期切页签时只收本篇的（review P2 同 matDel）
-                        if (get(noteID) === docID) show.set(false);
+                        // matflow P2（tailbatch □9）：转出后立即重判浮条态（原只退场、切页签
+                        // 才重出场）——文档已转普通摘抄，progressiveBtnFloating 按新身份重出
+                        //（confirm 悬窗期切页签只重判当前文档，迟回调不误伤新文档）
+                        const cur = events.currentProtyle();
+                        if (cur && get(noteID) === docID) await progressiveBtnFloating(cur);
+                        else if (get(noteID) === docID) show.set(false);
                     } catch (e) {
                         console.error("matOut failed", e);
                         await siyuan.pushMsg(tomatoI18n.操作失败请重试, 2500);
+                    } finally {
+                        matOpInFlight = false;
                     }
                 })());
                 break;

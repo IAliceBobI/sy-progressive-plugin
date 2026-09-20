@@ -250,6 +250,13 @@ html[data-theme-mode="dark"] {
   color: var(--prog-accent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--prog-accent) 55%, transparent);
 }
+/* 首行 ghost 暗轨提档（tailbatch □16 视学轮实测）：--prog-muted 46% alpha 实渲染
+   ≈2.2:1 悬空（图标件 3:1 线）；与平铺区 ghost 同款预混配方升 70%——实底色=浮条
+   accent 18% 混底（比 surface 亮，62/65% 配方按 surface 验算在实底上不达线），
+   70% 实测 ≈3.1:1 过线；亮轨维持 muted 不动 */
+html[data-theme-mode="dark"] .prog-fb .prog-fb-btn--ghost {
+  color: color-mix(in srgb, var(--b3-theme-on-surface) 70%, var(--b3-theme-surface));
+}
 /* toggle 开合态（[+] 展开中 / ✂ 摘抄子排展开中）：accent 环 + 加深底，展开/收起可感知；
    声明在 ghost 后以覆盖其 inset 描边 */
 .prog-fb .prog-fb-btn--on {
@@ -464,6 +471,13 @@ html:not([data-theme-mode="dark"]) .prog-fb-flat .prog-fb-flat-btn {
    不可达（基色全开才 5.5:1）；提档配方=62% 混表面≈3.04:1，存 next-version backlog） */
 html:not([data-theme-mode="dark"]) .prog-fb-flat .prog-fb-flat-btn--ghost {
   color: color-mix(in srgb, var(--b3-theme-on-surface) 62%, var(--b3-theme-surface));
+}
+/* digestpool P2（tailbatch □9）：dark ghost 提档 46%→65% 混表面——62% 实渲染≈3.04:1
+   贴 3:1 UI 线，65% 留余量（配方=基色×alpha+底×(1-alpha) 验算，backlog 原注）。
+   □16 视学轮实测修正：实底色=浮条 accent 18% 混底（非裸 surface，亮一档），
+   65% 在实底上 ≈2.88:1 仍差线；升 70% 实测 ≈3.1:1 过线（首行 ghost 同步同款） */
+html[data-theme-mode="dark"] .prog-fb-flat .prog-fb-flat-btn--ghost {
+  color: color-mix(in srgb, var(--b3-theme-on-surface) 70%, var(--b3-theme-surface));
 }
 .prog-fb-flat .prog-fb-flat-lbl {
   font-size: 12px;
@@ -1087,7 +1101,9 @@ html[data-theme-mode="dark"] .prog-wflame[data-state="idle"] {
   border-color: color-mix(in srgb, var(--prog-accent) 45%, var(--prog-card-border));
 }
 .prog-fleet-card.finished {
-  opacity: 0.65;
+  /* 舰队 P2②（tailbatch □10）：0.65→0.78——「已读完」12px muted 叠整卡透明双层弱化
+     观感偏弱（透明度父级乘子子级不可逆，抬整卡档） */
+  opacity: 0.78;
 }
 /* 期3 手动分片书：无进度语义（片=摘抄），隐藏进度轨道；✒✱✧ 徽章行照常 */
 .prog-fleet-card.manual .track {
@@ -1850,6 +1866,17 @@ button.prog-popover-item:hover {
 .prog-route-sub-first {
   margin-top: 0;
   border-top: none;
+}
+/* digestpool P2（tailbatch □9）：路线指引组头提档 0.55→0.65（12px 级小标在两轨底上
+   0.55 观感偏弱）；只作用 route 域（prog-popover-group 全族共享不动）+联动页脚分隔线 */
+.prog-popover-group.prog-route-here,
+.prog-popover-group.prog-route-sub {
+  opacity: 0.65;
+}
+.prog-route-foot-sep {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--b3-border-color);
 }
 .prog-route-item {
   cursor: default;

@@ -284,7 +284,10 @@ export function markDigestTag(protyle: any) {
  *  单发查空会把 cardInSet=false 钉进 60s 缓存——每发都 invalidate 防钉死；两发
  *  幂等（markDigestTag 清旧重挂）。getAllEditor 不可用即跳过，出场事件兜底。 */
 export function refreshDigestTagBadgeFor(docID: string, delayMs = 1300) {
-    for (const delay of [delayMs, delayMs * 2]) {
+    // recite 三件①（tailbatch □11）：第三发 5.2s——背诵快捷键（⌥⌘8 逐摘入卡）在巨库
+    // 实测卡落库+编辑器注册可双双超 2.6s 双发窗，留档态钉进 60s 缓存无事件纠正；
+    // 三发幂等（markDigestTag 清旧重挂），每发先 invalidate 防钉死
+    for (const delay of [delayMs, delayMs * 2, delayMs * 4]) {
         setTimeout(() => {
             try {
                 for (const editor of getAllEditor() as any[]) {

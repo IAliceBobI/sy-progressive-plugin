@@ -40,7 +40,7 @@ The all-in-one productivity toolbox for SiYuan — one plugin slot for a whole n
 - **Sync blocks** — edit once, sync everywhere
 - **Bidirectional links** — two blocks referencing each other, jump both ways
 - **Text to citation** — turn selected text into a reference block in place
-- **Bottom backlinks** — a persistent backlink panel at the bottom of the editor
+- **Floating backlinks** — a floating ball that summons the backlink panel anytime; can also stay docked at the bottom of the editor
 - **Database backlinks** — backlinks inside database views
 
 ### 🧭 Visualization
@@ -61,6 +61,11 @@ The all-in-one productivity toolbox for SiYuan — one plugin slot for a whole n
 - **AI knowledge-base Q&A** — ask questions over your own notes, streaming answers with sources
 - **Knowledge-base sync** — sync chosen docs (subdocs included) to Zhipu BigModel: per-doc whitelist, subtree exclusion, on-tree status marks; AI tools connected via SiYuan MCP can search it too
 
+### 🎨 Appearance
+
+- **UI cleanup** — six toggles to sweep unused chrome away: tab close buttons, tab-bar new/switch buttons, top-bar inbox & help, empty-page guide, file-tree ref counts & doc icons, compact file tree. Hidden actions keep keyboard shortcuts (⌘W to close tabs, ⌘N to create docs); toggles live in the settings "Appearance" section
+- **Editor appearance** — fine-tune reference effects (double brackets, link icon, …), list background stripes, memo visibility and more, until the editor feels like yours
+
 > Plus a row of editor mini-tools: enhanced folding, multi-select, list tools, copy-as-image, document aliases… right in the context menu, no extra plugin slot needed.
 
 ## Free vs Pro
@@ -73,7 +78,7 @@ One rule of thumb: **everything you need to read, annotate, memorize and stay fo
 | 📖 Annotations | All mark styles, panel, all four panel skins, light AI chat under annotations; click an annotation in the panel to jump to its source | Invite AI roles into the discussion; compress a whole discussion into a note; collect annotations recursively incl. sub-documents — gather a whole book's highlights in one pass |
 | 🃏 Flashcards | Create, review, priorities, per-document tab review, image cloze, broken-card cleanup | When today's pile is too big, spread the remaining cards over the coming hours (intervals configurable); priority bars auto-hide during review |
 | ⚡ Capture | Photo notes, quick notes, reading points | Conflict guard for photo notes across synced devices; delete the source selection once the note is created; flip to a document's backside draft and back with one keystroke |
-| 🔗 References | Sync blocks, bidirectional links, text-to-citation, bottom & database backlinks; invalid-ref check & bulk cleanup; click a ref-count to open its backlinks; jump-to-bottom button on the backlink panel; list conversion that keeps refs | Turn what you type into a citation with a space; pinyin aliases so two or three letters cite the right doc; render refs as tags; embed bilinks inline; sync-block menu with origin links |
+| 🔗 References | Sync blocks, bidirectional links, text-to-citation, floating & database backlinks; invalid-ref check & bulk cleanup; click a ref-count to open its backlinks; summon backlinks anytime via the floating ball; jump-to-bottom button; list conversion that keeps refs | Turn what you type into a citation with a space; pinyin aliases so two or three letters cite the right doc; render refs as tags; embed bilinks inline; sync-block menu with origin links |
 | 🧭 Visualization | Block graph (incl. click-to-jump), block editor, mind guides | Mind-wire line styles & relation colors — even dense maps stay readable at a glance |
 | 🗂 Export | Prefix doc tree & Tags float window; workspace export on demand, DailyNote tools; always jump to bottom when opening today's note | Scheduled incremental export with automatic cleanup — backup takes care of itself; merge documents into one file |
 | 🎈 Floating ball | Jump to docs & keymaps from the ball; toggle the doc ball with Cmd/Ctrl+Shift+F8 | Extended list capacity — every doc you keep handy fits |

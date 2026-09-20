@@ -285,9 +285,11 @@
         <div class="da-actionbar" bind:this={actionbarEl}>
             <span class="da-selected">{busy ? tomatoI18n.发送中 : (selected.length > 0 ? tomatoI18n.已选N篇(selected.length) : "")}</span>
             <!-- matflow（0914 □2+□5）：全选 / 解除关联两档（🔨 可逆+转出物理）/ 删除；
-                 destructive 三钮与入槽两钮同 disabled 面（busy 或空选择集） -->
+                 destructive 三钮与入槽两钮同 disabled 面（busy 或空选择集）。
+                 matflow P2（tailbatch □9）：全选对齐描边族（原 text 裸字与整排 outline
+                 钮两形态并存）；动作钮圆角 --b3-border-radius-b 防 b3 大圆角读成胶囊 -->
             <button
-                class="b3-button b3-button--text tomato-button"
+                class="b3-button b3-button--outline tomato-button da-btn"
                 disabled={busy || list.length === 0}
                 onclick={toggleSelectAll}
             >{allSelected ? tomatoI18n.取消全选 : tomatoI18n.全选}</button>
@@ -332,8 +334,11 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
-        height: 100%;
-        min-height: 0;
+        /* matflow P2（tailbatch □9）：高度自适应+封顶（原 height:100% 随弹窗定高 700px
+           常撑满——清单短也大空窗）；弹窗 height 已改 auto，本根按内容生长、70vh 封顶
+           内部滚动，240px 保底防空态塌缩成线 */
+        max-height: min(700px, 70vh);
+        min-height: 240px;
         color: var(--prog-title);
         word-break: normal; // 抵消 .b3-dialog__content 的 break-all 继承
     }
@@ -442,6 +447,11 @@
         gap: 8px;
         padding: 8px 0 2px;
         border-top: 1px solid var(--b3-border-color);
+    }
+    /* matflow P2（tailbatch □9）：动作钮圆角对小号 token——b3-button 基础
+       --b3-border-radius 在矮钮上读成胶囊 */
+    .da-actionbar .b3-button {
+        border-radius: var(--b3-border-radius-b);
     }
     /* 删除档 destructive 色（b3 error 族：浅底红字，重操作警示不喧宾）。钮不挂
        tomato-button——该全局类 color 带 !important 统一主题蓝（vision P1 实测文字

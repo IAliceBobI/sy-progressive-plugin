@@ -99,8 +99,8 @@ export function layoutPool(pool: BookMap, onlyIDs?: string[]): PoolLayout {
     g.setGraph({ rankdir: "TB", nodesep: 76, ranksep: 72, edgesep: 28 });
     for (const n of nodes) {
         const core = (degrees.get(n.id) ?? 0) >= CORE_DEGREE;
-        // 高度槽=钉宽后两行摘要+点条的实际上限（宽 140/176 与 CSS .prog-map-node 钉宽一字不差）
-        g.setNode(n.id, { width: core ? 176 : 140, height: core ? 80 : 64 } as never);
+        // 高度槽=钉宽后两行摘要+点条的实际上限（宽 156/176 与 CSS .prog-map-node 钉宽一字不差）
+        g.setNode(n.id, { width: core ? 176 : 156, height: core ? 80 : 64 } as never); // bookmap P2①（tailbatch □10）：非核槽 140→156——6 字名+徽章后名区仅 ~5 字
     }
     pool.edges.forEach((e, i) => {
         if (ids && (!ids.has(e.from) || !ids.has(e.to))) return;

@@ -205,8 +205,14 @@ type TomatoSettings = {
     //------------------
     graphHideStructEdges: boolean,
     graphShowNumbers: boolean,
+    // graphmind □6：视图收敛——full/treemap 入口显隐开关（默认关=主界面两档）
+    graphShowAllViewModes: boolean,
     graphblockmarkMenu: boolean,
     graphBlockMarkBar: boolean,
+    // graphfloat □3：悬浮图（球+浮窗看当前文档块关系图，dock 保留）
+    graph_float: boolean,
+    // gfloatnav：图内导航后自动收起悬浮面板
+    graphFloatJumpClose: boolean,
     graphMaxAllBlocks: string,
     graphMaxPBlocks: string,
     // graphbox 期2：默认展开层级（按标题层级 h1=1；"all"=全部展开，段落链折叠独立于档位）
@@ -375,6 +381,7 @@ type TomatoSettings = {
     "flash-thoughts-2-top": boolean,
     "flash-thoughts-target-file": string,
     "shorthandRelayEnabled": boolean,
+    "flash-stat-tag": boolean,
     "flashThoughtsBlurClose": boolean,
     "quickNoteCheckbox": boolean,
     "quickNoteOpenMode": "external" | "focus",
@@ -617,13 +624,19 @@ interface GraphDockData<T> {
     setCanvasSize: () => void;
     /** 期4：true=已居中脉冲；false=目标不在图（调用方 toast 找不到的原因） */
     locateID: (id: string) => Promise<boolean>;
-    /** refreshOnly=true=同文档内容刷新：relayout 不 fitView（保用户/定位视图；期4 P1 竞态修复） */
-    changeDoc: (p: IProtyle, refreshOnly?: boolean) => Promise<void>;
+    /** refreshOnly=true=同文档内容刷新：relayout 不 fitView（保用户/定位视图；期4 P1 竞态修复）。
+     *  返回是否真跑（gfloat review P1-2）：true=持锁执行完（含组件内指纹短路——数据未变
+     *  也是正确终态）；false=GRAPH_LOCK 被占（ifAvailable 抢锁失败静默放弃），调用方勿提交指纹 */
+    changeDoc: (p: IProtyle, refreshOnly?: boolean) => Promise<boolean>;
     /** 期4：定位脉冲窗口内抑制自动刷新（expandTo 写属性→ws 回流→relayout 重建打断脉冲/打回 setCenter） */
     suppressAutoRefreshUntil?: number;
     /** graphbox 期1：Provider 内 useSvelteFlow 借道（relayout 末尾首屏视口适配） */
-    /** minZoom=fitView 缩放下限（防孤儿列/宽树过缩成不可见小簇，□2 vision P1） */
-    fitView?: (opts?: { padding?: number; duration?: number; minZoom?: number }) => void;
+    /** minZoom/maxZoom=fitView 缩放上下限（graphmind □7fix 真 fit 显式传参；minZoom 下限
+     *  原防孤儿列/宽树过缩成不可见小簇——□2 vision P1，□7fix 取舍翻转为全树可见优先） */
+    fitView?: (opts?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number }) => void;
+    /** graphmind □2 P1 注册（fitReadable 根锚定分支消费）；□7fix 真 fit 后无图内消费方，
+     *  保留通道（GraphControl 仍注册，后续视口钉位需求复用） */
+    setViewport?: (vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void;
     /** graphbox 期2：展开目标节点的折叠祖先链（定位不静默）；返回是否有折叠变更 */
     expandTo?: (id: string) => Promise<boolean>;
     /** graphbox 期4：图当前通道态/文档/块上限（locateNode 的 toast 分支文案依据）；

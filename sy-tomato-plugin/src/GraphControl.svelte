@@ -5,7 +5,7 @@
     import { siyuan } from "./libs/utils";
     import { tomatoI18n } from "./tomatoI18n";
 
-    const { setCenter, getNodes, fitView, getZoom } = useSvelteFlow();
+    const { setCenter, getNodes, fitView, getZoom, setViewport } = useSvelteFlow();
     const flowStore = useStore();
 
     interface Props {
@@ -22,6 +22,7 @@
         if (d) {
             d.graphStore = null;
             d.fitView = null;
+            d.setViewport = null;
             d.locateID = null;
         }
     });
@@ -32,11 +33,15 @@
         // （useSvelteFlow 的 updateNode 内部即 store.nodes=...；bind:nodes={$store} 对
         // writable 的 prop 同步在 runes 组件不可靠，dev 实锤 dagre 已跑而 DOM 停在初始位）
         getData().graphStore = flowStore;
+        // graphmind □2 P1：setViewport 借道（fitReadable 的根锚定分支——fitView 可读下限）
+        getData().setViewport = setViewport;
         // graphbox 期1：借道 Provider 内上下文把 fitView 递给顶层 relayout（首屏视口适配，vision P1）
         // 期3 精修：fitView 完成后读 zoom——横向布局缩至 <0.25（大文档展开态钳 ~0.13）时
         // toast 提示可换形态（期2 P2 留观），60s 节流防每次 relayout 刷屏；
         // 期7 口径：已是竖排形态（vlr/vtb）不再提示
-        getData().fitView = async (opts?: { padding?: number; duration?: number }) => {
+        // graphmind □7fix：opts 放开 min/maxZoom 透传（原手写窄类型把 @xyflow/system
+        // FitViewOptionsBase 的两键挡在类型层——fitReadable 真 fit 需显式传参）
+        getData().fitView = async (opts?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number }) => {
             (getData() as any)._fitAt = Date.now();
             await fitView(opts);
             setTimeout(() => {

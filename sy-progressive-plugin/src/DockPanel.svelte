@@ -237,7 +237,7 @@
                             onpointerleave={lpCancel}
                         >
                             <div class="row">
-                                <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.name}</span>
+                                <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.status === "lost" && book.name === book.bookID ? tomatoI18n.原书已删除 : book.name}</span>
                                 <!-- ⏸&#xFE0E;：VS15 强制文本呈现，防 macOS emoji 化蓝方块（vision 二轮 P2-1） -->
                                 <span class="st-chip" data-st="paused">⏸&#xFE0E; {tomatoI18n.已暂停}</span>
                             </div>
@@ -258,7 +258,7 @@
                             onpointerleave={lpCancel}
                         >
                             <div class="row">
-                                <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.name}</span>
+                                <span class="name">{#if book.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{book.status === "lost" && book.name === book.bookID ? tomatoI18n.原书已删除 : book.name}</span>
                                 <span class="st-chip" data-st={book.status}
                                     >{book.status === "closed" ? `⏸\uFE0E ${tomatoI18n.笔记本已关闭}` : `⚠ ${tomatoI18n.疑似失效}`}</span
                                 >

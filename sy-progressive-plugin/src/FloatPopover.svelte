@@ -21,7 +21,7 @@
 
     // 定位：下方优先；视口 70% 高度也放不下时翻到锚点上方——翻转分支用 bottom 贴锚点
     // 上沿（按实际内容高度跟随，不按 maxH 估高——vision review P1：固定估高会让矮浮层
-    // 飘离按钮）。宽度 max-content 自适应（240~340），短清单不显空（vision review P2）。
+    // 飘离按钮）。宽度 max-content 自适应（240~360），短清单不显空（vision review P2）。
     // 高度份额 60%→70%（2026-08-30）：路线指引书态加仿写联动页脚后内容 ~371px，60% 在
     // <618px 矮视口会把动作按钮折进滚动区（vision review 实测 541px 折叠）——70% 覆盖到
     // ~530px 视口；其余浮层只多显示内容无副作用。
@@ -42,7 +42,7 @@
     });
 
     const pos = $derived.by(() => {
-        const maxW = Math.min(340, vw - 16);
+        const maxW = Math.min(360, vw - 16); // digestpool P2（tailbatch □9）：340→360 长文案行少折一句
         // 左侧同钳 8px：无坐标事件（程序触发等）落 x=0 时浮层贴视口边（review 加固）
         const left = Math.min(Math.max(8, x), Math.max(8, vw - 8 - maxW));
         // maxH 封顶 vh-16：下方优先；上方也放不下时按实测高度贴锚上沿、顶边钳 8px——

@@ -82,6 +82,8 @@
     .prog-map-node {
         background: var(--b3-theme-surface);
         border: 1px solid var(--b3-border-color);
+        /* bookmap P2②：暗色普通卡描边提档白 alpha 0.16（--b3-border-color 暗值≈白 10%
+           轮廓感弱；scoped CSS 挂 html 域须 :global——3.8.3 暗判据坑） */
         border-radius: 6px;
         padding: 6px 10px;
         font-size: 12px;
@@ -93,7 +95,7 @@
        渲染 140~216px vs 槽 140/176，vision 抓到 6px 贴脸）。内部自适应：名字 ellipsis、
        摘要两行钳、点条容器内换行；簇胶囊不在此列（仍按内容收缩） */
     .prog-map-node:not(.prog-map-cluster) {
-        width: 140px;
+        width: 156px; /* bookmap P2①：140→156 同步 dagre 槽宽（6 字名+徽章后不再 5 字截断） */
         box-sizing: border-box;
     }
     /* 核心节点放大（骨架分层视觉档） */
@@ -216,5 +218,9 @@
     /* prefers-reduced-motion 降级：脉动改静态 */
     @media (prefers-reduced-motion: reduce) {
         .prog-map-dotcell-w { animation: none; }
+    }
+    /* bookmap P2②（tailbatch □10）：暗色描边提档（见上注释） */
+    :global(html[data-theme-mode="dark"]) .prog-map-node:not(.prog-map-cluster) {
+        border-color: rgba(255, 255, 255, 0.16);
     }
 </style>

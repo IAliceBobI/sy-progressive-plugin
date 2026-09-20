@@ -123,6 +123,8 @@
 {/each}
 
 {#if onSendRecite}
+    <!-- digestpool P2（tailbatch □9）：book 联动页脚与清单主体补分隔线（同 prog-route-sub 值） -->
+    <div class="prog-route-foot-sep"></div>
     <div class="prog-popover-group prog-route-here">{tomatoI18n.仿写联动}</div>
     <div class="prog-route-recite-hint">{tomatoI18n.仿写联动说明}</div>
     <button class="prog-route-recite-btn" onclick={onSendRecite}>

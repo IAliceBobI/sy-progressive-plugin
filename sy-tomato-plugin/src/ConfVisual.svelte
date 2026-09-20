@@ -16,9 +16,12 @@
         mindWireWordWire,
         graphAddTopbarIcon,
         graphBoxCheckbox,
+        graph_float,
+        graphFloatJumpClose,
         graphDefaultExpandLevel,
         graphDefaultLayout,
         graphHideStructEdges,
+        graphShowAllViewModes,
         graphShowNumbers,
         graphBlockMarkBar,
         graph标记此块Menu,
@@ -31,6 +34,7 @@
     import { lastVerifyResult } from "./libs/user";
     import { MindWire启用或禁用思维导线, MindWire启用或禁用文档思维导线, MindWire划词连线 } from "./MindWire";
     import { GraphBox定位到图中的节点, GraphBox打开块关系图, GraphBox标记此块 } from "./GraphBox";
+    import { GraphFloatToggle, GraphFloatBallToggle } from "./GraphFloatBox";
     import { tomatoI18n } from "./tomatoI18n";
     import HotkeyCap from "./HotkeyCap.svelte";
     import ConfHelpIcon from "./ConfHelpIcon.svelte";
@@ -183,6 +187,24 @@
             <input type="checkbox" class="b3-switch" bind:checked={$graphAddTopbarIcon} />
             {tomatoI18n.添加顶栏图标}
         </div>
+        <!-- graphfloat □3：悬浮图开关（球+浮窗；默认开，桌面端生效）。gfloatnav：开关行合挂
+             开合键帽（配置跟功能走——悬浮反链双键帽在反链域同款对称）；跳转收起=双击/
+             Alt点/右键跳转/树双击等「跳去读」动作后自动收面板（悬浮图当大纲用，默认开） -->
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$graph_float} />
+            {tomatoI18n.悬浮图}
+            <HotkeyCap hk={GraphFloatToggle} pluginName="sy-tomato-plugin"></HotkeyCap>
+            <span class="ft__on-surface ft__small">{tomatoI18n.悬浮图说明}</span>
+        </div>
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$graphFloatJumpClose} />
+            {tomatoI18n.跳转后收起悬浮图}
+            <span class="ft__on-surface ft__small">{tomatoI18n.跳转后收起悬浮图说明}</span>
+        </div>
+        <div>
+            {GraphFloatBallToggle.langText()}
+            <HotkeyCap hk={GraphFloatBallToggle} pluginName="sy-tomato-plugin"></HotkeyCap>
+        </div>
         <div>
             <input class="b3-text-field" bind:value={$graphMaxPBlocks} />
             {tomatoI18n.最大连续段落块数量}
@@ -193,11 +215,17 @@
             {tomatoI18n.最大节点数量}
         </div>
         <div>
-            <!-- graphbox 期2：折叠机制默认展开层级（无持久化折叠态的文档首次打开按此推导；toggle 过的文档以 custom-graph-collapsed 为准） -->
+            <!-- graphbox 期2：折叠机制默认展开层级（无持久化折叠态的文档首次打开按此推导；toggle 过的文档以 custom-graph-collapsed 为准）。
+                 graphmind □2：新默认 headings=展开到文档最深标题级（脑图标题骨架）。
+                 graphmind □4：口径=「显示到第 N 级标题」（1..6；旧口径值 N 实显 N-1 级已迁移，见 index.ts 装载段） -->
             <select class="b3-select" bind:value={$graphDefaultExpandLevel}>
+                <option value="headings">{tomatoI18n.展开到标题层}</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
                 <option value="all">{tomatoI18n.全部展开}</option>
             </select>
             {tomatoI18n.默认展开层级}
@@ -220,6 +248,14 @@
         <div>
             <input type="checkbox" class="b3-switch" bind:checked={$graphShowNumbers} />
             章节自动编号（结构视图标题前缀 1 / 1.1）
+        </div>
+        <!-- graphmind □6（共识#1）视图收敛：主界面默认只出结构/只看标记两档；开启后工具栏
+             回显「方块总览/显示全部块」入口（即时热更）。旧文档存档档位不受影响——存过
+             full/treemap 的文档打开时会自动视为已开设置 -->
+        <div>
+            <input type="checkbox" class="b3-switch" bind:checked={$graphShowAllViewModes} />
+            {tomatoI18n.显示全部视图档位}
+            <span class="ft__on-surface ft__small">{tomatoI18n.显示全部视图档位说明}</span>
         </div>
         <div>
             {@html tomatoI18n.块关系图帮助}

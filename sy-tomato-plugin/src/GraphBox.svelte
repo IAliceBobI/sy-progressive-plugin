@@ -39,6 +39,7 @@
         graphHideStructEdges,
         graphMaxAllBlocks,
         graphMaxPBlocks,
+        graphShowAllViewModes,
         graphShowNumbers,
     } from "./libs/stores";
     import { OpenSyFile2 } from "./libs/docUtils";
@@ -47,7 +48,9 @@
     import { pickGraphChannel } from "./libs/graphSkeleton";
     import {
         buildTreeIndex, initialCollapsedRows, computeVisible, filterEdges, expandAncestors,
-        serializeCollapsed, parseCollapsed, mergeCollapsedOnRefresh, type ExpandLevel, type GraphEdgeSpec, type RenderEdge,
+        serializeCollapsed, parseCollapsed, mergeCollapsedOnRefresh,
+        headingRangeOf, showLevelToExpandLevel, settingShowLevelToExpand, visibleHeadingLevel,
+        type ExpandLevel, type GraphEdgeSpec, type RenderEdge,
     } from "./libs/graphCollapse";
     import {
         normalizeLayoutForm, rankdirOf, isTextVertical, migrateIsVertical, nextLayoutForm,
@@ -67,14 +70,25 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         dock: { element: HTMLElement; data: any };
         landscapeSwitchBtnID: string;
         viewModeGroupID: string;
+        /** graphmind □4：「显示到第几级」选择器控件 ID（dock/浮窗各自生成，按 ID 绑定；
+         *  空串=宿主未提供该控件（历史挂载面兜底）——级数功能整链静默不挂 */
+        showLevelSelectID?: string;
+        /** 画布尺寸策略（graphfloat □3）：dock=视口减法（左栏面板延伸到视口底，原有行为）；
+         *  host=量父容器填满（悬浮面板正文容器，flex:1 有确定尺寸）。dock.data 挂载面两通道
+         *  同构——悬浮窗传伪 dock { element: 面板正文容器, data: 独立暴露对象 } 即第二实例 */
+        fit?: "dock" | "host";
+        /** 图内导航回调（gfloatnav）：双击/Alt点/右键跳转/树双击/标记叶单击等「跳去读」
+         *  动作完成后触发——悬浮图实例传=跳转收面板（大纲式闭环）；dock 实例缺省=不调 */
+        onNavigate?: () => void;
     }
-    let { plugin, dock, landscapeSwitchBtnID, viewModeGroupID }: ProposType = $props();
+    let { plugin, dock, landscapeSwitchBtnID, viewModeGroupID, showLevelSelectID = "", fit = "dock", onNavigate }: ProposType = $props();
     let colorMode: ColorMode = $state("system");
     let canvas: HTMLElement;
     const nodes = writable<Node[]>([]);
     const edges = writable<Edge[]>([]);
     const snapGrid: [number, number] = [25, 25];
-    const nodeWidth = 172;
+    // graphmind □2：横排首轮估算宽与 .gn max-width 300 同步（GraphNode 注释互指；measured 精修接管）
+    const nodeWidth = 300;
     const nodeHeight = 36;
     let canvasHeight: number = $state();
     let canvasWidth: number = $state();
@@ -109,6 +123,9 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
     let paraByText = new Map<string, string>();  // 链头 id → 全文合并（截断后）
     let paraCount = new Map<string, number>();   // 链头 id → 链内块数（¶×N badge）
     let paraRedirect = new Map<string, string>();// 链成员 id → 链头 id（locateID 定位链中段重定向）
+    // graphmind □3：¶ 合并框展开态（会话级显示层态，不动数据层链合并）——链头 id 集合；
+    // 同文档刷新保留（applyRowsAndLinks 按 paraByText 键存活过滤），切文档随键清退
+    let paraExpanded = new Set<string>();
 
     // graphbox □2 通道语义反转（2026-09-17）：渲染默认=structure（结构优先：容器树+徽标），
     // full=显式切换档（会话记忆 graphFullLoadedBigDocs=用户对该文档选过全量）。旧 skeleton
@@ -262,16 +279,45 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         return "var(--b3-theme-background-light)";
     };
 
+    // graphmind □2 P1→P0（UI 验收两轮修复）：fitView 可读下限 + 最优可见带。
+    // 第一轮 P1：fit 计算值被 minZoom 0.35 钳住（实测 scale 0.35），徽章 11px 渲染 6px
+    // 目视不可辨——修=可读下限 0.8（评审 0.9 验证可读的近值）。第二轮 P0：打开文档链路
+    // locateID($nodes.at(0)) 的 setCenter(1.2) 把根居中，而 LR tidy 树根在垂直中位——
+    // 1.2 视口只覆盖根列（实测 2/34 节点相交、面板 80~90% 空白）=矫枉过正。
+    // graphmind □7fix（四场景终检 P1 清零）：上述「0.8 可读下限+最优可见带」策略整体退役，
+    // 统一改真 fitView（整树入画布、中心对齐）。终检实锤四病：①scale 恒 0.8 不按内容收缩
+    // （S1 34 节点 25 个在面板外、S3 16 节点标记叶卡右缘外）；②扫描带「cnt > bestN」严格
+    // 大于=全树入带时首采样带（c=lo 极值带）恒胜，内容被推到视口边（S4 小图垂直贴底，
+    // ty≈vh/2+0.8·bandW/2 实算吻合——期3 注释宣称已修的形态复发）；③恒含根约束带在大树
+    // 下够不到核心内容（S2 31 个合并框全部在屏上方外）。可读性取舍翻转：全树可见优先，
+    // 细节阅读靠 minimap（全量档）+用户缩放（minZoom prop 0.1→0.02 放开巨树真 fit 下限，
+    // wheel 缩出依然自由）；maxZoom 1 封顶防小图放大失当。locateID 通道本体不动
+    // （编辑器块→图定位 GraphBox.ts locateNode 消费，显式定位 setCenter 1.2 语义不变）
+    const FIT_PAD = 0.15;
+    const FIT_MIN = 0.02;
+    function fitReadable() {
+        const vf = data();
+        if (!vf?.fitView) return;
+        const tops = $nodes.filter(n => !n.parentId);
+        if (!tops.length) return;
+        // _fitAt 就地显式设置（5s 补跑窗锚点；GraphControl 桥层对每笔 fit 也会设——
+        // 此处冗余但自洽：fitReadable 不依赖桥层实现细节）
+        (data() as any)._fitAt = Date.now();
+        // duration 0=终态确定无动画（防与定位链路 setCenter 动画交错——在档坑）
+        void vf.fitView({ padding: FIT_PAD, duration: 0, minZoom: FIT_MIN, maxZoom: 1 });
+    }
+
     // 期2 P2 留观修复（期3 精修）：小图折叠首屏垂直贴下部=fitView 跑在容器尺寸就绪前——
     // 主动 fitView 后 5s 内容器尺寸变化（dock 面板展开/setCanvasSize 生效）后防抖重跑 fitView；
     // 窗口外不打扰（用户手动缩放不被打回）。锚点=_fitAt（fitView 时刻）而非 lastLayoutAt
     // （后者在 relayout 末尾才写，首轮尺寸变化的 effect 先跑时恒为 0=永跳过，dev 实锤沉底）
+    // graphmind □7fix：补跑同走 fitReadable（真 fit 统一语义）
     $effect(() => {
         if (!canvasHeight || !canvasWidth) return;
         const fitAt = (data() as any)?._fitAt ?? 0;
         if (!fitAt || Date.now() - fitAt > 5000) return;
         const t = setTimeout(() => {
-            data()?.fitView?.({ padding: 0.15, duration: 200, minZoom: 0.25 });
+            fitReadable();
         }, 300);
         return () => clearTimeout(t);
     });
@@ -287,6 +333,18 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         });
         themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme-mode"] });
         data().setCanvasSize = () => {
+            if (fit === "host") {
+                // 悬浮面板通道：canvas 父级（面板正文容器）flex:1 有确定尺寸，量自身填满。
+                // ⚠面板 display:none 期间宿主不得调本函数（测量归零→stop 误置→changeDoc
+                // 早退锁死），宿主只在 open 态调用
+                const host = canvas.parentElement;
+                const w = host?.clientWidth ?? 0;
+                const h = host?.clientHeight ?? 0;
+                canvas.style.width = `${w}px`;
+                canvas.style.height = `${h}px`;
+                stop = w < 10 || h < 10;
+                return;
+            }
             // dock.element 无固有高（历史上靠本函数写死 style 撑起，读它=自反馈虚高）；
             // 高按视口减法：顶锚 canvas.getBoundingClientRect().top、底到视口底（思源左侧
             // dock 面板延伸到视口底），窗口变化走 dock resize 钩子重算
@@ -361,10 +419,16 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
             blockCount: graphStat?.cnt,
         });
 
+        // gfloat P2：卸载旗标+时限帽——下方两处 getElementById 自旋环在「元素永不上桌」
+        // （卸载竞态/容器异常）时无限空转泄闭包，每次重载泄一条；cleanup 置位即出环，
+        // 10s 硬帽兜底 cleanup 未跑到的异常路径
+        let disposed = false;
         if (landscapeSwitchBtnID) {
             (async () => {
                 let btn: HTMLElement;
+                const t0 = Date.now();
                 while (!btn) {
+                    if (disposed || Date.now() - t0 > 10000) return;
                     btn = document.getElementById(
                         landscapeSwitchBtnID,
                     ) as HTMLElement;
@@ -407,7 +471,9 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         if (viewModeGroupID) {
             (async () => {
                 let group: HTMLElement;
+                const t0 = Date.now();
                 while (!group) {
+                    if (disposed || Date.now() - t0 > 10000) return;
                     group = document.getElementById(viewModeGroupID) as HTMLElement;
                     await sleep(1);
                 }
@@ -424,11 +490,32 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                 syncViewModeBtns();
             })();
         }
+        // graphmind □4：「显示到第几级」级数选择器——change 即全图收缩/展开到该级
+        // （applyShowLevel 重置手动态；档位/回显值由 syncShowLevelUI 按文档动态维护）
+        if (showLevelSelectID) {
+            (async () => {
+                let sel: HTMLSelectElement;
+                while (!sel) {
+                    sel = document.getElementById(showLevelSelectID) as HTMLSelectElement;
+                    await sleep(1);
+                }
+                sel.addEventListener("change", () => {
+                    const v = parseInt(sel.value, 10);
+                    if (Number.isFinite(v) && v >= 1) void applyShowLevel(v);
+                });
+                syncShowLevelUI();
+            })();
+        }
+        // graphmind □6：视图收敛开关热更——设置面板保存（bind 直写 store）/他端写 petal
+        // （热更钩子刷新 store）都经此订阅即时回显/收起 full/treemap 按钮组，无需插件重载
+        const unsubAllViewModes = graphShowAllViewModes.subscribe(() => syncViewModeBtns());
         // 期4：openGraphTab 页签通道退役，本组件仅由 dock 挂载（landscapeSwitchBtnID 恒非空）；
         // 原 else 分支（tab 冷启动 setCanvasSize+changeDoc+locateID）随之删除
         return () => {
+            disposed = true; // gfloat P2：吹停在途自旋环（见上方 disposed 注释）
             themeObserver.disconnect(); // 插件 reload 卸载时清 observer 防累积
             if (focusRaf) cancelAnimationFrame(focusRaf); // review P2：在途补刷随卸载取消
+            unsubAllViewModes(); // graphmind □6：视图收敛开关订阅随卸载退订
         };
     });
 
@@ -436,15 +523,20 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
     // 把画面刷成 A 文档而状态留 B 文档（2026-09-04 dev 实锤竞态）
     const GRAPH_LOCK = "tomato-graph-box-lock2024-11-4 20:09:58";
 
-    async function changeDoc(protyle: IProtyle, refreshOnly = false) {
-        await navigator.locks.request(
+    // 返回是否真跑（gfloat review P1-2）：true=持锁执行（含组件内指纹短路——数据未变
+    // 也是正确终态）；false=GRAPH_LOCK 被占（ifAvailable 抢锁失败静默放弃）——轮询类
+    // 调用方据此决定是否提交 updated 指纹（预提交×锁丢弃=丢一次刷新且不自愈）
+    async function changeDoc(protyle: IProtyle, refreshOnly = false): Promise<boolean> {
+        return await navigator.locks.request(
             GRAPH_LOCK,
             { ifAvailable: true },
             async (lock) => {
                 if (lock && protyle) {
                     await _changeDoc_(protyle, refreshOnly);
                     await sleep(1000);
+                    return true;
                 }
+                return false;
             },
         );
     }
@@ -469,6 +561,10 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
             gbLog("graph.short_circuit", `doc=${docID.slice(0, 8)} unchanged`);
             return;
         }
+        // graphmind □3：¶ 合并框展开态=显示层会话态，随文档身份变化立即清退（与 clearFocus
+        // 同款语义；applyRowsAndLinks 的按链头存活过滤只覆盖「数据落地」面——切走文档若
+        // 图数据未重建（如大文档确认链挡住）又切回，残留展开态无落地机会清，须在入口断）
+        if (docID !== lastDocID) paraExpanded.clear();
         currentDocName = docName;
         const taskLayoutForm = getLayoutForm(docID);
 
@@ -507,10 +603,20 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         // 兜住 setBlockAttrs 写后立读缓存回填窗（读回「无该键」旧 IAL → 档位被打回默认+指纹
         // 短路锁死，坑⑧同族）
         const sameDoc = lastDocID === docID;
+        // graphmind □6（共识#1）视图收敛：旧文档存档 custom-graph-mode ∈ {full,treemap} 的
+        // 档位尊重不重置——「显式用过=视为已开设置」（hiddenMenuItems 同款心智）：读档命中
+        // 即落盘开 graphShowAllViewModes（按钮组随 store 订阅即时回显，档位本身照常按存档
+        // 渲染）。只认 IAL 存档（会话 memo 不算——本会话从未有过 full/treemap 入口时 memo
+        // 也不可能命中这两档）；write 走 saveData 恒带 app 排除本窗，不触发自窗重载
+        const archivedMode = sameDoc ? undefined : resolveArchivedGraphMode(modeAttrs);
+        if ((archivedMode === "full" || archivedMode === "treemap") && !graphShowAllViewModes.get()) {
+            void graphShowAllViewModes.write(true);
+            gbLog("graph.viewmodes_optin", `doc=${docID.slice(0, 8)} archived=${archivedMode}`);
+        }
         let targetMode = sameDoc
             ? graphMode
             : (graphModeMemo.get(docID)
-                ?? resolveArchivedGraphMode(modeAttrs)
+                ?? archivedMode
                 ?? defaultGraphMode(stat?.cnt ?? 0));
         if (targetMode === "full" && !fullData) targetMode = "structure";
         gbLog("graph.channel", `doc=${docID.slice(0, 8)} → ${targetMode}(${fullData ? "dom" : "sql"})${graphFullLoadedBigDocs.has(docID) ? "+fullmem" : ""}`);
@@ -526,6 +632,7 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                     docName,
                     graphMaxPBlocks.get(),
                     graphMaxAllBlocks.get(),
+                    updatedRow?.updated ?? "", // gfloat P2⑤：双实例共享全量拉取缓存键
                 );
                 gbLog("graph.full", `rows=${rows.length} links=${links.length} ${Math.round(performance.now() - t0)}ms`);
                 fullRowsCache = { rows, links };
@@ -544,6 +651,7 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                         docName,
                         graphMaxPBlocks.get(),
                         graphMaxAllBlocks.get(),
+                        updatedRow?.updated ?? "", // gfloat P2⑤：双实例共享全量拉取缓存键
                     );
                     gbLog("graph.full", `rows=${rows.length} links=${links.length} ${Math.round(performance.now() - t0)}ms`);
                     fullRowsCache = { rows, links };
@@ -569,9 +677,11 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         syncViewModeBtns(); // □3：档位可能随存档变化（active 态+布局钮显隐回显）
         lastFingerprint = fingerprint; // 构建真正落地才落指纹（中途丢弃/异常不落）
         if (graphMode !== "treemap") await relayout(!refreshOnly); // review P2：treemap 档无 xyflow 布局语义（期3 起 marks=结构树渲染，有布局）
-        if (isNewDoc && data()?.locateID) {
-            data()?.locateID($nodes.at(0)?.id);
-        }
+        // graphmind □2 P0：打开文档不再 locateID($nodes.at(0)) ——setCenter(1.2) 把根居中，
+        // 而 LR tidy 树根在垂直中位，1.2 视口只覆盖根列（实测 2/34 节点相交、面板 80~90%
+        // 空白，三次开面板同值复现）。打开终态恒=relayout 尾部的 fitReadable（□7fix 起=
+        // 真 fit 整树入画布）。locateID 通道本体保留：编辑器块→图定位（GraphBox.ts locateNode
+        // 消费）仍 setCenter(1.2) 显式定位语义不变
     }
 
     // rows/links → 段落链合并（期7：链子树整链并 ¶ 大节点，链成员剔除+边端点重定向）→
@@ -587,13 +697,22 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         paraByText = merged.paraByText;
         paraCount = merged.paraCount;
         paraRedirect = merged.linkRedirect;
+        // graphmind □3：展开态按链头存活过滤（同文档刷新保留、切文档随新链头集清退）
+        paraExpanded = new Set([...paraExpanded].filter(id => paraByText.has(id)));
         labels = new Map(allRows.map(row => [row.id, rowLabel(row, docID)]));
-        // 折叠态：文档持久化（custom-graph-collapsed）优先；未 toggle 过的文档按「默认展开层级」推导。
+        // 折叠态：文档持久化（custom-graph-collapsed）优先；未 toggle 过的文档按「默认显示到第几级」推导
+        // （graphmind □4 新口径：设置值=显示到 N 级 → settingShowLevelToExpand 换算折叠档；
+        // base=文档最小标题级归一化——H2 起步文档全档同源，此前 full 档漏归一化的缺口一并补上）。
         // ¶ 链头过滤：旧版把链头存进折叠集（展开族），期7 起链头恒 ¶ 大节点、折叠语义不适用
         const attr = await siyuan.getBlockAttrs(docID);
         const saved = parseCollapsed(attr?.["custom-graph-collapsed"]);
+        const hRange = headingRangeOf(allRows, docID);
         collapsedSet = new Set(
-            (saved ?? initialCollapsedRows(allRows, normalizeExpandLevel(graphDefaultExpandLevel.get())))
+            (saved ?? initialCollapsedRows(
+                allRows,
+                settingShowLevelToExpand(normalizeExpandLevel(graphDefaultExpandLevel.get()), hRange),
+                hRange?.base ?? 1,
+            ))
                 .filter(id => !paraByText.has(id)),
         );
         applyCollapsedView();
@@ -604,7 +723,9 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
     }
 
     function normalizeExpandLevel(v: string): ExpandLevel {
-        return v === "1" || v === "2" || v === "3" || v === "all" ? v : "2";
+        // graphmind □4：口径=「显示到第 N 级标题」（1..6；□2 起 "headings"=最深标题级默认）。
+        // 旧值 1/2/3（折叠起点口径）字面保留按新口径解释——存量迁移与坏值兜底见 index.ts 装载段
+        return ["1", "2", "3", "4", "5", "6", "all", "headings"].includes(v) ? v as ExpandLevel : "headings";
     }
 
     // treemap 战役 □2 方案 A：DOM 全量通道换 outline 真值骨架（与 SQL 通道同构——
@@ -686,23 +807,36 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
             const base = rowLabel(row, docID);
             return [row.id, structNumbers.has(row.id) ? base.replace(/^#+\s*/, "") : base];
         }));
-        // treemap □2 病灶③：展开层级按文档最小标题级归一化（H2 起步文档 base=2，
-        // 章 h2 不再被默认 level=2 折掉；H1 文档 base=1 行为不变）
-        let minHeadingLv = 9;
-        for (const r of structRows) {
-            // review P2-5：限本档标题（跨文档端点标题行混入会把 base 拉回 1 抵消归一化）
-            if (r.type === "h" && r.root_id === docID && r.subtype?.startsWith("h")) minHeadingLv = Math.min(minHeadingLv, parseInt(r.subtype.slice(1), 10) || 1);
-        }
-        const defaults = initialCollapsedRows(structRows, normalizeExpandLevel(graphDefaultExpandLevel.get()), minHeadingLv === 9 ? 1 : minHeadingLv);
+        // graphmind □4：标题级检测单一事实源 headingRangeOf（原 minHeadingLv 内联循环收编；
+        // 相对级=绝对级−base+1，H2 起步文档 base=2 归一化——treemap □2 病灶③语义保留）。
+        // 默认折叠推导=设置新口径（显示到 N 级）经 settingShowLevelToExpand 换算折叠档
+        const hRange = headingRangeOf(structRows, docID);
+        const defaults = initialCollapsedRows(
+            structRows,
+            settingShowLevelToExpand(normalizeExpandLevel(graphDefaultExpandLevel.get()), hRange),
+            hRange?.base ?? 1,
+        );
         // graphmark 期3 标记感知展开：默认折叠叠加标记路径强制展开（预算制——种子=最小
         // 含标记容器、祖先出折叠集；超出预算的路径留收拢靠 ●N 可达）。仅默认推导叠加，
         // 会话折叠态（sameDoc merge）优先级不变——用户手动收起的标记路径不被打回
         markCtx = markTreeInfo(structRows, info, docMarks);
         const markDefaults = markCtx ? markAwareCollapsed(structRows, defaults, markCtx) : defaults;
         const curAlive = new Set(structRows.map(r => r.id));
+        // graphmind □4 P0：折叠态持久化读回——结构档冷加载（sameDoc=false）此前只走默认
+        // 推导，saveCollapsed 写了不读=级数选择/手动折叠整页重开后全丢（UI 验收 P0 实锤：
+        // IAL=[第1章] reload 后 34 全展开）。语义与 full 档 applyRowsAndLinks 同款：
+        // custom-graph-collapsed 存在（含 "[]" 显式全展开）=用户态整体优先；无持久化值才走
+        // 默认推导（标记感知展开仅默认态叠加）。saved 死 id 滤活集（编辑后 reload 残留已删
+        // 容器）。sameDoc=true 不读（会话 merge 已是最新，_changeDoc_ 入口的 modeAttrs 读
+        // 不透传——setGraphMode 等调用点无现成 attrs，构建链多一次 getBlockAttrs 无感）
+        const savedAttr = sameDoc ? null : await siyuan.getBlockAttrs(docID).catch(() => null);
+        const saved = sameDoc ? null : parseCollapsed(savedAttr?.["custom-graph-collapsed"]);
+        // await 位移探针（entryFP 同款纪律）：getBlockAttrs 期间新一轮构建接管（切文档/档位
+        // 重建都换 info 对象）→ 本轮丢弃，防旧文档 saved 叠新文档 allRows 的错位渲染
+        if (!sameDoc && structInfo !== info) return;
         collapsedSet = sameDoc
             ? mergeCollapsedOnRefresh(prevCollapsed, markDefaults, prevAlive, curAlive)
-            : new Set(markDefaults);
+            : new Set(saved ? saved.filter(id => curAlive.has(id)) : markDefaults);
         // 徽标展开态同款保留：展开的容器仍在本档容器集才留（删块自然清退）
         leafShowContainers = new Set([...prevLeafShow].filter(id => info.containers.has(id)));
         // 标记叶卡摊开：新文档且总量 ≤ 阈值直接摊开（bear 拍板「标记多就少显示」）；
@@ -753,7 +887,9 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         return out;
     }
 
-    // ¶×N 大节点全文（期7）：mergeParagraphChains 产物（链内全文合并+2000 字首尾截断），此处零加工
+    // ¶×N 大节点全文（期7）：mergeParagraphChains 产物（链内全文合并+2000 字首尾截断），此处零加工；
+    // graphmind □3 显示层双态（共识#4）：收起=首尾各一段+「⋯ N 块 ⋯」省略标记、展开=原文序
+    // 全段+序号——分段渲染在 GraphNode（paraText.split），数据层链合并不动
 
     // 折叠集 → 可见子图：$nodes 只装可见节点（type=tomatoNode 自定义节点带角标数据），
     // $edges 走 filterEdges（结构边随子可见过滤、引用边端点重定向到折叠祖先）。
@@ -836,10 +972,14 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                     // ¶ badge ¶×N = 链内合并块数（期7 起与折叠 hiddenCount 语义分家）
                     hiddenCount: isParaMerged ? paraCount.get(row.id) : vis.hiddenCount.get(row.id),
                     hasChildren: (vis.subtreeSize.get(row.id) ?? 1) > 1,
-                    // ¶ 横排 188 宽/竖排 122 宽，高钳 400（¶ 卡内滚）；普通节点竖排窄高 56×118
+                    // ¶ 横排 188 宽/竖排 122 宽；高=展开态 400（框内滚钳）/收起态首尾两段+标记
+                    // 估算 ~150（measured 精修接管）；普通节点竖排窄高 56×118
                     dagreW: isParaMerged ? (isTextVertical(layoutForm) ? 122 : 188) : isTextVertical(layoutForm) ? 56 : undefined,
-                    dagreH: isParaMerged ? 400 : isTextVertical(layoutForm) ? 118 : undefined,
-                    // ¶ 无展开概念（期7）：不挂 toggle；双击=滚动链头段
+                    dagreH: isParaMerged ? (paraExpanded.has(row.id) ? 400 : 150) : isTextVertical(layoutForm) ? 118 : undefined,
+                    // ¶ 展开态显示层数据（graphmind □3：收起=首尾+省略标记/展开=原文序全段）
+                    paraExpand: isParaMerged ? paraExpanded.has(row.id) : undefined,
+                    onParaToggle: isParaMerged ? () => void toggleParaMerge(row.id) : undefined,
+                    // ¶ 不挂子树折叠 toggle（链成员已并入）；双击=滚动链头段
                     toggle: isParaMerged ? undefined : () => void toggleCollapseNode(row.id),
                     // □4 章节编号独立字段（弱化前缀渲染）
                     number: isStructure ? structNumbers.get(row.id) : undefined,
@@ -885,7 +1025,8 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                         // 单行内容（余文空）正文退回全文（标题 20 字截断与正文完整可共存）
                         const nl = text.indexOf("\n");
                         const bodyText = nl > 0 ? text.slice(nl + 1) : text;
-                        const bodyLines = Math.min((bodyText || text).split("\n").length, 8);
+                        // graphmind □2：高不限（8 行封顶退役——首尾行数全量估算，measured 精修接管）
+                        const bodyLines = Math.max((bodyText || text).split("\n").length, 1);
                         nodeArr.push({
                             id: leaf.id,
                             type: "tomatoNode",
@@ -897,8 +1038,10 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                                 isParaMerged: false,
                                 blockType: leaf.type,
                                 structLeaf: !textV,
-                                dagreW: !textV ? 200 : 56,
-                                dagreH: !textV ? Math.min(30 + bodyLines * 17, 190) : 118,
+                                // graphmind □2：卡宽与 .gn-card max-width 300 同步；高不限
+                                // （190 封顶退役——bodyLines 全量估算，measured 精修接管）
+                                dagreW: !textV ? 300 : 56,
+                                dagreH: !textV ? 30 + bodyLines * 17 : 118,
                                 dblclick: () => void showBlockInEditor(leaf.id),
                             },
                             position: { x: 0, y: idx++ * 100 },
@@ -923,15 +1066,21 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                         const raw = leafContent.get(leaf.id) || leaf.content || "";
                         const text = stripMarkSyntax(raw);
                         const textV = isTextVertical(layoutForm);
-                        const firstLine = text.split("\n")[0].slice(0, 30) || "…";
-                        const nl = text.indexOf("\n");
-                        const bodyText = nl > 0 ? text.slice(nl + 1) : (text.length > 30 ? text : "");
-                        const bodyLines = bodyText ? Math.min(bodyText.split("\n").length, 2) : 0;
+                        // graphmind □5（共识#6）：markCardTexts 标题/正文切分退役——标题行
+                        // 与正文重复不再显示；bodyText 恒=全文完整显示（宽 300 封顶高自适应，
+                        // 2 行钳 structClamp 退役），label 仅竖排窄卡形态消费（横排标记叶
+                        // 不渲染标题栏，GraphNode aria 恒走 fullText）
+                        const firstLine = text.split("\n")[0] || "…";
+                        const bodyText = text || firstLine;
+                        // 首轮高度估算含折行（300px 卡正文区 ~17 CJK 字/行；无标题栏=
+                        // body 12px padding+2px 边框+行高 ~17）；measured 二轮精修接管，高不封顶
+                        const bodyLines = Math.max(
+                            bodyText.split("\n").reduce((n, ln) => n + Math.max(1, Math.ceil(ln.length / 17)), 0), 1);
                         nodeArr.push({
                             id: leaf.id,
                             type: "tomatoNode",
                             data: {
-                                label: firstLine,
+                                label: firstLine.slice(0, 30),
                                 fullText: text,
                                 bodyText,
                                 collapsed: false,
@@ -939,9 +1088,10 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                                 blockType: leaf.type,
                                 structLeaf: !textV,
                                 structMark: markCssOf(docMarks?.get(leaf.id)),
-                                structClamp: 2,
-                                dagreW: !textV ? 200 : 56,
-                                dagreH: !textV ? Math.min(30 + bodyLines * 17, 90) : 118,
+                                // graphmind □2：卡宽与 .gn-card max-width 300 同步；□5 高不封顶
+                                // （2 行钳随标题栏一起退役，bodyLines 全量估算 measured 精修接管）
+                                dagreW: !textV ? 300 : 56,
+                                dagreH: !textV ? 14 + bodyLines * 17 : 118,
                                 clickJump: true,
                                 dblclick: () => void showBlockInEditor(leaf.id),
                             },
@@ -961,6 +1111,16 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         if (gs) { gs.nodes = nodeArr; gs.edges = edgeArr; }
         else { nodes.set(nodeArr); edges.set(edgeArr); }
         scheduleFocusRefresh(); // 期4：可见集变更后邻域类补刷（目标可能随折叠漂走）
+    }
+
+    // graphmind □3：¶ 合并框展开/收起（纯显示层态——收起=首尾两小段+省略标记、
+    // 展开=原文序全段；数据层链合并恒整链，不随此态变化）
+    async function toggleParaMerge(id: string) {
+        if (paraExpanded.has(id)) paraExpanded.delete(id);
+        else paraExpanded.add(id);
+        gbLog("graph.para_toggle", `node=${id.slice(0, 8)} → ${paraExpanded.has(id) ? "expand" : "collapse"}`);
+        applyCollapsedView();
+        await relayout();
     }
 
     // □2 徽标展开/收起：放行该容器直属叶子（大文档叶子正文按需 getRows——SQL 通道首取不带
@@ -1070,17 +1230,26 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
     }
 
     // 档位按钮组态回显（graphmark 期1）：当前档钮挂 active 类（primary 高亮）+
-    // aria-pressed；布局形态钮在 treemap 档隐藏——无布局语义（期3 起 marks=结构树渲染，有布局）
+    // aria-pressed；布局形态钮在 treemap 档隐藏——无布局语义（期3 起 marks=结构树渲染，有布局）。
+    // graphmind □6：full/treemap 两钮+主次分隔线随 graphShowAllViewModes 开关显隐（默认
+    // 只出 structure/marks 两钮；渲染期初值在 graphToolbarHTML，运行期翻转全走本函数）
     function syncViewModeBtns() {
         const group = viewModeGroupID ? document.getElementById(viewModeGroupID) : null;
         if (!group) return;
         const landscape = landscapeSwitchBtnID ? document.getElementById(landscapeSwitchBtnID) : null;
         if (landscape) landscape.style.display = graphMode === "treemap" ? "none" : "";
+        const showAll = graphShowAllViewModes.get();
+        for (const el of Array.from(group.querySelectorAll<HTMLElement>(
+            '[data-graph-mode="treemap"], [data-graph-mode="full"], .tomato-graph-viewmodes__sep',
+        ))) {
+            el.style.display = showAll ? "" : "none";
+        }
         for (const btn of Array.from(group.querySelectorAll<HTMLElement>("[data-graph-mode]"))) {
             const on = btn.dataset.graphMode === graphMode;
             btn.classList.toggle("tomato-graph-viewmode-on", on);
             btn.setAttribute("aria-pressed", on ? "true" : "false");
         }
+        syncShowLevelUI(); // graphmind □4：treemap 档隐藏/回档重显+换文档档位刷新（本函数在 lastDocID 落定后被调）
     }
 
     // 折叠/展开 toggle：重算可见子图 + 持久化 + 局部重布局（复用 relayout 的 dagre+fitView 通道）
@@ -1089,6 +1258,7 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         else collapsedSet.add(id);
         gbLog("graph.collapse_toggle", `node=${id.slice(0, 8)} → ${collapsedSet.has(id) ? "collapse" : "expand"} visible=${computeVisible(allRows, collapsedSet).visibleIds.size}/${allRows.length}`);
         applyCollapsedView();
+        syncShowLevelUI(); // graphmind □4：手动折叠改变可见级——无钉（未显式选级）时派生跟进；有钉不动（级视图之上的修补）
         if (lastDocID) await saveCollapsed(lastDocID);
         await relayout();
     }
@@ -1100,6 +1270,65 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         });
     }
 
+    // □4 回显钉（按文档会话态）：显式选级后选择器恒显所选级——手动微调是级视图之上的
+    // 修补不动钉（任务语义「级数选择重置手动态，之后仍可手动微调」）；无钉（文档打开/
+    // 持久化态）才走派生。派生有结构性盲区：badge-only 标题（无子容器、直属段落走徽章，
+    // 如空壳 h2/末级小节）永不可折恒可见，计入=选 1 级回显漂 2，不计入=最深级派不出——
+    // 派生只配当缺省，不配当回显主通道（6809 实测「1.1 节」空壳 h2 实锤）
+    const showLevelPinned = new Map<string, number>();
+
+    // graphmind □4：级数一键收缩/展开（共识#5）——collapsedSet 整体重置为「显示到第 N 级」
+    // 推导集（折叠 ≥N 级标题=第 N 级折叠卡可见、第 N+1 级起全藏——P0 修正口径；
+    // 列表容器仍默认折叠=listfix 拍板不随级数抬升），手动态就此
+    // 重置；落 custom-graph-collapsed 与手动折叠同键共存——此后手动微调照常走 toggleCollapseNode
+    // 的持久化通道。标记感知展开不叠加（显式选级=严格级视图；●N 角标仍在折叠祖先上指路）
+    async function applyShowLevel(show: number) {
+        if (!lastDocID || !allRows.length) return;
+        const range = headingRangeOf(allRows, lastDocID);
+        if (!range) return;
+        const level = showLevelToExpandLevel(show, range.max - range.base + 1);
+        collapsedSet = new Set(initialCollapsedRows(allRows, level, range.base));
+        showLevelPinned.set(lastDocID, show); // 显式选择钉住回显（见上方钉注释）
+        gbLog("graph.show_level", `show=${show} → level=${level} collapsed=${collapsedSet.size}`);
+        applyCollapsedView();
+        await saveCollapsed(lastDocID);
+        await relayout(true); // 全图级收缩/展开：重排+重适配视口（fitReadable 真 fit）
+        syncShowLevelUI();
+    }
+
+    // 选择器档位/回显维护：档=当前文档实际标题相对级 1..maxRel（无标题文档/treemap 档/
+    // 未挂控件 → 隐藏）；回显值=本会话显式选过的级（钉）优先，否则按当前显示态派生。
+    // 档列表或回显值真变才重刷 options（签名比对）——防自动刷新路径把用户正开着的选择器
+    // 下拉打掉
+    function syncShowLevelUI() {
+        if (!showLevelSelectID) return;
+        const sel = document.getElementById(showLevelSelectID) as HTMLSelectElement | null;
+        if (!sel) return;
+        const range = lastDocID && graphMode !== "treemap" && allRows.length
+            ? headingRangeOf(allRows, lastDocID)
+            : null;
+        if (!range) {
+            sel.style.display = "none";
+            sel.innerHTML = "";
+            (sel as any)._gmSig = "";
+            return;
+        }
+        const maxRel = range.max - range.base + 1;
+        const pinned = showLevelPinned.get(lastDocID);
+        const cur = Math.min(Math.max(
+            pinned ?? visibleHeadingLevel(allRows, collapsedSet, lastDocID), 1), maxRel);
+        const sig = `${maxRel}:${cur}`;
+        if ((sel as any)._gmSig === sig) {
+            sel.style.display = "";
+            return;
+        }
+        (sel as any)._gmSig = sig;
+        sel.innerHTML = Array.from({ length: maxRel }, (_, i) =>
+            `<option value="${i + 1}"${i + 1 === cur ? " selected" : ""}>${i + 1}</option>`).join("");
+        sel.value = String(cur);
+        sel.style.display = "";
+    }
+
     // 展开目标 id 的祖先链（expandTo，期4 块→图定位链路消费）：目标在折叠子树内时不静默；
     // 返回是否有折叠变更（locateNode 据此等 relayout 尾部 fire-and-forget 的 fitView 落地再 setCenter）。
     // keepView=true（期4 聚焦通道）：relayout 不 fitView——聚焦承诺不挪图（定位路径保持默认 fitView）
@@ -1108,6 +1337,7 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         if (!expandAncestors(tree, collapsedSet, id)) return false;
         gbLog("graph.expand_to", `node=${id.slice(0, 8)} visible=${computeVisible(allRows, collapsedSet).visibleIds.size}/${allRows.length}`);
         applyCollapsedView();
+        syncShowLevelUI(); // graphmind □4：定位展开祖先链加深可见级——无钉时派生跟进
         if (lastDocID) await saveCollapsed(lastDocID);
         await relayout(!keepView);
         return true;
@@ -1133,11 +1363,14 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                         graphLoading = true;
                         try {
                             const t0 = performance.now();
+                            // gfloat P2⑤：手动全量同样走共享缓存键——另一实例已拉同指纹则秒回
+                            const updRow = await siyuan.sqlOne(`SELECT updated FROM blocks WHERE id = "${targetDocID}" AND type = "d"`);
                             const { rows, links } = await getData(
                                 targetDocID,
                                 currentDocName,
                                 graphMaxPBlocks.get(),
                                 graphMaxAllBlocks.get(),
+                                updRow?.updated ?? "",
                             );
                             if (lastDocID !== targetDocID) return; // 构建期间已切走，丢弃
                             fullRowsCache = null; // 大文档不缓存全量数据（内存守恒；切回结构走 SQL 轻通道）
@@ -1242,17 +1475,19 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         let label = e.label?.trim() ?? "";
         if (label === "*") label = "";
             // 边双通道（spec §3）：引用边=主色实线+闭合箭头（视觉主角；□3 加 opacity .55——纯叠加渲染后长线扫屏噪声，淡化保树形主角）；结构边=灰虚线无箭头（背景板）。
-            // stroke 走 CSS var 随主题自动换态；回边（isBackEdge）几何不动、样式同通道。
-            // （Edge.style 是 CSS 字符串非对象——与 Node.style 机制不同）
+            // graphmind □2 柔和贝塞尔（学官方 listMindmap 视觉：defaultLine=--b3-border-color、
+            // 1.5px、虚线 6 4、圆端帽——代码不搬）：曲率统一在 EdgeWithLabel 组件注入（全部边
+            // type=labeledEdge，无 label 时组件只画 path）。stroke 走 CSS var 随主题自动换态；
+            // 回边（isBackEdge）几何不动、样式同通道。（Edge.style 是 CSS 字符串非对象——与 Node.style 机制不同）
             into.push({
                 id: e.id,
                 source: e.rSource,
                 target: e.rTarget,
                 label,
-                type: label ? "labeledEdge" : undefined,
+                type: "labeledEdge",
                 style: e.isRef
-                    ? "stroke: var(--b3-theme-primary); stroke-width: 1.5; opacity: 0.55;"
-                    : "stroke: var(--b3-theme-on-surface-light); stroke-width: 1.25; stroke-dasharray: 4 3;",
+                    ? "stroke: var(--b3-theme-primary); stroke-width: 1.5; stroke-linecap: round; opacity: 0.55;"
+                    : "stroke: var(--b3-border-color); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 6 4;",
                 markerEnd: e.isRef
                     ? { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "var(--b3-theme-primary)" }
                     : undefined,
@@ -1315,26 +1550,30 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         }
         commit();
         // fitView prop 仅初始化生效，节点重建后须手动适配视口（vision P1：骨架/全量首屏空白画布）；
-        // minZoom 保底=孤儿列/宽树防 fitView 过缩成不可见小簇（□2 vision P1 实锤 14% 占比；□3 提 0.35=编号/label 可读下限）；
         // fitView 经 GraphControl 借道（useSvelteFlow 须在 Provider 内取）；
-        // refit=false=同文档内容刷新（自动刷新链）：保留当前视口，不打回用户/定位视图（期4 P1）
-        if (refit) data()?.fitView?.({ padding: 0.15, duration: 200, minZoom: 0.35 });
+        // refit=false=同文档内容刷新（自动刷新链）：保留当前视口，不打回用户/定位视图（期4 P1）。
+        // graphmind □7fix：fitReadable=真 fit（整树入画布中心对齐，min/maxZoom 显式传参；
+        // □2 的 0.8 可读下限+可见带策略被四场景终检 P1 否决退役——取舍翻转为全树可见优先）
+        if (refit) fitReadable();
         scheduleFocusRefresh(); // 期4：relayout commit 克隆节点后邻域类补刷
     }
 
-    // 检测两个节点是否重叠
+    // 检测两个节点是否重叠（marks P2①：两节点各自宽高——旧签名单尺寸对 172×36 常量，
+    // 高卡 vs 固定节点漏检 ~13px；实际尺寸取 dagre 节点 measured）
     function isOverlapping(
         pos1: { x: number; y: number },
         pos2: { x: number; y: number },
-        width: number,
-        height: number,
+        w1: number,
+        h1: number,
+        w2: number,
+        h2: number,
         padding: number
     ): boolean {
         return !(
-            pos1.x + width + padding < pos2.x ||
-            pos1.x > pos2.x + width + padding ||
-            pos1.y + height + padding < pos2.y ||
-            pos1.y > pos2.y + height + padding
+            pos1.x + w1 + padding < pos2.x ||
+            pos1.x > pos2.x + w2 + padding ||
+            pos1.y + h1 + padding < pos2.y ||
+            pos1.y > pos2.y + h2 + padding
         );
     }
 
@@ -1437,7 +1676,11 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         };
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
-        dagreGraph.setGraph({ rankdir, nodesep: 70 });
+        // graphmind □2 P0：nodesep 70→46（窄 dock 脑图紧凑化——0.8 可读下限视口的 y 带
+        // 覆盖率 48%→~60%，间距纯几何不动字号可读性；兄弟间视觉净距=46−徽章悬垂 11×2=24px 仍足够）；
+        // ranksep 显式 28（LR 列距默认 50——x 带同为瓶颈：442px 面板 0.8 视口 552 树单位装 4 列
+        // 需压列距；28+卡宽仍留可辨呼吸）
+        dagreGraph.setGraph({ rankdir, nodesep: 46, ranksep: 28 });
         topNodes.forEach((node) => {
             const isGroup = (node as any).type === "tomatoGroup";
             dagreGraph.setNode(node.id, {
@@ -1472,84 +1715,90 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         // 结构边序（=文档 DFS 序）先序遍历，叶子自上而下堆叠、内部节点 y=子树首尾中位
         // （子贴父、兄弟文档序）；x/rank 沿用 dagre。手动拖拽固定的子树整树保持 dagre
         // 原位占位（savedPositions 语义优先）；跨文档补块的孤儿节点不在结构树内、保持原位
-        const NODE_GAP = 40; // 与 dagre 默认 nodesep 视觉密度同族
-        const docOrderSiblings = new Map<string, string[]>();
-        edges.forEach((edge) => {
-            if ((edge as any).data?.isRef) return; // 结构边（父子）才承载文档序
-            const s = nodeIdTop(edge.source), t = nodeIdTop(edge.target);
-            if (s === t) return;
-            const arr = docOrderSiblings.get(s) ?? docOrderSiblings.set(s, []).get(s)!;
-            if (!arr.includes(t)) arr.push(t);
-        });
-        const fixedTop = new Set(topNodes.filter(n => savedPositions[n.id]).map(n => n.id));
-        const readRange = (id: string): [number, number] => {
-            const n = dagreGraph.node(id);
-            let min = n.y - n.height / 2, max = n.y + n.height / 2;
-            for (const k of docOrderSiblings.get(id) ?? []) {
-                const [a, b] = readRange(k);
-                min = Math.min(min, a); max = Math.max(max, b);
-            }
-            return [min, max];
-        };
-        let yCursor = 0;
-        const yAssigned = new Map<string, number>();
-        const subtreeY = (id: string): [number, number] => {
-            const node = dagreGraph.node(id);
-            const h = node?.height ?? nodeHeight;
-            const kids = docOrderSiblings.get(id) ?? [];
-            if (fixedTop.has(id) || kids.length === 0) {
-                // fixed 整树保持 dagre 原位（子树成员都不动）；叶子按游标堆叠
-                const y = fixedTop.has(id) ? node.y : yCursor + h / 2;
-                if (!fixedTop.has(id)) yCursor += h + NODE_GAP;
-                yAssigned.set(id, y);
-                return fixedTop.has(id) ? readRange(id) : [y - h / 2, y + h / 2];
-            }
-            let min = Infinity, max = -Infinity;
-            for (const k of kids) {
-                if (fixedTop.has(k)) {
+        // graphfloat □1：y 接管是 LR 脑图语义（叶竖排+父贴子中位），TB 下同跑会把 dagre 的
+        // rank 层级 y 压平——单子链父 y==子 y 且 dagre-TB 又把单子父居中到子 x 附近，
+        // 父子卡整叠（v5.15.1 marks/structure 档 TB 形态实锤）。TB 回归 dagre 原生树
+        // （父上子下、siblings 横排），孤儿底置/文档序堆叠等 LR 增益一并不适用。
+        if (rankdir === "LR") {
+            const NODE_GAP = 28; // graphmind □2 P0：40→28 同 nodesep 紧凑化（y 接管堆叠间距；与 46 视觉密度同族）
+            const docOrderSiblings = new Map<string, string[]>();
+            edges.forEach((edge) => {
+                if ((edge as any).data?.isRef) return; // 结构边（父子）才承载文档序
+                const s = nodeIdTop(edge.source), t = nodeIdTop(edge.target);
+                if (s === t) return;
+                const arr = docOrderSiblings.get(s) ?? docOrderSiblings.set(s, []).get(s)!;
+                if (!arr.includes(t)) arr.push(t);
+            });
+            const fixedTop = new Set(topNodes.filter(n => savedPositions[n.id]).map(n => n.id));
+            const readRange = (id: string): [number, number] => {
+                const n = dagreGraph.node(id);
+                let min = n.y - n.height / 2, max = n.y + n.height / 2;
+                for (const k of docOrderSiblings.get(id) ?? []) {
                     const [a, b] = readRange(k);
-                    yCursor = Math.max(yCursor, b + NODE_GAP);
-                    min = Math.min(min, a); max = Math.max(max, b);
-                } else {
-                    const [a, b] = subtreeY(k);
                     min = Math.min(min, a); max = Math.max(max, b);
                 }
+                return [min, max];
+            };
+            let yCursor = 0;
+            const yAssigned = new Map<string, number>();
+            const subtreeY = (id: string): [number, number] => {
+                const node = dagreGraph.node(id);
+                const h = node?.height ?? nodeHeight;
+                const kids = docOrderSiblings.get(id) ?? [];
+                if (fixedTop.has(id) || kids.length === 0) {
+                    // fixed 整树保持 dagre 原位（子树成员都不动）；叶子按游标堆叠
+                    const y = fixedTop.has(id) ? node.y : yCursor + h / 2;
+                    if (!fixedTop.has(id)) yCursor += h + NODE_GAP;
+                    yAssigned.set(id, y);
+                    return fixedTop.has(id) ? readRange(id) : [y - h / 2, y + h / 2];
+                }
+                let min = Infinity, max = -Infinity;
+                for (const k of kids) {
+                    if (fixedTop.has(k)) {
+                        const [a, b] = readRange(k);
+                        yCursor = Math.max(yCursor, b + NODE_GAP);
+                        min = Math.min(min, a); max = Math.max(max, b);
+                    } else {
+                        const [a, b] = subtreeY(k);
+                        min = Math.min(min, a); max = Math.max(max, b);
+                    }
+                }
+                const y = (min + max) / 2;
+                yAssigned.set(id, y);
+                return [min, max];
+            };
+            // 结构真根=不在任何兄弟集合内的源点（doc/孤儿）；带子的顶层分叉节点（如嵌套
+            // 列表项）不是根——重复跑会把其子树二次分配到游标尾端（e2e 实锤）
+            const kidSet = new Set<string>();
+            docOrderSiblings.forEach(kids => kids.forEach(k => kidSet.add(k)));
+            for (const root of topNodes.map(n => n.id)) {
+                if (docOrderSiblings.has(root) && !kidSet.has(root) && !fixedTop.has(root)) subtreeY(root);
             }
-            const y = (min + max) / 2;
-            yAssigned.set(id, y);
-            return [min, max];
-        };
-        // 结构真根=不在任何兄弟集合内的源点（doc/孤儿）；带子的顶层分叉节点（如嵌套
-        // 列表项）不是根——重复跑会把其子树二次分配到游标尾端（e2e 实锤）
-        const kidSet = new Set<string>();
-        docOrderSiblings.forEach(kids => kids.forEach(k => kidSet.add(k)));
-        for (const root of topNodes.map(n => n.id)) {
-            if (docOrderSiblings.has(root) && !kidSet.has(root) && !fixedTop.has(root)) subtreeY(root);
-        }
-        yAssigned.forEach((y, id) => { dagreGraph.node(id).y = y; });
-        // □2 vision P1-1 修复：y 接管后孤儿节点（跨文档端点，无结构边）的 dagre y 与重排后
-        // 的结构树失配→盒叠。孤儿续排在结构树底部（右对齐树缘内侧的水平横列）——不撑宽
-        // 画布 bbox（首版右侧纵列曾把 fitView 压缩到 14% 的 P1 回归），零碰撞+语义=外部附录
-        {
-            const placed = topNodes.filter(n => yAssigned.has(n.id));
-            const orphans = topNodes.filter(n => !yAssigned.has(n.id) && !savedPositions[n.id]);
-            if (placed.length && orphans.length) {
-                const treeRight = Math.max(...placed.map(n => {
-                    const nd = dagreGraph.node(n.id);
-                    return (nd?.x ?? 0) + (nd?.width ?? nodeWidth) / 2;
-                }));
-                const baseY = Math.max(...placed.map(n => {
-                    const nd = dagreGraph.node(n.id);
-                    return (nd?.y ?? 0) + (nd?.height ?? nodeHeight) / 2;
-                })) + NODE_GAP * 2;
-                let oy = baseY;
-                orphans.sort((a, b) => (dagreGraph.node(a.id)?.y ?? 0) - (dagreGraph.node(b.id)?.y ?? 0));
-                for (const o of orphans) {
-                    const nd = dagreGraph.node(o.id);
-                    const h = nd?.height ?? nodeHeight;
-                    nd.x = Math.max(treeRight - (nd?.width ?? nodeWidth) / 2, (nd?.width ?? nodeWidth) / 2);
-                    nd.y = oy + h / 2;
-                    oy += h + NODE_GAP;
+            yAssigned.forEach((y, id) => { dagreGraph.node(id).y = y; });
+            // □2 vision P1-1 修复：y 接管后孤儿节点（跨文档端点，无结构边）的 dagre y 与重排后
+            // 的结构树失配→盒叠。孤儿续排在结构树底部（右对齐树缘内侧的水平横列）——不撑宽
+            // 画布 bbox（首版右侧纵列曾把 fitView 压缩到 14% 的 P1 回归），零碰撞+语义=外部附录
+            {
+                const placed = topNodes.filter(n => yAssigned.has(n.id));
+                const orphans = topNodes.filter(n => !yAssigned.has(n.id) && !savedPositions[n.id]);
+                if (placed.length && orphans.length) {
+                    const treeRight = Math.max(...placed.map(n => {
+                        const nd = dagreGraph.node(n.id);
+                        return (nd?.x ?? 0) + (nd?.width ?? nodeWidth) / 2;
+                    }));
+                    const baseY = Math.max(...placed.map(n => {
+                        const nd = dagreGraph.node(n.id);
+                        return (nd?.y ?? 0) + (nd?.height ?? nodeHeight) / 2;
+                    })) + NODE_GAP * 2;
+                    let oy = baseY;
+                    orphans.sort((a, b) => (dagreGraph.node(a.id)?.y ?? 0) - (dagreGraph.node(b.id)?.y ?? 0));
+                    for (const o of orphans) {
+                        const nd = dagreGraph.node(o.id);
+                        const h = nd?.height ?? nodeHeight;
+                        nd.x = Math.max(treeRight - (nd?.width ?? nodeWidth) / 2, (nd?.width ?? nodeWidth) / 2);
+                        nd.y = oy + h / 2;
+                        oy += h + NODE_GAP;
+                    }
                 }
             }
         }
@@ -1581,17 +1830,24 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
             let hasOverlap = true;
             let attempts = 0;
             const maxAttempts = 100;
+            // marks P2①：碰撞/推开量用 dagre 实际尺寸（两轮量测后 measured 已就位），
+            // 高卡不再按 172×36 常量漏检
+            const ndN = dagreGraph.node(newNode.id);
+            const nw = ndN?.width ?? nodeWidth;
+            const nh = ndN?.height ?? nodeHeight;
 
             while (hasOverlap && attempts < maxAttempts) {
                 hasOverlap = false;
                 for (const fixedNode of fixedNodes) {
-                    if (isOverlapping(newNode.position, fixedNode.position, nodeWidth, nodeHeight, padding)) {
+                    const ndF = dagreGraph.node(fixedNode.id);
+                    if (isOverlapping(newNode.position, fixedNode.position, nw, nh,
+                        ndF?.width ?? nodeWidth, ndF?.height ?? nodeHeight, padding)) {
                         hasOverlap = true;
                         // 向布局方向偏移
                         if (rankdir === "TB") {
-                            newNode.position.y += nodeHeight + padding;
+                            newNode.position.y += nh + padding;
                         } else {
-                            newNode.position.x += nodeWidth + padding;
+                            newNode.position.x += nw + padding;
                         }
                         break;
                     }
@@ -1610,6 +1866,23 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
                 node.sourcePosition = Position.Right;
             }
         });
+
+        // marks P2③：结构边按几何长度降透明度——大树梳状边密带（根→N 章的长边束在根
+        // 汇入区融成实线带）压淡骨架、保局部短边可读；只处理双端点均顶层的边（嵌套子流
+        // 边在容器相对坐标系，跳过免炸）。引用边（视觉主角 opacity .55）与标签边不动。
+        // 地板 0.25 防浅底灰虚线整体不可见（vision 约束）
+        {
+            const posOf = new Map(topNodes.map(n => [n.id, n.position] as const));
+            for (const e of edges) {
+                if ((e as any).data?.isRef || (e as any).data?.skipLenFade) continue;
+                const s = posOf.get(e.source), t = posOf.get(e.target);
+                if (!s || !t) continue;
+                const d = Math.hypot(t.x - s.x, t.y - s.y);
+                const opacity = Math.max(0.25, Math.min(1, 1 - (d - 120) / 900));
+                if (opacity >= 0.99) continue;
+                e.style = `stroke: var(--b3-theme-on-surface-light); stroke-width: 1.25; stroke-dasharray: 4 3; opacity: ${opacity.toFixed(2)};`;
+            }
+        }
 
         // 回边处理：不交换 source/target，直接标记 isBackEdge，弧线从右边出接左边入
         // （子节点 position 是容器相对坐标，判定用沿 parentId 链累加的绝对坐标）
@@ -1667,16 +1940,19 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
     }
 
     // 「在编辑器中显示」：同文档滚动+内核闪烁类（bgFade 同款 1024ms）；跨文档/窗口化
-    // 渲染不在 DOM 时退化为 openTab cb-get-hl（内核 uri.ts 跳转链同款 action 组）
+    // 渲染不在 DOM 时退化为 openTab cb-get-hl（内核 uri.ts 跳转链同款 action 组）。
+    // gfloatnav：滚动/开档两条分支都算「跳去读」——末尾统一 fire onNavigate（悬浮图收面板）
     async function showBlockInEditor(blockID: string) {
         const el = editorOfRoot(rootIDOf(blockID))?.wysiwyg?.element?.querySelector(`[data-node-id="${blockID}"]`);
         if (el) {
             el.scrollIntoView({ block: "center" });
             el.classList.add("protyle-wysiwyg--hl");
             setTimeout(() => el.classList.remove("protyle-wysiwyg--hl"), 1024);
+            onNavigate?.();
             return;
         }
         await OpenSyFile2(plugin, blockID, null, ["cb-get-hl", "cb-get-context", "cb-get-rootscroll"]);
+        onNavigate?.();
     }
 
     // 单击轻联动：编辑器对应块淡高亮（不滚动不抢焦点）；文档未开则静默（轻语义，不 toast 打扰）
@@ -1715,7 +1991,7 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
         const menu = new (Menu as any)("tomatoGraphNodeMenu", undefined, true) as Menu;
         liveCtxMenu = menu;
         menu.addItem({ label: tomatoI18n.在编辑器中显示, click: () => void showBlockInEditor(node.id) });
-        menu.addItem({ label: tomatoI18n.打开所在文档, click: () => void OpenSyFile2(plugin, node.id) });
+        menu.addItem({ label: tomatoI18n.打开所在文档, click: () => void OpenSyFile2(plugin, node.id).then(() => onNavigate?.()) });
         // 期4 聚焦：一跳邻域高亮+其余淡化；同节点再点=退出全景（toggle 语义与标签同步）
         menu.addItem({
             label: focusTarget === node.id ? tomatoI18n.退出聚焦 : tomatoI18n.聚焦此块,
@@ -1811,8 +2087,13 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
     async function nodeclick({ node, event }: { node: Node; event: MouseEvent }) {
         if ((event as PointerEvent).altKey) {
             await OpenSyFile2(plugin, node.id);
+            onNavigate?.();
         } else if ((node.data as any).clickJump) {
             await showBlockInEditor(node.id);
+        } else if (graphMode === "structure" && (node.data as any).toggleBadge) {
+            // graphmind □2：点标题节点本体=展开/收起其段落卡（脑图心智主通道；徽章 pill 点击
+            // 同款语义）——编辑器轻联动对该类节点让位（双击滚动/Alt 跳转仍在）
+            await toggleBadge(node.id);
         } else {
             softLinkEditorBlock(node.id);
         }
@@ -1833,7 +2114,7 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
              迁回结构树渲染（标记路径过滤），旧 treemap marks 消费退役 -->
         {#key lastDocID}
             <GraphTreemap rows={allRows} info={structInfo!} docID={lastDocID} docName={currentDocName}
-                refLinks={structRefLinks} onOpenDoc={id => void OpenSyFile2(plugin, id)} />
+                refLinks={structRefLinks} onOpenDoc={id => void OpenSyFile2(plugin, id).then(() => onNavigate?.())} />
         {/key}
     {:else}
     <SvelteFlowProvider>
@@ -1845,7 +2126,7 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
             {snapGrid}
             {edgeTypes}
             {nodeTypes}
-            minZoom={0.1}
+            minZoom={FIT_MIN}
             fitView
             {ondelete}
             {onconnect}
@@ -1901,7 +2182,10 @@ import { focusNeighborhood, noStructureRows } from "./libs/graphFocus";
             {#if marksSettledDoc === lastDocID && (docMarks?.size ?? 0) > 0}
                 <button class="b3-button b3-button--outline" onclick={() => void setGraphMode("marks")}>{tomatoI18n.只看标记处数.replace("%1", `${docMarks!.size}`)}</button>
             {/if}
-            <button class="b3-button b3-button--outline" onclick={() => void setGraphMode("treemap")}>{tomatoI18n.方块总览看段落分布}</button>
+            <!-- graphmind □6：treemap 入口随视图收敛开关（共识#1 收进设置默认关） -->
+            {#if $graphShowAllViewModes}
+                <button class="b3-button b3-button--outline" onclick={() => void setGraphMode("treemap")}>{tomatoI18n.方块总览看段落分布}</button>
+            {/if}
             <button class="b3-button b3-button--outline" onclick={() => { structEmptyDismissed = [...structEmptyDismissed, lastDocID]; }}>{tomatoI18n.知道了}</button>
         </div>
     {/if}
