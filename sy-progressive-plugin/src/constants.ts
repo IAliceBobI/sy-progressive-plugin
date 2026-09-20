@@ -41,4 +41,6 @@ export enum HtmlCBType {
     cleanOriginText = 18,
     readThisBlock = 19,
     nop = 20,
+    // delswap □1（650189 鸟反馈）：删本片+滚筒轮转下一本书——满额时也可用的换书出口
+    deleteAndSwap = 21,
 }

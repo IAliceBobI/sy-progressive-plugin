@@ -19,7 +19,6 @@
         graph_float,
         graphFloatJumpClose,
         graphDefaultExpandLevel,
-        graphDefaultLayout,
         graphHideStructEdges,
         graphShowAllViewModes,
         graphShowNumbers,
@@ -217,8 +216,11 @@
         <div>
             <!-- graphbox 期2：折叠机制默认展开层级（无持久化折叠态的文档首次打开按此推导；toggle 过的文档以 custom-graph-collapsed 为准）。
                  graphmind □2：新默认 headings=展开到文档最深标题级（脑图标题骨架）。
-                 graphmind □4：口径=「显示到第 N 级标题」（1..6；旧口径值 N 实显 N-1 级已迁移，见 index.ts 装载段） -->
+                 graphmind □4：口径=「显示到第 N 级标题」（1..6；旧口径值 N 实显 N-1 级已迁移，见 index.ts 装载段）。
+                 graphrelayout □7：新默认 auto=自适应最高标题级（有 h1 显示到 h1、只有 h2 显示到 h2）；
+                 存量显式档（headings/1..6/all）尊重不迁移 -->
             <select class="b3-select" bind:value={$graphDefaultExpandLevel}>
+                <option value="auto">{tomatoI18n.自动}</option>
                 <option value="headings">{tomatoI18n.展开到标题层}</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
@@ -229,17 +231,6 @@
                 <option value="all">{tomatoI18n.全部展开}</option>
             </select>
             {tomatoI18n.默认展开层级}
-        </div>
-        <div>
-            <!-- graphbox 期7：默认布局形态（文档无 custom-graph-layout 时用，顶栏循环钮优先）；
-                 竖排=节点文字竖排，窄 dock 纵向叠多层子节点 -->
-            <select class="b3-select" bind:value={$graphDefaultLayout}>
-                <option value="lr">{tomatoI18n.形态横排向右}</option>
-                <option value="tb">{tomatoI18n.形态横排向下}</option>
-                <option value="vlr">{tomatoI18n.形态竖排向右}</option>
-                <option value="vtb">{tomatoI18n.形态竖排向下}</option>
-            </select>
-            {tomatoI18n.默认布局形态}
         </div>
         <div>
             <input type="checkbox" class="b3-switch" bind:checked={$graphHideStructEdges} />

@@ -405,6 +405,7 @@
         nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片, Progressive下一页.w()),
         delBack: () => tip3(tomatoI18n.上片删, tomatoI18n.tip上片删),
         delExit: () => tip3(tomatoI18n.删片退出, tomatoI18n.tip删片退出),
+        delSwap: () => tip3(tomatoI18n.删片换书, tomatoI18n.tip删片换书), // delswap □1 删本片+轮转下一本书（满额时也可用）
         quit: () => tip3(tomatoI18n.关闭分片, tomatoI18n.tip关闭分片),
         ignore: () => tip3(tomatoI18n.不再推送,
             $kind === "free" ? tomatoI18n.tip不再推送复访 : tomatoI18n.tip不再推送),
@@ -452,6 +453,7 @@
         nextPure: "iconProgFFast",
         delBack: "iconProgDelBack",
         delExit: "iconProgDelExit",
+        delSwap: "iconProgDelSwap",
         quit: "iconProgQuit",
         ignore: "iconProgIgnore",
         map: "iconProgMap",
@@ -494,6 +496,7 @@
         refill: () => tomatoI18n.重插,
         clean: () => tomatoI18n.删原文,
         delExit: () => tomatoI18n.删片退出,
+        delSwap: () => tomatoI18n.删片换书, // delswap □1 短标签（2-6 字规格；全名在 FLAT_TIPS）
         ignore: () => tomatoI18n.不再推送,
         map: () => tomatoI18n.路线指引,
         traceUp: () => $kind === "free" ? tomatoI18n.关联摘抄 : isWritingDoc ? tomatoI18n.本书素材 : tomatoI18n.本书摘抄,
@@ -1196,9 +1199,9 @@
     /** 平铺区低频段旧动作（HtmlCBType 单入口）+ □11 浮层族改道 */
     async function onLowFreq(id: string, ev?: MouseEvent) {
         // □4 review P1-2：删除/清空/重插族面向阅读分片（一次性餐具），写作槽=用户定稿
-        // 文档绝无删片语义（本包原则）——refill/clean/delBack/delExit 四口统一前置拦截
-        //（onBtn 首行 default 分支也汇入此处，单点守卫覆盖首行+平铺两面）
-        if (isWritingPiece && (id === "refill" || id === "clean" || id === "delBack" || id === "delExit")) {
+        // 文档绝无删片语义（本包原则）——refill/clean/delBack/delExit/delSwap（delswap □1）
+        // 五口统一前置拦截（onBtn 首行 default 分支也汇入此处，单点守卫覆盖首行+平铺两面）
+        if (isWritingPiece && (id === "refill" || id === "clean" || id === "delBack" || id === "delExit" || id === "delSwap")) {
             await siyuan.pushMsg(tomatoI18n.写作槽不支持删除类操作, 2500);
             return;
         }
@@ -1285,6 +1288,9 @@
                 break;
             case "delExit":
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.deleteAndExit, $point);
+                break;
+            case "delSwap": // delswap □1（650189 鸟反馈）：删本片+轮转下一本书——满额时也可用（语义注释见 Progressive.deleteAndSwap case）
+                await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.deleteAndSwap, $point);
                 break;
             case "quit": // 关闭分片（退出分片模式，不删）
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.quit, $point);

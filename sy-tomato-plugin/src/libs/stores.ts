@@ -530,10 +530,11 @@ export const graphShowAllViewModes = settingFactory("graphShowAllViewModes", fal
 // graphbox 期2（2026-09-04）：折叠机制默认展开层级（"1"|"2"|"3"|"all"，按标题层级 h1=1；段落链折叠独立于档位）。
 // graphmind □2（2026-09-19）：默认改 "headings"=展开到文档最深标题级（脑图默认=标题骨架全显、
 // 段落收徽章；列表容器仍默认折叠）。存量用户存过 1/2/3/all 的不受影响（settingFactory 语义）。
-export const graphDefaultExpandLevel = settingFactory("graphDefaultExpandLevel", "headings", STORAGE_SETTINGS, null as TSK);
-// graphbox 期7（2026-09-04）：默认布局形态（"lr"|"tb"|"vlr"|"vtb"；文档无 custom-graph-layout 时用，
-// 顶栏循环钮写的 per-doc 持久化优先）
-export const graphDefaultLayout = settingFactory("graphDefaultLayout", "lr", STORAGE_SETTINGS, null as TSK);
+// graphrelayout □7（2026-09-20 bear 拍板）：默认改 "auto"=自适应最高标题级（有 h1 显示到
+// h1、只有 h2 显示到 h2、无标题杂项照常）——headings 及 1..6/all 均为合法显式档，
+// 盘上有值的存量用户（settingFactory load 语义）一律尊重不迁移，唯从未落盘者落新默认。
+export const graphDefaultExpandLevel = settingFactory("graphDefaultExpandLevel", "auto", STORAGE_SETTINGS, null as TSK);
+// graphrelayout □2：graphDefaultLayout（默认布局形态四态）随四态退役删除——恒 LR 无默认可配
 export const graphAddTopbarIcon = settingFactory("graphAddTopbarIcon", true, STORAGE_SETTINGS, null as TSK);
 export const graph打开块关系图Menu = settingFactory("graphopengraphMenu", true, STORAGE_SETTINGS, null as TSK);
 export const graph定位到图中的节点Menu = settingFactory("graphlocatetographMenu", true, STORAGE_SETTINGS, null as TSK);

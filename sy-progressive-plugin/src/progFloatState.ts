@@ -227,9 +227,10 @@ export const PIECE_MAIN_POOL = ["digest", "cards", "swap", "next", "prev", "orig
  * □11 增 map（🗺 路线指引浮层，四态通用低频）；□27 增 recite（✍仿写本片——副本练习，
  * 恒可见不做未装过滤，未装点击 toast 引导=导流语义，同 □26 书态页脚口径）；
  * □29 增 traceUp（📋本书摘抄清单，片态复用书态浮层——用户点名「分篇也要能看」）；
- * rollerquota □3 增 resetHere（📍重置到这个分片——回看旧片后钉住续读，入口③）。
+ * rollerquota □3 增 resetHere（📍重置到这个分片——回看旧片后钉住续读，入口③）；
+ * delswap □1 增 delSwap（🗑🔄删片换书——删本片+轮转下一本书，满额时也可用）。
  */
-export const PIECE_LOW_POOL = ["contents", "refill", "clean", "delExit", "ignore", "map", "traceUp", "recite", "resetHere"];
+export const PIECE_LOW_POOL = ["contents", "refill", "clean", "delExit", "delSwap", "ignore", "map", "traceUp", "recite", "resetHere"];
 
 /**
  * □14c 高级四组 14 项 id（设置面板池复用；顺序 = 制卡|收集|移动|提取整理 组语义序）。
@@ -242,7 +243,8 @@ export const ADV_POOL = [
 ];
 
 /**
- * □14c 首行全量池（32 项 = 7 池钮 + 3 托盘 + 8 低频 + 14 高级，VIP 门已拆）：mainIds 有序清单
+ * □14c 首行全量池（33 项 = 7 池钮 + 3 托盘 + 9 低频 + 14 高级，VIP 门已拆；delswap □1
+ * 低频增 delSwap 32→33）：mainIds 有序清单
  * 可引用的全部动作 spec。低频/高级项 kind：默认 normal，退出/弱化语义（删原文/删片
  * 退/不再推送）ghost 与 SCENE 家族同口径。icon 与 UI 层 ADV_GROUPS / FLAT_ICONS
  * 同源（改动须两处同步——纯逻辑层保单测覆盖，UI 层 icon 名历史在彼）。
@@ -253,6 +255,9 @@ const EXTRA_MAIN: FloatButtonSpec[] = [
     { id: "refill", icon: "iconProgRefill", kind: "normal", group: "scene" },
     { id: "clean", icon: "iconProgClean", kind: "ghost", group: "scene" },
     { id: "delExit", icon: "iconProgDelExit", kind: "ghost", group: "scene" },
+    // delswap □1 删片换书（650189 鸟反馈）：删本片+轮转下一本书，满额时也可用——退出/
+    // 弱化语义同 delExit 口径走 ghost；icon=换书双箭头+ban 圆底角标（家族视觉）
+    { id: "delSwap", icon: "iconProgDelSwap", kind: "ghost", group: "scene" },
     { id: "ignore", icon: "iconProgIgnore", kind: "ghost", group: "scene" },
     { id: "map", icon: "iconProgMap", kind: "normal", group: "scene" }, // □11 路线指引浮层
     // □27 仿写本片（片态副本练习）：icon 同 digest 态送仿写家族；跨态同 id 异义——
@@ -406,7 +411,7 @@ export function reorderMainIds(renderIds: string[], dragId: string, dropIndex: n
 
 /**
  * □10 平铺区低频段动作清单（id 对接旧 HtmlCBType 通道 + □11 浮层族）：
- * 片=未勾池钮 + 目录/重插/清理原文/删片退/忽略本书/路线指引；
+ * 片=未勾池钮 + 目录/重插/清理原文/删片退/删片换书（delswap □1）/忽略本书/路线指引；
  * 书=目录/原文侧追溯/忽略本书/路线指引；摘抄=路线指引；自由态=目录/关联摘抄/路线指引
  * （群反馈 650189 补齐，无 ignore）。
  * contents（□11 起改弹目录浮层）、map（🗺 路线指引）、traceUp（原文侧追溯）走浮层族，
@@ -425,7 +430,7 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[]; 
                 ...PIECE_LOW_POOL.filter(id => !inMain.has(id)),
             ];
         }
-        return ["contents", "refill", "clean", ...PIECE_TRAY_POOL, "delExit", "ignore", "map", "traceUp", "recite", "resetHere"];
+        return ["contents", "refill", "clean", ...PIECE_TRAY_POOL, "delExit", "delSwap", "ignore", "map", "traceUp", "recite", "resetHere"];
     }
     if (kind === "book") {
         // 书/摘抄态 mainIds（650189 第二轮，2026-09-10）：池内未进首行的一律落平铺区

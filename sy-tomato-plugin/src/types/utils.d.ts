@@ -217,7 +217,6 @@ type TomatoSettings = {
     graphMaxPBlocks: string,
     // graphbox 期2：默认展开层级（按标题层级 h1=1；"all"=全部展开，段落链折叠独立于档位）
     graphDefaultExpandLevel: string,
-    graphDefaultLayout: string,
     graphBoxCheckbox: string,
     userToken: string,
     userID: string,
@@ -522,7 +521,8 @@ type AttrType = {
     "custom-graph-layout"?: string,
     "custom-graph-mode"?: string,
     "custom-graph-struct-marks"?: string,
-    "custom-graph-node-positions"?: string,
+    // custom-graph-node-positions（拖拽位置存档）graphrelayout □6 惰性废弃：不再读不清，
+    // 遗留键读到也忽略
     "custom-graph-collapsed"?: string,
     "custom-tomato-mark"?: string,
     "custom-super-list"?: string,
@@ -637,6 +637,8 @@ interface GraphDockData<T> {
     /** graphmind □2 P1 注册（fitReadable 根锚定分支消费）；□7fix 真 fit 后无图内消费方，
      *  保留通道（GraphControl 仍注册，后续视口钉位需求复用） */
     setViewport?: (vp: { x: number; y: number; zoom: number }, opts?: { duration?: number }) => void;
+    /** graphrelayout □1 注册：交互链视口钉（capturePin 交互前快照被点节点屏幕位置） */
+    getViewport?: () => { x: number; y: number; zoom: number };
     /** graphbox 期2：展开目标节点的折叠祖先链（定位不静默）；返回是否有折叠变更 */
     expandTo?: (id: string) => Promise<boolean>;
     /** graphbox 期4：图当前通道态/文档/块上限（locateNode 的 toast 分支文案依据）；
@@ -645,10 +647,8 @@ interface GraphDockData<T> {
     getGraphState?: () => { mode: "structure" | "full" | "treemap" | "marks"; docID: string; maxBlocks: number; blockCount?: number };
     /** graphbox 二期 □2：图内全块 id 集（locateNode 定位兜底上爬祖先的「图内」判定） */
     graphIDsOf?: () => Set<string>;
-    /** graphbox 期3：当前布局方向（横 LR=false 纵 TB=true）——zoom 过小提示切纵向的判定依据（期7 起随 isVertical 退役，改 layoutForm） */
-    isVertical?: boolean;
-    /** graphbox 期7：当前布局形态四态（lr/tb/vlr/vtb）——fitView toast 已竖排态不提示的判定依据 */
-    layoutForm?: string;
+    // graphrelayout □2：isVertical/layoutForm 两字段随四态退役删除（原服务「zoom 过小提示
+    // 切纵向」toast 的判定，恒 LR 后无处可切）
     /** graphbox 期7：¶ 链中段定位重定向（目标块并进 ¶ 大节点 → 图上节点=链头） */
     paraRedirectOf?: (id: string) => string;
     /** graphmark 期3：块级标记写后通知（标记写不碰 updated=指纹短路不含标记集，
@@ -697,6 +697,7 @@ interface DoOperation {
     action: string;
     data: string;
     id: string;
+    rootID: string; // graphrelayout □5：内核 Operation 恒带（model/blockial.go pushBlockAttrs）——updateAttrs op 的块属性判定键（op.id=块 id 无 parentID）
     parentID: string;
     previousID: string;
     nextID: string;

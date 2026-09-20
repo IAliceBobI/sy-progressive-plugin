@@ -309,7 +309,9 @@ class DailyNoteBox {
                 if (dailyNoteGoToBottom.get() === true) {
                     const id = await siyuan.getDocLastID(targetDocID)
                     if (id) {
-                        await OpenSyFile2(this.plugin, id);
+                        // bear 09-20：跳底=打开即续写——keepFocus 豁免禁聚焦（否则
+                        // noFocusAfterOpen 400/1100ms 双拍把落下的光标 blur 掉）
+                        await OpenSyFile2(this.plugin, id, null, null, null, null, true);
                     } else {
                         await OpenSyFile2(this.plugin, targetDocID);
                     }

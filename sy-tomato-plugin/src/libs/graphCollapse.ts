@@ -11,7 +11,11 @@
 // graphmind □4（2026-09-19）：档位口径=「显示到第 N 级标题」（N=1..6，h1~h6 大纲心智）。
 // ExpandLevel 本体仍是折叠口径（level="N"=折叠相对级 ≥N 的标题——initialCollapsedRows
 // 语义与单测钉死不动），「显示到 N 级 ⇔ 折叠档 N」换算走 showLevelToExpandLevel。
-export type ExpandLevel = "1" | "2" | "3" | "4" | "5" | "6" | "all" | "headings";
+// graphrelayout □7（2026-09-20）：新档 "auto"=自适应最高标题级（bear 拍板「默认显示到
+// 一级标题；没有一级只有二级就显示二级」）——设置消费层 settingShowLevelToExpand 换算
+// （文档最高标题级经 base 归一化恒=相对第 1 级 ⇒ auto ⇔ 折叠档 1；无标题退 headings），
+// 直通 initialCollapsedRows 的防御口径=折叠档 1（同 "1"）。
+export type ExpandLevel = "auto" | "1" | "2" | "3" | "4" | "5" | "6" | "all" | "headings";
 
 export interface TreeIndex {
     byId: Map<string, Block>;
@@ -39,6 +43,13 @@ export function buildTreeIndex(rows: Block[]): TreeIndex {
     return { byId, childrenOf, parentOf, roots };
 }
 
+/** 初始折叠集档位豁免（□8 评审 P2）：full 档超级块不进默认折叠——subflow 空间组默认
+ *  展开（□8 前语义；□8 的 s 默认折叠是 structure 档拍板，误扩 full 档会让无存档文档
+ *  首开 sb 从空间组退折叠卡） */
+export interface CollapsedRowsOpts {
+    keepSuperExpanded?: boolean;
+}
+
 /**
  * 初始折叠集（按 rows 出现序，确定性；期7 起只按标题层级，段落链已改走 ¶ 合并通道）：
  * level="N"：标题层级 ≥N 且有图内子节点的标题；level="all"：空集。
@@ -47,11 +58,17 @@ export function buildTreeIndex(rows: Block[]): TreeIndex {
  * 「列表不在展开范围」不随默认档抬升）。
  * 叶子标题（无子树）不进集——空角标点击无反应（e2e 实锤）；文档根不折叠。
  * graphbox-listfix（2026-09-18 bear 拍板「列表不在展开范围也可以」）：非标题容器
- * （结构态=列表项 i）默认折叠——层级可见靠展开 toggle（+N 角标），all 同样全展开。
+ * 默认折叠——层级可见靠展开 toggle（+N 角标），all 同样全展开。
+ * graphrelayout □8（bear 拍板「列表/超级块都是容器，向下打开」）：容器族=i/l/s 全默认
+ * 折叠（●N 徽标自带展开/收缩）；级数档（1..6/auto/headings）只管标题层，容器不受
+ * 级数选择器折叠影响（自己的 ●N 控制），唯 all 恒全展开。**s 折叠限 structure 档**——
+ * full 档传 {keepSuperExpanded:true}（applyRowsAndLinks/applyShowLevel 消费），sb 保持
+ * subflow 空间组默认展开；l 壳 full 档不入 rows（shortenList 剔壳）分支天然不涉。
  */
-export function initialCollapsedRows(rows: Block[], level: ExpandLevel, base = 1): string[] {
+export function initialCollapsedRows(rows: Block[], level: ExpandLevel, base = 1, opts?: CollapsedRowsOpts): string[] {
     const tree = buildTreeIndex(rows);
-    const minHeading = level === "all" || level === "headings" ? 99 : parseInt(level, 10);
+    // "auto" 直通防御（正常经 settingShowLevelToExpand 已换算掉）：自适应=相对第 1 级起折叠
+    const minHeading = level === "all" || level === "headings" ? 99 : level === "auto" ? 1 : parseInt(level, 10);
     const out: string[] = [];
     for (const r of rows) {
         if (r.type === "h" && r.subtype?.startsWith("h")) {
@@ -59,8 +76,8 @@ export function initialCollapsedRows(rows: Block[], level: ExpandLevel, base = 1
             // 时章=h2 不再被默认 level=2 折掉——treemap 战役 □2 病灶③）
             const lv = parseInt(r.subtype.slice(1), 10) - base + 1;
             if (lv >= minHeading && (tree.childrenOf.get(r.id)?.length ?? 0) > 0) out.push(r.id);
-        } else if (r.type === "i") {
-            // 列表不在「展开层级」范围（i 不占标题层级）；无子树不折（空角标无意义同款）
+        } else if (r.type === "i" || r.type === "l" || (r.type === "s" && !opts?.keepSuperExpanded)) {
+            // 容器不在「展开层级」范围（不占标题层级）；无子树不折（空角标无意义同款）
             if (level !== "all" && (tree.childrenOf.get(r.id)?.length ?? 0) > 0) out.push(r.id);
         }
     }
@@ -228,10 +245,15 @@ export function showLevelToExpandLevel(show: number, maxRel: number): ExpandLeve
 
 /** 设置值 → 折叠档（设置新口径=「显示到第 N 级标题」；headings/all 透传）：
  *  数字档按文档实际级范围换算；无标题文档退 headings（无标题可折，空推导同语义）。
+ *  graphrelayout □7："auto"=自适应最高标题级——文档最高标题级（headingRangeOf 的 base，
+ *  绝对级）经 base 归一化恒=相对第 1 级，故 auto ⇔ 显示到相对第 1 级 ⇔ 折叠档 1：
+ *  有 h1 显示到 h1、只有 h2 显示到 h2（章=折叠卡）；无标题同数字档退 headings（标题层
+ *  无物可显，杂项照常）；单级文档（maxRel=1 无更深可折）落 headings=标题全不折。
  *  旧口径（折叠起点，值 N 实显 N-1 级）存量值的读时迁移见 index.ts 装载段。 */
 export function settingShowLevelToExpand(setting: ExpandLevel, range: { base: number; max: number } | null): ExpandLevel {
     if (setting === "headings" || setting === "all") return setting;
     if (!range) return "headings";
+    if (setting === "auto") return showLevelToExpandLevel(1, range.max - range.base + 1);
     return showLevelToExpandLevel(parseInt(setting, 10), range.max - range.base + 1);
 }
 

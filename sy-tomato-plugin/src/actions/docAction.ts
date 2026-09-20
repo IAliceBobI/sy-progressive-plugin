@@ -39,10 +39,11 @@ const LastDocBallKey = "TomatoFloatingLastDocBall";
 function rememberLastDocBall(ball: BallItem) {
     (globalThis as any)[LastDocBallKey] = ball.id;
 }
-/** 落底定位 id（仅 tab 通道——OpenSyFile2→openTab 默认 action=cb-get-hl 滚到尾块
- *  （bear 09-15 禁聚焦政策，navUtils 默认值已去 cb-get-focus）；对话框/悬浮窗内
- *  new Protyle 构造不消费定位类 action——跳底走尾窗种档直载（fballtail □1/□2，
- *  docAction 预取+组件构造期 cb-get-rootscroll） */
+/** 落底定位 id（仅 tab 通道——OpenSyFile2→openTab 按 keepFocus 分流 action：跳底开=
+ *  cb-get-focus+cb-get-outline 光标钉尾块块尾（bear 09-20 打开即续写豁免）；跳底关=
+ *  cb-get-hl 只滚动（bear 09-15 禁聚焦政策）。对话框/悬浮窗内 new Protyle 构造不
+ *  消费定位类 action——跳底走尾窗种档直载（fballtail □1/□2，docAction 预取+组件
+ *  构造期 cb-get-rootscroll） */
 const focusIDOf = (docID: string) =>
     resolveFocusID(docID, floatingballDocOpenBottom.get() === true, (id) => siyuan.getDocLastID(id));
 
@@ -151,7 +152,11 @@ export const docAction: BallAction = {
                     if (item.docName === "$$dailynote" ? closeTabByDocID(docID) : closeTab(item.docName)) {
                         //
                     } else {
-                        await OpenSyFile2(getTomatoPluginInstance(), await focusIDOf(docID));
+                        // bear 09-20：跳底开=打开即续写——keepFocus 豁免禁聚焦（同日记
+                        // 跳底，光标钉尾块块尾）；跳底关=维持禁聚焦政策不动
+                        const atBottom = floatingballDocOpenBottom.get() === true;
+                        await OpenSyFile2(getTomatoPluginInstance(), await focusIDOf(docID),
+                            null, null, null, null, atBottom);
                     }
                     break;
                 case FloatingBallDocType_dialog.id:

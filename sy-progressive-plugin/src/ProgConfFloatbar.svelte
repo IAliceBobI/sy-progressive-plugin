@@ -14,9 +14,9 @@
     let { pieceMainBtns = $bindable(), pieceMainBtnsDirty = $bindable(false) }: Props = $props();
 
     // ============ 片态浮条首行按钮池（勾选站首行大钮，未勾落平铺区小格——□10 方案 B；
-    // □14c 扩全量池（32 项 = 7 池钮 + 3 托盘 + 8 低频含 map/recite/traceUp + 14 高级，
-    // □14c 时为 28、□11 增 map、□27 增 recite、□29 增 traceUp）：池钮 + 低频 + 高级钮
-    // 皆可入首行，桌面浮条上直接拖拽同效） ============
+    // □14c 扩全量池（33 项 = 7 池钮 + 3 托盘 + 9 低频含 map/recite/traceUp/delSwap + 14 高级，
+    // □14c 时为 28、□11 增 map、□27 增 recite、□29 增 traceUp、delswap □1 增 delSwap 32→33）：
+    // 池钮 + 低频 + 高级钮皆可入首行，桌面浮条上直接拖拽同效） ============
     const MAIN_BTN_LABELS: Record<string, () => string> = {
         digest: () => tomatoI18n.摘抄选中内容,
         cards: () => tomatoI18n.附属卡,
@@ -33,6 +33,7 @@
         refill: () => tomatoI18n.重插,
         clean: () => tomatoI18n.删原文,
         delExit: () => tomatoI18n.删片退出,
+        delSwap: () => tomatoI18n.删片换书, // delswap □1 删本片+轮转下一本书（满额时也可用）
         ignore: () => tomatoI18n.不再推送,
         // □11 路线指引浮层（四态通用低频）——此前缺键，fallback 裸显英文 id「Map」（□23 实锤）
         map: () => tomatoI18n.路线指引,
@@ -74,6 +75,7 @@
         refill: () => tomatoI18n.tip重插,
         clean: () => tomatoI18n.tip删原文,
         delExit: () => tomatoI18n.tip删片退出,
+        delSwap: () => tomatoI18n.tip删片换书, // delswap □1（新增按钮两表同步加行纪律）
         ignore: () => tomatoI18n.tip不再推送,
         map: () => tomatoI18n.tip路线指引,
         recite: () => tomatoI18n.tip仿写本片, // 片态语义（digest 态「送进仿写」不进此池）

@@ -80,8 +80,8 @@ class GraphFloatBox {
     private panelBodyEl: HTMLElement | null = null;
     /** 浮窗实例专属控件 ID（与 dock 实例独立，GraphBoxSvelte 按 ID 绑定不串台） */
     private readonly viewModeGroupID = newID();
-    private readonly landscapeSwitchBtnID = newID();
-    // graphmind □4：级数选择器（与 dock 头栏同款控件组）
+    // graphmind □4：级数选择器（与 dock 头栏同款控件组；graphrelayout □2 形态循环钮退役）
+
     private readonly showLevelSelectID = newID();
 
     private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -114,9 +114,9 @@ class GraphFloatBox {
                     this.panelBodyEl = el;
                 },
                 onTools: (el: HTMLElement) => {
-                    // dock 头栏同款控件组（四档直切+形态循环钮）——ID 独立，绑定由
-                    // GraphBoxSvelte onMount 按 ID 完成（与 dock 通道同一套逻辑）
-                    el.innerHTML = graphToolbarHTML(this.viewModeGroupID, this.landscapeSwitchBtnID, this.showLevelSelectID);
+                    // dock 头栏同款控件组（四档直切；graphrelayout □2 形态循环钮退役）——
+                    // ID 独立，绑定由 GraphBoxSvelte onMount 按 ID 完成（与 dock 通道同一套逻辑）
+                    el.innerHTML = graphToolbarHTML(this.viewModeGroupID, this.showLevelSelectID);
                 },
                 // 拖拽/resize 落定后：重测量画布+重算球让位
                 onGeoChange: () => this.onPanelGeoChange(),
@@ -242,7 +242,6 @@ class GraphFloatBox {
                 props: {
                     plugin: this.plugin,
                     dock: this.pseudoDock,
-                    landscapeSwitchBtnID: this.landscapeSwitchBtnID,
                     viewModeGroupID: this.viewModeGroupID,
                     showLevelSelectID: this.showLevelSelectID,
                     fit: "host",
@@ -286,6 +285,15 @@ class GraphFloatBox {
             clearInterval(this.pollTimer);
             this.pollTimer = null;
         }
+    }
+
+    /** graphrelayout □5：dock 侧 ws 监听转发——块属性写（updateAttrs，含块级标记 toggle）
+     *  的标记轻通道通知。浮窗不自挂 ws（Events.addWsListener 无 remove，GraphBox.ts 的
+     *  "tomato-graph-auto-refresh-2025" 已覆盖全实例），由 dock 监听判定命中时调这里；
+     *  面板未开/已卸载=静默 no-op（toggleBlockMark 只通知 dock 实例的既有形态在此补齐） */
+    notifyMarksChanged() {
+        if (!this.alive || !this.panelOpen) return;
+        this.pseudoDock?.data?.marksChanged?.();
     }
 
     private async pollOnce() {

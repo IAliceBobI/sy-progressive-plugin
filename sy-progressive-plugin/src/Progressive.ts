@@ -1275,6 +1275,22 @@ class Progressive {
                     pressSkip()
                 });
                 break;
+            // delswap □1（650189 鸟反馈）：删本片+滚筒轮转下一本书（deleteAndExit 停在原地
+            // 的换书版）。不中满闸——同 deleteAndExit 口径：不出片不记账不在闸面，下一本
+            // 书的账由它自己的出片链走。这正是「本书今日满额时也可用」的要点：满额时
+            // 「下一片」被 progpush □1 硬闸拦停，本动作给「不保留已读片」的用户一个出口
+            // （片删掉锚无回推目标，次日不会重推这篇无价值分片）。换书段照抄 nextBook 链。
+            case HtmlCBType.deleteAndSwap:
+                confirm("⚠️", tomatoI18n.删片换书确认, async () => {
+                    await siyuan.removeRiffCards([noteID]);
+                    siyuan.removeDocByID(noteID);
+                    const r = await this.startToLearnLeased();
+                    if (r === "done") {
+                        showCardAnswer();
+                        pressSkip()
+                    }
+                });
+                break;
             case HtmlCBType.deleteAndBack:
                 confirm("⚠️", tomatoI18n.删除并返回, async () => {
                     await siyuan.removeRiffCards([noteID]);

@@ -4133,6 +4133,23 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Del & exit";
         }
     }
+    // delswap □1（650189 鸟反馈）：删本片+轮转下一本书（满额时也可用）
+    public get 删片换书() {
+        switch (this.lang) {
+            case "zh_CN": return "删片换书";
+            case "zh_CHT": return "刪片換書";
+            case "en_US":
+            default: return "Del & swap";
+        }
+    }
+    public get 删片换书确认() {
+        switch (this.lang) {
+            case "zh_CN": return "删除本片并换下一本书？";
+            case "zh_CHT": return "刪除本片並換下一本書？";
+            case "en_US":
+            default: return "Delete this piece and swap to the next book?";
+        }
+    }
     public get 不再推送() {
         switch (this.lang) {
             case "zh_CN": return "不再推送";
@@ -6986,6 +7003,16 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "刪本片，退出閱讀";
             case "en_US":
             default: return "Delete this piece, exit reading";
+        }
+    }
+
+    // delswap □1（650189 鸟反馈）：句式沿读片五变体「删不删→去哪」同构（tip下片删矩阵）
+    public get tip删片换书() {
+        switch (this.lang) {
+            case "zh_CN": return "删本片，换下一本书；本书今日满额也能用";
+            case "zh_CHT": return "刪本片，換下一本書；本書今日滿額也能用";
+            case "en_US":
+            default: return "Delete this piece and open the next book; works even at today's limit";
         }
     }
 
@@ -10706,101 +10733,100 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "%1 paras · %2 chars, click to collapse";
         }
     }
-    // graphmind □3（2026-09-19）：¶ 合并框双态文案（共识#4——收起=首尾各一段+省略标记，
-    // 块计数并入标记承载、¶×N 徽标收起态退役不重复报数；展开=原文序全段）
-    public get 段落链省略块() {
+    // graphrelayout □9（2026-09-20）：内容块胶囊化文案——¶ 合并链双态卡退役（graphmind □3
+    // 三键随之清退，one-in-one-out），胶囊/hover 预览词表取代
+    public get 胶囊段落链() {
         switch (this.lang) {
-            case "zh_CN": return "⋯ %1 块 ⋯";
-            case "zh_CHT": return "⋯ %1 塊 ⋯";
-            case "ja_JP": return "⋯ %1 ブロック ⋯";
+            case "zh_CN": return "段落链 · %1 段";
+            case "zh_CHT": return "段落鏈 · %1 段";
+            case "ja_JP": return "段落チェーン · %1 ブロック";
             case "en_US":
-            default: return "… %1 blocks …";
+            default: return "Para chain · %1 blocks";
         }
     }
-    public get 段落链点击展开() {
+    public get 胶囊代码() {
         switch (this.lang) {
-            case "zh_CN": return "已省略 %1 块，点击展开全文";
-            case "zh_CHT": return "已省略 %1 塊，點擊展開全文";
-            case "ja_JP": return "%1 ブロックを省略中、クリックで全文展開";
+            case "zh_CN": return "代码";
+            case "zh_CHT": return "代碼";
+            case "ja_JP": return "コード";
             case "en_US":
-            default: return "%1 blocks omitted; click to expand";
+            default: return "Code";
         }
     }
-    public get 段落链点击收起() {
+    public get 胶囊引用() {
         switch (this.lang) {
-            case "zh_CN": return "点击收起，显示首尾段";
-            case "zh_CHT": return "點擊收起，顯示首尾段";
-            case "ja_JP": return "クリックで折りたたんで前後の段落のみ表示";
+            case "zh_CN": return "引用";
+            case "zh_CHT": return "引用";
+            case "ja_JP": return "引用";
             case "en_US":
-            default: return "Click to collapse to first and last paragraphs";
+            default: return "Quote";
+        }
+    }
+    public get 胶囊表格() {
+        switch (this.lang) {
+            case "zh_CN": return "表 %1 行";
+            case "zh_CHT": return "表 %1 行";
+            case "ja_JP": return "表 %1 行";
+            case "en_US":
+            default: return "Table %1 rows";
+        }
+    }
+    public get 胶囊表格名() {
+        switch (this.lang) {
+            case "zh_CN": return "表格";
+            case "zh_CHT": return "表格";
+            case "ja_JP": return "表";
+            case "en_US":
+            default: return "Table";
+        }
+    }
+    public get 胶囊表格行数() {
+        switch (this.lang) {
+            case "zh_CN": return "共 %1 行";
+            case "zh_CHT": return "共 %1 行";
+            case "ja_JP": return "計 %1 行";
+            case "en_US":
+            default: return "%1 rows";
+        }
+    }
+    public get 胶囊公式() {
+        switch (this.lang) {
+            case "zh_CN": return "公式";
+            case "zh_CHT": return "公式";
+            case "ja_JP": return "数式";
+            case "en_US":
+            default: return "Math";
+        }
+    }
+    public get 胶囊音频() {
+        switch (this.lang) {
+            case "zh_CN": return "音频";
+            case "zh_CHT": return "音頻";
+            case "ja_JP": return "オーディオ";
+            case "en_US":
+            default: return "Audio";
+        }
+    }
+    public get 胶囊视频() {
+        switch (this.lang) {
+            case "zh_CN": return "视频";
+            case "zh_CHT": return "視頻";
+            case "ja_JP": return "ビデオ";
+            case "en_US":
+            default: return "Video";
+        }
+    }
+    public get 胶囊属性视图() {
+        switch (this.lang) {
+            case "zh_CN": return "属性视图";
+            case "zh_CHT": return "屬性視圖";
+            case "ja_JP": return "データベース";
+            case "en_US":
+            default: return "Database";
         }
     }
     // graphbox 期3（2026-09-04）：大图缩放提示（「超级块/引述块」复用基类既有 getter 不重定义）；
     // 期7 改口径：四态形态下「竖排·向右」是窄窗解，不再说「纵向布局」
-    public get 图较大建议切换纵向() {
-        switch (this.lang) {
-            case "zh_CN": return "图较大（已缩至 %1%），可点顶栏按钮试竖排布局";
-            case "zh_CHT": return "圖較大（已縮至 %1%），可點頂欄按鈕試豎排佈局";
-            case "ja_JP": return "グラフが大きく（%1% まで縮小）、上部ボタンで縦書きレイアウトを試せます";
-            case "en_US":
-            default: return "Large graph (zoomed to %1%); try vertical-text layout via the topbar button";
-        }
-    }
-    // graphbox 期7（2026-09-04）：布局形态四态（循环钮 aria-label 与设置项共用）
-    public get 切换布局形态() {
-        switch (this.lang) {
-            case "zh_CN": return "切换布局形态（当前：%1）";
-            case "zh_CHT": return "切換佈局形態（當前：%1）";
-            case "ja_JP": return "レイアウトを切り替え（現在：%1）";
-            case "en_US":
-            default: return "Switch layout form (now: %1)";
-        }
-    }
-    public get 形态横排向右() {
-        switch (this.lang) {
-            case "zh_CN": return "横排·向右";
-            case "zh_CHT": return "橫排·向右";
-            case "ja_JP": return "横書き·右向き";
-            case "en_US":
-            default: return "Horizontal, right";
-        }
-    }
-    public get 形态横排向下() {
-        switch (this.lang) {
-            case "zh_CN": return "横排·向下";
-            case "zh_CHT": return "橫排·向下";
-            case "ja_JP": return "横書き·下向き";
-            case "en_US":
-            default: return "Horizontal, down";
-        }
-    }
-    public get 形态竖排向右() {
-        switch (this.lang) {
-            case "zh_CN": return "竖排·向右";
-            case "zh_CHT": return "豎排·向右";
-            case "ja_JP": return "縦書き·右向き";
-            case "en_US":
-            default: return "Vertical, right";
-        }
-    }
-    public get 形态竖排向下() {
-        switch (this.lang) {
-            case "zh_CN": return "竖排·向下";
-            case "zh_CHT": return "豎排·向下";
-            case "ja_JP": return "縦書き·下向き";
-            case "en_US":
-            default: return "Vertical, down";
-        }
-    }
-    public get 默认布局形态() {
-        switch (this.lang) {
-            case "zh_CN": return "默认布局形态";
-            case "zh_CHT": return "預設佈局形態";
-            case "ja_JP": return "既定レイアウト";
-            case "en_US":
-            default: return "Default layout form";
-        }
-    }
     // 「刷新」复用基类既有 getter（ja_JP=リフレッシュ），不重定义
     public get 图加载中() {
         switch (this.lang) {
