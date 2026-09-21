@@ -14,6 +14,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
 import { cardBlocksForMake } from "./flashCardChannel";
+import { parseBookIDFromCtime } from "./progData";
 import { shouldAddOriginRef } from "./flashCardRef";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { lockWithLease } from "./lockLease";
@@ -237,7 +238,7 @@ class FlashBox {
     }
 
     private async doInsertCard(protyle: IProtyle, divs: HTMLElement[], t: CardType, lastSelectedID: string, path?: string, landing?: CardLanding) {
-        const boxID = flashcardNotebook.get(a => {
+        let boxID = flashcardNotebook.get(a => {
             if (!a) return protyle.notebookId
             return a;
         });
@@ -245,6 +246,22 @@ class FlashBox {
         if (!docID) return;
         let { bookID } = await getBookID(docID);
         const srcDocAttrs = await siyuan.getBlockAttrs(docID);
+        // □3 落点修复（刘璐 09-21 反馈）：getBookID 只认分片锚（custom-progmark/
+        // custom-book-writing），摘抄中制卡恒空 → cards 档退回「当前文档下」，摘抄在
+        // 集中归档本=卡落归档本+按面包屑补建空路径文档。摘抄文档带 custom-pdigest-ctime
+        // （值含书 id，曲线巡查/摘抄面板同款 parseBookIDFromCtime 反解）——书锚在手走书下
+        // cards 夹；建卡夹的 box 跟书走（用户显式设了 flashcardNotebook 卡本的除外）。
+        // 书已删不认锚（box 查空=书不在世），保持旧行为落当前文档下防静默 no-op
+        if (!bookID) {
+            const digestBookID = parseBookIDFromCtime(String(srcDocAttrs[gconst.PDIGEST_CTIME] ?? ""));
+            if (digestBookID) {
+                const bookBox = await siyuan.sqlOne(`select box from blocks where id = "${digestBookID}"`);
+                if (bookBox?.box) {
+                    bookID = digestBookID;
+                    if (!flashcardNotebook.get()) boxID = bookBox.box;
+                }
+            }
+        }
         const srcPriority = srcDocAttrs["custom-card-priority"];
         const { cardID, domStr, text } = await this.createList(divs, srcPriority);
         const ops = []

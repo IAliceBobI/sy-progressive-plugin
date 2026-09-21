@@ -15,6 +15,13 @@
 export const READCARD_KEY = "custom-prog-readcard";
 /** 自家建卡尾链 review(2) 的 lastReview≈建卡时刻；真评分判据须留 5s 余量 */
 export const RATING_GRACE_MS = 5_000;
+/** 撤回保护窗（□1 曲线undo双计）：收到原生「上一步」(-2) 时把水位线推到 now+本窗，
+ *  撤回后几秒内的重评 lastReview < 水位线+RATING_GRACE_MS → isRated 恒 false，不再
+ *  消耗第二轮（上一步=内核纯前端 index-- 回退不撤 riff 评分，第一次评分已消耗
+ *  waterline=t1，撤回重评 lastReview=t2>t1+grace → 无保护则下轮巡查双计）。
+ *  5min：远超 5s 余量，覆盖撤回→重评的手速窗；每次 -2 窗口起点后移=多次上一步
+ *  幂等；过期无需清理——lastReview 是固定历史时刻，水位线已在其后即永久挡住 */
+export const UNDO_GUARD_MS = 300_000;
 /** 陈卡/忽略书推远天数（与忽略同通道；片删孤儿自然出局） */
 export const FAR_DUE_DAYS = 99;
 
@@ -94,6 +101,27 @@ export function parseReadCard(value: string): ReadCardState | null {
 export function skipDefersCard(value: string): boolean {
     const st = parseReadCard(value);
     return !!st && !st.graduated && (st.mode === "grow" || st.mode === "sched");
+}
+
+/** □1 曲线undo：-2 保护窗是否适用。拦=grow/sched 未毕业（任意 kind，含转档金句片
+ *  与 rpcard/plain 全局对象）+ material/digest 的 daily（首推/存量升级面也有 count，
+ *  digestAnchored=素材摘抄锚在场，生产侧按 inspectReadCard 同判据面算好）；
+ *  piece/slot 分片 daily=流转族（评分=摘卡清键，撤回重评无 count 面）零动作；
+ *  毕业卡已摘不在队列，无键/垃圾值天然放行 */
+export function undoGuardsCard(value: string, digestAnchored: boolean): boolean {
+    const st = parseReadCard(value);
+    if (!st || st.graduated) return false;
+    if (st.mode === "grow" || st.mode === "sched") return true;
+    return st.mode === "daily" && digestAnchored;
+}
+
+/** □1 曲线undo：-2 保护窗键值变换——水位线推到 nowMs+UNDO_GUARD_MS，mode/count/
+ *  freq/graduated 零漂移（与 consumeRound 回写同通道，只动 waterlineMs；垃圾值返
+ *  null 由调用方判空放行） */
+export function guardReadCardValue(value: string, nowMs: number): string | null {
+    const st = parseReadCard(value);
+    if (!st) return null;
+    return formatReadCard({ ...st, waterlineMs: nowMs + UNDO_GUARD_MS });
 }
 
 /** 状态 → 身份键值（毕业态落 g；与 parseReadCard 互逆。□3：频率尾段只落 grow/毕业态

@@ -25,7 +25,7 @@ import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
 import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, rollerTodayGate, rollerTodaysFullIDs, activeFullIDs, manualFirstExcerptGuide } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { notifyFleetChanged } from "./fleetNotify";
-import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadCurve, initReadCurveTriggers, removeFromReadingCurve, resolveReadMenuTarget, retirePieceCard, sweepReadCurve } from "./readCurve";
+import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadCurve, guardUndoReadCard, initReadCurveTriggers, removeFromReadingCurve, resolveReadMenuTarget, retirePieceCard, sweepReadCurve } from "./readCurve";
 import { openReadCardMenu } from "./readCardMenu";
 import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCore";
 import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
@@ -169,9 +169,13 @@ class Progressive {
         });
         // progpush □3：原生复习「跳过」→推迟明天（grow/sched 曲线卡 due=明天 00:00，曲线
         // 零消耗）。click-flashcard-action=内核卡动作广播（payload={type,card}，-3=跳过；
-        // npm siyuan 类型包尚无此枚举，as any 绕过）。非曲线卡 defer 内判键零动作放行原生语义
+        // npm siyuan 类型包尚无此枚举，as any 绕过）。非曲线卡 defer 内判键零动作放行原生语义。
+        // □1 曲线undo双计：-2 上一步=内核纯前端回退不撤 riff 评分，撤回重评的 lastReview
+        // 更晚 → 巡查 isRated 再真=双计；guard 内推水位线保护窗把重评挡在外面（只算一轮）
         (this.plugin.eventBus.on as any)("click-flashcard-action", ({ detail }: any) => {
-            if (detail?.type === "-3" && detail.card?.blockID) void deferSkippedReadCard(detail.card.blockID);
+            const id = detail?.card?.blockID;
+            if (detail?.type === "-3" && id) void deferSkippedReadCard(id);
+            if (detail?.type === "-2" && id) void guardUndoReadCard(id);
         });
         this.plugin.eventBus.on("open-menu-content", ({ detail }) => {
             const menu = detail.menu;

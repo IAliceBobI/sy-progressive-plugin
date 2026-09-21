@@ -30,8 +30,8 @@ import {
     AUTORELAX_KEY, AUTO_RELAX_CAP, CurveMode, CurvePlanCard, parseReadCard, RATING_GRACE_MS, READCARD_KEY, READOUT_KEY, ReadCardKind,
     cadenceDays, cadenceOpts, consumeRound, DIGEST_BUILD_CAP, dueStamp, formatReadCard, GROW_INTERVALS,
     growInterval, isConsumedCurve, isMaterialFirstPush, isRPCardMarkdown, isRated, normalizeDue, parseStamp, planSweep, plusDays,
-    readMenuTarget, RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, skipDefersCard, sortForReconcile, tailFollowState,
-    toSchedValue, tomorrowStart, VisitFreq, VISITRATE_KEY,
+    guardReadCardValue, readMenuTarget, RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, skipDefersCard, sortForReconcile, tailFollowState,
+    toSchedValue, tomorrowStart, undoGuardsCard, VisitFreq, VISITRATE_KEY,
 } from "./readCurveCore";
 import { statusLineOf } from "./readCurveText";
 
@@ -1225,6 +1225,32 @@ export async function deferSkippedReadCard(blockID: string): Promise<void> {
         debugLog("readcurve", `skip→defer ${blockID}`, "progressive");
     } catch (e) {
         debugLog("readcurve", `skip→defer fail ${blockID}: ${e}`, "progressive");
+    }
+}
+
+/** □1 曲线undo双计：原生「上一步」(-2) → 撤回重评只算一轮。上一步=内核纯前端
+ *  index-- 回退（openCard data-type="-2"，不调任何 API），第一次评分已落 riff
+ *  lastReview 且消耗已推水位线（waterline=t1）；内核无撤销评分 API，撤回重评=
+ *  内核再记一次完整复习（lastReview=t2>t1+grace）→ 下轮巡查 isRated 再真=双计。
+ *  此处把水位线推到 now+UNDO_GUARD_MS：重评的 lastReview 落窗内 → 恒非真评分，
+ *  不再消耗第二轮。digestAnchored=素材/摘抄锚（inspectReadCard 同判据面：MarkKey
+ *  真片锚优先判流转族，PDIGEST_CTIME 反解书 id）；piece 分片族零动作。IAL 直读
+ *  判键（判向通道禁 SQL）；多次 -2 后移窗起点=幂等无害；静默无 toast（对外口径：
+ *  收到上一步时给卡片加保护窗，撤回重评只算一轮） */
+export async function guardUndoReadCard(blockID: string): Promise<void> {
+    if (!blockID) return;
+    try {
+        const attrs = ((await siyuan.getBlockAttrs(blockID)) ?? {}) as any;
+        const readcard = String(attrs[READCARD_KEY] ?? "");
+        const anchored = !parsePieceMark(String(attrs[MarkKey] ?? ""))
+            && !!parseBookIDFromCtime(String(attrs[PDIGEST_CTIME] ?? ""));
+        if (!undoGuardsCard(readcard, anchored)) return;
+        const value = guardReadCardValue(readcard, Date.now());
+        if (!value) return;
+        await siyuan.setBlockAttrs(blockID, { [READCARD_KEY]: value } as any);
+        debugLog("readcurve", `undo→guard ${blockID}`, "progressive");
+    } catch (e) {
+        debugLog("readcurve", `undo→guard fail ${blockID}: ${e}`, "progressive");
     }
 }
 
