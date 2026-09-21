@@ -9,7 +9,7 @@ import FleetFlame from "./FleetFlame.svelte";
 import WritingFlame from "./WritingFlame.svelte";
 import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
-import { rollerDebtSummary, rollerTodayWrites, type DebtSummary } from "./roller";
+import { rollerDebtSummary, rollerTodayWrites, invalidateTodaysFullCache, type DebtSummary } from "./roller";
 import { pickWritingFlameBook } from "./writeBook";
 import { latestVisitNoteOfBook } from "./visitNoteQuery";
 import { progStorage } from "./ProgressiveStorage";
@@ -59,6 +59,9 @@ export interface FleetActions {
     /** rollerquota □3 入口①：读完书重置阅读进度（point 归零，分片/摘抄/复习记录不动）
      *  并立即出片 */
     resetReadingPoint(bookID: string): any;
+    /** progfeatpool 件4：批量整理摘抄（对该书摘抄清单开选择器：勾选→目标写作书→
+     *  批量复制入池/换籍，见 Progressive.openBatchPoolDialog） */
+    openBatchPool(bookID: string): any;
 }
 
 export const FLEET_DOCK_TYPE = "prog-fleet-dock";
@@ -162,9 +165,12 @@ export async function refreshFleet() {
     await Promise.all([refreshFlame(), refreshWritingFlame(), refreshPanel()]);
 }
 
-/** 档位切换（Dock 今日状态区胶囊）：落盘 + 立即重刷（今天的 q 以实时档位覆盖） */
+/** 档位切换（Dock 今日状态区胶囊）：落盘 + 立即重刷（今天的 q 以实时档位覆盖）。
+ *  progfeatpool 件2 边界⑥：达量集 1s TTL 缓存随调档立即失效——免窗口内按旧档判
+ *  「今日已读满」（quota 现取已在 todaysFullIDsImpl 保证，此处只清按旧档算出的值） */
 export async function setQuota(n: number) {
     await dailyQuota.write(String(n));
+    invalidateTodaysFullCache();
     await refreshFleet();
 }
 

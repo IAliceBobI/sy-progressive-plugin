@@ -11096,13 +11096,16 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
-    // rollerquota □1 全满额对症提示（nextBook null 且达量集非空=不再误报空书架）
-    public get 今日轮转书已全部读满() {
+    // rollerquota □1 全满额对症提示（nextBook null 且达量集非空=不再误报空书架）。
+    // progfeatpool 件2（B 口径 2026-09-21）后达量集含手动书：计量=当日轮到次数（与
+    // 切片书共用档位，次日自动回池），文案口径随键名说明；旧键「今日轮转书已全部读满」
+    // 唯一消费者已换新键，删除防死键
+    public get 今日轮转书已全部读满含手动书() {
         switch (this.lang) {
-            case "zh_CN": return "今日的书都已读满档位，明天再来；想连读可点书卡续读";
-            case "zh_CHT": return "今日的書都已讀滿檔位，明天再來；想連讀可點書卡續讀";
+            case "zh_CN": return "今日的书都已轮满档位（手动书按当日轮到次数计），明天再来；想连读可点书卡续读";
+            case "zh_CHT": return "今日的書都已輪滿檔位（手動書按當日輪到次數計），明天再來；想連讀可點書卡續讀";
             case "en_US":
-            default: return "All books have hit today's piece limit — come back tomorrow, or tap a book card to keep reading";
+            default: return "All books have hit today's limit (manual books count per serve) — come back tomorrow, or tap a book card to keep reading";
         }
     }
 
@@ -11825,6 +11828,173 @@ export class TomatoI18n extends TomatoI18nABC {
         if (skipped > 0) s += zh ? `，${skipped} 篇无内容已跳过` : `, ${skipped} empty skipped`;
         if (failed > 0) s += zh ? `，${failed} 篇失败请重试` : `, ${failed} failed`;
         return s;
+    }
+
+    // ============ progfeatpool 件4 批量整理摘抄（入素材池/换籍 UI 化） ============
+
+    /** 书卡右键菜单项（打开该书摘抄批量选择器） */
+    public get 批量整理摘抄() {
+        switch (this.lang) {
+            case "zh_CN": return "批量整理摘抄…";
+            case "zh_CHT": return "批次整理摘抄…";
+            case "en_US":
+            default: return "Batch organize digests…";
+        }
+    }
+
+    /** 摘抄子排钮三行制 tooltip：第一行短名 */
+    public get 批量整理() {
+        switch (this.lang) {
+            case "zh_CN": return "批量整理";
+            case "zh_CHT": return "批次整理";
+            case "en_US":
+            default: return "Batch organize";
+        }
+    }
+
+    public get tip批量整理() {
+        switch (this.lang) {
+            case "zh_CN": return "勾选本书摘抄，批量复制或换籍进写作书素材池";
+            case "zh_CHT": return "勾選本書摘抄，批次複製或換籍進寫作書素材池";
+            case "en_US":
+            default: return "Select digests of this book, then copy or move them into a writing book's material pool in bulk";
+        }
+    }
+
+    /** Dialog 头部说明行（信息平铺不藏 hover）；cap=单批上限（POOL_BATCH_CAP 注入防漂移） */
+    public 批量整理摘抄说明(cap: number) {
+        switch (this.lang) {
+            case "zh_CN": return `勾选摘抄，批量复制（留底）或换籍（移动）进写作书素材池，单批至多 ${cap} 篇`;
+            case "zh_CHT": return `勾選摘抄，批次複製（留底）或換籍（移動）進寫作書素材池，單批至多 ${cap} 篇`;
+            case "en_US":
+            default: return `Select digests to copy (keep original) or move into a writing book's material pool, up to ${cap} per batch`;
+        }
+    }
+
+    /** >100 UI 侧先拦提示（引擎壳抛错兜底同口径：按去重后计数） */
+    public 批量超上限提示(n: number, cap: number) {
+        switch (this.lang) {
+            case "zh_CN": return `本批 ${n} 篇超出单批上限 ${cap} 篇，请分批整理（建议每批 50~100 篇）`;
+            case "zh_CHT": return `本批 ${n} 篇超出單批上限 ${cap} 篇，請分批整理（建議每批 50~100 篇）`;
+            case "en_US":
+            default: return `This batch has ${n} digests, over the ${cap} per-batch limit. Split it (50-100 per batch recommended)`;
+        }
+    }
+
+    public get 批量复制入池() {
+        switch (this.lang) {
+            case "zh_CN": return "批量复制入池";
+            case "zh_CHT": return "批次複製入池";
+            case "en_US":
+            default: return "Copy to pool";
+        }
+    }
+
+    public get 批量换籍() {
+        switch (this.lang) {
+            case "zh_CN": return "批量换籍";
+            case "zh_CHT": return "批次換籍";
+            case "en_US":
+            default: return "Move to pool";
+        }
+    }
+
+    /** 换籍前 confirm（移动=摘抄文档迁出本书清单，破坏性须确认；DigestAllDialog
+     *  「移动素材确认」同款纪律） */
+    public 换籍摘抄确认(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `换籍将把 ${n} 篇摘抄文档移入目标书素材池（本书清单中移除），确认继续？`;
+            case "zh_CHT": return `換籍將把 ${n} 篇摘抄文件移入目標書素材池（本書清單中移除），確認繼續？`;
+            case "en_US":
+            default: return `Move ${n} digest doc(s) into the target book's material pool (removed from this book's list)?`;
+        }
+    }
+
+    /** 跑批中逐项进度（引擎串行壳 log 注入解析驱动） */
+    public 批量整理进度(done: number, total: number) {
+        switch (this.lang) {
+            case "zh_CN": return `整理中 ${done}/${total}`;
+            case "zh_CHT": return `整理中 ${done}/${total}`;
+            case "en_US":
+            default: return `Organizing ${done}/${total}`;
+        }
+    }
+
+    /** 回执 headline：copy/move 动词差异化（引擎收尾 log 直译） */
+    public 批量复制入池汇总(ok: number, skipped: number, failed: number) {
+        const zh = this.lang === "zh_CN" || this.lang === "zh_CHT";
+        let s = zh ? `已入池 ${ok} 篇` : `Copied ${ok} to pool`;
+        if (skipped > 0) s += zh ? `，跳过 ${skipped} 篇` : `, ${skipped} skipped`;
+        if (failed > 0) s += zh ? `，失败 ${failed} 篇` : `, ${failed} failed`;
+        return s;
+    }
+
+    public 批量换籍汇总(ok: number, skipped: number, failed: number) {
+        const zh = this.lang === "zh_CN" || this.lang === "zh_CHT";
+        let s = zh ? `已换籍 ${ok} 篇` : `Moved ${ok} to pool`;
+        if (skipped > 0) s += zh ? `，跳过 ${skipped} 篇` : `, ${skipped} skipped`;
+        if (failed > 0) s += zh ? `，失败 ${failed} 篇` : `, ${failed} failed`;
+        return s;
+    }
+
+    /** copy 回执差异化重试行（引擎 log「重试请只传返回值 failed 里的 id（复制非幂等，
+     *  整批重跑会双份）」直译）+ 配套重试钮短标 */
+    public get 重试只传失败篇提示() {
+        switch (this.lang) {
+            case "zh_CN": return "复制非幂等：重试只传失败篇的 id，整批重跑会产生双份副本";
+            case "zh_CHT": return "複製非冪等：重試只傳失敗篇的 id，整批重跑會產生雙份副本";
+            case "en_US":
+            default: return "Copy is not idempotent: retry with only the failed ids — rerunning the whole batch would duplicate copies";
+        }
+    }
+
+    public get 重试失败篇() {
+        switch (this.lang) {
+            case "zh_CN": return "重试失败篇";
+            case "zh_CHT": return "重試失敗篇";
+            case "en_US":
+            default: return "Retry failed";
+        }
+    }
+
+    /** move 回执差异化重试行（引擎 log「换籍幂等，整批重跑安全（已在目标书的自动
+     *  跳过，不会重复搬）」直译）+ 配套重跑钮短标 */
+    public get 换籍整批重跑安全提示() {
+        switch (this.lang) {
+            case "zh_CN": return "换籍幂等：整批重跑安全（已在目标书的自动跳过，不会重复搬）";
+            case "zh_CHT": return "換籍冪等：整批重跑安全（已在目標書的自動跳過，不會重複搬）";
+            case "en_US":
+            default: return "Move is idempotent: rerunning the whole batch is safe (already-moved ones are skipped, never duplicated)";
+        }
+    }
+
+    public get 整批重跑() {
+        switch (this.lang) {
+            case "zh_CN": return "整批重跑";
+            case "zh_CHT": return "整批重跑";
+            case "en_US":
+            default: return "Rerun batch";
+        }
+    }
+
+    /** 目标书一级菜单空态（无可用写作书=无从选目标） */
+    public get 还没有写作书可入池() {
+        switch (this.lang) {
+            case "zh_CN": return "还没有写作书可入池（先创建写作书）";
+            case "zh_CHT": return "還沒有寫作書可入池（先建立寫作書）";
+            case "en_US":
+            default: return "No writing book available yet (create one first)";
+        }
+    }
+
+    /** 子排 batchpool 钮 $bookID 空窗兜底（理论不可达：free 态钮不上排——防御分支文案） */
+    public get 无法识别所属书() {
+        switch (this.lang) {
+            case "zh_CN": return "无法识别本文档所属的书";
+            case "zh_CHT": return "無法識別本文檔所屬的書";
+            case "en_US":
+            default: return "Cannot resolve the book this document belongs to";
+        }
     }
 
     // ============ matflow（0914 □2+□5 合拍）素材池出口+翻素材+护卡断句 ============

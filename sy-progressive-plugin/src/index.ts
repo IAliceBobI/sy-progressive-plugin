@@ -624,6 +624,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
             // rollerquota □3 入口①：书卡右键「重新阅读（从头）」（守卫+重置+出片都在
             // Progressive.resetBookForReread 内）
             resetReadingPoint: (bookID) => prog.resetBookForReread(bookID),
+            // progfeatpool 件4：书卡右键「批量整理摘抄…」（选择器/跑批/回执都在
+            // Progressive.openBatchPoolDialog 内）
+            openBatchPool: (bookID) => prog.openBatchPoolDialog(bookID),
         };
         initFleet(this, fleetActions);
     }

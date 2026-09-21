@@ -91,6 +91,14 @@ export async function openBookMenu(
             else showMessage(tomatoI18n.番茄插件未启用, 2500);
         },
     });
+    // progfeatpool 件4：批量整理摘抄（查看动作组末位，退场组分隔线之前）——对该书
+    // 摘抄清单开批量选择器（勾选→目标写作书→复制入池/换籍）；iconProgMaterial=
+    // 目标素材池语义（直接入槽命令同款 sprite）
+    menu.addItem({
+        icon: "iconProgMaterial",
+        label: tomatoI18n.批量整理摘抄,
+        click: () => actions.openBatchPool(book.bookID),
+    });
     // progpush □2：暂停态不出退场组（已暂停无「再暂停/归档」高频诉求，恢复首项承担）
     if (!book.paused) {
         menu.addSeparator();

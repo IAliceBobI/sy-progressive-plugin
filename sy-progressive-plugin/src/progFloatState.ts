@@ -579,11 +579,43 @@ export function moveToFlatSeg(
 }
 
 /**
+ * 段级 drop 全量计划（件5 残留修复，onSegDrop 唯一写通道）：manifest 与剔首行后的
+ * mainIds 一次产出——调用方只负责按序落（快照先取、set 后行，与首行 onRowDrop「先算
+ * 后 commit」纪律对齐），结构上无从把 commit 写在快照之前。
+ *
+ * renderedTarget 契约=commit 前的目标段渲染快照。残留根因（progfeatpool 件5）：旧链
+ * 先 commitMainIds（剔首行）再读 rendered——$derived 链同步重算，buildFlatCells 池兜底
+ * （「digest/addBook 被拖出首行也兜底回平铺区」）把被拖首行钮按固有池位灌回快照，
+ * reorderMainIds 的 adj=-1 生效=实落=指示线左一格（dropmark 所见与实落背离，实测
+ * want∈{1,2,4}→实落{0,1,3}）。快照在 commit 前取得时：首行钮不在平铺渲染序（池/组
+ * 都按 inMain 滤）→ dragIdx0=-1 → 精确落位；平铺钮同段重排照旧带 adj 语义（快照含
+ * 被拖钮=所见即所得）。
+ *
+ * fromMain 剥除防线：mainIds 含 id（=首行拖入、尚未 commit）而快照里又出现 id，只可能
+ * 是迟快照（池兜底灌回的固有位——用户从未见过它在那），剥除即还原 commit 前快照，
+ * 落点照常精确（同 dedupFlatSegs 的「入口免疫坏输入」哲学）。首行 id 恒不进平铺渲染
+ * （池/组双滤），防线无误伤面。守备边界：mainIds 已 commit（不含 id）的迟快照与合法
+ * 同段拖拽同形、纯层不可辨——主修复靠调用方时序（快照先取），防线只是兜底。
+ */
+export function dropToFlatSeg(
+    manifest: Record<string, string[]>, targetSeg: FlatSegId,
+    renderedTarget: readonly string[], mainIds: readonly string[],
+    id: string, index: number,
+): { manifest: Record<string, string[]>; mainIds: string[] } {
+    const fromMain = mainIds.includes(id);
+    const snap = fromMain ? renderedTarget.filter(x => x !== id) : renderedTarget;
+    return {
+        manifest: moveToFlatSeg(manifest, targetSeg, snap, id, index),
+        mainIds: mainIds.filter(x => x !== id),
+    };
+}
+
+/**
  * 摘抄子排 id 联合（□3 review P2-1 编译期收紧）：组件层 DIG_ICONS/DIG_TIPS 须以
  * Record<DigSubrankId, ...> 精确匹配——任一侧增删 id 都是编译错（make check 拦），
  * 防两源漂移（漂移的失效模式是 icon undefined 渲染期 TypeError，不是温和降级）。
  */
-export type DigSubrankId = "inbox" | "tobook" | "tohub" | "splitinplace" | "think" | "card" | "review" | "word" | "wordai" | "write" | "sched" | "whole";
+export type DigSubrankId = "inbox" | "tobook" | "tohub" | "splitinplace" | "think" | "card" | "review" | "word" | "wordai" | "write" | "sched" | "whole" | "batchpool";
 
 /**
  * 摘抄子排 id 清单（□3 起单一事实源，渲染序）：digest 态精简子排；whole（整篇摘抄）限
@@ -600,13 +632,16 @@ export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
     // splitinplace 就地断句（2026-09-09）限 free+digest——book 态不给（README 初版警告：
     // 分片后改原书会让渐进找不到块）。0914 □5 放开 piece（鸟：只想断选中几段，重插
     // 必然全断）：挂闪卡的段落执行层拦（护卡），写作槽在组件层滤（死路指路勿上钮）。
-    if (kind === "digest") return ["inbox", "tobook", "tohub", "splitinplace", "think", "card", "word", "wordai"];
+    // progfeatpool 件4 batchpool（批量整理摘抄→选择器入池/换籍）限 book/piece/digest
+    // 尾位——free 态无书卡上下文（所属书 id 缺席，选择器对象=「某书的摘抄清单」无从
+    // 构造），不暴露入口。
+    if (kind === "digest") return ["inbox", "tobook", "tohub", "splitinplace", "think", "card", "word", "wordai", "batchpool"];
     const base: DigSubrankId[] = ["inbox", "tobook", "tohub", "think", "card", "review", "word", "wordai", "write", "sched"];
-    if (kind === "book") return base;
+    if (kind === "book") return [...base, "batchpool"];
     // □3 语义清理：piece 态砍 write（与低频段 recite「仿写本片」同调 runPieceRecite 纯重复；
     // book/free 首行无仿写钮保留不算重复）；0914 □5 增 splitinplace（分片部分断句，
     // 落位同 free 态=tohub 之后）
-    if (kind === "piece") return ["inbox", "tobook", "tohub", "splitinplace", ...base.filter(id => id !== "write").slice(3), "whole"];
+    if (kind === "piece") return ["inbox", "tobook", "tohub", "splitinplace", ...base.filter(id => id !== "write").slice(3), "whole", "batchpool"];
     return ["inbox", "tobook", "tohub", "splitinplace", ...base.slice(3), "whole"];
 }
 

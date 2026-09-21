@@ -313,6 +313,37 @@ export function cardActionSet(readcard: string): CardAction[] {
     return ["stop", "sched", "defer", "repush", "memory"];
 }
 
+/** riff 卡现状条目（getRiffCardsByBlockIDs 响应 blocks[] 的最小判读面；完整形态=
+ *  tomato types/siyuan.d.ts GetCardRetBlock。⚠内核对无卡块也补占位条目——riffCard=null
+ *  /riffCardID=""——真卡判定必须过滤 riffCard 空值，Map.has 恒真语义恒错（readCurve.ts
+ *  getReadingCardStates 同坑注释） */
+export interface RiffStateEntry {
+    riffCard: unknown;
+}
+
+/** 右键「阅读推送」目标块四态选择（progfeatpool 件1，纯函数；探测封装=readCurve.ts
+ *  resolveReadMenuTarget）。第四态=「转记忆卡退出的文档卡」恢复接管入口——memory 动作
+ *  只清 READCARD_KEY 不摘 riff 卡，此后 rootKeyed=false 而 root 仍有卡，旧逻辑锚右键
+ *  内容块=把内容块做成新卡（文档卡原身份四路皆断的唯一死角）。
+ *  四态序（先到先赢）：① rootKeyed=托管（片/槽/摘抄/文档卡整卡管理）→ rootID 零变化；
+ *  ② 右键块自身有 riff 卡（块级闪卡/rpcard）→ nodeID 块优先（既有 adopt 顺带清退推）；
+ *  ③ root 本身 riff 有卡（官方文档卡）且未托管 → rootID（走既有 add→addToReadingCurve
+ *  hasCard→adopt 只挂键排 due 不重建卡=原身份恢复）；④ 其余 → nodeID（普通文档内容块
+ *  单卡 opt-in，□3 语义保留）。states 缺省/null（探测失败降级）=②③皆不命中=nodeID，
+ *  即件1 前旧语义 */
+export function readMenuTarget(p: {
+    nodeID: string;
+    rootID: string;
+    rootKeyed: boolean;
+    states?: Map<string, RiffStateEntry[]> | null;
+}): string {
+    if (p.rootKeyed && p.rootID) return p.rootID;
+    const hasCard = (id: string) => (p.states?.get(id) ?? []).some(s => !!s.riffCard);
+    if (p.nodeID && hasCard(p.nodeID)) return p.nodeID;
+    if (p.rootID && hasCard(p.rootID)) return p.rootID;
+    return p.nodeID;
+}
+
 /** 巡查输入卡（身份键 SQL × riff 现状合并后的活卡；孤儿键在生产侧已滤） */
 export interface CurvePlanCard {
     blockID: string;

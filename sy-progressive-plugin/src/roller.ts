@@ -101,15 +101,38 @@ export function pickNextBook(ro: ReadingOrder, readable: Set<string>): string | 
 
 /** 当日达量书集合（纯）：粗条件 reads>=quota 不含锚——选书口语义=「今天不再轮到你」，
  *  重开当前片的锚语义留给开片闸 gateBlocked（主动点书卡续读不受影响）；quota 由调用方
- *  取当前设置（中途调档按新档判，与 gateCheck 同源）；exempt=手动书豁免集（轮转路径
- *  markReadSafe 无锚、b 计数无上限，剔除反而改变「轮到=回阅读点续读」既有语义，
- *  对齐 gateCheck 对 manualMode 直接放行） */
+ *  取当前设置（中途调档按新档判，与 gateCheck 同源）。exempt=豁免集机制保留位：B 口径
+ *  （progfeatpool 件2，2026-09-21）后生产侧豁免集由 manualExemptIDs 按 b 计数收窄——
+ *  手动书纳入「当日达量→滚筒跳过」同语义（b=当日轮转出现次数，markReadSafe 滚筒路径
+ *  唯一写点；无片概念不经 gateBlocked，达量收口只在此选书口），次日新日块 b 归零自动
+ *  回池=软出口。旧口径（手动书全量豁免、b 无上限）已退役 */
 export function fullBookIDsFrom(data: DayLogData, quota: number, exempt: Set<string>): Set<string> {
     const full = new Set<string>();
     for (const [id, reads] of Object.entries(data.b)) {
         if (!exempt.has(id) && reads >= quota) full.add(id);
     }
     return full;
+}
+
+/** B 口径豁免集（纯，progfeatpool 件2 2026-09-21）：手动书按当日轮转出现次数（b 计数）
+ *  收窄——b>=quota 的不再豁免（达量即入 fullBookIDsFrom，与切片书共用 quota 档位）；
+ *  b<quota / 当日未轮到（b 缺键=0）保留豁免位（等价空集语义：未达量本不入 full，保留
+ *  集合形态表达「收窄」而非「废除」）。quota 调用方现取——调档即按新档判（边界⑥） */
+export function manualExemptIDs(data: DayLogData, quota: number, manualBookIDs: string[]): Set<string> {
+    const exempt = new Set<string>();
+    for (const id of manualBookIDs) {
+        if ((data.b[id] ?? 0) < quota) exempt.add(id);
+    }
+    return exempt;
+}
+
+/** 0 摘抄引导触发判定（纯，边界②）：活跃手动书「全部」无未锤摘抄才引导「先摘一次」
+ *  （startToLearn 全满额分支链用）。unreadMap=bookID→hasUnreadMaterial 结果（有未锤
+ *  摘抄=在池）；任一有未锤摘抄却没被轮上 ⇒ 是当日达量（下个分支全满额提示接手）或
+ *  ⏸/⚠（首分支 handleUnreadableBook 接手）——B 口径后此分支不再吞这两种情形。
+ *  空列表=无手动书，不引导 */
+export function manualFirstExcerptGuide(manualBookIDs: string[], unreadMap: Record<string, boolean>): boolean {
+    return manualBookIDs.length > 0 && manualBookIDs.every(id => unreadMap[id] === false);
 }
 
 /** 达量集 ∩ 活跃书（未忽略/未归档/非写作/未删；review P1-1）——全满额提示判定专用：
@@ -286,6 +309,13 @@ function parseDayLogData(raw: string): DayLogData {
 /** 当日达量集进程级缓存（makeRollerDeps 每次新建，memo 只能挂模块级；见 todaysFullIDsImpl 注释） */
 let fullCache: { at: number; v: Set<string> } | null = null;
 
+/** 调档即失效（progfeatpool 件2 边界⑥）：setQuota 落盘后调用——免 1s TTL 窗内按旧档
+ *  判达量（偏严：本该可轮的书被剔）。quota 现取已在 todaysFullIDsImpl 内保证，此钩子
+ *  只清掉按旧档算出的缓存值 */
+export function invalidateTodaysFullCache(): void {
+    fullCache = null;
+}
+
 function makeRollerDeps(): RollerDeps {
     // 当日块按值查（findDayBlock 与 todaysFullIDs 共用）
     const findDayBlockByDate = async (date: string): Promise<string> => {
@@ -294,11 +324,14 @@ function makeRollerDeps(): RollerDeps {
         return rows?.at(0)?.block_id ?? "";
     };
     // 今日达量书集合（rollerquota □1）：rollerTodayGate 同款直读链+防撞窗（当日块刚建
-    // 800ms 内 findDayBlock 可能 miss，miss=今日零读、闸偏松方向）；手动书豁免对齐
-    // gateCheck；quota 取当前设置（与出片闸同源，中途调档按新档判）。
+    // 800ms 内 findDayBlock 可能 miss，miss=今日零读、闸偏松方向）；quota 取当前设置
+    // （与出片闸同源，中途调档按新档判）。B 口径（progfeatpool 件2，2026-09-21）：手动
+    // 书不再全量豁免——manualExemptIDs 按当日 b 计数收窄豁免集，达量手动书与切片书
+    // 同入达量集（滚筒选书口跳过，nextBook 自动联动；点击路径不经此池不受控）。
     // 1s TTL memo（review P1-2）：nextBook 与 startToLearn 全满额分支毫秒级两次调用
     // 共享一次读（无当日块时双 800ms 防撞睡=空书架用户每次点轮转固定 +1.6s）；陈旧面
-    // =1s 内记账后重读旧值——出片闸 gateCheck 兜底且窗口极窄，无害
+    // =1s 内记账后重读旧值——出片闸 gateCheck 兜底且窗口极窄，无害；调档走
+    // invalidateTodaysFullCache 立即失效（setQuota 接线，边界⑥）
     const todaysFullIDsImpl = async (): Promise<Set<string>> => {
         if (fullCache && Date.now() - fullCache.at < 1000) return fullCache.v;
         const date = todayStr();
@@ -313,9 +346,10 @@ function makeRollerDeps(): RollerDeps {
         }
         const attrs = await siyuan.getBlockAttrs(blockID);
         const data = parseDayLogData(attrs?.[constants.PLOG_DATA] ?? "");
-        const manual = new Set(Object.entries(progStorage.booksInfos())
-            .filter(([, v]) => v.manualMode).map(([k]) => k));
-        const v = fullBookIDsFrom(data, Number(dailyQuota.get()) || 3, manual);
+        const quota = Number(dailyQuota.get()) || 3;
+        const manualIDs = Object.entries(progStorage.booksInfos())
+            .filter(([, v]) => v.manualMode).map(([k]) => k);
+        const v = fullBookIDsFrom(data, quota, manualExemptIDs(data, quota, manualIDs));
         fullCache = { at: Date.now(), v };
         return v;
     };

@@ -15,7 +15,7 @@
     } from "./Progressive";
     import { HtmlCBType } from "./constants";
     import { CARD_RECITE } from "./digestCardMode";
-    import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, moveToFlatSeg, advGroupIndexesForKind, dedupFlatSegs, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, isFlatGhost, type FloatDocKind } from "./progFloatState";
+    import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, dropToFlatSeg, advGroupIndexesForKind, dedupFlatSegs, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, isFlatGhost, type FloatDocKind } from "./progFloatState";
     import { progStorage } from "./ProgressiveStorage";
     import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, mergePieceIntoNeighbor, feedBlocksToPool, moveDigestToPool, copyDigestToPool, nextFlipMaterial, transferMaterialOut, removeMaterialDocs } from "./writeBook";
     import { fetchWritingTreeSlots, invalidateWritingTreeCache } from "./writeTree";
@@ -299,7 +299,13 @@
     /** □2 段级 drop：首行钮=所见即所得落点（剔首行清单+manifest 记归属段+段内序）；
      *  平铺钮=跨段改派/段内重排。renderedTarget 以段当前渲染序为事实源（同 onRowDrop
      *  渲染序纪律：渲染序≡manifest 序，滤显隐破缺）；manifest.set 后 $floatbarFlatManifest
-     *  驱动 flatSegs 重算即时生效 */
+     *  驱动 flatSegs 重算即时生效。
+     *  件5 残留修复：快照先取、commit 后行（onRowDrop「先算后 commit」纪律对齐）——旧序
+     *  先 commitMainIds 再读 rendered，$derived 链同步重算把被拖首行钮按固有池位灌回快照
+     *  （buildFlatCells 池兜底），reorderMainIds adj=-1 生效=实落=指示线左一格（实测
+     *  want∈{1,2,4}→实落{0,1,3}）。commit 前快照里首行钮不在平铺渲染序（池/组按 inMain
+     *  滤）→ 精确落位；平铺钮同段重排照旧 adj（快照含被拖钮）。dropToFlatSeg 纯函数层
+     *  另有 fromMain 剥除防线（迟快照也救得回） */
     function onSegDrop(seg: FlatSegId, ev: DragEvent) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -307,12 +313,12 @@
         const id = dragId;
         // 钉位格守卫（与首行 onRowDrop 池守卫同款）：不拦会写垃圾进 manifest 且当场无变化
         if (WRITING_PINNED.includes(id)) { onDragEnd(); return; }
-        if (mainIds.includes(id)) commitMainIds(mainIds.filter(x => x !== id));
         const rendered = seg === "low"
             ? flatCells.filter(x => !WRITING_PINNED.includes(x))
             : flatSegs.adv[FLAT_SEG_IDS.indexOf(seg) - 1];
-        const next = moveToFlatSeg($floatbarFlatManifest[$kind] ?? {}, seg, rendered, id, flatDrop.index);
-        floatbarFlatManifest.set({ ...$floatbarFlatManifest, [$kind]: next });
+        const plan = dropToFlatSeg($floatbarFlatManifest[$kind] ?? {}, seg, rendered, mainIds, id, flatDrop.index);
+        if (mainIds.includes(id)) commitMainIds(plan.mainIds);
+        floatbarFlatManifest.set({ ...$floatbarFlatManifest, [$kind]: plan.manifest });
         void floatbarFlatManifest.write();
         debugLog("floatbar", `flatDrop seg=${seg} index=${flatDrop.index} id=${id} kind=${$kind} → manifest 落盘`);
         onDragEnd();
@@ -529,6 +535,8 @@
         write: () => tip3(tomatoI18n.仿写, tomatoI18n.tip仿写),
         sched: () => tip3(tomatoI18n.重访调度, tomatoI18n.tip重访调度),
         whole: () => tip3(tomatoI18n.整篇摘抄, tomatoI18n.tip整篇摘抄),
+        // progfeatpool 件4：批量整理摘抄（选择器入池/换籍，书卡右键同动作）
+        batchpool: () => tip3(tomatoI18n.批量整理, tomatoI18n.tip批量整理),
     };
     const DIG_ICONS: Record<DigSubrankId, string> = {
         inbox: "iconProgInbox",
@@ -543,6 +551,7 @@
         write: "iconProgSend", // □2 家族统一：仿写=纸飞机（digest 态送仿写同族）；铅笔归 WriteAdd 写作书族专用
         sched: "iconProgSched",
         whole: "iconProgWhole",
+        batchpool: "iconProgMaterial", // 素材池语义直给（直接入槽命令/移入素材池菜单项同款现成 sprite）
     };
 
     // ---- 期3 素材入槽双入口动作 ----
@@ -1623,6 +1632,18 @@
                         }
                     }
                     break;
+            case "batchpool": // progfeatpool 件4：批量整理摘抄（对所属书摘抄清单开选择器）。
+                // bookID 点击时捕获（切页签漂移防护同 openSlotMenuForDigest P1-2 纪律）；
+                // free 态无所属书=钮不上排（digestSubrankIds 态过滤），此处空值兜底 toast
+                {
+                    const ctxBookID = $bookID;
+                    if (!ctxBookID) {
+                        await siyuan.pushMsg(tomatoI18n.无法识别所属书);
+                        break;
+                    }
+                    prog.openBatchPoolDialog(ctxBookID);
+                }
+                break;
             default: {
                 // 穷尽断言（review P2 备案）：联合加新 id 漏写 case = 编译错而非点击静默
                 const _exhaustive: never = id;

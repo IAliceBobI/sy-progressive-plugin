@@ -567,40 +567,35 @@ html[data-theme-mode="dark"] .prog-material-trace {
 
 
 // ============================================================
-// revtrace 修订痕迹（revTrace.ts 注入 span）：块左侧 3px 全高色条，5 档一天一档浓度衰减
-// （09-10 bear 拍板恢复 5 档；竖条=改过，本族是竖条形态唯一持有者——形态分工不变）。
-// 零落盘四件套同 digest 痕迹：span 零 textContent+contenteditable=false+块 div 零改动
-// +:has() 锚定让位。纯展示无交互（hover tip 归 □4 i18n 接线后再挂）。
+// revtrace 修订痕迹（revperf2 件3 块级染色）：视觉载体从「span 条带+宿主 :has padding」
+// 改为块 div 直接挂 .prog-revtrace-block.prog-revtrace-tN——零 DOM 节点注入（旧 span
+// 插拔的行首退格锚点扰动面、replant 补挂 span 全消失）、:has 交叉链退役（出场/打字期
+// 样式重算候选面归零）、reconcile 只剩 classList 同值幂等微操作。视觉=左缘 inset
+// box-shadow 3px 竖条（不参与布局：染色/褪色/换档零重排，仅重绘）+padding-left 8px
+// 让字。色带 [0,3] 与徽章栏 [4,19] 邻接=原双痕共存语言（digest 徽章规则 :519/:522 在
+// 本节之前声明，同特异性源序会被本节 8px 反压——双痕让位由下方 (0,4,1) 组合规则显式
+// 保证，不赌源序；material 族 :599/:2347 虽在本节之后，但素材块在写作书、revtrace 只
+// 挂源文档，永不同块，无需组合）。
+// 类名刻意避开旧 span 的 prog-revtrace-mark（seller/recite 打包内联的旧版 CSS 抄送副本
+// 含 .prog-revtrace-mark{position:absolute;width:3px}，块 div 复用同名=3px 细条，6810
+// 实测）；档类规则与 block 基类复合成双类条件，抗抄送副本未来新增单类规则污染。
+// 内核 [data-node-id].sb{padding:0} 特异性 (0,3,0) 前科——宿主选择器带 div[data-node-id]
+// 对齐提权 (0,3,1)。5 档色仍走 --prog-rt-*（亮暗同色，matfeed □5 vision 终审在案）。
 // ============================================================
-.protyle-wysiwyg div[data-node-id]:has(> .prog-revtrace-mark) {
-  position: relative;
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block {
   padding-left: 8px;
 }
-// 双痕共存让位：digest/material 的 22px 徽章栏优先（双 :has 特异性压过上面单 :has，
-// 防 8px 压扁徽章栏）；trace 条退 left:0（0~3px）与徽章（4~19px）邻接不叠压——
-// 「一根竖条+一个徽章」=形态分工后双痕的天然分层语言
-.protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark):has(> .prog-revtrace-mark),
-.protyle-wysiwyg div[data-node-id]:has(> .prog-material-mark):has(> .prog-revtrace-mark) {
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t0 { box-shadow: inset 3px 0 0 0 var(--prog-rt-0); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t1 { box-shadow: inset 3px 0 0 0 var(--prog-rt-1); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t2 { box-shadow: inset 3px 0 0 0 var(--prog-rt-2); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t3 { box-shadow: inset 3px 0 0 0 var(--prog-rt-3); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t4 { box-shadow: inset 3px 0 0 0 var(--prog-rt-4); }
+// 双痕让位（Run2 评审 P1 修复）：digest 徽章块撞染色块时 22px 徽章栏压过 8px——
+// 旧 span 版有同款 (0,4,1) 组合保护，:has 交叉链退役时被误删。徽章 span 是块直子
+// 不随染色 classList 变更重算，一条组合 :has 无旧交叉链的样式重算面。
+.protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark).prog-revtrace-block {
   padding-left: 22px;
 }
-.protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark,
-.protyle-wysiwyg div[data-node-id]:has(> .prog-material-mark):has(> .prog-revtrace-mark) .prog-revtrace-mark {
-  left: 0;
-}
-.prog-revtrace-mark {
-  position: absolute;
-  left: 2px;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 2px;
-  pointer-events: none;
-}
-.prog-revtrace-mark.prog-revtrace-t0 { background: var(--prog-rt-0); }
-.prog-revtrace-mark.prog-revtrace-t1 { background: var(--prog-rt-1); }
-.prog-revtrace-mark.prog-revtrace-t2 { background: var(--prog-rt-2); }
-.prog-revtrace-mark.prog-revtrace-t3 { background: var(--prog-rt-3); }
-.prog-revtrace-mark.prog-revtrace-t4 { background: var(--prog-rt-4); }
 
 // 期5 素材徽标（materialMarker 注入 span，写作书片内素材块）：matfeed □5 形态分工后
 // =入托盘徽章独挑（图标=素材语义，与原书侧 .prog-material-trace 同形同参）+胶囊
@@ -2422,23 +2417,14 @@ html[data-theme-mode="dark"] .prog-material-tag {
 }
 
 // 期C 双痕共存（matfeed □5 形态分工改版）：与 digest 徽章同块（书态直送块既被摘抄
-// 又被直送）→ 双徽章并排 [羽毛笔 4~19][托盘 21~36]，栏宽 40px；与 revtrace 竖条
-// 同块（素材文档编辑过=期C 核心场景）→ 竖条退 left:0（0~3px）与徽章（4~19px）
-// 邻接不叠压；三痕同块由末条 (0,5,1) 显式定格 40px
-.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-revtrace-mark) {
-  padding-left: 22px;
-}
-.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-revtrace-mark) .prog-revtrace-mark {
-  left: 0;
-}
+// 又被直送）→ 双徽章并排 [羽毛笔 4~19][托盘 21~36]，栏宽 40px。revperf2：与 revtrace
+// 竖条同块的两条 :has 组合退役（块级染色后色带 [0,3] 天然落在徽章栏 [4,19] 左邻，
+// 源序让位同旧——revtrace 节注释）
 .protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-digest-mark) {
   padding-left: 40px;
 }
 .protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-digest-mark) .prog-material-trace {
   left: 19px;
-}
-.protyle-wysiwyg div[data-node-id]:has(> .prog-material-trace):has(> .prog-digest-mark):has(> .prog-revtrace-mark) {
-  padding-left: 40px;
 }
 
 // 阅读曲线接管（1530 期2）：官方复习界面阅读卡评分套——注入独立「下一张」主钮

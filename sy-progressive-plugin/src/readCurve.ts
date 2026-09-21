@@ -30,7 +30,7 @@ import {
     AUTORELAX_KEY, AUTO_RELAX_CAP, CurveMode, CurvePlanCard, parseReadCard, RATING_GRACE_MS, READCARD_KEY, READOUT_KEY, ReadCardKind,
     cadenceDays, cadenceOpts, consumeRound, DIGEST_BUILD_CAP, dueStamp, formatReadCard, GROW_INTERVALS,
     growInterval, isConsumedCurve, isMaterialFirstPush, isRPCardMarkdown, isRated, normalizeDue, parseStamp, planSweep, plusDays,
-    RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, skipDefersCard, sortForReconcile, tailFollowState,
+    readMenuTarget, RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, skipDefersCard, sortForReconcile, tailFollowState,
     toSchedValue, tomorrowStart, VisitFreq, VISITRATE_KEY,
 } from "./readCurveCore";
 import { statusLineOf } from "./readCurveText";
@@ -886,6 +886,26 @@ export async function addToReadingCurve(blockID: string): Promise<number> {
 export async function removeFromReadingCurve(blockID: string): Promise<void> {
     await removeReadingCards([blockID]);
     await clearKeysSafe([blockID]);
+}
+
+/** 右键「阅读推送」目标块探测（progfeatpool 件1；四态选择核=readMenuTarget 纯函数，
+ *  单测在那侧钉死）。新增第四态=「转记忆卡退出的文档卡」恢复接管：memory 动作只清键
+ *  落 READOUT_KEY 不摘 riff 卡——rootKeyed=false 而 root 有卡时旧 target 锚右键内容块，
+ *  会把内容块做成新卡而非恢复文档卡原身份。riff 判读走 getReadingCardStates 收口
+ *  （判向/现值禁裸查 riffcards 表/SQL ial——索引抖动窗）；探测只读放锁外（写动作进
+ *  addToReadingCurve 既有 ReadCurveSweepLock，add 勿嵌套死锁）；失败降级=nodeID
+ *  （=件1 前旧语义）。托管态（rootKeyed）同步短路零 API 零变化 */
+export async function resolveReadMenuTarget(nodeID: string, rootID: string, rootKeyed: boolean): Promise<string> {
+    if (rootKeyed && rootID) return readMenuTarget({ nodeID, rootID, rootKeyed });
+    const ids = [...new Set([nodeID, rootID].filter(Boolean))];
+    if (!ids.length) return "";
+    let states: Map<string, GetCardRetBlock[]> | null = null;
+    try {
+        states = await getReadingCardStates(ids);
+    } catch (e) {
+        debugLog("readcurve.ui", `target probe fail node=${nodeID} root=${rootID}: ${e}`, "progressive");
+    }
+    return readMenuTarget({ nodeID, rootID, rootKeyed, states });
 }
 
 // ============ □3 回访频率：书 IAL 默认+批量跟随 / 卡级改档 ============

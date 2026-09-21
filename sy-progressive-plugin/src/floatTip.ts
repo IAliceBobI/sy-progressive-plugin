@@ -27,15 +27,18 @@ function ensureTipEl(): HTMLElement | null {
     return el;
 }
 
-/** 显示/移位：textContent 纯文本（三行制 \n 交给 .tooltip 的 break-spaces 换行） */
-export function showFloatTip(btn: HTMLElement) {
+/** 显示/移位：textContent 纯文本（三行制 \n 交给 .tooltip 的 break-spaces 换行）。
+ *  override（revperf2 revTrace 块级染色通道用，既有调用方零改动）：text=文案不读宿主
+ *  aria-label（块 div 不落本族属性防进思源 tip 生态）；anchorRect=定位锚不取宿主矩形
+ *  （块全宽矩形的居中锚会远离光标，合成条带窄锚贴住色条） */
+export function showFloatTip(btn: HTMLElement, override?: { text?: string; anchorRect?: { left: number; top: number; bottom: number; width: number } }) {
     const tip = ensureTipEl();
-    const text = btn.getAttribute("aria-label");
+    const text = override?.text ?? btn.getAttribute("aria-label");
     if (!tip || !text) return; // aria-label 缺失静默无 tip，功能不受损
     tip.className = "tooltip"; // 清上轮 fn__none 即显示
     tip.textContent = text;
     tip.removeAttribute("style"); // 清上轮定位再测宽（原生 showTooltip 同款）
-    const r = btn.getBoundingClientRect();
+    const r = override?.anchorRect ?? btn.getBoundingClientRect();
     const pos = northTipPos(
         { left: r.left, top: r.top, bottom: r.bottom, width: r.width },
         tip.clientWidth, tip.clientHeight, innerWidth, innerHeight,
