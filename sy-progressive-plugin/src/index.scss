@@ -570,12 +570,12 @@ html[data-theme-mode="dark"] .prog-material-trace {
 // revtrace 修订痕迹（revperf2 件3 块级染色）：视觉载体从「span 条带+宿主 :has padding」
 // 改为块 div 直接挂 .prog-revtrace-block.prog-revtrace-tN——零 DOM 节点注入（旧 span
 // 插拔的行首退格锚点扰动面、replant 补挂 span 全消失）、:has 交叉链退役（出场/打字期
-// 样式重算候选面归零）、reconcile 只剩 classList 同值幂等微操作。视觉=左缘 inset
-// box-shadow 3px 竖条（不参与布局：染色/褪色/换档零重排，仅重绘）+padding-left 8px
-// 让字。色带 [0,3] 与徽章栏 [4,19] 邻接=原双痕共存语言（digest 徽章规则 :519/:522 在
-// 本节之前声明，同特异性源序会被本节 8px 反压——双痕让位由下方 (0,4,1) 组合规则显式
-// 保证，不赌源序；material 族 :599/:2347 虽在本节之后，但素材块在写作书、revtrace 只
-// 挂源文档，永不同块，无需组合）。
+// 样式重算候选面归零）、reconcile 只剩 classList 同值幂等微操作。视觉=**右缘** inset
+// box-shadow 3px 竖条（不参与布局：染色/褪色/换档零重排，仅重绘）+padding-right 8px
+// 让字。（09-21 650189 反馈从左缘挪右缘：思源闪卡块的左缘圆角竖线标记与左缘竖条同
+// 形态同槽位，块挂闪卡时互相遮盖；摘抄痕迹竖条已在 matfeed □5 退役=左缘只剩闪卡
+// 官方标记与 revtrace，挪右后正交。digest 徽章栏 22px 恒在左——旧「双痕让位」
+// 组合规则随挪位退役，同块左侧由徽章规则自管。）
 // 类名刻意避开旧 span 的 prog-revtrace-mark（seller/recite 打包内联的旧版 CSS 抄送副本
 // 含 .prog-revtrace-mark{position:absolute;width:3px}，块 div 复用同名=3px 细条，6810
 // 实测）；档类规则与 block 基类复合成双类条件，抗抄送副本未来新增单类规则污染。
@@ -583,19 +583,22 @@ html[data-theme-mode="dark"] .prog-material-trace {
 // 对齐提权 (0,3,1)。5 档色仍走 --prog-rt-*（亮暗同色，matfeed □5 vision 终审在案）。
 // ============================================================
 .protyle-wysiwyg div[data-node-id].prog-revtrace-block {
-  padding-left: 8px;
+  padding-right: 8px;
 }
-.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t0 { box-shadow: inset 3px 0 0 0 var(--prog-rt-0); }
-.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t1 { box-shadow: inset 3px 0 0 0 var(--prog-rt-1); }
-.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t2 { box-shadow: inset 3px 0 0 0 var(--prog-rt-2); }
-.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t3 { box-shadow: inset 3px 0 0 0 var(--prog-rt-3); }
-.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t4 { box-shadow: inset 3px 0 0 0 var(--prog-rt-4); }
-// 双痕让位（Run2 评审 P1 修复）：digest 徽章块撞染色块时 22px 徽章栏压过 8px——
-// 旧 span 版有同款 (0,4,1) 组合保护，:has 交叉链退役时被误删。徽章 span 是块直子
-// 不随染色 classList 变更重算，一条组合 :has 无旧交叉链的样式重算面。
-.protyle-wysiwyg div[data-node-id]:has(> .prog-digest-mark).prog-revtrace-block {
-  padding-left: 22px;
-}
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t0 { box-shadow: inset -3px 0 0 0 var(--prog-rt-0); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t1 { box-shadow: inset -3px 0 0 0 var(--prog-rt-1); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t2 { box-shadow: inset -3px 0 0 0 var(--prog-rt-2); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t3 { box-shadow: inset -3px 0 0 0 var(--prog-rt-3); }
+.protyle-wysiwyg div[data-node-id].prog-revtrace-block.prog-revtrace-t4 { box-shadow: inset -3px 0 0 0 var(--prog-rt-4); }
+// 挂卡块双条共存（□7 vision P1 破案）：内核闪卡左缘标记=box-shadow inset 2px 单值
+// （_wysiwyg.scss:116 [custom-riff-decks]）——box-shadow 同属性整值替换不可叠加，本族
+// 右缘条 (0,3,1) 压过内核 (0,2,0) 后青蓝左条被吞（原「左缘互盖」同根因换方向复发）。
+// 组合规则 (0,5,1) 显式双值：左=内核青蓝 2px 原参原色，右=本族紫 3px。
+.protyle-wysiwyg div[data-node-id][custom-riff-decks].prog-revtrace-block.prog-revtrace-t0 { box-shadow: inset 2px 0 0 0 var(--b3-protyle-inline-mark-background), inset -3px 0 0 0 var(--prog-rt-0); }
+.protyle-wysiwyg div[data-node-id][custom-riff-decks].prog-revtrace-block.prog-revtrace-t1 { box-shadow: inset 2px 0 0 0 var(--b3-protyle-inline-mark-background), inset -3px 0 0 0 var(--prog-rt-1); }
+.protyle-wysiwyg div[data-node-id][custom-riff-decks].prog-revtrace-block.prog-revtrace-t2 { box-shadow: inset 2px 0 0 0 var(--b3-protyle-inline-mark-background), inset -3px 0 0 0 var(--prog-rt-2); }
+.protyle-wysiwyg div[data-node-id][custom-riff-decks].prog-revtrace-block.prog-revtrace-t3 { box-shadow: inset 2px 0 0 0 var(--b3-protyle-inline-mark-background), inset -3px 0 0 0 var(--prog-rt-3); }
+.protyle-wysiwyg div[data-node-id][custom-riff-decks].prog-revtrace-block.prog-revtrace-t4 { box-shadow: inset 2px 0 0 0 var(--b3-protyle-inline-mark-background), inset -3px 0 0 0 var(--prog-rt-4); }
 
 // 期5 素材徽标（materialMarker 注入 span，写作书片内素材块）：matfeed □5 形态分工后
 // =入托盘徽章独挑（图标=素材语义，与原书侧 .prog-material-trace 同形同参）+胶囊

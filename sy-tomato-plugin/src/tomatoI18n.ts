@@ -13307,6 +13307,43 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "No reading points yet";
         }
     }
+    // 尾巴钮（横滚区末尾「全部 N 个（· X 旧版）」）：全量面板入口可发现性补强
+    public get 查看全部阅读点() {
+        switch (this.lang) {
+            case "zh_CN": return "查看全部阅读点";
+            case "zh_CHT": return "查看全部閱讀點";
+            case "ja_JP": return "すべての読書ポイントを表示";
+            case "es_ES": return "Ver todos los puntos de lectura";
+            case "fr_FR": return "Voir tous les points de lecture";
+            case "it_IT": return "Visualizza tutti i punti di lettura";
+            case "en_US":
+            default: return "View all reading points";
+        }
+    }
+    public 全部N个(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `全部 ${n} 个`;
+            case "zh_CHT": return `全部 ${n} 個`;
+            case "ja_JP": return `すべて (${n})`;
+            case "es_ES": return `Todos (${n})`;
+            case "fr_FR": return `Tous (${n})`;
+            case "it_IT": return `Tutti (${n})`;
+            case "en_US":
+            default: return `All ${n}`;
+        }
+    }
+    public X旧版(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `${n} 旧版`;
+            case "zh_CHT": return `${n} 舊版`;
+            case "ja_JP": return `旧版 ${n}`;
+            case "es_ES": return `${n} antiguos`;
+            case "fr_FR": return `${n} anciens`;
+            case "it_IT": return `${n} vecchi`;
+            case "en_US":
+            default: return `${n} legacy`;
+        }
+    }
     public get 刚刚() {
         switch (this.lang) {
             case "zh_CN": return "刚刚";
