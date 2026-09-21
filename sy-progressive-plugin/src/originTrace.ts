@@ -67,14 +67,14 @@ export interface OriginTargetInput {
 }
 
 /** 摘抄归属链来源：mark=片 IAL、progref=块级反查（□29）、book=发起文档自身是注册书
- *  （□8 书态原文直接摘抄）、self=三链落空自指（札记摘抄/普通文档，落札记匣） */
+ *  （□8 书态原文直接摘抄）、self=三链落空自指（摘抄再摘抄/普通文档，走非书链路落总夹） */
 export type DigestOriginFrom = "mark" | "progref" | "book" | "self";
 
 /**
  * 摘抄发起文档 → 归属书判定链（digestUtils.init 消费，□11 从三段内联收拢为纯函数）：
  * ①mark（getBookID 解析片 IAL）②mark 落空的属性窗口期走 progref 反查（带回片序号）
  * ③发起文档自身是注册书。inBook=归属书须已注册——mark/反查给了 bookID 但书已删
- * （记录已清）时 inBook=false 落札记匣；三链全空自指 bookID=docID。
+ * （记录已清）时 inBook=false 转非书链路（落点由 digestLanding 定，集中档=总夹）；三链全空自指 bookID=docID。
  * refHit 仅在 mark 落空时参与（与旧链一致）；isRegistered 由消费方注入
  * （progStorage.isRegisteredBook）。
  */

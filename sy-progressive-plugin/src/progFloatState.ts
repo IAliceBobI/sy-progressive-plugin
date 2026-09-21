@@ -62,7 +62,7 @@ export function expandAtAppear(pref: boolean | null, kind: FloatDocKind): boolea
 }
 
 /**
- * 附属卡到期刷新守卫：digest 态出场载荷 bookID 可能是非书摘抄的源文档 ID（札记匣/
+ * 附属卡到期刷新守卫：digest 态出场载荷 bookID 可能是非书摘抄的源文档 ID（总夹 digest-源名 夹/
  * 源下夹摘抄），其「digest-源名」夹子树永远无卡——ensure 只会建 100% 空夹污染总夹
  * （期1 □2 Task 6 dev e2e 实锤）。到期数只对注册书刷新。
  */
@@ -136,7 +136,7 @@ const SCENE: Record<FloatDocKind, FloatButtonSpec[]> = {
     ],
     // □11 自由态（普通文档摘抄上岗）：✂ 子排 + 📥 加书两键起步，无公共组
     free: [
-        { id: "digest", icon: "iconProgScissors", kind: "primary", group: "scene" },   // ✂摘抄子排（非书文本落札记匣）
+        { id: "digest", icon: "iconProgScissors", kind: "primary", group: "scene" },   // ✂摘抄子排（非书文本集中档同落总夹）
         { id: "addBook", icon: "iconProgAddBook", kind: "normal", group: "scene" },    // 📥加书（AddBook 弹窗，加完变书态）
     ],
 };
@@ -628,7 +628,7 @@ export function digestSubrankIds(kind: FloatDocKind): DigSubrankId[] {
     // bear 试用拍板「落点都能选」：全局档（digestLanding）一刀切之外逐次指定。
     // □11 digest 态开精简子排（bear「与分片差不多」）：再摘抄三档落点+问题+强制卡+
     // 单词两钮；review/sched 与首行 ✧ 复访组重复、write 与首行送仿写重复、whole 对卡片
-    // 无意义（整摘复制）——不收。再摘抄走非书链路（落源文档下/札记匣）。
+    // 无意义（整摘复制）——不收。再摘抄走非书链路（落点随 digestLanding：源文档下/摘抄总夹）。
     // splitinplace 就地断句（2026-09-09）限 free+digest——book 态不给（README 初版警告：
     // 分片后改原书会让渐进找不到块）。0914 □5 放开 piece（鸟：只想断选中几段，重插
     // 必然全断）：挂闪卡的段落执行层拦（护卡），写作槽在组件层滤（死路指路勿上钮）。

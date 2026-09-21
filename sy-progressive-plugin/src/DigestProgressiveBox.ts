@@ -9,7 +9,7 @@ import { DigestBuilder } from "./digestUtils";
 import { blockIconMenu, digestmenu, wholeDigestMenu, reviewSchedMenu, revisitRhythmMenu } from "../../sy-tomato-plugin/src/libs/stores";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
-import { kind, openDigestSubrank, show, toggleFreeFloat, digOpen, expanded, collapseFloatBar, freeFloatOff } from "./ProgressiveBtn";
+import { kind, openDigestSubrank, show, toggleFreeFloat, digOpen, expanded, collapseFloatBar, freeFloatOff, cardHostProtyle, forceCardHostFloatBar, noteID, zIndexPlus } from "./ProgressiveBtn";
 import { cardModeFor, type DigestIntent } from "./digestCardMode";
 import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
 import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
@@ -38,8 +38,21 @@ class DigestProgressiveBox {
     lute: Lute;
     singleTab: SingleTab;
 
-    /** □2 片间卡「再摘抄」钮入口（等价 ⌥Z 摘抄模式 toggle，卡内按钮直调） */
+    /** □2 片间卡「再摘抄」钮入口（等价 ⌥Z 摘抄模式 toggle，卡内按钮直调）。
+     *  □3 复习卡再摘抄（刘璐 09-21「复习卡上直接划选」）：复习宿主浮条默认被
+     *  hideBtnsInFlashCard 收起，enterDigestMode 的 toggleFreeFloat 出口会被同一守卫
+     *  挡回（点了零可见反应）——卡宿主+浮条未出场时改走 forceCardHostFloatBar 显式
+     *  放行出场+开子排；浮条已在场（用户关了复习隐浮条）维持原 toggle 语义。 */
     digestModeToggle() {
+        // 子排锚定复习卡：浮条未出场、或锚的还是后台文档页签（同文档也骗不过
+        // zIndexPlus——后台页签浮条 z10 在复习 Dialog 底下，卡宿主浮条才 z999），
+        // 都重锚到卡宿主强制出场；浮条已真盖在本卡上维持原 toggle 语义
+        const host = cardHostProtyle();
+        const overCard = show.get() && kind.get() && zIndexPlus.get() && noteID.get() === host?.block?.rootID;
+        if (host && !overCard) {
+            void forceCardHostFloatBar();
+            return;
+        }
         this.enterDigestMode();
     }
 
@@ -122,7 +135,7 @@ class DigestProgressiveBox {
                 });
             }
             // 可见性期4 □4 B②：整篇摘抄从 digestmenu 一拖二拆独立开关（□16 整摘双通道之一：
-            // 任意文档无浮条载体，右键整篇摘抄落札记匣/摘抄集；替代通道=⇧⌥D?命令面板）
+            // 任意文档无浮条载体，右键整篇摘抄落摘抄总夹/摘抄集（落点随 digestLanding）；替代通道=⇧⌥D?命令面板）
             if (wholeDigestMenu.get()) {
                 menu.addItem({
                     label: tomatoI18n.整篇摘抄,

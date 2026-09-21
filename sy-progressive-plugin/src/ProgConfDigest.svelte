@@ -30,12 +30,15 @@
 
     <div>
         <!-- 期1 □2 落点三档：digest2dailycard 开关并入（迁移见 index.ts loadStore）；脏值兜底失效占位。
-             vision □5：与下行「摘抄制卡模式」select 统一 min-width，右侧标签起始对齐 -->
+             vision □5：与下行「摘抄制卡模式」select 统一 min-width，右侧标签起始对齐；
+             liulfb □1 再加 sibling/child 两档（再摘抄目录树连续，以发起文档为锚） -->
         <select class="b3-select" style="min-width: 160px" bind:value={$digestLanding}>
             <option value="central">{tomatoI18n.落点集中归档}</option>
             <option value="source">{tomatoI18n.落点源文档下方}</option>
             <option value="daily">{tomatoI18n.落点卡目录}</option>
-            {#if !["central", "source", "daily"].includes($digestLanding)}
+            <option value="sibling">{tomatoI18n.落点同级文档}</option>
+            <option value="child">{tomatoI18n.落点子文档}</option>
+            {#if !["central", "source", "daily", "sibling", "child"].includes($digestLanding)}
                 <option value={$digestLanding}>{$digestLanding} {tomatoI18n.已失效请重新选择}</option>
             {/if}
         </select>

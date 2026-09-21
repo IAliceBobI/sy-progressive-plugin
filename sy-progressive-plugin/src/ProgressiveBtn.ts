@@ -65,7 +65,7 @@ export function progFloatStores() {
 
 // DigestProgressiveBox ⌥z 改道需要读出场态（show+kind=当前文档在三态内；□10 toggle 化
 // 还要 digOpen/expanded 判「激活态」与收缩通道）
-export { show, kind, digOpen, expanded };
+export { show, kind, digOpen, expanded, noteID, zIndexPlus };
 
 /** 展开浮条（球点击 / 命令通道）；显式意志落盘（2026-09-02 起跨会话记忆）。子排不
  *  联动——□2 起开合持久记忆只归 ✂ 与显式命令管，点球展开浮条尊重用户上次的子排状态 */
@@ -81,6 +81,7 @@ export function collapseFloatBar() {
     floatbarExpandPref.set(false);
     void floatbarExpandPref.write();
     expanded.set(false);
+    cardHostExplicit = false; // □3：显式收起=撤销复习宿主放行（用户意志优先）
 }
 
 /** 展开浮条并打开摘抄子排（⌥z 摘抄模式命令在三态文档内的改道出口）。
@@ -90,6 +91,38 @@ export function openDigestSubrank() {
     expandFloatBar();
     digOpen.set(true);
     void digSubrankOpen.write();
+}
+
+// □3 复习卡再摘抄（刘璐 09-21「复习卡上直接划选」）：复习宿主（card__block）浮条默认
+// 被 hideBtnsInFlashCard/freeSession 守卫收起——尾卡「再摘抄」钮点击=显式意志，放行
+// 出场（守卫管「自动出场」，不管显式请求）。放行持续到复习结束/用户收起/离开卡宿主：
+// 同卡内划选（click-editorcontent 重出场）不收浮条，翻卡也不收（用户开了就是要在复习
+// 现场连续用）；清点=显式 ✕（collapseFloatBar）、freeFloatOff、非卡宿主出场、卡宿主销毁。
+let cardHostExplicit = false;
+
+/** □3：当前在场的复习卡宿主 protyle（card__block）。点击复习卡后 events.currentProtyle
+ *  即它；一次都没点过卡内容时（打开复习直接点尾卡钮）currentProtyle 还是后台文档——
+ *  兜底扫编辑器注册表（dialogs.editors 注册面=getActiveEditor 同一扫描面） */
+export function cardHostProtyle(): IProtyle | null {
+    const cur = events.currentProtyle();
+    if (cur?.element?.classList?.contains("card__block")) return cur;
+    return getAllEditor().find(p => p?.protyle?.element?.classList?.contains("card__block"))?.protyle ?? null;
+}
+
+/** □3：尾卡「再摘抄」钮在浮条未出场时的强制出场出口（浮条已在场走原 toggle 语义，
+ *  见 DigestProgressiveBox.digestModeToggle）。返回是否真出了场——卡内容非渐进文档
+ *  （三态识别落空）时不出场并回滚旗标，调用方维持原语义兜底 */
+export async function forceCardHostFloatBar(): Promise<boolean> {
+    const host = cardHostProtyle();
+    if (!host) return false;
+    cardHostExplicit = true;
+    await progressiveBtnFloating(host);
+    if (!show.get()) {
+        cardHostExplicit = false;
+        return false;
+    }
+    openDigestSubrank();
+    return true;
 }
 
 // □11 自由态（第四态）：会话级上岗/下班——上岗后本会话所有普通文档浮条都到场，
@@ -141,6 +174,7 @@ export async function toggleFreeFloat(withSubrank = false) {
 export function freeFloatOff() {
     freeSession = false;
     show.set(false);
+    cardHostExplicit = false; // □3：显式下班=撤销复习宿主放行
 }
 
 // 子排常驻后无需「不可见即清」兜底（旧订阅防 ⇧⌥Z 开子排后跨文档带旧开合态）——开是默认态，
@@ -235,6 +269,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         if (canHost && events.getInfo(protyle).docID == noteID.get()) {
             show.set(false)
         }
+        cardHostExplicit = false; // □3：卡宿主销毁（复习界面关闭/翻卡拆建）=放行失效
         return;
     }
     retrofitDigestTailCard(protyle);
@@ -248,7 +283,9 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     if (protyle.element.classList.contains("card__block")) {
         // 闪卡预览里显示的是分片：维持片态出场（hideBtnsInFlashCard 可关）；
         // □11 free 态不进闪卡预览（普通文档的卡预览弹 free 浮条违反直觉，review P2）
-        if (events.isMobile || hideBtnsInFlashCard.get() || freeSession) {
+        // □3：cardHostExplicit=尾卡「再摘抄」钮的显式放行（forceCardHostFloatBar），
+        // 两守卫都让路——守卫管自动出场，显式请求胜出
+        if (events.isMobile || (hideBtnsInFlashCard.get() && !cardHostExplicit) || (freeSession && !cardHostExplicit)) {
             show.set(false);
             return;
         }
@@ -260,6 +297,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         if (!isEditor(protyle)) {
             return;
         }
+        cardHostExplicit = false; // □3：离开卡宿主（普通编辑器出场）=放行失效
     }
 
     // v5 三态识别（progFloatState.detectFloatDoc：判据优先级 pdigest > mark > books，

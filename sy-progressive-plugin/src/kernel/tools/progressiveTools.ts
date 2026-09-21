@@ -272,7 +272,7 @@ async function getSchedule(input: Record<string, any>) {
     windowDays: days,
     buckets,
     byBook,
-    hint: `due=已到期/within=未来 ${days} 天内/later=更远；byBook 按书聚合（unassigned=札记匣等无书归属）；mode: curve=间隔拉长曲线/sched=每 N 天日程`,
+    hint: `due=已到期/within=未来 ${days} 天内/later=更远；byBook 按书聚合（unassigned=非书摘抄等无书归属）；mode: curve=间隔拉长曲线/sched=每 N 天日程`,
   });
 }
 

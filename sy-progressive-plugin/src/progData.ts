@@ -41,11 +41,14 @@ export function getDocIalFreeDigestDir(docID: string): string {
     return `digestdirfree#${TEMP_CONTENT}#${docID}`;
 }
 
+/** 札记匣（legacy）：liulfb □4 2026-09-21 起集中档非书统一落摘抄总夹，匣锚保留=存量
+ *  数据认读与新匣兜底认回（防重复建），新去向写入方已退役 */
 export function getDocIalNoteBox(): string {
     return `notebox#${TEMP_CONTENT}`;
 }
 
-/** 札记匣内按源文档归集的夹（□3：digest-源文档名 挂札记匣下；按源文档锚定，位置无关） */
+/** 札记匣内按源文档归集的夹（legacy：□3 digest-源文档名 挂札记匣下；liulfb □4 起
+ *  central 非书改落总夹，此锚只认读存量、按源文档锚定，位置无关） */
 export function getDocIalNoteDir(docID: string): string {
     return `notedir#${TEMP_CONTENT}#${docID}`;
 }

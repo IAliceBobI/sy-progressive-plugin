@@ -42,9 +42,11 @@ export class DigestBuilder {
     settings: TomatoSettings;
     /** □16：摘抄发起文档是片时的片序号（写片序号键用；null=非片发起） */
     piecePoint: number | null = null;
-    /** v5：getBookID 结果是否为已注册的书——非书文本（含札记摘抄再摘抄）落札记匣 */
+    /** v5：getBookID 结果是否为已注册的书——非书文本（含摘抄再摘抄）集中档同落摘抄总夹
+     *  （liulfb □4 2026-09-21 统一：书/非书只是来源不同，摘抄层面统一资产） */
     inBook: boolean;
-    /** writebook-next □4：落点去向级覆盖（"source"=书/源侧夹、"central"=总夹/札记匣）——
+    /** writebook-next □4：落点去向级覆盖（"source"=书/源侧夹、"central"=摘抄总夹〔书/非书
+     *  统一，liulfb □4〕）——
      *  浮条子排「挂书侧/归总夹」两钮逐次指定，不落盘不改 digestLanding 全局档（同
      *  cardMode 覆盖模式：intent 决定去向，saveCardMode 都不调）；undefined=跟全局档 */
     landingOverride?: "source" | "central";
@@ -83,7 +85,7 @@ export class DigestBuilder {
             if (refID) refHit = await progStorage.findPieceByBlockID(refID);
         }
         // 归属判定链（mark → progref 反查 → □8 书态兜底 → 自指）收拢为纯函数，
-        // 优先级语义与 inBook（含「书已删记录已清落札记匣」）见 originTrace.resolveDigestOrigin
+        // 优先级语义与 inBook（含「书已删记录已清=转非书链路落总夹」）见 originTrace.resolveDigestOrigin
         const origin = resolveDigestOrigin({
             markBookID: markBookID ?? "",
             refHit,
@@ -121,18 +123,23 @@ export class DigestBuilder {
     }
 
     /** 期1 □2 非日记档落点解析：书→digest 夹（源下档新建挂书下/集中档挂总夹下，已有夹 IAL 原位认回）；
-     *  非书→源下档挂源文档下 digest-源文档名 夹/集中档进札记匣（□3 起匣内按源文档建夹归集，
-     *  同 source 档命名法：札记匣/digest-源文档名/摘抄文档 三层） */
+     *  非书→源下档挂源文档下 digest-源文档名 夹/集中档同规则落摘抄总夹（liulfb □4 2026-09-21
+     *  统一总夹：非书 digest-源文档名 与书并排，锚复用 digestdir 不因注册态换夹；老札记匣
+     *  存量原地兼容读不迁移）。
+     *  liulfb □1 sibling/child 档无夹概念：child 的清卡域=发起文档子树（容器即 docID）；
+     *  sibling 无自然子树域（父容器会误伤他人），返回空串=setDigestCard 跳过清卡只加新卡 */
     private async landingDirID(): Promise<string> {
         const landing = this.landing();
         const source = landing === "source";
+        if (landing === "child") return this.docID;
+        if (landing === "sibling") return "";
         if (this.inBook) {
             // □4 逐次 override：方向锚双夹（主力夹恰在该方向时 ensure 内复用，同位置不建双夹）
             if (this.landingOverride === "source") return progStorage.ensureDigestDirUnder(this.bookID);
             if (this.landingOverride === "central") return progStorage.ensureDigestDirHub(this.bookID);
             return progStorage.ensureDigestDir(this.bookID, source);
         }
-        return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureNoteDir(this.docID);
+        return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureFreeDigestHubDir(this.docID);
     }
 
     private async setDigestCard(digestID: string) {
@@ -143,7 +150,7 @@ export class DigestBuilder {
                 return;
             } else if (this.cardMode == "1") {
                 // v5：digest 夹位置无关（IAL 锚定），子树旧卡直接按夹 ID 取；
-                // 非书文本没有书夹，按札记匣子树清卡
+                // 非书文本没有书夹，按总夹内 digest-源文档名 夹子树清卡（liulfb □4）
                 const dirID = await this.landingDirID();
                 if (dirID) {
                     const cards = await siyuan.getTreeRiffCardsAll(dirID);
@@ -173,11 +180,23 @@ export class DigestBuilder {
         if (forRecite) attr["custom-prog-for-recite"] = "1";
         // 期1 □2 落点三档：daily=daily card 月目录（原 digest2dailycard；落发起文档所在笔记本，
         // 不看制卡侧 flashcardNotebook）；source=书下/源文档下（老版回归）；
-        // central=书→摘抄总夹/digest-书名，非书→札记匣（夹均按 IAL 锚定，位置无关）
+        // central=书/非书统一→摘抄总夹/digest-来源名（liulfb □4；夹均按 IAL 锚定，位置无关）
+        // liulfb □1（2026-09-21）sibling/child 两档：以发起文档 hpath 为锚直算 dirPath，无夹无
+        // ensure 链——child=挂发起文档下（知识树），sibling=挂发起文档同级（剥 hpath 末段；发起
+        // 文档在笔记本根时剥空落根层）。再摘抄场景发起=摘抄文档，即多次摘抄聚一层/树状连续
         let boxID = this.boxID;
         let dirPath: string;
         if (this.landing() === "daily") {
             dirPath = getDailyPath().split("/").slice(0, -1).join("/");
+        } else if (this.landing() === "sibling" || this.landing() === "child") {
+            const info = await siyuan.getBlockInfo(this.docID);
+            if (!info?.box) return "";
+            boxID = info.box;
+            const hp = await siyuan.getHPathByID(this.docID, info.box);
+            if (!hp) return "";
+            dirPath = this.landing() === "child"
+                ? hp
+                : hp.split("/").slice(0, -1).join("/");
         } else {
             const dirID = await this.landingDirID();
             if (!dirID) return "";

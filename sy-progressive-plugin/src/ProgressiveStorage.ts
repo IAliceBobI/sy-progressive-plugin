@@ -424,7 +424,8 @@ export class ProgressiveStorage {
         return nameRow?.content ?? bookID;
     }
 
-    /** 札记匣：无书文本的沉淀落点 */
+    /** 札记匣（legacy，liulfb □4 2026-09-21 起不再有新写入方）：无书文本的历史沉淀落点，
+     *  存量匣与匣内夹原地不动不迁移，锚保留供认读；新非书摘抄统一走 ensureFreeDigestHubDir */
     async ensureNoteBox(): Promise<string> {
         return ensureAnchoredDoc(getDocIalNoteBox(), {
             findByIal: () => findDocByIal(getDocIalNoteBox()),
@@ -434,7 +435,7 @@ export class ProgressiveStorage {
         });
     }
 
-    /** 札记匣内源文档夹（□3 分组）：central+非书档的摘抄按源文档归集进
+    /** 札记匣内源文档夹（legacy，□3 分组）：central+非书档的历史归集锚
      *  札记匣/digest-源文档名/ 三层；夹名初始皮=源文档名（走 getBlockInfo 实时通道，
      *  bookName 的 SQL content 列对刚建文档有索引延迟会落 id 形态丑名），认 IAL 位置无关 */
     async ensureNoteDir(sourceDocID: string): Promise<string> {
@@ -458,6 +459,26 @@ export class ProgressiveStorage {
             findByIal: () => findDocByIal(getDocIalFreeDigestDir(sourceDocID)),
             checkBlockExist: (id) => siyuan.checkBlockExist(id),
             create: async () => this.createChildUnder(sourceDocID, `digest-${await this.bookName(sourceDocID)}`, getDocIalFreeDigestDir(sourceDocID)),
+            onResolved: async () => { },
+        });
+    }
+
+    /** liulfb □4（2026-09-21 刘璐拍板）集中档统一总夹：非书摘抄与书同规则落摘抄总夹下的
+     *  digest-源文档名 夹（书/非书只是来源与入口不同，到摘抄层面=统一资产集中管理）。
+     *  锚复用书主力夹同锚（digestdir#t#docID）——同一来源书/非书身份互转（注册/退注册）
+     *  不换夹不重复建，与 ensureDigestDir 天然收敛同一夹；夹名初始皮走 getBlockInfo 实时
+     *  通道（bookName 的 SQL content 列对刚建文档有索引延迟会落 id 形态丑名，ensureNoteDir
+     *  同判）。取代 ensureNoteDir 成为非书 central 的去向（老札记匣存量原地兼容读不迁移）。 */
+    async ensureFreeDigestHubDir(sourceDocID: string): Promise<string> {
+        const ial = getDocIalDigestDir(sourceDocID);
+        return ensureAnchoredDoc(ial, {
+            findByIal: () => findDocByIal(ial),
+            checkBlockExist: (id) => siyuan.checkBlockExist(id),
+            create: async () => {
+                const info = await siyuan.getBlockInfo(sourceDocID);
+                const name = info?.rootTitle ? `digest-${info.rootTitle}` : `digest-${sourceDocID}`;
+                return this.createChildUnder(await this.ensureDigestHub(), name, ial);
+            },
             onResolved: async () => { },
         });
     }

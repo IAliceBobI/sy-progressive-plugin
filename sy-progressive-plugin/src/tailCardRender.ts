@@ -9,6 +9,7 @@
 // 隐全部动作钮与胶囊，只留静态头（防复习现场点「下一片」搅局）。
 import { icon, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
+import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { pieceTailCard } from "../../sy-tomato-plugin/src/libs/stores";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { HtmlCBType } from "./constants";
@@ -237,6 +238,17 @@ function renderCard(element: HTMLElement, content: string): void {
         quiet.className = "prog-tailcard__quiet";
         quiet.textContent = tomatoI18n.片尾卡复习态;
         head.append(quiet);
+        // □3 白名单（刘璐 09-21「复习卡上直接划选」）：digest 卡复习宿主放行「再摘抄」
+        // 钮——再摘抄是复习现场的正需求非搅局动作（划选→子排留档全链不切文档）；
+        // 其余收起动作不放行；移动端不放行（复习宿主浮条 isMobile 守卫恒收=死钮）。
+        // piece 卡无 redigest 动作天然不放行
+        if (data.kind === "digest" && !events.isMobile) {
+            const row = document.createElement("div");
+            row.className = "prog-tailcard__row";
+            const a = digestActions().find(x => x.act === "redigest");
+            if (a) row.append(mkBtn(a, data));
+            card.append(row);
+        }
         element.append(card);
         return;
     }

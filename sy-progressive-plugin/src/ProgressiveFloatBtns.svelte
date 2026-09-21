@@ -522,7 +522,7 @@
     const DIG_TIPS: Record<DigSubrankId, () => string> = {
         inbox: () => tip3(tomatoI18n.留档, tomatoI18n.tip留档),
         // □4 落点变体（去向级覆盖，不落盘不改 digestLanding 全局档）：书/片态挂所属书下、
-        // free 态挂源文档下（source 档原生语义）｜总夹/札记匣按是否在书（central 原生语义）
+        // free 态挂源文档下（source 档原生语义）｜归总夹（central 原生语义，书/非书统一进摘抄总夹）
         tobook: () => tip3(tomatoI18n.摘抄挂书侧, isMaterialDoc ? tomatoI18n.tip素材挂本书池 : tomatoI18n.tip摘抄挂书侧), // matflow □2 素材语境：落点=本书素材池
         tohub: () => tip3(tomatoI18n.摘抄归总夹, tomatoI18n.tip摘抄归总夹),
         // 就地断句（2026-09-09）：Pro 标随钮名走（子排钮无锁角标，执行层兜底门禁+toast 引导）
@@ -1572,7 +1572,7 @@
             case "tobook": // □4 落点变体：显式挂书/源侧（覆盖全局档，一次性）
                 await runDigest(false, false, undefined, false, "source");
                 break;
-            case "tohub": // □4 落点变体：显式归总夹/札记匣（覆盖全局档，一次性）
+            case "tohub": // □4 落点变体：显式归总夹（书/非书统一，覆盖全局档，一次性）
                 await runDigest(false, false, undefined, false, "central");
                 break;
             case "splitinplace": { // 就地断句（2026-09-09）：选中段落块原位拆句，改的是原文档（Pro）。

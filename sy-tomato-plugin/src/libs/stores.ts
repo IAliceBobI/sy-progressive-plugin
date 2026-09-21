@@ -779,6 +779,12 @@ export const shorthandRelayEnabled = settingFactory("shorthandRelayEnabled", fal
 // 默认关=新功能不惊喜。运行时落点判（insertIntoDailynote/shorthandRelay/moveFromQueue 三点），
 // 非 onload 注册读死类，不进 STRUCTURAL_KEYS
 export const flashStatTag = settingFactory("flash-stat-tag", false, STORAGE_SETTINGS, null as TSK);
+// □4 速记落块形态（fballfb 2026-09-21）：super=超级块/para=段落块（默认，bear 09-21 拍板：
+// 简单不裹容器）/list=列表项块——后两者无壳直落（解「删内容留壳→删壳报错」）；构造与搬运
+// 判定收拢 libs/flashBlockForm.ts。存量不迁移（旧 sb 块原样、显式存过 super 的照旧 super）；
+// 勿让开关切换重写已有块（updateBlock 不迁移 custom-* 属性，在档坑）。运行时落点判
+// （insertIntoDailynote/shorthandRelay），非 onload 注册读死类，不进 STRUCTURAL_KEYS
+export const flashBlockForm = settingFactory("flash-block-form", "para", STORAGE_SETTINGS, null as TSK);
 // □4 全局小窗失焦自动关（2026-09-06，小记 quick-notes 可移植增强）：子窗失焦即落盘草稿并关窗；
 // pin 住 / 选图对话框在途 / 上传在途时不关。默认开=对标杆品速记手感（草稿持久化不丢内容）
 export const flashThoughtsBlurClose = settingFactory("flashThoughtsBlurClose", true, STORAGE_SETTINGS, null as TSK);
@@ -839,6 +845,10 @@ export const floatingballKeyboardList = settingFactory("floatingballKeyboardList
 export const floatingballBallList = settingFactory("floatingballBallList", [] as BallItem[], STORAGE_SETTINGS, null as TSK);
 // fbfeat □1：文档球打开落底（速记「接着写」场景；默认关与 dailyNoteGoToBottom 先例一致）
 export const floatingballDocOpenBottom = settingFactory("floatingballDocOpenBottom", false, STORAGE_SETTINGS, null as TSK);
+// fballfb □3：「打开后保留悬浮球」——开=悬浮窗形态球常驻（点一下开窗、再点一下关窗，
+// execute float 分支不再反杀球本体/不写 openOnCreate）；关=维持现状「开窗即消失让位」
+// （老用户行为不突变，默认关）
+export const floatingballKeepBall = settingFactory("floatingballKeepBall", false, STORAGE_SETTINGS, null as TSK);
 export const markdownExportPics = settingFactory("markdownExportPics", false, STORAGE_SETTINGS, null as TSK);
 export const mindWireCheckbox = settingFactory("mindWireCheckbox", false, STORAGE_SETTINGS, null as TSK);
 export const mindWireEnable = settingFactory("mindWireEnable", true, STORAGE_SETTINGS, null as TSK);
@@ -916,8 +926,11 @@ export const digestAddReadingpoint = settingFactory("digestAddReadingpoint", fal
 /** 期1 □2 退役（2026-09-03）：并入 digestLanding 三档枚举（true→"daily" 迁移见 progressive index.ts loadStore）；
  *  store 留作迁移读源，勿新增使用，旧持久化值留着无害 */
 export const digest2dailycard = settingFactory("digest2dailycard", false, STORAGE_Prog_SETTINGS, null as TSK);
-// 期1 □2 摘抄落点三档（2026-09-03 群反馈设计定稿）：central=集中归档（书→摘抄总夹/digest-书名，
-// 非书→札记匣，默认）/ source=源文档下方（老版行为回归）/ daily=原 digest2dailycard 语义
+// 期1 □2 摘抄落点三档（2026-09-03 群反馈设计定稿）：central=集中归档（书→摘抄总夹/digest-书名；
+// liulfb □4 2026-09-21 起非书同规则落总夹 digest-源文档名，老札记匣存量原地兼容读）/ source=
+// 源文档下方（老版行为回归）/ daily=原 digest2dailycard 语义；
+// liulfb □1（2026-09-21）再摘抄目录树连续两档：sibling=发起文档同级（不建夹，多次摘抄聚一层）/
+// child=发起文档子文档（不建夹，SM 式知识树）——以发起文档为锚书/非书通用，见 digestUtils newDigestDoc
 export const digestLanding = settingFactory("digestLanding", "central", STORAGE_Prog_SETTINGS, null as TSK);
 // □3 制卡统一归置（2026-09-01 拍板方案 A）：默认制卡（⌥E/浮条制卡钮）并入当日 daily card
 // 文档；存量用户无此 key 读默认 true 即集中（发版 notes 说明），关掉回落 cards 夹旧路线
