@@ -13,13 +13,22 @@ import { splitBySentencePeriod } from "./splitEn";
 
 const MATH_SPAN_RE = /\$\$[\s\S]*?\$\$|\$[^$\n]+?\$/g;
 const LINK_IMG_RE = /!?\[[^\]\n]*\]\([^)\n]*\)/g;
+// 块引用 kramdown 形态（09-22 □1 实测 3.8.4）：`((id "锚文本"))` / `((id "锚文本" "s"))`
+// ——锚文本常带句号（引用目标即句子），盲切=断引信，回灌内核落字面文本泄漏进正文。
+const BLOCK_REF_RE = /\(\([0-9]{14}-[a-z0-9]+\s+"[^"\n]*"(?:\s+"[a-z]{1,2}")?\)\)/g;
+// 备注脱糖形态（09-22 □1 实测）：getBlockKramdown 把 inline-memo 剥成 `正文<sup>（内容）
+// </sup>`（kramdown 通道不带备注 span 回灌），备注内容含句号时被腰斩=多条备注+sup 裸裂。
+// sup 整体 vault（用户真上标通常短引用无句号，误锁=该区间少切，零损失）。
+const SUP_RE = /<sup[^>]*>[\s\S]*?<\/sup>/g;
 const PLACEHOLDER_RE = /\u0000(\d+)\u0000/g;
 
 function mathGuard(ps: string[]): { guarded: string[]; restore: (out: string[]) => string[] } {
     const vault: string[] = [];
     const stash = (m: string) => `\u0000${vault.push(m) - 1}\u0000`;
-    // 公式先锁（链接 text/url 里的 $ 可靠锁公式），链接/图片后锁（占位符无 [] 不二次命中）
-    const guarded = ps.map(s => s.replace(MATH_SPAN_RE, stash).replace(LINK_IMG_RE, stash));
+    // 公式先锁（链接 text/url 里的 $ 可靠锁公式），链接/图片后锁（占位符无 [] 不二次命中）；
+    // 块引用/sup 再后锁（占位符无 ((/ 字母 tag 不二次命中）
+    const guarded = ps.map(s => s.replace(MATH_SPAN_RE, stash).replace(LINK_IMG_RE, stash)
+        .replace(BLOCK_REF_RE, stash).replace(SUP_RE, stash));
     const restore = (out: string[]) => out.map(s => s.replace(PLACEHOLDER_RE, (_, i) => vault[i]));
     return { guarded, restore };
 }
@@ -168,21 +177,103 @@ function openText(stack: MarkTok[]): string {
     return stack.map(t => ("tag" in t) ? t.open : t.char).join("");
 }
 
-function closeText(stack: MarkTok[]): string {
-    return stack.map(t => ("tag" in t) ? `</${t.tag}>` : t.char).reverse().join("");
+function closeText(stack: MarkTok[], ialMap: Map<string, string>): string {
+    // 09-22 □1：闭合补全按原 kramdown 的 IAL 映射带后缀（`</span>{: style=…}` / `=={:
+    // style=…}` 存储形态）——行内 {: style} 与被切标记分离=除末片外外观丢失的修法②
+    return stack.map(t => ("tag" in t)
+        ? `</${t.tag}>${ialMap.get(t.open) ?? ""}`
+        : `${t.char}${ialMap.get(t.char) ?? ""}`).reverse().join("");
+}
+
+// 行内 IAL 后缀（kramdown 存储形态，紧跟闭合标记：`</span>{: style=…}`、`==…=={: style=…}`）
+const IAL_RE = /^\{:[^}]*\}/;
+
+/** 预扫全批片序，收集「闭合标记→紧随 IAL」映射（09-22 □1 修法②）：IAL 在原 kramdown
+ *  里只出现在被切标记真正闭合的那一片（末片），而补全发生在每一片——先扫后补。
+ *  tag 形态栈式配对（开 tag 串=键，同开串同款 IAL 折叠取末次）；字符对形态按标记本身
+ *  为键（同种标记同款样式，物理上 kramdown 不区分实例）。 */
+function collectCloseIALs(ps: string[]): Map<string, string> {
+    const map = new Map<string, string>();
+    const stack: { tag: string; open: string }[] = [];
+    for (const p of ps) {
+        let i = 0;
+        while (i < p.length) {
+            if (p[i] === "<") {
+                const m = HTML_TAG_RE.exec(p.slice(i));
+                if (m) {
+                    const [, slash, tag, attrs] = m;
+                    if (slash) {
+                        for (let k = stack.length - 1; k >= 0; k--) {
+                            if (stack[k].tag === tag) {
+                                const ial = IAL_RE.exec(p.slice(i + m[0].length));
+                                if (ial) map.set(stack[k].open, ial[0]);
+                                stack.length = k;
+                                break;
+                            }
+                        }
+                    } else {
+                        stack.push({ tag, open: `<${tag}${attrs}>` });
+                    }
+                    i += m[0].length;
+                    continue;
+                }
+            }
+            i++;
+        }
+    }
+    for (const t of CHAR_MARKS) {
+        const re = new RegExp(`${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\{:[^}]*\\})`);
+        for (const p of ps) {
+            const m = re.exec(p);
+            if (m) map.set(t, m[1]);
+        }
+    }
+    return map;
+}
+
+/** 片首孤儿闭合标记与 carry 配对消耗（09-22 □1 修法①）：句界落在标记收尾时，闭合标记
+ *  孤立在片首——canClose 的 i>0 前置（行内 flanking 简化）使它被误判新开标记，栈深
+ *  超限触发整批放弃线→裸片。修=片首闭合标记与栈顶（carry）同种则配对：标记+紧随 IAL
+ *  从正文剥除、栈顶弹出——该跨度的闭合已由上一片的补全闭合接管，本片不再头补其开
+ *  形态（闭在上一片末尾的语义，正是原 kramdown 的真实切分点）。纯标记片/剥空片同
+ *  通道消耗（不产出空残渣片）。 */
+function pairHeadClosers(p: string, stack: MarkTok[]): string {
+    let s = p;
+    while (s.length) {
+        const top = stack[stack.length - 1];
+        if (!top) break;
+        if ("tag" in top) {
+            const m = new RegExp(`^</${top.tag}\\s*>`).exec(s);
+            if (!m) break;
+            s = s.slice(m[0].length);
+        } else {
+            if (!s.startsWith(top.char)) break;
+            s = s.slice(top.char.length);
+        }
+        stack.pop();
+        const ial = IAL_RE.exec(s);
+        if (ial) s = s.slice(ial[0].length);
+    }
+    return s;
 }
 
 export function closeInlineMarks(ps: string[]): string[] {
     if (ps.length <= 1) return ps; // 单片批无切分发生，书源原样（补全只对切分产生的片界有意义）
+    const ialMap = collectCloseIALs(ps);
     const carry: MarkTok[] = [];
     const out: string[] = [];
     for (const p of ps) {
-        if (PURE_MARK_RE.test(p.trim())) continue; // 纯标记片丢弃（老 filter i=="*" 语义扩展）
         const stack = [...carry];
-        if (!scanInlineMarks(p, stack) || stack.length > 2) {
-            return ps.map(i => i.replace(/\*+$/g, "")); // 放弃线：回退老清理
+        const body = pairHeadClosers(p, stack);
+        const reopened = openText(stack); // 配对后剩余 carry 的开形态头补
+        const trimmed = body.trim();
+        if (trimmed !== "" && !PURE_MARK_RE.test(trimmed)) {
+            if (!scanInlineMarks(body, stack) || stack.length > 2) {
+                return ps.map(i => i.replace(/\*+$/g, "")); // 放弃线：回退老清理
+            }
+            out.push(reopened + body + closeText(stack, ialMap));
         }
-        out.push(openText(carry) + p + closeText(stack));
+        // carry 恒推进到本片终态：纯标记片/剥空片只消耗不产出（老 filter i=="*" 语义扩展）
         carry.length = 0;
         carry.push(...stack);
     }

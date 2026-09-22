@@ -42,3 +42,19 @@ export function stripBlockIAL(kramdown: string): string {
     if (lines.length > 1 && /^\{:/.test(lines[lines.length - 1])) lines.pop();
     return lines.join("\n");
 }
+
+/** 摘抄断句 kramdown 取文的正文容器收集（09-22 □1，摘抄管线 digestUtils 用）：结构判据
+ *  与 getBlockOwnEditableText 同款（2026-09-15 鸟反馈规则——无 class 的 contenteditable
+ *  直子=正文层；外来插件标注容器带 class、官方 protyle-attr 不混入），但取 HTML 而非
+ *  textContent：调用方套段落壳过 BlockDOM2Md 得存储形态 kramdown 喂断句引擎（行内标记
+ *  随句保留，textContent 通道=样式进引擎前全丢的旧根因）。判据失配（无正文直子，如
+ *  代码块结构）返回 null，调用方回退旧 textContent 通道（宁丢样式不丢文本）。 */
+export function ownEditableChildrenHTML(el: Element): string | null {
+    let html: string | null = null;
+    for (const child of Array.from(el.children)) {
+        if (child.hasAttribute("contenteditable") && child.classList.length === 0) {
+            html = (html ?? "") + child.outerHTML;
+        }
+    }
+    return html;
+}

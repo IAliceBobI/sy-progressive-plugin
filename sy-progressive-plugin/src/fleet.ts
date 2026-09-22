@@ -174,7 +174,16 @@ export async function setQuota(n: number) {
     await refreshFleet();
 }
 
+/** □3 管理书目右键：initFleet 注入的 actions 全局引用（ShowAllBooks 弹窗复用
+ *  openBookMenu 的同一动作集，单一事实源不重复组配；reload 重跑模块顶层=引用随代
+ *  重建无跨代陈旧，onunloadFleet 置 null 防悬挂） */
+let _fleetActions: FleetActions | null = null;
+export function fleetActionsRef(): FleetActions | null {
+    return _fleetActions;
+}
+
 export function initFleet(plugin: any, actions: FleetActions) {
+    _fleetActions = actions;
     // ---- □11 状态栏 ✂ 钮（火苗旁，不复用火苗）：上岗/浮条生命周期 toggle（□3 二击=收缩/消失） ----
     // 两钮均 position:"left"（afterbegin 插头部，后注册者更靠左）→ 火苗须后注册才在最左端
     const freeHost = document.createElement("div");
@@ -246,6 +255,7 @@ export function initFleet(plugin: any, actions: FleetActions) {
 }
 
 export function onunloadFleet() {
+    _fleetActions = null;
     if (refreshTimer) {
         clearInterval(refreshTimer);
         refreshTimer = null;

@@ -508,6 +508,17 @@ export function gateBlocked(todayRead: number, quota: number, nextPoint: number,
     return todayRead >= quota && nextPoint > dayAnchor;
 }
 
+/** □7 读完宣告回落点（纯，progfix0922 □7）：书卡/滚筒出片闸拦时回落开当日锚片
+ *  （最后读的那片）续读——断点已被「下一片」宣告推过锚后，当天点书卡仍能进书
+ *  （拦截≠禁读，续读自由）。无效锚返回 null=调用方维持原拦停（notice+return）：
+ *  anchor=-1 当日无前进记录（旧账 b 满 p 缺、quota 调低命中存量 b）/锚越出索引
+ *  （当天重分片缩索引）。锚=请求点理论不可达（拦=point 越过锚），防御性同 null
+ *  （回落同点无意义且形态绕闸） */
+export function gateFallbackPoint(requestedPoint: number, anchor: number, indexLength: number): number | null {
+    if (anchor < 0 || anchor >= indexLength || anchor === requestedPoint) return null;
+    return anchor;
+}
+
 /** 闸数据（当日该书读数+去重锚）：markRead 同款直读链——findDayBlock 走 sqlAttr
  *  （PLOG_DATE 值恒定、按值查块 id，不吃写后立读窗）+ getBlockAttrs IAL 直读拿
  *  PLOG_DATA（勿走 SQL attributes 读回数据：写后立查缓存回旧值）。当日块刚建的

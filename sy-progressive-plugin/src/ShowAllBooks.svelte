@@ -18,8 +18,13 @@
     import { notifyFleetChanged, onFleetChanged } from "./fleetNotify";
     import { fetchWritingPieces } from "./writeBook";
     import { writingCompareBox } from "./WritingCompareBox";
-    import { AUTORELAX_KEY, parseStamp, VISITRATE_KEY, type VisitFreq } from "./readCurveCore";
-    import { setBookVisitFreq } from "./readCurve";
+import { AUTORELAX_KEY, parseStamp, VISITRATE_KEY, type VisitFreq } from "./readCurveCore";
+import { setBookVisitFreq } from "./readCurve";
+// □3 书卡右键+搜索：菜单/动作/过滤三件全部复用舰队侧边栏同源（bookMenu 单一菜单事实源，
+// fleetActionsRef=initFleet 注入的同一动作集，filterFleetBooks=同一过滤语义）
+import { openBookMenu } from "./bookMenu";
+import { filterFleetBooks } from "./fleetData";
+import { fleetActionsRef } from "./fleet";
 
     interface Props {
         dm: DestroyManager;
@@ -186,6 +191,96 @@
         );
     });
 
+    /** □3 书名搜索：舰队总览同款（filterFleetBooks 同一过滤事实源，纯视觉不动排序；
+     *  空关键字=全量） */
+    let searchKw = $state("");
+    const shownBooks = $derived(filterFleetBooks(sortedBooks, searchKw));
+
+    /** □3/□9 书卡菜单书参（右键与长按共用）：与 FleetBook 派生位同口径——paused=
+     *  ignored、manual=manualMode、finished=total>0 且 point 达标（写作书素材终态位
+     *  不在此判定——rereadMenuEligible 本就排除写作/手动书） */
+    function fleetBookOf(b: TaskType) {
+        return {
+            bookID: b.bookID,
+            name: b.name,
+            pinned: !!b.bookInfo.pinned,
+            paused: !!b.bookInfo.ignored,
+            manual: !!b.bookInfo.manualMode,
+            writing: !!b.bookInfo.writing,
+            finished:
+                !b.bookInfo.writing &&
+                totalOf(b) > 0 &&
+                (b.bookInfo.point ?? 0) >= totalOf(b),
+        };
+    }
+
+    /** □3 书卡右键：复用舰队侧边栏同款 openBookMenu（bookMenu.ts 单一事实源）；
+     *  菜单动作落地后 notifyFleetChanged 驱动本弹窗重载刷新 */
+    function onCardMenu(ev: MouseEvent, b: TaskType) {
+        const fa = fleetActionsRef();
+        if (!fa) return;
+        void openBookMenu(ev, fleetBookOf(b), fa);
+    }
+
+    // □9 移动端长按开菜单：抄 DockPanel 舰队书卡同款三件套（lpStart/lpUp/lpCancel——
+    // pointerType=mouse 走 contextmenu 不走此通道；到点只亮旗不开菜单，开菜单挂松手
+    // click，independent 菜单构造与松手 click 交叠零竞态，同款 300ms 兜底）。与 DockPanel
+    // 的结构差异：管理卡是 article 容器内嵌多个动作钮（阅读/删除等），长按松手的 click
+    // 会落进钮里——闸门挂 capture 阶段（钮 handler 是 document 委托冒泡，capture 先到）
+    // 旗亮即吞 click 就地开菜单防误触；闸内先 lpCancel 清掉 lpUp 已排的 300ms 兜底
+    // （click 已到=兜底永不需要，留着会在 +300ms 二次构造同位菜单）。
+    let lpTimer: ReturnType<typeof setTimeout> | undefined;
+    let lpClickFallback: ReturnType<typeof setTimeout> | undefined;
+    let lpArmed = false;
+    let lpX = 0;
+    let lpY = 0;
+
+    function lpStart(e: PointerEvent) {
+        lpArmed = false; // 先重置再早退：混合设备下 mouse 按下也须清旗，防残留吞掉鼠标点击
+        if (e.pointerType === "mouse") return;
+        lpCancel();
+        lpX = e.clientX;
+        lpY = e.clientY;
+        lpTimer = setTimeout(() => {
+            lpArmed = true;
+        }, 500);
+    }
+    function lpCancel() {
+        if (lpTimer) {
+            clearTimeout(lpTimer);
+            lpTimer = undefined;
+        }
+        if (lpClickFallback) {
+            clearTimeout(lpClickFallback);
+            lpClickFallback = undefined;
+        }
+        lpArmed = false;
+    }
+    /** 长按到点后的松手：click 若来（capture 闸消费旗），否则 300ms 兜底开菜单 */
+    function lpUp(b: TaskType) {
+        if (lpArmed && !lpClickFallback) {
+            lpClickFallback = setTimeout(() => {
+                lpClickFallback = undefined;
+                lpOpen(b);
+            }, 300);
+        }
+    }
+    /** click 派发完毕后构造菜单（零竞态点） */
+    function lpOpen(b: TaskType) {
+        lpArmed = false;
+        const fa = fleetActionsRef();
+        if (!fa) return;
+        void openBookMenu({ clientX: lpX, clientY: lpY }, fleetBookOf(b), fa);
+    }
+    /** 书卡 click 统一闸（capture）：长按旗亮=吞掉内嵌钮 click 就地开菜单；否则放行 */
+    function cardClickGate(e: MouseEvent, b: TaskType) {
+        if (!lpArmed) return;
+        e.preventDefault();
+        e.stopPropagation();
+        lpCancel();
+        lpOpen(b);
+    }
+
     function totalOf(b: TaskType): number {
         // 期2 写作书：total=片数（定稿占比的分母）；阅读书=索引长
         if (b.bookInfo.writing) return b.pieceLen;
@@ -312,8 +407,9 @@
         </div>
     {:else}
         <div class="manage-bar">
+            <!-- □9 计数跟随搜索过滤：与列表同源 shownBooks（过滤时=命中数，无匹配=0） -->
             <span class="manage-count"
-                >{tomatoI18n.共N本书(sortedBooks.length)}</span
+                >{tomatoI18n.共N本书(shownBooks.length)}</span
             >
             <span class="spacer"></span>
             <!-- 期1 写作书：管理页常驻入口；□2 图标统一线稿家族；accent=常驻主入口提示性（同 prog-fleet-plan） -->
@@ -328,11 +424,32 @@
                 onclick={() => load(true)}
             ><svg><use xlink:href="#iconProgRefresh"></use></svg></button>
         </div>
+        <!-- □3 搜索框：舰队总览同款形态（.prog-fleet-search 全局样式 index.scss 单一源；
+             空架子插画态不出搜索框，与 DockPanel 同判） -->
+        <input
+            class="prog-fleet-search b3-text-field"
+            type="search"
+            placeholder={tomatoI18n.搜索书名}
+            aria-label={tomatoI18n.搜索书名}
+            bind:value={searchKw}
+        />
+        {#if shownBooks.length === 0}
+            <!-- □3 搜索无匹配（区别于全书架空插画态；清空关键字即恢复全量） -->
+            <div class="prog-fleet-nomatch">{tomatoI18n.无匹配书目}</div>
+        {:else}
         <div class="manage-list">
-            {#each sortedBooks as b (b.bookID)}
+            {#each shownBooks as b (b.bookID)}
                 {#if stOf(b.bookID) === "closed"}
-                    <!-- ⏸ 笔记本已关闭：整卡灰化，无任何操作（闭箱是暂态，不给清理） -->
-                    <article class="card closed">
+                    <!-- ⏸ 笔记本已关闭：整卡灰化，无任何操作（闭箱是暂态，不给清理）；
+                         右键菜单与舰队侧边栏同款照挂（配置类动作如置顶/回访频率对闭箱书仍有意义） -->
+                    <article class="card closed"
+                        oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); onCardMenu(e, b); }}
+                        onpointerdown={(e) => lpStart(e)}
+                        onpointerup={() => lpUp(b)}
+                        onpointercancel={lpCancel}
+                        onpointerleave={lpCancel}
+                        onclickcapture={(e) => cardClickGate(e, b)}
+                    >
                         <div class="row top">
                             <span class="name">{b.name}</span>
                             <span class="chip chip-closed"
@@ -344,8 +461,15 @@
                         </div>
                     </article>
                 {:else if stOf(b.bookID) === "lost"}
-                    <!-- ⚠ 疑似失效：warn 警示 + 唯一出口「清理记录」突出 -->
-                    <article class="card lost">
+                    <!-- ⚠ 疑似失效：warn 警示 + 唯一出口「清理记录」突出；右键菜单照挂（同舰队侧边栏） -->
+                    <article class="card lost"
+                        oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); onCardMenu(e, b); }}
+                        onpointerdown={(e) => lpStart(e)}
+                        onpointerup={() => lpUp(b)}
+                        onpointercancel={lpCancel}
+                        onpointerleave={lpCancel}
+                        onclickcapture={(e) => cardClickGate(e, b)}
+                    >
                         <div class="row top">
                             <span class="name">{b.name}</span>
                             <span class="chip chip-lost"
@@ -367,8 +491,17 @@
                         </div>
                     </article>
                 {:else}
-                    <!-- 活书卡：书名行 / 进度条 / 动作行 / 折叠分片设置；□2 隐匿书灰态行（舰队不显示但管理页可见=找回出口） -->
-                    <article class="card" class:hidden={!!b.bookInfo.hidden}>
+                    <!-- 活书卡：书名行 / 进度条 / 动作行 / 折叠分片设置；□2 隐匿书灰态行（舰队不显示但管理页可见=找回出口）；
+                         □3 右键=舰队侧边栏同款 openBookMenu（置顶/隐匿/回访频率/知识地图/划线总览/批量整理/忽略/归档）；
+                         □9 移动端长按=右键同款菜单（lp 三件套+capture 闸防长按松手误触内嵌钮） -->
+                    <article class="card" class:hidden={!!b.bookInfo.hidden}
+                        oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); onCardMenu(e, b); }}
+                        onpointerdown={(e) => lpStart(e)}
+                        onpointerup={() => lpUp(b)}
+                        onpointercancel={lpCancel}
+                        onpointerleave={lpCancel}
+                        onclickcapture={(e) => cardClickGate(e, b)}
+                    >
                         <div class="row top">
                             <span class="name">{#if b.bookInfo.pinned}<span class="pin" aria-label={tomatoI18n.置顶本书}>📌</span>{/if}{b.name}</span>
                             {#if b.bookInfo.hidden}<span class="chip chip-hidden">{tomatoI18n.已隐匿此书}</span>{/if}
@@ -600,6 +733,7 @@
                 {/if}
             {/each}
         </div>
+        {/if}
     {/if}
 </div>
 
@@ -611,6 +745,10 @@
         gap: 8px;
         height: 100%;
         min-height: 0;
+        /* b3-dialog__body 内核 padding 0（.prog-vnote-input 同款坑）——自带内边距对齐标题行，
+           vision P2 贴边修法；border-box 防 height:100% 被 padding 撑破 */
+        box-sizing: border-box;
+        padding: 12px 16px;
         color: var(--prog-title);
         word-break: normal; // 抵消 .b3-dialog__content 的 break-all 继承
     }

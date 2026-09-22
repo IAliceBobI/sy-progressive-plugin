@@ -16,6 +16,7 @@
         pieceNoBacktraceLink,
         readCurveSweepMins,
         readCurveTakeover,
+        pieceAutoCard,
         readCurvePiece,
         readCurveMaterial,
         readCurveDigest,
@@ -147,7 +148,21 @@
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置阅读曲线}>{tomatoI18n.阅读曲线接管实验}</span>
     </div>
-    {#if $readCurveTakeover}
+    <!-- □5 progfix0922（bear 09-22 拍板「拆出来、默认开」）：分片自动制卡独立开关——
+         与上方接管解耦（接管关着也生效）：分片（含槽片/素材首推）自动加入背诵闪卡；
+         关=分片族建卡环整体停（接管开着也停，存量走完自然毕业）。放在 if 块外=没开
+         接管的用户也能找到（刘璐④/650189「分片后想自动制卡，没找到配置项」） -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$pieceAutoCard}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置分片自动制卡}>{tomatoI18n.分片自动加入背诵闪卡}</span>
+    </div>
+    <!-- □11 progfix0922：巡查频率+分片/素材类=分片族建卡面，pieceOnly 态（接管关+分片
+         制卡开）也生效，故随 takeover||pieceAutoCard 显示；下方摘抄/阅读点/文档卡=接管面 -->
+    {#if $readCurveTakeover || $pieceAutoCard}
         <div>
             <select class="b3-select" style="min-width: 160px" bind:value={$readCurveSweepMins}>
                 <option value={0}>{tomatoI18n.关闭}</option>
@@ -179,6 +194,8 @@
                 {/if}
             </select>
         </div>
+    {/if}
+    {#if $readCurveTakeover}
         <div>
             <input type="checkbox" class="b3-switch" bind:checked={$readCurveDigest} />
             <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip推送摘抄}>{tomatoI18n.摘抄}</span>

@@ -236,8 +236,9 @@ export function rereadMenuEligible(b: Pick<FleetBook, "finished" | "manual" | "w
 }
 
 /** 书卡关键字过滤（舰队管理 □1 搜索框）：书名大小写不敏感包含匹配，
- *  纯视觉过滤不动滚筒序/沉底序；空/纯空白关键字原样返回 */
-export function filterFleetBooks(books: FleetBook[], kw: string): FleetBook[] {
+ *  纯视觉过滤不动滚筒序/沉底序；空/纯空白关键字原样返回。
+ *  □3 管理书目搜索同源复用：泛型化只读 name（TaskType 卡同样可过滤），DockPanel/单测调用不变 */
+export function filterFleetBooks<T extends { name: string }>(books: T[], kw: string): T[] {
     const k = (kw ?? "").trim().toLowerCase();
     if (!k) return books;
     return books.filter(b => b.name.toLowerCase().includes(k));

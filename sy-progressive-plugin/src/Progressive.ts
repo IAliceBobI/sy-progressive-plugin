@@ -22,8 +22,9 @@ import DigestAllDialogSvelte from "./DigestAllDialog.svelte";
 import ShowAllBooksSvelte from "./ShowAllBooks.svelte";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
-import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, rollerTodayGate, rollerTodaysFullIDs, activeFullIDs, manualFirstExcerptGuide } from "./roller";
+import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, gateFallbackPoint, rollerTodayGate, rollerTodaysFullIDs, activeFullIDs, manualFirstExcerptGuide } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
+import { pieceHasChildDocs } from "./pieceGuard";
 import { notifyFleetChanged } from "./fleetNotify";
 import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadCurve, guardUndoReadCard, initReadCurveTriggers, removeFromReadingCurve, resolveReadMenuTarget, retirePieceCard, sweepReadCurve } from "./readCurve";
 import { openReadCardMenu } from "./readCardMenu";
@@ -31,11 +32,12 @@ import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCor
 import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
 import { HtmlCBType } from "./constants";
 import { lockWithLease, type LockLeaseResult } from "./lockLease";
+import { leasedThenSweep } from "./flipSweep";
 import { findDocByIal, getDocIalDigestDir, parseBookIDFromCtime, latestDigestAnchorOfBook } from "./progData";
 import { PIECE_IDX_KEY, resolveOriginTarget } from "./originTrace";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
-import { dailyQuota, mobileSelectBtns, readCurveCadMaterial, readCurveMaterial, readCurveTakeover } from "../../sy-tomato-plugin/src/libs/stores";
+import { dailyQuota, mobileSelectBtns, readCurveCadMaterial, readCurveMaterial, readCurveTakeover, pieceAutoCard } from "../../sy-tomato-plugin/src/libs/stores";
 import { addClickEvent, progressiveBtnFloating, yieldFloatbarForMenu, restoreFloatbarAfterMenu } from "./ProgressiveBtn";
 import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
@@ -1036,7 +1038,16 @@ class Progressive {
         // 书籍状态判定（2026-08-28 设计共识）：⏸ 闭笔记本/⚠ 文档丢失的书不出片——
         // 死书曾是「点了没反应」的根因（toast 一闪而过、无窗口打开）
         const statuses = await loadBookStatuses();
-        const st = statuses.get(bookID);
+        let st = statuses.get(bookID);
+        if (!st) {
+            // □10 progfix0922：statuses miss（刚注册窗口撞 30s 状态缓存——map 建自
+            // 旧 booksInfos 快照，未含新书），旧码在下方「还未分片」分支裸读 st.name
+            // 崩 TypeError（run1 e2e 实锤）。就绪通道=force 跳缓存重判一次：内存
+            // booksInfos 已含新书，重判即入 map（新书保护期判 ok）；仍 miss（盘上
+            // books.json 半注册等边缘）按活书放行——与「宁可信其活」口径一致，
+            // 提示名字走下方兜底链，不拦阅读
+            st = (await loadBookStatuses(true)).get(bookID);
+        }
         if (st && st.status !== "ok") {
             await this.handleUnreadableBook(bookID, st);
             return;
@@ -1103,7 +1114,10 @@ class Progressive {
                 // 已有键（复习链先建了首推卡 x#0 在弹）不动——卡链自管，此处只是预读；
                 // 存量已锤无键（v3.7.0 消费过）不追溯（老数据不动）。键读复用锤复核的
                 // attrs（review P2-3：省一次 getBlockAttrs 往返）
-                if (readCurveTakeover.get() && readCurveMaterial.get() && !String(attrsAfter[READCARD_KEY] ?? "")) {
+                // □5 progfix0922：总闸从 readCurveTakeover 换 pieceAutoCard——素材属分片族
+                // 建卡面（接管关着也建），takeover 不再独占；接管开着+新开关关=同停（口径
+                // 与巡查 ④ 建卡环一致）
+                if (pieceAutoCard.get() && readCurveMaterial.get() && !String(attrsAfter[READCARD_KEY] ?? "")) {
                     const cad = readCurveCadMaterial.get();
                     await buildReadingCard(dispatch.id, plusDays(new Date(), cadenceDays(cad)), cadenceOpts(cad) ?? { mode: "grow", count: 1 });
                 }
@@ -1143,9 +1157,12 @@ class Progressive {
         // 写盘风暴+dataChanges 广播）。挪除：成功出片由 fullfilContent 落 time，
         // 失败重试/终态路径不再记活跃时间
         if (bookIndex.length === 0) {
-            // 0 片 ≠ 最后一页（旧文案误导）：未分片的书引导去分片
-            await siyuan.pushMsg(tomatoI18n.本书还未分片(st.name));
-            confirm("", tomatoI18n.本书还未分片立即重新分片吗(st.name), async () => {
+            // 0 片 ≠ 最后一页（旧文案误导）：未分片的书引导去分片。□10：st 可为
+            // undefined（statuses miss，见上方 □10 注）——名字三兜底 st →
+            // bookInfo.bookName → bookID，不再裸读 st.name 崩 TypeError
+            const bookName = st?.name || bookInfo.bookName || bookID;
+            await siyuan.pushMsg(tomatoI18n.本书还未分片(bookName));
+            confirm("", tomatoI18n.本书还未分片立即重新分片吗(bookName), async () => {
                 await this.addProgressiveReadingWithLock(bookID);
             });
             return;
@@ -1163,9 +1180,20 @@ class Progressive {
         // progpush □1 硬闸（滚筒+书卡点击路径的统一闸口）：当日该书已读满档位且
         // point 越过当日锚=开新片 → 拦。重开当前片（读一半回来续读）/next 链放行
         // 后的 leased（point=刚推的锚）天然不中此闸
-        if (await this.gateCheck(bookID, point)) {
+        // □7 读完宣告回落：断点可能已被「下一片」宣告推过锚（point>锚的来处）——
+        // 不回落则宣告后当天点书卡进不了这本书（旧拦停径 return）。回落开当日锚片
+        // （最后读的那片）续读，不前进不记账（与旧「重开当前片续读」语义对齐）；
+        // 无锚可回落=维持原拦停
+        const gate = await this.gateCheck(bookID, point);
+        if (gate) {
+            const fallback = gateFallbackPoint(point, gate.anchor, bookIndex.length);
+            if (fallback === null) {
+                await this.gateNotice(bookID);
+                return;
+            }
+            debugLog("floatbar", `gate fallback book=${bookID} point=${point}→anchor#${fallback}`, "progressive");
+            point = fallback;
             await this.gateNotice(bookID);
-            return;
         }
         let openPiece = false;
         noteID = await help.createPiece(bookInfo, bookIndex, point)
@@ -1263,7 +1291,7 @@ class Progressive {
         switch (cbType) {
             case HtmlCBType.previous: {
                 await progStorage.gotoBlock(bookID, point - 1);
-                const r = await this.startToLearnLeased(bookID);
+                const r = await leasedThenSweep(() => this.startToLearnLeased(bookID));
                 if (r === "done") {
                     this.closePeices(bookID);
                     showCardAnswer();
@@ -1272,10 +1300,16 @@ class Progressive {
                 break;
             }
             case HtmlCBType.next: {
-                // progpush □1 硬闸：满了完整拦停（不前进/不记账/不出片）——被拒的
-                // 已读宣告明天从当前片重来，账面不超额；判定必须在 markRead 前
-                // （记账会把锚推到 point+1，事后判=重开当前片形态恒放行）
+                // □7 读完宣告（progfix0922，650189 09-22 15:06）：闸拦改判=断点前进
+                // 但不记账不出片。「点了下一片」=当前片已读完的宣告——明天从 point+1
+                // 续读（不再重读几行才能点下一片）；没点=断点不动，明天仍从当前片续读
+                // （打开了没读完的不被漏）。不 markRead：当日 b/p 不动（账面不超额、锚
+                // 不前移——前移会让重开当前片形态恒放行、宣告可无限连发）。判定必须在
+                // markRead 前（同 progpush □1 原注释：记账会把锚推到 point+1，事后判=
+                // 重开当前片形态恒放行）。幂等：连点同片回调 point 同值，断点已=point+1
+                // 再 set 同值（gotoBlock 直写 books.json，ProgressiveStorage.ts gotoBlock）
                 if (await this.gateCheck(bookID, point + 1)) {
+                    await progStorage.gotoBlock(bookID, point + 1);
                     await this.gateNotice(bookID);
                     break;
                 }
@@ -1287,7 +1321,7 @@ class Progressive {
                 // 等评分——skip 不消卡的回锅根治位（deleteAndNext 删片文档键随灭
                 // 天然退场，无需同款）
                 await retirePieceCard(noteID);
-                const r = await this.startToLearnLeased(bookID);
+                const r = await leasedThenSweep(() => this.startToLearnLeased(bookID));
                 if (r === "done") {
                     this.closePeices(bookID);
                     showCardAnswer();
@@ -1297,6 +1331,13 @@ class Progressive {
             }
             case HtmlCBType.deleteAndExit:
                 confirm("⚠️", "🏃 🗑", async () => {
+                    // progfix0922 □2 删片子文档守卫：片下挂了子文档（child 档误锚存量/手拖）
+                    // 时 removeDocByID 连坐删整棵子树——拦删提示先处理（守卫 fail-open：
+                    // 取向瞬态故障不废删片动作）
+                    if (await pieceHasChildDocs(noteID)) {
+                        await siyuan.pushMsg(tomatoI18n.片下有子文档不可删, 3000);
+                        return;
+                    }
                     await siyuan.removeRiffCards([noteID]);
                     siyuan.removeDocByID(noteID);
                     showCardAnswer();
@@ -1310,9 +1351,14 @@ class Progressive {
             // （片删掉锚无回推目标，次日不会重推这篇无价值分片）。换书段照抄 nextBook 链。
             case HtmlCBType.deleteAndSwap:
                 confirm("⚠️", tomatoI18n.删片换书确认, async () => {
+                    // □2 子文档守卫（同 deleteAndExit）
+                    if (await pieceHasChildDocs(noteID)) {
+                        await siyuan.pushMsg(tomatoI18n.片下有子文档不可删, 3000);
+                        return;
+                    }
                     await siyuan.removeRiffCards([noteID]);
                     siyuan.removeDocByID(noteID);
-                    const r = await this.startToLearnLeased();
+                    const r = await leasedThenSweep(() => this.startToLearnLeased());
                     if (r === "done") {
                         showCardAnswer();
                         pressSkip()
@@ -1321,9 +1367,14 @@ class Progressive {
                 break;
             case HtmlCBType.deleteAndBack:
                 confirm("⚠️", tomatoI18n.删除并返回, async () => {
+                    // □2 子文档守卫（同 deleteAndExit）
+                    if (await pieceHasChildDocs(noteID)) {
+                        await siyuan.pushMsg(tomatoI18n.片下有子文档不可删, 3000);
+                        return;
+                    }
                     await siyuan.removeRiffCards([noteID]);
                     await progStorage.gotoBlock(bookID, point - 1);
-                    const r = await this.startToLearnLeased(bookID);
+                    const r = await leasedThenSweep(() => this.startToLearnLeased(bookID));
                     siyuan.removeDocByID(noteID);
                     if (r === "done") {
                         this.closePeices(bookID);
@@ -1339,12 +1390,17 @@ class Progressive {
                     await this.gateNotice(bookID);
                     break;
                 }
+                // □2 子文档守卫（同 deleteAndExit；本路径无 confirm，拦停即不动锚不删片）
+                if (await pieceHasChildDocs(noteID)) {
+                    await siyuan.pushMsg(tomatoI18n.片下有子文档不可删, 3000);
+                    break;
+                }
                 // v5「读完即删」：分片是一次性餐具（原文档还在、误删可重分片），主循环高频动作不再 confirm
                 await siyuan.removeRiffCards([noteID]);
                 await progStorage.gotoBlock(bookID, point + 1);
                 // routemap □1：已读=读到新片那一刻（翻页/删片同权；锚防回看后再删重复计）
                 await this.markReadSafe(bookID, point + 1);
-                const r = await this.startToLearnLeased(bookID);
+                const r = await leasedThenSweep(() => this.startToLearnLeased(bookID));
                 siyuan.removeDocByID(noteID);
                 if (r === "done") {
                     this.closePeices(bookID);
@@ -1354,7 +1410,7 @@ class Progressive {
                 break;
             }
             case HtmlCBType.nextBook: {
-                const r = await this.startToLearnLeased();
+                const r = await leasedThenSweep(() => this.startToLearnLeased());
                 if (r === "done") {
                     showCardAnswer();
                     pressSkip()
@@ -1426,22 +1482,25 @@ class Progressive {
 
     /** 出片硬闸判定（progpush □1：每书每天出片上限=档位值）：只在「开新片」时判
      *  拦（gateBlocked 锚语义）——重开当前片/回看旧片恒放行，拦截≠禁读。手动书
-     *  （开原书/摘抄直达）与写作书（素材 materialInterval 自己节奏）不在闸面。无
-     *  副作用，提示由 gateNotice 出（拦停点手调） */
-    private async gateCheck(bookID: string, nextPoint: number): Promise<boolean> {
+     *  （开原书/摘抄直达）与写作书（素材 materialInterval 自己节奏）不在闸面。
+     *  返回 false=放行；拦时带当日锚（□7 回落开锚片用，调用方免二次查询）。
+     *  无副作用，提示由 gateNotice 出（拦停点手调） */
+    private async gateCheck(bookID: string, nextPoint: number): Promise<false | { anchor: number }> {
         const info = await progStorage.booksInfo(bookID);
         if (!info || info.manualMode || info.writing) return false;
         const { reads, anchor } = await rollerTodayGate(bookID);
         const quota = Number(dailyQuota.get()) || 3;
         if (!gateBlocked(reads, quota, nextPoint, anchor)) return false;
         debugLog("floatbar", `gate block book=${bookID}(${info.bookName}) reads=${reads}/${quota} point=${nextPoint} anchor=${anchor}`, "progressive");
-        return true;
+        return { anchor };
     }
 
-    /** 闸拦截提示：书名+档位，明天再来（想连读自己开原书——闸只拦「产生分片」） */
+    /** 闸拦截提示（□7 口径）：书名+档位+明天续读起点——N=books.json 断点（0 起）+1
+     *  的用户口径（与 第N片 同源）。next case 宣告前进后调=按新断点报；未宣告
+     *  拦停（deleteAndNext/无锚回落失败）=报当前片（明天从它续读） */
     private async gateNotice(bookID: string) {
         const info = await progStorage.booksInfo(bookID);
-        await siyuan.pushMsg(tomatoI18n.今日已读满N篇(info?.bookName ?? "", Number(dailyQuota.get()) || 3), 3000);
+        await siyuan.pushMsg(tomatoI18n.今日已满明天从第N片继续(info?.bookName ?? "", Number(dailyQuota.get()) || 3, (info?.point ?? 0) + 1), 3000);
     }
 
     /** 已读记账；附属动作失败只降级不阻断开片。routemap □1：point=前进后的新 point，

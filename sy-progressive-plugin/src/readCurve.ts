@@ -12,7 +12,7 @@ import { Constants } from "siyuan";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { dailyQuota, readCurveSweepMins, readCurveTakeover, readCurveReadingPoint, readCurvePlainDocs, readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain } from "../../sy-tomato-plugin/src/libs/stores";
+import { dailyQuota, readCurveSweepMins, readCurveTakeover, pieceAutoCard, readCurveReadingPoint, readCurvePlainDocs, readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain } from "../../sy-tomato-plugin/src/libs/stores";
 import { MarkKey, PDIGEST_CTIME, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { progStorage } from "./ProgressiveStorage";
 import * as constants from "./constants";
@@ -30,8 +30,8 @@ import {
     AUTORELAX_KEY, AUTO_RELAX_CAP, CurveMode, CurvePlanCard, parseReadCard, RATING_GRACE_MS, READCARD_KEY, READOUT_KEY, ReadCardKind,
     cadenceDays, cadenceOpts, consumeRound, DIGEST_BUILD_CAP, dueStamp, formatReadCard, GROW_INTERVALS,
     growInterval, isConsumedCurve, isMaterialFirstPush, isRPCardMarkdown, isRated, normalizeDue, parseStamp, planSweep, plusDays,
-    guardReadCardValue, readMenuTarget, RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, skipDefersCard, sortForReconcile, tailFollowState,
-    toSchedValue, tomorrowStart, undoGuardsCard, VisitFreq, VISITRATE_KEY,
+    guardReadCardValue, isPieceFamily, readMenuTarget, RELAX_WINDOW_DAYS, relaxVerdict, relaxWindowStart, REVISIT_DAILY_LIMIT, rescheduleDays, SCHED_CHOICES, shouldReconcilePiece, skipDefersCard, sortForReconcile, sweepRegime, tailFollowState,
+    toSchedValue, tomorrowStart, takeoverOffClearScope, undoGuardsCard, VisitFreq, VISITRATE_KEY,
 } from "./readCurveCore";
 import { statusLineOf } from "./readCurveText";
 
@@ -203,7 +203,7 @@ const plainSkipped = new Set<string>();
  *  （曲线族沉底判定）。
  *  □3 扩展：rpcardTargets=全库无键阅读点卡块（接管候选，类开关滤）；plainCandidates=
  *  「我的文档卡」开闸时的无键无锚文档块头 2*CAP（收编候选，riff 检查在 ④）。 */
-async function computeTargets(noCreate: boolean, readcards?: Map<string, string>): Promise<{
+async function computeTargets(noCreate: boolean, readcards?: Map<string, string>, adoptOthers = true): Promise<{
     targets: Map<string, string>;
     gateOpen: Map<string, boolean>;
     readable: Set<string>;
@@ -221,10 +221,10 @@ async function computeTargets(noCreate: boolean, readcards?: Map<string, string>
     const infos = progStorage.booksInfos();
     const ro = await progStorage.loadReadingOrder();
     const order = mergeMissingBooks(ro, Object.keys(infos)).order;
-    const rpOn = readCurveReadingPoint.get() && !noCreate;
-    const plainOn = readCurvePlainDocs.get() && !noCreate;
+    const rpOn = adoptOthers && readCurveReadingPoint.get() && !noCreate;
+    const plainOn = adoptOthers && readCurvePlainDocs.get() && !noCreate;
     // □5 类别开关：关=该类不再新建卡（存量键走完自然毕业，清场语义对齐一期分级）
-    const digestOn = readCurveDigest.get() && !noCreate;
+    const digestOn = adoptOthers && readCurveDigest.get() && !noCreate;
     const [todayReads, revisitRows, ctRows, statuses, customRows, docRows, markRows, optoutRows] = await Promise.all([
         rollerTodayReads(),
         siyuan.sql(`select block_id from attributes where name='${PdigestReviewKey}' limit 10000000`) as Promise<any[]> ?? [],
@@ -585,10 +585,16 @@ async function mainSweepLocksHeld(): Promise<boolean> {
 
 /** 巡查主流程：①扫已评分→对账回写+摘卡 ②目标集现算（看到对账后的最新 point）
  *  ③diff 拉 due ④目标片缺卡补建。noCreate=onload 态（只对账拉平不建片）。
- *  触发点：onload/推片后/复习翻卡/设置变更/定时兜底。 */
+ *  触发点：onload/推片后/复习翻卡/设置变更/定时兜底。
+ *  □5 progfix0922 闸拆分（sweepRegime 纯核）：run=takeover‖pieceAutoCard（全关=
+ *  整体 skip）；adoptOthers=false（接管关+分片自动制卡开的 pieceOnly 态）=对账/
+ *  排程面过滤到分片族（isPieceFamily），digest/rpcard/plain 接管面整环不跑（候选
+ *  集在 computeTargets 侧即空——全库 custom/文档块扫描省下）；takeover=true 老路径
+ *  零变化 */
 export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean } = {}): Promise<void> {
-    if (!readCurveTakeover.get()) {
-        debugLog("readcurve", `sweep skip (${reason}): takeover off`, "progressive");
+    const regime = sweepRegime(readCurveTakeover.get(), pieceAutoCard.get());
+    if (!regime.run) {
+        debugLog("readcurve", `sweep skip (${reason}): takeover off & piece auto-card off`, "progressive");
         return;
     }
     await lockWithLease(ReadCurveSweepLock, async () => {
@@ -599,9 +605,12 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
         try {
             const now = new Date();
             const { cards: cards0, keyed } = await getReadingCards();
+            // □5 pieceOnly 态过滤：对账/排程只见分片族；接管面残留行（清场失败遗留）
+            // 不动——归接管开关管，重开接管时自愈。known（④ 防重建）仍用全量 cards0
+            const cardsA = regime.adoptOthers ? cards0 : cards0.filter(c => isPieceFamily(c.kind));
             // ① 对账（评分晚于建卡+5s 余量=真评分；reps 基线可省——水位线判据幂等全覆盖）；
             //    rc 计数由对账聚合、此处合并一次写（逐卡写撞 markRead 建块窗口分裂当日块）
-            const rated = cards0.filter(c => isRated(c.readcard, c.lastReviewMs));
+            const rated = cardsA.filter(c => isRated(c.readcard, c.lastReviewMs));
             let revisits = 0;
             // cardflip*=用户评分现场（毕业 toast 出口）；onload/timer 补账静默
             if (rated.length) revisits = await reconcileRated(rated, reason.startsWith("cardflip"));
@@ -618,11 +627,11 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
             //    （素材首推池过滤+digest 建卡排除——含 g 毕业档案，review P0-1）；
             //    rcGateOpen=全局重现额度闸门（□2）
             const readcards = keyed;
-            const { targets, gateOpen, readable, materialTargets, digestTargets, rpcardTargets, plainCandidates, matUnread } = await computeTargets(!!opts.noCreate, readcards);
+            const { targets, gateOpen, readable, materialTargets, digestTargets, rpcardTargets, plainCandidates, matUnread } = await computeTargets(!!opts.noCreate, readcards, regime.adoptOthers);
             const rcGateOpen = (await rollerTodayRevisits()) < REVISIT_DAILY_LIMIT;
             const ratedIDs = new Set(rated.map(c => c.blockID));
             const plan = planSweep({
-                cards: cards0.filter(c => !ratedIDs.has(c.blockID)),
+                cards: cardsA.filter(c => !ratedIDs.has(c.blockID)),
                 targets, gateOpen, now, readable, rcGateOpen,
                 matRemaining: matUnread, // □4：素材写完出池+间隔传参的剩余量快照
             });
@@ -641,7 +650,7 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
             let liveTargets = targets, liveGate = gateOpen, liveDigests = digestTargets;
             let liveMat = materialTargets, liveRPCards = rpcardTargets, livePlain = plainCandidates;
             if (plan.graduate.length && !opts.noCreate) {
-                const t = await computeTargets(false, readcards);
+                const t = await computeTargets(false, readcards, regime.adoptOthers);
                 liveTargets = t.targets;
                 liveGate = t.gateOpen;
                 liveDigests = t.digestTargets;
@@ -662,18 +671,24 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
             const cadDg = readCurveCadDigest.get();
             const cadRP = readCurveCadReadingPoint.get();
             const cadPlain = readCurveCadPlain.get();
-            for (const [bookID, pieceID] of liveTargets) {
-                if (opts.noCreate) break; // onload 不建片（勿凭空多 N 个文档+巨书成本）
-                if (known.has(pieceID)) continue;
-                if (liveMat.has(pieceID)) {
-                    if (!matOn) continue; // □5 素材关：目标位素材不建卡（下轮自然重选）
-                    await buildReadingCard(pieceID, liveGate.get(bookID) ? dueStamp(now) : tomorrowStart(now),
-                        cadenceOpts(cadMat) ?? { mode: "grow", count: 0, freq: await bookVisitFreq(bookID) });
-                } else {
-                    if (!pieceOn) continue; // □5 分片关：不再建分片卡（存量每日重现走完毕业）
-                    await buildReadingCard(pieceID, liveGate.get(bookID) ? dueStamp(now) : tomorrowStart(now));
+            // □5 分片族建卡环总闸=pieceAutoCard（bear 09-22 拍板「拆出来、默认开」）：
+            // 关=整环停（分片/槽片/素材首推建卡全停，存量走完自然毕业）——接管开着也停
+            // （「分片自动加入背诵闪卡」在两种接管态下同义）；默认开=takeover=true 老
+            // 行为不变。类别开关（pieceOn/matOn）在环内再分卡型
+            if (regime.pieceFace) {
+                for (const [bookID, pieceID] of liveTargets) {
+                    if (opts.noCreate) break; // onload 不建片（勿凭空多 N 个文档+巨书成本）
+                    if (known.has(pieceID)) continue;
+                    if (liveMat.has(pieceID)) {
+                        if (!matOn) continue; // □5 素材关：目标位素材不建卡（下轮自然重选）
+                        await buildReadingCard(pieceID, liveGate.get(bookID) ? dueStamp(now) : tomorrowStart(now),
+                            cadenceOpts(cadMat) ?? { mode: "grow", count: 0, freq: await bookVisitFreq(bookID) });
+                    } else {
+                        if (!pieceOn) continue; // □5 分片关：不再建分片卡（存量每日重现走完毕业）
+                        await buildReadingCard(pieceID, liveGate.get(bookID) ? dueStamp(now) : tomorrowStart(now));
+                    }
+                    builtN++;
                 }
-                builtN++;
             }
             if (!opts.noCreate && liveDigests.length) {
                 // 用户 FSRS 卡零接触：已有 riff 卡的摘抄跳过（内核一块一卡 issue 7476，
@@ -754,8 +769,10 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
             debugLog("readcurve",
                 `sweep(${reason}) cards=${cards0.length} rated=${rated.length} due=${plan.setDue.length} key=${plan.setKey.length} grad=${plan.graduate.length} build=${builtN} rc=${rcGateOpen ? "open" : "shut"}`,
                 "progressive");
-            // □6 产出率反哺顺带算（锁内直调无锁核；自带 30min 限流，cardflip 高频无感）
-            await autoRelaxSweep();
+            // □6 产出率反哺顺带算（锁内直调无锁核；自带 30min 限流，cardflip 高频无感）。
+            // □5 接管面专属（摘抄/制卡产出判定）：pieceOnly 态不跑——未开接管的用户
+            // 零接触书 IAL 反写
+            if (regime.adoptOthers) await autoRelaxSweep();
         } catch (e) {
             debugLog("readcurve", `sweep fail (${reason}): ${e}`, "progressive");
         }
@@ -768,13 +785,26 @@ export async function sweepReadCurve(reason: string, opts: { noCreate?: boolean 
  *  □3 起按块形态分流（review P0-1）：custom-rpcard 块上的卡=tomato 资产（QUICK
  *  deck、其复用链 reuseRPCard 只 review 不重建）——只清键不摘卡，否则一次开关
  *  往复静默摧毁全部已接管阅读点的复习功能且无恢复路径；书锚行（片/素材/摘抄）
- *  与无锚行照旧摘（自家 build 面；用户 deck 卡摘不动=no-op 等价只清，语义自洽） */
-export async function clearReadCurve(): Promise<void> {
+ *  与无锚行照旧摘（自家 build 面；用户 deck 卡摘不动=no-op 等价只清，语义自洽）
+ *  □5 progfix0922 scope 分流：all=全量（老语义）；nonPiece=只清接管面（takeover
+ *  关而分片自动制卡开——分片族卡仍由 pieceOnly 巡查续命）；pieceOnly=只清分片族
+ *  （pieceAutoCard 关且接管也关——分片族卡断管）。分片族判定复用 getReadingCards
+ *  归类（live 卡面；g 毕业档案无卡不可归类=随非分片族清——档案本就随所属开关存废） */
+export async function clearReadCurve(scope: "all" | "nonPiece" | "pieceOnly" = "all"): Promise<void> {
     await lockWithLease(ReadCurveSweepLock, async () => {
         try {
-            const rows = (await siyuan.sql(
-                `select block_id from attributes where name='${READCARD_KEY}' limit 10000000`)) as any[] ?? [];
-            const ids = rows.map(r => r.block_id);
+            let ids: string[];
+            if (scope === "all") {
+                const rows = (await siyuan.sql(
+                    `select block_id from attributes where name='${READCARD_KEY}' limit 10000000`)) as any[] ?? [];
+                ids = rows.map(r => r.block_id);
+            } else {
+                const { cards, keyed } = await getReadingCards();
+                const pieceIDs = new Set(cards.filter(c => isPieceFamily(c.kind)).map(c => c.blockID));
+                const all = [...keyed.keys()];
+                ids = scope === "nonPiece" ? all.filter(id => !pieceIDs.has(id))
+                    : all.filter(id => pieceIDs.has(id));
+            }
             let removable = ids;
             if (ids.length) {
                 const inL = ids.map(id => `'${id}'`).join(",");
@@ -1405,16 +1435,19 @@ function dueMsOf(due: string | null): number | null {
 
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
 let takeoverStop: (() => void) | null = null;
+let pieceAutoStop: (() => void) | null = null;
 let minsStop: (() => void) | null = null;
 let quotaStop: (() => void) | null = null;
 let classStops: (() => void)[] = [];
 let takeoverPrev = false;
+let pieceAutoPrev = false;
 let quotaPrev = "";
 
 function resetSweepTimer() {
     if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
     const mins = Number(readCurveSweepMins.get()) || 0;
-    if (!readCurveTakeover.get() || mins <= 0) return;
+    // □5：pieceOnly 态（接管关+分片自动制卡开）定时兜底照跑——对账排程续命不分态
+    if (!sweepRegime(readCurveTakeover.get(), pieceAutoCard.get()).run || mins <= 0) return;
     sweepTimer = setInterval(() => void sweepReadCurve("timer"), mins * 60_000);
 }
 
@@ -1427,7 +1460,18 @@ export function initReadCurveTriggers() {
         if (v === takeoverPrev) return;
         takeoverPrev = v;
         if (v) void sweepReadCurve("settings-on");
-        else void clearReadCurve();
+        // □5：关接管时分片自动制卡仍开=只清接管面（分片族卡留给 pieceOnly 巡查续命）
+        else void clearReadCurve(takeoverOffClearScope(pieceAutoCard.get()));
+    });
+    // □5 分片自动制卡开关边缘：开=即时巡查建卡（takeover 开着也走同一条幂等链）；
+    // 关=仅当接管也关时清分片族（两闸全闭=断管清场；接管开着=巡查仍在，存量走完
+    // 自然毕业——类别开关同款不清语义）。首轮回调=当前值，prev 预置防 load 误触
+    pieceAutoPrev = pieceAutoCard.get();
+    pieceAutoStop = pieceAutoCard.subscribe(v => {
+        if (v === pieceAutoPrev) return;
+        pieceAutoPrev = v;
+        if (v) void sweepReadCurve("settings-on");
+        else if (!readCurveTakeover.get()) void clearReadCurve("pieceOnly");
     });
     minsStop = readCurveSweepMins.subscribe(() => resetSweepTimer());
     quotaPrev = String(dailyQuota.get() ?? "");
@@ -1457,6 +1501,7 @@ export function initReadCurveTriggers() {
 export function disposeReadCurve() {
     if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
     takeoverStop?.(); takeoverStop = null;
+    pieceAutoStop?.(); pieceAutoStop = null;
     minsStop?.(); minsStop = null;
     quotaStop?.(); quotaStop = null;
     classStops.forEach(stop => stop()); classStops = [];

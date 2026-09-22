@@ -73,24 +73,33 @@ export type DigestOriginFrom = "mark" | "progref" | "book" | "self";
 /**
  * 摘抄发起文档 → 归属书判定链（digestUtils.init 消费，□11 从三段内联收拢为纯函数）：
  * ①mark（getBookID 解析片 IAL）②mark 落空的属性窗口期走 progref 反查（带回片序号）
+ * ②'反查 miss 时 progref 的 root 书身份兜底（□2 650189：手动书索引恒空致反查恒 miss，
+ * mark 又在读不到的窗口 → 旧链 self 兜底把片当新书，source 档在片下建 digest-；root
+ * 解析由消费方经 docBookID 归书根并 vetting 注册态，片序号此通道不可得=point null）
  * ③发起文档自身是注册书。inBook=归属书须已注册——mark/反查给了 bookID 但书已删
  * （记录已清）时 inBook=false 转非书链路（落点由 digestLanding 定，集中档=总夹）；三链全空自指 bookID=docID。
- * refHit 仅在 mark 落空时参与（与旧链一致）；isRegistered 由消费方注入
+ * refHit/refRootBookID 仅在 mark 落空时参与（与旧链一致）；isRegistered 由消费方注入
  * （progStorage.isRegisteredBook）。
  */
 export function resolveDigestOrigin(args: {
     markBookID: string;
     refHit: { bookID: string; point: number } | null;
+    /** □2：progref root 解析出的书身份（索引反查 miss 的兜底通道，注册态由调用方 vetting） */
+    refRootBookID?: string;
     docID: string;
     isRegistered: (id: string) => boolean;
 }): { bookID: string; inBook: boolean; point: number | null; from: DigestOriginFrom } {
-    const { markBookID, refHit, docID, isRegistered } = args;
+    const { markBookID, refHit, refRootBookID, docID, isRegistered } = args;
     let bookID = markBookID ?? "";
     let point: number | null = null;
     let from: DigestOriginFrom = "mark";
     if (!bookID && refHit) {
         bookID = refHit.bookID;
         point = refHit.point;
+        from = "progref";
+    }
+    if (!bookID && refRootBookID) {
+        bookID = refRootBookID;
         from = "progref";
     }
     if (!bookID && isRegistered(docID)) {

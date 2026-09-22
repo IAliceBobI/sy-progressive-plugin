@@ -28,6 +28,34 @@ export const FAR_DUE_DAYS = 99;
 /** 宿主分类：piece=自动书分片（MarkKey 反解 point）/ slot=写作书槽片（同 MarkKey，书 writing 位区分）/ material=素材文档（写作书池，PDIGEST_CTIME 锚，首推=锤）/ digest=摘抄文档（阅读书，PDIGEST_CTIME 锚，□2 建卡即 ×2 曲线）/ rpcard=tomato 阅读点卡块（□3 接管，custom 围栏锚识别）/ plain=用户文档卡（□3 opt-in 收编，type='d'）——后两者无书归属（全局对象） */
 export type ReadCardKind = "piece" | "material" | "slot" | "digest" | "rpcard" | "plain";
 
+// ============ □5 progfix0922：巡查闸拆分纯核（bear 09-22 拍板「拆出来、默认开」） ============
+
+/** 分片族判定：piece/slot/material=「分片制卡」面（巡查目标环——分片/槽片/素材首推
+ *  建卡+对账排程随行）；digest/rpcard/plain=「曲线接管」面（摘抄建卡/阅读点/文档卡
+ *  收编，readCurveTakeover 专属）。takeover 关+分片自动制卡开的 pieceOnly 巡查按此
+ *  过滤对账/排程面，接管面残留行不动（归接管开关管） */
+export function isPieceFamily(kind: ReadCardKind | ""): boolean {
+    return kind === "piece" || kind === "slot" || kind === "material";
+}
+
+/** □5 巡查闸拆分（takeover×pieceAutoCard 四态矩阵，分片建卡/其余卡型接管两维）：
+ *  run=任一开（巡查整体闸——全关=对账排程建卡全停）；pieceFace=分片族建卡环只随
+ *  pieceAutoCard（接管开着也须它开——「分片自动加入背诵闪卡」双态同义，默认开=
+ *  takeover=true 老用户行为不变）；adoptOthers=digest 建卡/rpcard/plain 收编只随
+ *  takeover（接管默认仍关=未开接管用户零接触）。类开关（readCurvePiece/Material）
+ *  在环内再分卡型，不进本矩阵 */
+export interface SweepRegime { run: boolean; pieceFace: boolean; adoptOthers: boolean; }
+export function sweepRegime(takeoverOn: boolean, pieceAutoOn: boolean): SweepRegime {
+    return { run: takeoverOn || pieceAutoOn, pieceFace: pieceAutoOn, adoptOthers: takeoverOn };
+}
+
+/** □5 takeover 关闸清场范围：分片自动制卡仍开=只清接管面（digest/rpcard/plain，
+ *  分片族卡仍由 pieceOnly 巡查续命）；也关=全量清（阅读卡 due 语义完全依赖巡查
+ *  续命、弃管比不开更糟——本文件既有拍板语义原样继承） */
+export function takeoverOffClearScope(pieceAutoOn: boolean): "all" | "nonPiece" {
+    return pieceAutoOn ? "nonPiece" : "all";
+}
+
 // ============ rpcard 识别（□3：tomato 阅读点卡块，跨插件纪律=围栏字面量禁 import） ============
 
 /** tomato 阅读点卡块围栏头（=tomato gconst RPCARD_FENCE；禁 import tomato 模块，字面量同源维护） */
