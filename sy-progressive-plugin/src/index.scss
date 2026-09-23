@@ -2542,3 +2542,38 @@ html[data-theme-mode="dark"] .prog-material-tag {
   border-color: var(--b3-theme-primary-light);
   background: var(--b3-theme-primary-lightest);
 }
+
+// ============ revsrcguard（650189 09-23 帖）：复习界面源不可达提示条 ============
+// 官方 warning 卡色系（--b3-card-warning-* 明暗两主题都在——daylight:82 / midnight:81
+// 核实过；仍带 fallback 防整条静默失效家族坑）。布局：卡面顶部通栏，图标+文案左、
+// 两钮右侧收尾；钮走官方 b3-button--small/--white 类不自绘（同构纪律）
+.prog-revsrc-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin: 0 0 8px; // .card__main 自带 padding，条只补与卡内容区的间距
+  padding: 8px 12px;
+  border-radius: var(--b3-border-radius);
+  background-color: var(--b3-card-warning-background, #ffe8c8);
+
+  > .prog-revsrc-bar__icon {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    color: var(--b3-card-warning-color, #8a4f00);
+
+    > svg { width: 14px; height: 14px; }
+  }
+
+  > .prog-revsrc-bar__text {
+    flex: 1;
+    min-width: 0; // flex 子防溢出（候选区炸裂修法同族）
+    color: var(--b3-card-warning-color, #8a4f00);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  > button { flex: none; }
+}
+

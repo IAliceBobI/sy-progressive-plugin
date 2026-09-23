@@ -30,6 +30,7 @@ import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadC
 import { openReadCardMenu } from "./readCardMenu";
 import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCore";
 import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
+import { disposeRevSrcGuard, revSrcGuardOnAppear } from "./revSrcGuard";
 import { HtmlCBType } from "./constants";
 import { lockWithLease, type LockLeaseResult } from "./lockLease";
 import { leasedThenSweep } from "./flipSweep";
@@ -97,6 +98,7 @@ class Progressive {
         this.observer = null;
         disposeReadCurve();
         disposeRevCardUI();
+        disposeRevSrcGuard();
         // 件4：批量整理摘抄 Dialog 热重载善后（destroy→destroyCallback 闭包拆本代组件树）
         this.batchPoolDialog?.destroy();
         this.batchPoolDialog = null;
@@ -320,6 +322,9 @@ class Progressive {
                 // 阅读曲线期2：阅读卡换皮「下一张」主钮+徽标——四事件全挂（翻卡=loaded
                 // /switch、点击=click；复习容器判定在 revCardOnAppear 内做，普通文档自短路）
                 revCardOnAppear((detail.protyle as any)?.element as HTMLElement | undefined);
+                // revsrcguard（650189 09-23 帖）：背诵卡源不可达守卫——digest 卡查
+                // custom-pdigest-parent-id 可达性，不可达挂「跳过/移除背诵卡」提示条
+                revSrcGuardOnAppear((detail.protyle as any)?.element as HTMLElement | undefined);
                 // 阅读曲线：官方复习界面翻卡触发对账（容器判定=CardBox 同款 card__block；
                 // 普通编辑器点击不触发——全量巡查太重。纯键盘空格流无此事件=期2 主钮补）
                 if (eventType == EventType.click_editorcontent) {

@@ -8,7 +8,7 @@
     import type { DebtSummary } from "./roller";
     import type { Writable } from "svelte/store";
     import { PROG_FLAMES, DEFAULT_FLAME_SLUG, FLAME_CORE_D, progFlameSkin, progPaid, PROG_GATE_OPEN } from "./theme";
-    import { digestDueState } from "./fleet";
+    import { digestDueState, flameRemaining } from "./fleet";
     import { showFloatTip, hideFloatTip, destroyFloatTip } from "./floatTip";
     import { onDestroy } from "svelte";
 
@@ -21,11 +21,14 @@
     // 期2 复访通道：火苗 tooltip 尾行非阻塞提示（不占 quota 不进欠债），无到期不占行
     // □4⑤：传 todayGap/histDebt（来源拆分标注）——身上数字仍是 debt 总数（状态色同源）
     // progpush □2：尾行加「累计已读 N 篇」（DebtSummary.totalRead=各日 read 全历史求和）
+    // revsrcguard 同批（650189 09-23 帖）：尾行加「今日待轮转 N 本」——readable 集合数
+    // （今天滚筒还会轮到的书；null=查询未及/失败不占行，digestDueState 同款非阻塞哲学）
     const tooltip = $derived(
-        $flame == null
+        ($flameRemaining != null ? `${tomatoI18n.今日待轮转N本($flameRemaining)}\n` : "")
+        + ($flame == null
             ? tomatoI18n.今日阅读 + ($digestDueState > 0 ? `\n${tomatoI18n.今日还有N条到期摘抄($digestDueState)}` : "")
             : tomatoI18n.火苗提示($flame.readToday, $flame.quotaToday, $flame.todayGap, $flame.histDebt, $digestDueState)
-                + `\n${tomatoI18n.累计已读N篇($flame.totalRead)}`,
+                + `\n${tomatoI18n.累计已读N篇($flame.totalRead)}`),
     );
     const skin = $derived(
         PROG_FLAMES.find(s => s.slug === $progFlameSkin)

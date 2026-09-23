@@ -211,15 +211,22 @@ export function isFinished(point: number, indexLength: number): boolean {
     return point >= indexLength;
 }
 
-export async function nextBook(deps: RollerDeps): Promise<string | null> {
-    const merged = mergeMissingBooks(await deps.loadOrder(), await deps.listBookIDs());
-    const unreadable = new Set<string>([
+/** 选书排除并集（ignored/archived/finished/invisible/todaysFull 五路合成）——
+ *  nextBook 与火苗「今日待轮转」计数（revsrcguard 同批 650189 09-23 帖）共用一口径：
+ *  readable = order − 本集合，「今天滚筒还会轮到」的书就是它 */
+async function collectUnreadable(deps: RollerDeps): Promise<Set<string>> {
+    return new Set<string>([
         ...await deps.ignoredIDs(),
         ...await deps.archivedIDs(),
         ...await deps.finishedIDs(),
         ...(deps.invisibleIDs ? await deps.invisibleIDs() : []),
         ...(deps.todaysFullIDs ? await deps.todaysFullIDs() : []),
     ]);
+}
+
+export async function nextBook(deps: RollerDeps): Promise<string | null> {
+    const merged = mergeMissingBooks(await deps.loadOrder(), await deps.listBookIDs());
+    const unreadable = await collectUnreadable(deps);
     const readable = new Set(merged.order.filter(id => !unreadable.has(id)));
     const pick = pickNextBook(merged, readable);
     if (pick === null) return null;
@@ -483,6 +490,16 @@ export async function rollerArchiveBook(bookID: string): Promise<void> {
 /** 火苗/热力图数据（□6 状态栏与 Dock 面板消费） */
 export async function rollerDebtSummary(): Promise<DebtSummary> {
     return summarizeDebt(await makeRollerDeps().loadAllDays(), todayStr(), Number(dailyQuota.get()) || 3);
+}
+
+/** 今日待轮转书数（revsrcguard 同批 650189 09-23 帖）：readable 集合大小=「今天滚筒
+ *  还会轮到的书」。只算集合不动 order（绝不走 nextBook——那会写 lastServed 改轮转序）；
+ *  排除五路与选书同口径（collectUnreadable 单一事实源） */
+export async function rollerRemainingToday(): Promise<number> {
+    const deps = makeRollerDeps();
+    const merged = mergeMissingBooks(await deps.loadOrder(), await deps.listBookIDs());
+    const unreadable = await collectUnreadable(deps);
+    return merged.order.filter(id => !unreadable.has(id)).length;
 }
 
 /** 全量每日 {date,q,read}（□6 热力图横条数据源） */

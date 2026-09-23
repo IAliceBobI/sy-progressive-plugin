@@ -15,6 +15,7 @@ import { progStorage } from "./ProgressiveStorage";
 import { ReviewKey, PdigestReviewKey, markQuestion, nextIntervalDays } from "./reviewQueue";
 import { notifyFleetChanged } from "./fleetNotify";
 import { PIECE_IDX_KEY, buildPieceIdx, piecePointFromMark, resolveDigestOrigin, validDigestMd, validDigestIdx } from "./originTrace";
+import { parseBookIDFromCtime } from "./progData";
 import { isDigestHostDoc } from "./progFloatState";
 import { bookCommentsFromRows, type BookCommentItem, type BookCommentRow } from "./digestComments";
 import { ownEditableChildrenHTML, stripBlockIAL } from "./splitInPlaceCore";
@@ -157,27 +158,29 @@ export class DigestBuilder {
      *  sibling 无自然子树域（父容器会误伤他人），返回空串=setDigestCard 跳过清卡只加新卡。
      *  □2 条件式：sibling/child 只对摘抄文档发起生效（landingForDispatch 已退化片/普通
      *  文档到 source），片发起的清卡域跟着落点走=原书 digest- 夹子树。
-     *  □8 摘抄宿主分叉（650189/刘璐 帖内追评收口）：发起文档是摘抄时 source/central 的
-     *  分组换锚——不再并回原书 digest-，归「该摘抄自己的 digest-」（三形态归组统一到
-     *  「正在摘的那篇」：原书/片→书 digest-，摘抄→自身；物理位置仍跟档位走）。同源书
-     *  ensureDigestDir 链路形态挂 digestDocID 下=free 两链（ensureFreeDigestDir 挂摘抄下/
-     *  ensureFreeDigestHubDir 落总夹，均按任意 docID 锚定天然承接）；override 逐次指定经
-     *  同一映射落到自身 digest- 的两方向位——书侧双夹链（digestdiru/h#bookID）对摘抄宿主
-     *  退役，inBook 分支只服务书/片形态。清卡域（cardMode=1）随分叉改为自身 digest- 子树
-     *  （旧链并原书夹时再摘抄会连坐清掉书摘抄同批卡）。 */
+     *  □8 摘抄宿主分叉（650189/刘璐 帖内追评收口）→ 0923regroup 推翻（两人 09-23 同向
+     *  反馈：v3.24.0 落的「摘抄里再摘归自身 digest-」不是他们要的）：摘抄宿主发起改归
+     *  出生原书（ctime bookID，书/非书源文档同构——非书源文档锚=liulfb □4 总夹同锚）
+     *  的 digest-，不管几级摘、一本书的摘抄聚一处；已有夹 IAL 原位认回，v3.24.0 期间
+     *  落在自身 digest- 的存量原地不动。出生原书已删时退回自身 free 夹兜底（资产不丢）。
+     *  清卡域（cardMode=1）随夹走=原书维度「只留最新」与书摘抄语义一致（□8 曾防的
+     *  「连坐」即该语义本身，随分叉推翻一并回归）。 */
     private async landingDirID(): Promise<string> {
         const landing = this.landingForDispatch();
         const source = landing === "source";
         if (landing === "child") return this.docID;
         if (landing === "sibling") return "";
-        if (isDigestHostDoc(this.ctime)) {
-            return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureFreeDigestHubDir(this.docID);
-        }
-        if (this.inBook) {
+        // 归书锚：书/片发起=归属链 bookID（init 解析）；摘抄宿主发起=出生原书（ctime）
+        const host = isDigestHostDoc(this.ctime);
+        const homeBook = host ? parseBookIDFromCtime(this.ctime) : this.bookID;
+        const home = host
+            ? !!homeBook && await siyuan.checkBlockExist(homeBook)
+            : this.inBook;
+        if (home) {
             // □4 逐次 override：方向锚双夹（主力夹恰在该方向时 ensure 内复用，同位置不建双夹）
-            if (this.landingOverride === "source") return progStorage.ensureDigestDirUnder(this.bookID);
-            if (this.landingOverride === "central") return progStorage.ensureDigestDirHub(this.bookID);
-            return progStorage.ensureDigestDir(this.bookID, source);
+            if (this.landingOverride === "source") return progStorage.ensureDigestDirUnder(homeBook);
+            if (this.landingOverride === "central") return progStorage.ensureDigestDirHub(homeBook);
+            return progStorage.ensureDigestDir(homeBook, source);
         }
         return source ? progStorage.ensureFreeDigestDir(this.docID) : progStorage.ensureFreeDigestHubDir(this.docID);
     }

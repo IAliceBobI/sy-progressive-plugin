@@ -229,7 +229,11 @@ export function markDigestTag(protyle: any) {
     const parentID = wys.getAttribute("custom-pdigest-parent-id");
     if (parentID) {
         siyuan.getBlockInfo(parentID).then((info: any) => {
-            if (info?.rootTitle) tag.setAttribute("aria-label", `${label}\n${tomatoI18n.摘抄来源提示(info.rootTitle)}`);
+            // revsrcguard 同批：失败态（null=源在关闭笔记本/已删）也提示——hover 有解释
+            // 优于静默无 tip（call 层 code!=0 返 null 不走 catch，失败分支须在 then 内判）
+            tag.setAttribute("aria-label", info?.rootTitle
+                ? `${label}\n${tomatoI18n.摘抄来源提示(info.rootTitle)}`
+                : `${label}\n${tomatoI18n.来源不可达}`);
         }).catch(() => { });
         tag.addEventListener("mouseenter", () => showFloatTip(tag));
         tag.addEventListener("mouseleave", hideFloatTip);

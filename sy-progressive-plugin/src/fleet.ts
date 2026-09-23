@@ -9,7 +9,7 @@ import FleetFlame from "./FleetFlame.svelte";
 import WritingFlame from "./WritingFlame.svelte";
 import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
-import { rollerDebtSummary, rollerTodayWrites, invalidateTodaysFullCache, type DebtSummary } from "./roller";
+import { rollerDebtSummary, rollerTodayWrites, rollerRemainingToday, invalidateTodaysFullCache, type DebtSummary } from "./roller";
 import { pickWritingFlameBook } from "./writeBook";
 import { latestVisitNoteOfBook } from "./visitNoteQuery";
 import { progStorage } from "./ProgressiveStorage";
@@ -70,6 +70,8 @@ export const FLEET_DOCK_TYPE = "prog-fleet-dock";
 export const flameState = writable<DebtSummary | null>(null);
 /** 到期摘抄数（火苗 tooltip 尾行消费，期2；非阻塞提示，不占 quota 不进欠债） */
 export const digestDueState = writable(0);
+/** 今日待轮转书数（火苗 tooltip 尾行消费，650189 09-23 帖；null=查询失败/未及不占行） */
+export const flameRemaining = writable<number | null>(null);
 /** 面板数据（Dock 消费，重查询） */
 export const panelState = writable<FleetSummary | null>(null);
 
@@ -100,13 +102,15 @@ export async function refreshFlame() {
         // 期2 □2 B 盲区双源化：到期摘抄数=pdigest 文档级 + think 块级（两类键行不重叠，计数直加；
         // dueReviewSQLFor 只回到期行，done/垃圾值被 q#/s# 前缀自然排除）
         const now = Date.now();
-        const [debt, dueRows, thinkRows] = await Promise.all([
+        const [debt, dueRows, thinkRows, remaining] = await Promise.all([
             rollerDebtSummary(),
             siyuan.sql(dueReviewSQLFor(PdigestReviewKey, now)) as Promise<any[]>,
             siyuan.sql(dueReviewSQLFor(ReviewKey, now)) as Promise<any[]>,
+            rollerRemainingToday().catch(() => null),
         ]);
         flameState.set(debt);
         digestDueState.set((dueRows ?? []).length + (thinkRows ?? []).length);
+        flameRemaining.set(remaining);
     } catch (e) {
         console.error("fleet refreshFlame failed", e);
     }
