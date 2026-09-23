@@ -92,6 +92,11 @@ function loadStore(plugin: BaseTomatoPlugin) {
     if (!hasLanding && digest2dailycard.get() === true) {
         digestLanding.set("daily");
     }
+    // needs0923-01 砍「当前文档同级」档（慕渔确认无用，真实诉求=归原书 digest- 已由
+    // source 档 v3.25.0 满足）：存量 sibling → source；.set 只写内存，启动重跑幂等
+    if (digestLanding.get() === "sibling") {
+        digestLanding.set("source");
+    }
     card2dailycard.load(plugin);
     // 制卡落点三档迁移（同上款幂等）：cardLanding 无存量时 card2dailycard=false → "cards"
     // （true 与默认 dailycard 同值无需动）；.set 只写内存，每次启动重跑幂等

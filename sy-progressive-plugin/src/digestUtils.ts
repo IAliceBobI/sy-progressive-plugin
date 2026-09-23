@@ -59,14 +59,17 @@ export class DigestBuilder {
         return this.landingOverride ?? digestLanding.get();
     }
 
-    /** □2 落点身份条件式（刘璐 v3.23.0 sibling 档无条件以当前文档为锚）：sibling/child
-     *  只对「发起文档是摘抄」生效（再摘抄聚一层/树状连续，liulfb □1 设计原意）；片/普通
+    /** □2 落点身份条件式（刘璐 v3.23.0 child 档无条件以当前文档为锚）：child
+     *  只对「发起文档是摘抄」生效（再摘抄树状连续，liulfb □1 设计原意）；片/普通
      *  源文档发起退化为 source 档——片→落回原书 digest-（书夹链优先；身份解析见 init
      *  的 progref root 加固），普通文档→照旧 digest-源文档名。判据=isDigestHostDoc
-     *  （宿主 wysiwyg 的 custom-pdigest-ctime，init 已读，与摘抄痕迹 gate 同通道）。 */
+     *  （宿主 wysiwyg 的 custom-pdigest-ctime，init 已读，与摘抄痕迹 gate 同通道）。
+     *  needs0923-01 砍 sibling 档（UI 删除+loadStore 存量迁移 source）：此处对漏网
+     *  存量值兜底退化 source，等价「档位从未存在」 */
     private landingForDispatch(): string {
         const landing = this.landing();
-        if ((landing === "sibling" || landing === "child") && !isDigestHostDoc(this.ctime)) return "source";
+        if (landing === "sibling") return "source";
+        if (landing === "child" && !isDigestHostDoc(this.ctime)) return "source";
         return landing;
     }
 
@@ -154,9 +157,8 @@ export class DigestBuilder {
      *  非书→源下档挂源文档下 digest-源文档名 夹/集中档同规则落摘抄总夹（liulfb □4 2026-09-21
      *  统一总夹：非书 digest-源文档名 与书并排，锚复用 digestdir 不因注册态换夹；老札记匣
      *  存量原地兼容读不迁移）。
-     *  liulfb □1 sibling/child 档无夹概念：child 的清卡域=发起文档子树（容器即 docID）；
-     *  sibling 无自然子树域（父容器会误伤他人），返回空串=setDigestCard 跳过清卡只加新卡。
-     *  □2 条件式：sibling/child 只对摘抄文档发起生效（landingForDispatch 已退化片/普通
+     *  liulfb □1 child 档无夹概念：清卡域=发起文档子树（容器即 docID）。
+     *  □2 条件式：child 只对摘抄文档发起生效（landingForDispatch 已退化片/普通
      *  文档到 source），片发起的清卡域跟着落点走=原书 digest- 夹子树。
      *  □8 摘抄宿主分叉（650189/刘璐 帖内追评收口）→ 0923regroup 推翻（两人 09-23 同向
      *  反馈：v3.24.0 落的「摘抄里再摘归自身 digest-」不是他们要的）：摘抄宿主发起改归
@@ -169,7 +171,6 @@ export class DigestBuilder {
         const landing = this.landingForDispatch();
         const source = landing === "source";
         if (landing === "child") return this.docID;
-        if (landing === "sibling") return "";
         // 归书锚：书/片发起=归属链 bookID（init 解析）；摘抄宿主发起=出生原书（ctime）
         const host = isDigestHostDoc(this.ctime);
         const homeBook = host ? parseBookIDFromCtime(this.ctime) : this.bookID;
@@ -224,25 +225,23 @@ export class DigestBuilder {
         // 期1 □2 落点三档：daily=daily card 月目录（原 digest2dailycard；落发起文档所在笔记本，
         // 不看制卡侧 flashcardNotebook）；source=书下/源文档下（老版回归）；
         // central=书/非书统一→摘抄总夹/digest-来源名（liulfb □4；夹均按 IAL 锚定，位置无关）
-        // liulfb □1（2026-09-21）sibling/child 两档：以发起文档 hpath 为锚直算 dirPath，无夹无
-        // ensure 链——child=挂发起文档下（知识树），sibling=挂发起文档同级（剥 hpath 末段；发起
-        // 文档在笔记本根时剥空落根层）。再摘抄场景发起=摘抄文档，即多次摘抄聚一层/树状连续。
-        // □2 条件式：片/普通源文档发起时 sibling/child 已被 landingForDispatch 退化为 source
+        // liulfb □1（2026-09-21）child 档：以发起文档 hpath 为锚直算 dirPath，无夹无
+        // ensure 链——child=挂发起文档下（知识树）。再摘抄场景发起=摘抄文档，即多次摘抄
+        // 树状连续。needs0923-01 sibling 档已砍（存量迁移 source，landingForDispatch 兜底）
+        // □2 条件式：片/普通源文档发起时 child 已被 landingForDispatch 退化为 source
         //（片摘落回原书 digest- 书夹链，不再以片 hpath 为锚/挂片下）
         let boxID = this.boxID;
         let dirPath: string;
         const dispatch = this.landingForDispatch();
         if (dispatch === "daily") {
             dirPath = getDailyPath().split("/").slice(0, -1).join("/");
-        } else if (dispatch === "sibling" || dispatch === "child") {
+        } else if (dispatch === "child") {
             const info = await siyuan.getBlockInfo(this.docID);
             if (!info?.box) return "";
             boxID = info.box;
             const hp = await siyuan.getHPathByID(this.docID, info.box);
             if (!hp) return "";
-            dirPath = dispatch === "child"
-                ? hp
-                : hp.split("/").slice(0, -1).join("/");
+            dirPath = hp;
         } else {
             const dirID = await this.landingDirID();
             if (!dirID) return "";
