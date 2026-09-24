@@ -654,6 +654,53 @@ body.prog-material-border-on .protyle-wysiwyg div[data-node-id].sb[custom-prog-m
 }
 
 // ============================================================
+// need-0924-01 状态栏 ✧ 到期复访角标：火苗同骨架（图标+数字）。到期亮 warning
+// 系——复访非欠债、刻意不进火苗红绿语义（fleet.ts 期2 拍板「不占 quota 不进
+// 欠债」的正交延续）；0 条灰淡常驻（入口稳定不抖、点开确认没欠账也是价值）。
+// ============================================================
+.prog-duebell-host {
+  display: flex;
+  align-items: center;
+}
+.prog-duebell {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  height: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--b3-theme-on-surface);
+  opacity: 0.55;
+  transition: opacity 0.12s ease-out;
+}
+.prog-duebell[data-on="true"] {
+  opacity: 1;
+  /* warning 系必须带 fallback（--b3-theme-warning 不存在=整条声明静默失效，css.md 坑） */
+  color: var(--b3-card-warning-color, #d25f00);
+}
+.prog-duebell:hover {
+  opacity: 0.8;
+}
+.prog-duebell-svg {
+  width: 13px;
+  height: 13px;
+}
+.prog-duebell-num {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: currentColor;
+  min-width: 8px;
+  text-align: center;
+}
+/* 暗轨到期数字对比度提亮一档（火苗绿芯数字同款手法：官方 warning 深底压线时混白） */
+html[data-theme-mode="dark"] .prog-duebell[data-on="true"] {
+  color: color-mix(in srgb, var(--b3-card-warning-color, #f0a05a) 78%, white);
+}
+
+// ============================================================
 // v5 □6 状态栏火苗（docs/prog-v5-visual-design.md §2）：恒暖壳+可变芯光。
 // 三态 = data-state 注入 --prog-flame-core/glow + 形态冗余（黄瘦/红宽呼吸），
 // 色盲双通道可读；长驻无动画，仅红态 3s 慢辉光呼吸。

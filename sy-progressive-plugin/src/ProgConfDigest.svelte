@@ -2,7 +2,11 @@
     // 渐进设置页域组件（2026-09-03 双栏改造）：自 Settings.svelte 整块搬运，卡片内部一行不动；
     // 2026-09-07 bear 三问拍板 A1 拆域（7→8 域）：本组件收窄为「摘抄」域 5 项，制卡 8 项拆出
     // ProgConfCard.svelte（摘抄制卡模式留摘抄侧=行为参数跟发起管线走）
+    import { confirm } from "siyuan";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+    import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+    import { progStorage } from "./ProgressiveStorage";
+    import { consolidateDigests, restoreDigests, findDocByIal, getDocIalDigestHub } from "./progData";
     import {
         digestLanding,
         digestNoBacktraceLink,
@@ -13,6 +17,37 @@
         digestAddReadingpoint,
         digestGlobalSigle,
     } from "../../sy-tomato-plugin/src/libs/stores";
+
+    // need-0924-02 落点联动：改档即生效（与兄弟 select 同 .set() 语义，面板整体落盘），
+    // central↔source 方向切换时二确认「存量摘抄要不要一起搬」（取消=不搬，数据与落点
+    // 解耦）；daily/child 无夹概念不联动。放回侧总夹不存在=零存量直接静默（不空建总夹）
+    function onLandingChange(e: Event) {
+        const v = (e.currentTarget as HTMLSelectElement).value;
+        const old = digestLanding.get();
+        digestLanding.set(v);
+        if (v === old) return;
+        if (v === "central") confirm("⚠️", tomatoI18n.落点搬总夹确认, () => void runLinked("central"));
+        else if (v === "source") confirm("⚠️", tomatoI18n.落点放回确认, () => void runLinked("source"));
+    }
+
+    async function runLinked(dir: "central" | "source") {
+        try {
+            if (dir === "central") {
+                const rootID = await progStorage.ensureProgDataRoot();
+                const hubID = await progStorage.ensureDigestHub();
+                if (!rootID || !hubID) return;
+                const s = await consolidateDigests(rootID, hubID);
+                await siyuan.pushMsg(tomatoI18n.归拢结果(s.result.moved, s.result.failed, s.cleanedEmptyPieceDirs, s.plan.skippedForeign), 2500);
+                return;
+            }
+            const hubID = await findDocByIal(getDocIalDigestHub());
+            if (!hubID) return;
+            const r = await restoreDigests(hubID);
+            await siyuan.pushMsg(tomatoI18n.放回结果(r.moved, r.failedNames), 2500);
+        } catch {
+            // 搬迁失败不影响已生效的落点设置——数据位置仍可走数据管理页两命令手动处理
+        }
+    }
 </script>
 
 <!-- 摘抄（□23：术语型开关全部补 hover tip，语义见 tomatoI18n.tip设置* 家族） -->
@@ -32,8 +67,10 @@
         <!-- 期1 □2 落点三档：digest2dailycard 开关并入（迁移见 index.ts loadStore）；脏值兜底失效占位。
              vision □5：与下行「摘抄制卡模式」select 统一 min-width，右侧标签起始对齐；
              liulfb □1 加 child 档（再摘抄目录树连续，以发起文档为锚）；needs0923-01 砍
-             sibling 档（慕渔确认无用，存量 sibling→source 迁移见 index.ts loadStore） -->
-        <select class="b3-select" style="min-width: 160px" bind:value={$digestLanding}>
+             sibling 档（慕渔确认无用，存量 sibling→source 迁移见 index.ts loadStore）；
+             need-0924-02 落点联动：bind 改 value+onchange——central/source 方向切换时
+             确认后顺带搬存量夹（不搬=落点只管新摘抄） -->
+        <select class="b3-select" style="min-width: 160px" value={$digestLanding} onchange={onLandingChange}>
             <option value="central">{tomatoI18n.落点集中归档}</option>
             <option value="source">{tomatoI18n.落点源文档下方}</option>
             <option value="daily">{tomatoI18n.落点卡目录}</option>

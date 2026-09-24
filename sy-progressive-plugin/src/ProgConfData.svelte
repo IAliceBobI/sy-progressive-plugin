@@ -6,9 +6,10 @@
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { progStorage } from "./ProgressiveStorage";
-    import { consolidateDigests } from "./progData";
+    import { consolidateDigests, restoreDigests, findDocByIal, getDocIalDigestHub } from "./progData";
 
-    // v5 数据管理：prog-data 位置显示 + 「归拢老数据」命令
+    // v5 数据管理：prog-data 位置显示 + 「归拢摘抄」/「放回源文档下」一对对称命令
+    // （need-0924-02：正向无回头路的后悔药；「老数据」名退役换中性「归拢摘抄」）
     let progDataPath = $state("");
     let consolidateMsg = $state("");
 
@@ -50,6 +51,21 @@
         consolidateMsg = tomatoI18n.归拢结果(s.result.moved, s.result.failed, s.cleanedEmptyPieceDirs, s.plan.skippedForeign);
         await refreshProgDataPath();
     }
+
+    /** need-0924-02 反向放回：总夹内 digest- 夹按锚定来源搬回各书/源文档正下方；
+     *  无锚/来源已删 → 失败清单。幂等可重跑（与归拢对称，落点设置不动=手动自调）。
+     *  总夹探测式查（findDocByIal）不 ensure——没有总夹=零存量，点了不空建 */
+    async function doRestore() {
+        consolidateMsg = tomatoI18n.放回中;
+        const hubID = await findDocByIal(getDocIalDigestHub());
+        if (!hubID) {
+            consolidateMsg = tomatoI18n.放回结果(0, []);
+            return;
+        }
+        const r = await restoreDigests(hubID);
+        consolidateMsg = tomatoI18n.放回结果(r.moved, r.failedNames);
+        await refreshProgDataPath();
+    }
 </script>
 
 <div class="settingBox">
@@ -62,7 +78,19 @@
         <button
             class="b3-button b3-button--outline tomato-button prog-accent-btn b3-tooltips b3-tooltips__n"
             aria-label={tomatoI18n.tip设置归拢}
-            onclick={doConsolidate}>{tomatoI18n.归拢老数据}</button>
-        {#if consolidateMsg}<span>{consolidateMsg}</span>{/if}
+            onclick={doConsolidate}>{tomatoI18n.归拢摘抄}</button>
+        <button
+            class="b3-button b3-button--outline tomato-button prog-accent-btn b3-tooltips b3-tooltips__n"
+            aria-label={tomatoI18n.tip设置放回}
+            onclick={doRestore}>{tomatoI18n.放回源文档下}</button>
     </div>
+    <!-- vision P2：结果文案（失败清单可能很长）独立成行在按钮下方，避免与按钮同排
+         折行时回绕悬挂到按钮正下方难读 -->
+    {#if consolidateMsg}<div class="dev-row"><span class="prog-consolidate-msg">{consolidateMsg}</span></div>{/if}
 </div>
+
+<style>
+    .prog-consolidate-msg {
+        color: color-mix(in srgb, var(--b3-theme-on-surface, #4b4b4b) 70%, transparent);
+    }
+</style>

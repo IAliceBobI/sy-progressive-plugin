@@ -3857,6 +3857,79 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    // need-0924-01 到期复访「它来找你」：状态栏 ✧ 角标 + 单张卡片流（鸟 09-24 拍板）
+    public get 到期复访() {
+        switch (this.lang) {
+            case "zh_CN": return "到期复访";
+            case "zh_CHT": return "到期複訪";
+            case "en_US":
+            default: return "Due revisits";
+        }
+    }
+
+    public 到期复访N条(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `到期复访 ${n} 条，点击逐张处理`;
+            case "zh_CHT": return `到期複訪 ${n} 條，點擊逐張處理`;
+            case "en_US":
+            default: return `${n} revisit(s) due — click to process`;
+        }
+    }
+
+    public 剩N张(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `剩 ${n} 张`;
+            case "zh_CHT": return `剩 ${n} 張`;
+            case "en_US":
+            default: return `${n} left`;
+        }
+    }
+
+    public 逾期N天(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `逾期 ${n} 天`;
+            case "zh_CHT": return `逾期 ${n} 天`;
+            case "en_US":
+            default: return `${n} day(s) overdue`;
+        }
+    }
+
+    public get 今天到期() {
+        switch (this.lang) {
+            case "zh_CN": return "今天到期";
+            case "zh_CHT": return "今天到期";
+            case "en_US":
+            default: return "Due today";
+        }
+    }
+
+    public get 复访已清空() {
+        switch (this.lang) {
+            case "zh_CN": return "复访已清空";
+            case "zh_CHT": return "複訪已清空";
+            case "en_US":
+            default: return "All revisits cleared";
+        }
+    }
+
+    public get 看原文() {
+        switch (this.lang) {
+            case "zh_CN": return "看原文";
+            case "zh_CHT": return "看原文";
+            case "en_US":
+            default: return "View source";
+        }
+    }
+
+    public get 无到期复访() {
+        switch (this.lang) {
+            case "zh_CN": return "无到期复访";
+            case "zh_CHT": return "無到期複訪";
+            case "en_US":
+            default: return "No due revisits";
+        }
+    }
+
     public get 不再推送复访确认() {
         switch (this.lang) {
             case "zh_CN": return "移除该文档所有摘抄的复访调度？";
@@ -6497,12 +6570,12 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
-    public get 归拢老数据() {
+    public get 归拢摘抄() {
         switch (this.lang) {
-            case "zh_CN": return "归拢老数据";
-            case "zh_CHT": return "歸攏老數據";
+            case "zh_CN": return "归拢摘抄";
+            case "zh_CHT": return "歸攏摘抄";
             case "en_US":
-            default: return "Consolidate legacy data";
+            default: return "Consolidate excerpts";
         }
     }
 
@@ -6556,6 +6629,60 @@ export class TomatoI18n extends TomatoI18nABC {
                     (failed ? ` (${failed} failed)` : "") +
                     `, cleaned ${cleaned} empty piece dirs` +
                     (skipped ? `, ${skipped} diary excerpts untouched` : "");
+        }
+    }
+
+    // ===== need-0924-02 归拢后悔药：反向「放回源文档下」+ 落点联动搬迁确认 =====
+    public get 放回源文档下() {
+        switch (this.lang) {
+            case "zh_CN": return "放回源文档下";
+            case "zh_CHT": return "放回源文檔下";
+            case "en_US":
+            default: return "Restore to sources";
+        }
+    }
+    public get 放回中() {
+        switch (this.lang) {
+            case "zh_CN": return "放回中…";
+            case "zh_CHT": return "放回中…";
+            case "en_US":
+            default: return "Restoring…";
+        }
+    }
+    public 放回结果(moved: number, names: string[]) {
+        switch (this.lang) {
+            case "zh_CN":
+            case "zh_CHT":
+                return `放回 ${moved} 个摘抄夹` +
+                    (names.length ? `，未动 ${names.length} 个（无锚定或来源已删）：${names.join("、")}` : "");
+            case "en_US":
+            default:
+                return `Restored ${moved} excerpt folders` +
+                    (names.length ? `, ${names.length} untouched (no anchor or source gone): ${names.join(", ")}` : "");
+        }
+    }
+    public get tip设置放回() {
+        switch (this.lang) {
+            case "zh_CN": return "把摘抄总夹里的摘抄夹按锚定的来源搬回各书/源文档正下方（与「归拢摘抄」反向）；无锚定或来源已删的夹不动";
+            case "zh_CHT": return "把摘抄總夾裡的摘抄夾按錨定的來源搬回各書/源文檔正下方（與「歸攏摘抄」反向）；無錨定或來源已刪的夾不動";
+            case "en_US":
+            default: return "Move excerpt folders in the digest hub back under their anchored source books/docs (reverse of Consolidate); folders without an anchor or with a deleted source stay";
+        }
+    }
+    public get 落点搬总夹确认() {
+        switch (this.lang) {
+            case "zh_CN": return "摘抄落点已改为集中归档。要把现有的摘抄夹一起搬进摘抄总夹吗？（不搬也可以，落点只管新摘抄的保存位置）";
+            case "zh_CHT": return "摘抄落點已改為集中歸檔。要把現有的摘抄夾一起搬進摘抄總夾嗎？（不搬也可以，落點只管新摘抄的保存位置）";
+            case "en_US":
+            default: return "Digest landing changed to centralized. Move existing excerpt folders into the digest hub too? (Skipping is fine — landing only affects new excerpts)";
+        }
+    }
+    public get 落点放回确认() {
+        switch (this.lang) {
+            case "zh_CN": return "摘抄落点已改为源文档下方。要把摘抄总夹里现有的摘抄夹一起放回各来源书/文档正下方吗？（不搬也可以，落点只管新摘抄的保存位置）";
+            case "zh_CHT": return "摘抄落點已改為源文檔下方。要把摘抄總夾裡現有的摘抄夾一起放回各來源書/文檔正下方嗎？（不搬也可以，落點只管新摘抄的保存位置）";
+            case "en_US":
+            default: return "Digest landing changed to under source doc. Restore existing excerpt folders from the digest hub back under their sources too? (Skipping is fine — landing only affects new excerpts)";
         }
     }
 

@@ -458,7 +458,14 @@ export class ProgressiveStorage {
         return ensureAnchoredDoc(getDocIalFreeDigestDir(sourceDocID), {
             findByIal: () => findDocByIal(getDocIalFreeDigestDir(sourceDocID)),
             checkBlockExist: (id) => siyuan.checkBlockExist(id),
-            create: async () => this.createChildUnder(sourceDocID, `digest-${await this.bookName(sourceDocID)}`, getDocIalFreeDigestDir(sourceDocID)),
+            create: async () => {
+                // 主力锚（集中档锚）夹恰在源文档下（need-0924-02 反向放回后的形态：
+                // 总夹非书夹放回后统一改打主力锚）：复用不建双夹——与 ensureDigestDirUnder
+                // 复用主力夹同构，free 锚退役不影响认回
+                const mainDir = await this.digestDirParentOf(getDocIalDigestDir(sourceDocID), sourceDocID);
+                if (mainDir) return mainDir;
+                return this.createChildUnder(sourceDocID, `digest-${await this.bookName(sourceDocID)}`, getDocIalFreeDigestDir(sourceDocID));
+            },
             onResolved: async () => { },
         });
     }

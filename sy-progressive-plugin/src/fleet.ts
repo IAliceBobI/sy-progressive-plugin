@@ -7,6 +7,7 @@ import { mount, unmount } from "svelte";
 import { writable } from "svelte/store";
 import FleetFlame from "./FleetFlame.svelte";
 import WritingFlame from "./WritingFlame.svelte";
+import DueBell from "./DueBell.svelte";
 import DockPanel from "./DockPanel.svelte";
 import { loadFleetSummary, type FleetSummary } from "./fleetData";
 import { rollerDebtSummary, rollerTodayWrites, rollerRemainingToday, invalidateTodaysFullCache, type DebtSummary } from "./roller";
@@ -46,6 +47,8 @@ export interface FleetActions {
     openDueList(ev: { clientX: number; clientY: number }, bookID?: string): any;
     /** 可见性期3 □3：复习计划面板（独立 Dialog，常驻入口不依赖 due>0） */
     openReviewPlan(): any;
+    /** need-0924-01：状态栏 ✧ 角标点击=单张到期复访卡片流（完成/推迟/看原文，见 index.openDueCardFlow） */
+    openDueFlow(): any;
     /** □8 知识地图：书级地图 Dialog（书卡右键菜单动作入口） */
     openBookMap(bookID: string): any;
     /** 舰队管理 □2：书卡右键菜单四动作（置顶/隐匿=存储纯视觉；忽略/归档复用现成链） */
@@ -70,6 +73,20 @@ export const FLEET_DOCK_TYPE = "prog-fleet-dock";
 export const flameState = writable<DebtSummary | null>(null);
 /** 到期摘抄数（火苗 tooltip 尾行消费，期2；非阻塞提示，不占 quota 不进欠债） */
 export const digestDueState = writable(0);
+
+/** need-0924-01 卡片流乐观账：动作已落盘但 attributes SQL 索引秒级窗内 refreshFlame 会拿
+ *  旧值回写覆盖计数（造数实测乐观 set 与信号轮竞速不可赌）——乐观窗内 refreshFlame 让位
+ *  （digestDueEffective 滤旧值），过期或下轮定时自然校准真值 */
+let dueOverride: { value: number; until: number } | null = null;
+export function setDigestDueOverride(n: number, ttlMs = 8000) {
+    dueOverride = { value: n, until: Date.now() + ttlMs };
+    digestDueState.set(n);
+}
+export function digestDueEffective(n: number): number {
+    if (dueOverride && Date.now() < dueOverride.until) return dueOverride.value;
+    dueOverride = null;
+    return n;
+}
 /** 今日待轮转书数（火苗 tooltip 尾行消费，650189 09-23 帖；null=查询失败/未及不占行） */
 export const flameRemaining = writable<number | null>(null);
 /** 面板数据（Dock 消费，重查询） */
@@ -94,6 +111,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let refreshing = false;
 let flameApp: any = null;
 let wflameApp: any = null;
+let dueBellApp: any = null;
 let quotaSubStop: (() => void) | null = null;
 let notifySubStop: (() => void) | null = null;
 
@@ -109,7 +127,7 @@ export async function refreshFlame() {
             rollerRemainingToday().catch(() => null),
         ]);
         flameState.set(debt);
-        digestDueState.set((dueRows ?? []).length + (thinkRows ?? []).length);
+        digestDueState.set(digestDueEffective((dueRows ?? []).length + (thinkRows ?? []).length));
         flameRemaining.set(remaining);
     } catch (e) {
         console.error("fleet refreshFlame failed", e);
@@ -202,6 +220,17 @@ export function initFleet(plugin: any, actions: FleetActions) {
     freeHost.appendChild(freeBtn);
     plugin.addStatusBar({ element: freeHost, position: "left" });
 
+    // ---- need-0924-01 状态栏 ✧ 到期复访角标（写作火苗与 ✂ 之间：注册序=✂→✧→写作→
+    //      阅读，afterbegin 后注册者更靠左，最终左→右=阅读火苗、写作火苗、✧、✂）。
+    //      0 条灰淡常驻（DueBell 组件内 data-on 分态）；计数源=digestDueState ----
+    const bhost = document.createElement("div");
+    bhost.className = "prog-duebell-host";
+    dueBellApp = mount(DueBell, {
+        target: bhost,
+        props: { due: digestDueState, onOpen: actions.openDueFlow },
+    }) as any;
+    plugin.addStatusBar({ element: bhost, position: "left" });
+
     // ---- □5 状态栏写作火苗（阅读火苗与 ✂ 之间：先于阅读火苗注册=靠右一位；afterbegin
     //      插头部，最终左→右=阅读火苗、写作火苗、✂）。无写作书组件内 {#if} 不渲染 ----
     const whost = document.createElement("div");
@@ -275,5 +304,9 @@ export function onunloadFleet() {
     if (wflameApp) {
         unmount(wflameApp);
         wflameApp = null;
+    }
+    if (dueBellApp) {
+        unmount(dueBellApp);
+        dueBellApp = null;
     }
 }

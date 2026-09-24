@@ -259,6 +259,108 @@ export async function executeConsolidation(plan: ConsolidatePlan, deps: Consolid
     return r;
 }
 
+// ============ 反向放回（need-0924-02「放回源文档下」，与归拢对称） ============
+
+/** 总夹内 digest- 夹的放回目标解析：锚值末段=来源书/源文档 id。
+ *  四锚家族全认（digestdir/digestdiru/digestdirh/digestdirfree——非书总夹夹与书主力夹
+ *  同锚，u/h 为 override 双夹手搬场景）；严格三段+TEMP 段校验+头白名单，垃圾/异锚 →
+ *  空串（进失败清单不硬塞，与用户定稿口径一致） */
+export function parseRestoreTarget(markValue: string): string {
+    const seg = String(markValue ?? "").split("#");
+    if (seg.length !== 3 || seg[1] !== TEMP_CONTENT) return "";
+    return ["digestdir", "digestdiru", "digestdirh", "digestdirfree"].includes(seg[0]) ? seg[2] : "";
+}
+
+export interface RestoreDirToMove {
+    dirID: string;
+    dirName: string;
+    /** 放回目标=来源书/源文档 id（挂其正下方） */
+    targetID: string;
+}
+
+export interface RestorePlan {
+    dirsToMove: RestoreDirToMove[];
+    /** 无锚（手搬/v3 期未打锚）或来源已删的夹名——列给用户自行处理 */
+    failedNames: string[];
+}
+
+export interface RestorePlanDeps {
+    attrsOf(docID: string): Promise<Record<string, string>>;
+    checkExist(id: string): Promise<boolean>;
+}
+
+/** 放回计划：总夹子项（调用方已过滤 digest- 名）逐个读锚定 → 待搬/失败清单 */
+export async function planRestore(hubChildren: { id: string; name: string }[], deps: RestorePlanDeps): Promise<RestorePlan> {
+    const plan: RestorePlan = { dirsToMove: [], failedNames: [] };
+    for (const c of hubChildren) {
+        // getBlockAttrs 读通道偶发空 map 闪烁（踩坑索引）：夹锚在 IAL 属性里，SQL/attrs
+        // 双通道都不碰块内容，空读=闪烁误报「无锚」——重试一次再判（放回是低频手动
+        // 命令，失败清单误报很烦；150ms 先例=latestDigestAnchorOfBook）
+        let attrs = await deps.attrsOf(c.id);
+        if (!attrs || !Object.keys(attrs).length) {
+            await new Promise(r => setTimeout(r, 150));
+            attrs = await deps.attrsOf(c.id);
+        }
+        const target = parseRestoreTarget(String((attrs ?? {})[MarkKey] ?? ""));
+        if (!target || !(await deps.checkExist(target))) {
+            plan.failedNames.push(c.name);
+            continue;
+        }
+        plan.dirsToMove.push({ dirID: c.id, dirName: c.name, targetID: target });
+    }
+    return plan;
+}
+
+export interface RestoreExecDeps {
+    listChildDocs(docID: string): Promise<{ id: string; name: string }[]>;
+    /** 整夹移动到目标正下方（目标各不相同，与正向 hubID 固定不同须参数化） */
+    moveDirWhole(dirID: string, targetID: string): Promise<boolean>;
+    moveDocInto(docID: string, targetDirID: string): Promise<boolean>;
+    removeDoc(docID: string): Promise<void>;
+    setIal(docID: string, ialValue: string): Promise<void>;
+}
+
+export interface RestoreResult {
+    moved: number;
+    failed: number;
+    failedNames: string[];
+}
+
+/** 执行放回计划：目标下已有同名 digest- 夹 → 逐子并入存留夹+删壳+锚转移（正向归拢
+ *  同构）；否则整夹搬回。搬完统一改打主力锚 digestdir——u/h/free 锚退役：h 锚夹搬回
+ *  书下后 override「归总夹」语义已漂移，free 锚夹回源文档下后与主力锚同位；主力锚
+ *  位置无关，central/source 两档 ensure 链均能原位认回（ensureDigestDirUnder 复用
+ *  主力夹 / ensureFreeDigestDir 复用分支），不产生双夹。单夹失败不阻断（可重跑）。 */
+export async function executeRestore(plan: RestorePlan, deps: RestoreExecDeps): Promise<RestoreResult> {
+    const r: RestoreResult = { moved: 0, failed: 0, failedNames: [...plan.failedNames] };
+    for (const dir of plan.dirsToMove) {
+        try {
+            const kept = (await deps.listChildDocs(dir.targetID)).find(c => c.name === dir.dirName);
+            if (kept) {
+                const children = await deps.listChildDocs(dir.dirID);
+                let allMoved = true;
+                for (const child of children) {
+                    if (!await deps.moveDocInto(child.id, kept.id)) allMoved = false;
+                }
+                if (allMoved) await deps.removeDoc(dir.dirID);
+                await deps.setIal(kept.id, getDocIalDigestDir(dir.targetID));
+            } else {
+                if (!await deps.moveDirWhole(dir.dirID, dir.targetID)) {
+                    r.failed++;
+                    r.failedNames.push(dir.dirName);
+                    continue;
+                }
+                await deps.setIal(dir.dirID, getDocIalDigestDir(dir.targetID));
+            }
+            r.moved++;
+        } catch {
+            r.failed++;
+            r.failedNames.push(dir.dirName);
+        }
+    }
+    return r;
+}
+
 // ============ 生产侧实现（真实 siyuan API） ============
 
 /** 按 IAL 值全库搜文档（IAL 全局唯一，SQL 命中即真；位置无关） */
@@ -492,4 +594,24 @@ export async function consolidateDigests(progDataID: string, hubID = progDataID)
     `) ?? [];
     for (const row of emptyPieceDirs) await siyuan.removeDocByIDSiyuan(row.id);
     return { plan, result, cleanedEmptyPieceDirs: emptyPieceDirs.length };
+}
+
+/**
+ * 「放回源文档下」命令（need-0924-02，与「归拢摘抄」反向对称）：
+ * 总夹内 digest- 夹按 IAL 锚末段（来源书/源文档 id）全量搬回各来源正下方；
+ * 无锚（手搬）或来源已删 → 失败清单不硬塞。幂等可重跑，单夹失败不阻断。
+ */
+export async function restoreDigests(hubID: string): Promise<RestoreResult> {
+    const children = (await listChildDocs(hubID)).filter(c => c.name.startsWith("digest-"));
+    const plan = await planRestore(children, {
+        attrsOf: async (id) => ((await siyuan.getBlockAttrs(id)) ?? {}) as Record<string, string>,
+        checkExist: (id) => siyuan.checkBlockExist(id),
+    });
+    return executeRestore(plan, {
+        listChildDocs,
+        moveDirWhole: (dirID, targetID) => moveDocIntoParent(dirID, targetID),
+        moveDocInto: (docID, targetDirID) => moveDocIntoParent(docID, targetDirID),
+        removeDoc: (id) => siyuan.removeDocByIDSiyuan(id),
+        setIal: (id, ial) => siyuan.setBlockAttrs(id, { [MarkKey]: ial } as any),
+    });
 }

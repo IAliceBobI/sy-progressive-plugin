@@ -29,6 +29,7 @@ import { installReadonlyHotkeyBridge, uninstallReadonlyHotkeyBridge } from "../.
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
 import SettingsSvelte from "./Settings.svelte"
 import ReviewPlanDialog from "./ReviewPlanDialog.svelte"
+import DueCardFlow from "./DueCardFlow.svelte"
 import BookMapDialog from "./BookMapDialog.svelte"
 import { resetKey, verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { neighborCode } from "../../sy-tomato-plugin/src/libs/neighbor";
@@ -430,6 +431,29 @@ export default class ThePlugin extends BaseTomatoPlugin {
         dm.add("2", () => { unmount(app) });
     }
 
+    // need-0924-01 到期复访卡片流：单张卡 Dialog（复习计划同款去重重开范式）。
+    // 宽度收窄贴合单卡语境（480px）；height 不传=auto 随内容（Dialog 尺寸两件记忆）
+    private dueFlowDm: DestroyManager | null = null;
+
+    openDueCardFlow() {
+        const dm = new DestroyManager();
+        this.dueFlowDm?.destroyBy();
+        this.dueFlowDm = dm;
+        const id = newID();
+        const dialog = new Dialog({
+            title: tomatoI18n.到期复访,
+            content: `<div id="${id}"></div>`,
+            width: events.isMobile ? "92vw" : "min(480px, 92vw)",
+            destroyCallback: () => dm.destroyBy("1"),
+        });
+        const app = mount(DueCardFlow, {
+            target: dialog.element.querySelector("#" + id),
+            props: { plugin: this, onClose: () => this.dueFlowDm?.destroyBy() },
+        });
+        dm.add("1", () => { dialog.destroy() });
+        dm.add("2", () => { unmount(app) });
+    }
+
     // □8 知识地图：书级地图 Dialog（入口=书卡右键 bookMenu + 目录浮层顶栏钮）。
     // e2e 通道=window 挂点（渐进全局键盐前缀纪律——只读不写，globalThis 注册表
     // 容忍重注册；进入函数体才挂，不占启动期）
@@ -605,6 +629,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
             isReciteInstalled: () => prog.isReciteInstalled(),
             openDueList: (ev, bookID) => openDueReviewList(ev, bookID),
             openReviewPlan: () => this.openReviewPlanDialog(),
+            openDueFlow: () => this.openDueCardFlow(),
             openBookMap: (bookID) => this.openBookMapDialog(bookID),
             // 舰队管理 □2：书卡菜单动作（数据侧动作后 notifyFleetChanged 驱动面板即时刷新；
             // 归档走 confirm 确认链，书摘出调度后由 30s 刷新兜底，不抢 confirm 时序）
