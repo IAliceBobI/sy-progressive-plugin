@@ -1,7 +1,7 @@
 <script lang="ts">
     // 渐进设置页域组件（2026-09-03 双栏改造）：自 Settings.svelte 整块搬运，卡片内部一行不动；
     // 本组件=「浮条」域的卡片（移动端顶栏形态 + 片态首行按钮池）
-    import { mobileTopBar } from "../../sy-tomato-plugin/src/libs/stores";
+    import { mobileTopBar, floatbarSlotEntryShow } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_LOW_POOL, ADV_POOL } from "./progFloatState";
 
@@ -113,6 +113,16 @@
             bind:checked={$mobileTopBar}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置移动端顶栏}>{tomatoI18n.移动端浮条固定顶部}</span>
+    </div>
+    <!-- need-0924-03 入槽入口按需出现的手动开关（默认开）：探测条件在 ProgressiveFloatBtns，
+         这里只管总开关——关=恒不显示，开=有在写的注册书才显示 -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$floatbarSlotEntryShow}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip浮条入槽按钮}>{tomatoI18n.浮条入槽按钮}</span>
     </div>
     <div class="prog-fb-pool-hint">{tomatoI18n.浮条主排按钮提示}</div>
     {#each MAIN_BTN_POOL as id (id)}

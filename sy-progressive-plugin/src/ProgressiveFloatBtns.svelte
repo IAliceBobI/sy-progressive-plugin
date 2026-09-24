@@ -17,11 +17,11 @@
     import { CARD_RECITE } from "./digestCardMode";
     import { buildFloatButtons, buildFlatCells, digestSubrankIds, reorderMainIds, applyFlatManifest, dropToFlatSeg, advGroupIndexesForKind, dedupFlatSegs, FLAT_SEG_IDS, type FlatSegId, type DigSubrankId, PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_ALL_MAIN_IDS, FREE_ALL_MAIN_IDS, DIGEST_ALL_MAIN_IDS, BOOK_ALL_MAIN_IDS, isFlatGhost, type FloatDocKind } from "./progFloatState";
     import { progStorage } from "./ProgressiveStorage";
-    import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, mergePieceIntoNeighbor, feedBlocksToPool, moveDigestToPool, copyDigestToPool, nextFlipMaterial, transferMaterialOut, removeMaterialDocs } from "./writeBook";
+    import { listWritingSlotTargets, insertDigestIntoPiece, insertBlocksIntoPiece, setPieceDoneState, mergePieceIntoNeighbor, feedBlocksToPool, moveDigestToPool, copyDigestToPool, nextFlipMaterial, transferMaterialOut, removeMaterialDocs, hasActiveWritingBooks } from "./writeBook";
     import { fetchWritingTreeSlots, invalidateWritingTreeCache } from "./writeTree";
     import { PROG_DONE_KEY } from "../../sy-tomato-plugin/src/libs/gconst";
     import { notifyFleetChanged } from "./fleetNotify";
-    import { digSubrankOpen, floatbarFlatCollapsed, floatbarFlatManifest, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarMainBtns } from "../../sy-tomato-plugin/src/libs/stores";
+    import { digSubrankOpen, floatbarFlatCollapsed, floatbarFlatManifest, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarMainBtns, floatbarSlotEntryShow } from "../../sy-tomato-plugin/src/libs/stores";
     import { progPaid } from "./theme";
     import { collapseFloatBar, expandFloatBar, floatSwapBook, freeFloatOff, progressiveBtnFloating } from "./ProgressiveBtn";
     import { digestProgressiveBox, initDi, digestWholeDoc } from "./DigestProgressiveBox";
@@ -1205,6 +1205,20 @@
         if ($kind === "digest" && id) probeRevisitDue(id);
     });
 
+    // ---- need-0924-03 入槽入口按需出现（鸟三轮收敛拍板）：有在写的注册书才渲染
+    //      「直接入槽」/摘抄态「入槽」钮，手动开关恒可藏。探测=hasActiveWritingBooks
+    //      轻探测（storage 内存读零 SQL，微任务级返回）；show/kind 沿刷新——写作书
+    //      集合与当前文档无关，noteID 沿不跑防翻片重复探测。探测异常 fail-soft=按
+    //      显示（功能宁在勿丢；点开菜单本就有空态 toast 兜底）----
+    let slotEntrySeen = $state(false);
+    $effect(() => {
+        if (!$show) return;
+        void $kind;
+        void hasActiveWritingBooks().then(v => { slotEntrySeen = v; })
+            .catch(() => { slotEntrySeen = true; });
+    });
+    const slotEntryOK = $derived(slotEntrySeen && $floatbarSlotEntryShow);
+
     /** 平铺区低频段旧动作（HtmlCBType 单入口）+ □11 浮层族改道 */
     async function onLowFreq(id: string, ev?: MouseEvent) {
         // □4 review P1-2：删除/清空/重插族面向阅读分片（一次性餐具），写作槽=用户定稿
@@ -1240,8 +1254,11 @@
                     if (matOpInFlight) return; // matflow P2：confirm 回调双发闸
                     matOpInFlight = true;
                     try {
-                        const n = await removeMaterialDocs([docID]);
-                        await siyuan.pushMsg(n > 0 ? tomatoI18n.已删除素材 : tomatoI18n.操作失败请重试, 2500);
+                        // □3：单篇删除，lastSources 至多 1 项（最后线索才提醒出处）
+                        const { n, lastSources } = await removeMaterialDocs([docID]);
+                        await siyuan.pushMsg(n > 0
+                            ? (lastSources.length > 0 ? tomatoI18n.已删除素材最后线索(lastSources[0]) : tomatoI18n.已删除素材)
+                            : tomatoI18n.操作失败请重试, 2500);
                         // 本体已删浮条退场；confirm 悬窗期用户可能已切页签——只收本篇的
                         //（review P2：迟到回调误杀新文档浮条，crumbs 同款守卫）
                         if (get(noteID) === docID) show.set(false);
@@ -1749,7 +1766,8 @@
         <!-- 期3 素材入槽双入口（条件钮，不进配置池）：拉式=写作书片态 / 推式=摘抄态；
              期4 写作书片态追加：拆为新片（块级）/ 定稿（片级，动态图标=当前态）；
              期5 追加：汇编成稿（书级，Pro——灰档视觉+点击引导与高级组同口径）；
-             slotmerge 追加：与上一槽/下一槽合并（片级结构操作，向上并视点跳保留槽） -->
+             slotmerge 追加：与上一槽/下一槽合并（片级结构操作，向上并视点跳保留槽）；
+             need-0924-03：推式入槽钮改按需出现（slotEntryOK=有在写的注册书+手动开关） -->
         {#if isWritingPiece}
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
@@ -1786,7 +1804,7 @@
                 onclick={() => compileWritingFromBar()}
             >{@html icon("iconProgMerge", 16)}</button>
         {/if}
-        {#if $kind === "digest"}
+        {#if slotEntryOK && $kind === "digest"}
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
                 aria-label={tip3(tomatoI18n.入槽, isMaterialDoc ? tomatoI18n.tip入槽素材 : tomatoI18n.tip入槽)}
@@ -1794,8 +1812,9 @@
             >{@html icon("iconProgPiece", 16)}</button>
         {/if}
         <!-- 直送：一切阅读态（书/片/自由文档）选中块直接进槽——不经摘抄池不建摘抄本体；
-             写作书片自身排除（片内搬运是移片/拆分领地）；摘抄态排除（已有整摘入槽） -->
-        {#if ($kind === "piece" || $kind === "free" || $kind === "book") && !isWritingPiece}
+             写作书片自身排除（片内搬运是移片/拆分领地）；摘抄态排除（已有整摘入槽）；
+             need-0924-03 按需出现（slotEntryOK：没建过写作书的浮条不出现此钮，鸟拍板） -->
+        {#if slotEntryOK && ($kind === "piece" || $kind === "free" || $kind === "book") && !isWritingPiece}
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
                 aria-label={tip3(tomatoI18n.直接入槽, tomatoI18n.tip直接入槽)}

@@ -12501,6 +12501,35 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    /** need-0924-03 □3：单篇删除且该素材为最后线索（同源无存活胶囊）——出处兜记忆 */
+    public 已删除素材最后线索(name: string) {
+        switch (this.lang) {
+            case "zh_CN": return `已删除素材；这是《${name}》的最后一条线索`;
+            case "zh_CHT": return `已刪除素材；這是《${name}》的最後一條線索`;
+            case "ja_JP": return `素材を削除しました。『${name}』の最後の手がかりでした`;
+            case "es_ES": return `Material eliminado; era la última pista de «${name}»`;
+            case "fr_FR": return `Matériau supprimé ; c'était le dernier indice de « ${name} »`;
+            case "it_IT": return `Materiale eliminato; era l'ultimo indizio di «${name}»`;
+            case "en_US":
+            default: return `Material deleted; this was the last trace of "${name}"`;
+        }
+    }
+
+    /** □3 批量版：names=批内最后线索素材的出处名（书名/文档名） */
+    public 已删除N篇素材M篇最后线索(n: number, names: string[]) {
+        const m = names.length;
+        switch (this.lang) {
+            case "zh_CN": return `已删除 ${n} 篇素材；其中 ${m} 篇是最后线索：${names.map(s => `《${s}》`).join("、")}`;
+            case "zh_CHT": return `已刪除 ${n} 篇素材；其中 ${m} 篇是最後線索：${names.map(s => `《${s}》`).join("、")}`;
+            case "ja_JP": return `${n} 件の素材を削除しました。うち ${m} 件が最後の手がかりでした：${names.map(s => `『${s}』`).join("・")}`;
+            case "es_ES": return `${n} materiales eliminados; ${m} eran la última pista: ${names.map(s => `«${s}»`).join(", ")}`;
+            case "fr_FR": return `${n} matériaux supprimés ; ${m} étaient le dernier indice : ${names.map(s => `« ${s} »`).join(", ")}`;
+            case "it_IT": return `${n} materiali eliminati; ${m} erano l'ultimo indizio: ${names.map(s => `«${s}»`).join(", ")}`;
+            case "en_US":
+            default: return `${n} materials deleted; ${m} were the last trace: ${names.map(s => `"${s}"`).join(", ")}`;
+        }
+    }
+
     /** 护卡断句（0914 □5 分片放开）：挂闪卡段落被拦的两种收场 */
     public 断句完成N块M句跳K段(blocks: number, sentences: number, skipped: number) {
         switch (this.lang) {
@@ -13190,6 +13219,32 @@ export class TomatoI18n extends TomatoI18nABC {
             case "it_IT": return "Invia la selezione direttamente in uno slot del libro di scrittura — senza passare dagli estratti né creare schede; il materiale è testo semplice e il badge torna all'origine";
             case "en_US":
             default: return "Send the selection straight into a writing-book slot — no excerpt pool, no review cards; material is plain text and the badge jumps back to the source";
+        }
+    }
+
+    public get 浮条入槽按钮() {
+        switch (this.lang) {
+            case "zh_CN": return "浮条入槽按钮";
+            case "zh_CHT": return "浮條入槽按鈕";
+            case "ja_JP": return "フロートバーのスロット送りボタン";
+            case "es_ES": return "Botones de ranura en la barra flotante";
+            case "fr_FR": return "Boutons d'emplacement de la barre flottante";
+            case "it_IT": return "Pulsanti slot della barra flottante";
+            case "en_US":
+            default: return "Float-bar slot buttons";
+        }
+    }
+
+    public get tip浮条入槽按钮() {
+        switch (this.lang) {
+            case "zh_CN": return "开启后，建过在写的书时浮条才显示「直接入槽」和摘抄态「入槽」按钮（没建过不显示）\n关闭后恒不显示";
+            case "zh_CHT": return "開啟後，建過在寫的書時浮條才顯示「直接入槽」和摘抄態「入槽」按鈕（沒建過不顯示）\n關閉後恆不顯示";
+            case "ja_JP": return "オンの場合、執筆中の本があるときのみフロートバーに「スロットへ直送」と摘抄状態の「スロットへ」ボタンが表示されます\nオフなら常に非表示";
+            case "es_ES": return "Activado: la barra flotante muestra «Directo a la ranura» y «A la ranura» (modo extracto) solo si existe un libro en escritura\nDesactivado: nunca se muestran";
+            case "fr_FR": return "Activé : la barre flottante affiche « Direct dans l'emplacement » et « A l'emplacement » (mode extrait) seulement s'il existe un livre en écriture\nDésactivé : jamais affichés";
+            case "it_IT": return "Attivo: la barra flottante mostra «Diretto nello slot» e «Nello slot» (modo estratto) solo se esiste un libro in scrittura\nDisattivo: mai mostrati";
+            case "en_US":
+            default: return "On: the float bar shows \"Straight to slot\" and the digest-mode \"To slot\" buttons only when a writing book exists\nOff: never shown";
         }
     }
 

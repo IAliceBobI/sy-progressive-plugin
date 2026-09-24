@@ -679,22 +679,48 @@ export async function transferMaterialOut(docID: string): Promise<void> {
  *  反查（blocks 表文档行 parent_id 恒空，父子在 path；子文档物理目录=父 id 不带 .sy），
  *  有子文档的单篇跳过不删。端点无逐篇失败信号（code 0 假成功坑族）——清单生命周期
  *  内不复核（doSend 先例），重开 Dialog 自然重查拿真态；真 throw 不计数（toast 已删
- *  N 篇=n 真实删成数，失败可见）。已入槽胶囊血缘死链=首版容忍（跳转失败 toast 兜底）。 */
-export async function removeMaterialDocs(docIDs: string[]): Promise<number> {
+ *  N 篇=n 真实删成数，失败可见）。已入槽胶囊血缘死链=首版容忍（跳转失败 toast 兜底）。
+ *  need-0924-03 □3 出处提醒：删前探测同源胶囊（value=`id#…`），0 条=这段内容在
+ *  体系里的最后实体（血缘徽标与原文侧痕迹 materialTrace 数据源都是胶囊反查，同源
+ *  全删=线索同步消失）→ lastSources 收录出处名（书名/文档名），调用方 toast 提醒；
+ *  同源还有胶囊（内容副本活在槽里）则不打扰。探测在删除**前**做（先查后删——删后
+ *  查 attributes 吃索引窗见旧误判）；探测/解析失败按「有胶囊」处理（fail-soft 宁漏
+ *  勿误，不挡删除主链）。 */
+export async function removeMaterialDocs(docIDs: string[]): Promise<{ n: number; lastSources: string[] }> {
     let n = 0;
+    const lastSources: string[] = [];
     for (const id of docIDs) {
         try {
-            const path = String((await siyuan.getBlockInfo(id))?.path ?? "").replace(/\.sy$/, "");
+            const info = await siyuan.getBlockInfo(id);
+            const path = String(info?.path ?? "").replace(/\.sy$/, "");
             if (path) {
                 const kids = await siyuan.sql(
                     `select count(*) as c from blocks where path like '${path}/%' limit 1`) as any;
                 if (Number(kids?.[0]?.c ?? 0) > 0) continue; // 有子摘抄：跳过保树
             }
+            let alive = 1;
+            try {
+                alive = ((await siyuan.sqlAttr(
+                    `select block_id from attributes where name="${MATERIAL_KEY}" and value like "${id}#%" limit 2`)) ?? []).length;
+            } catch { /* 探测失败不打扰 */ }
+            const name = alive === 0 ? await lastSourceNameOf(id, info?.path) : "";
             await siyuan.removeDocByID(id);
             n++;
+            if (name) lastSources.push(name);
         } catch { /* 单篇失败不计——n=真实删成数 */ }
     }
-    return n;
+    return { n, lastSources };
+}
+
+/** □3 出处名（书名优先/文档名兜底，均空=""=不提醒）：ctime 走 IAL 直读（删除类
+ *  操作直读复核纪律）；文档名=物理 path 末段（getBlockInfo 无标题字段、SQL content
+ *  列有索引延迟——copyToPool 源标题同款口径） */
+async function lastSourceNameOf(id: string, rawPath?: string): Promise<string> {
+    const attrs = await siyuan.getBlockAttrs(id).catch(() => null);
+    const bookID = parseBookIDFromCtime(attrs?.["custom-pdigest-ctime"] ?? "");
+    const bookName = bookID ? String(progStorage.booksInfos()[bookID]?.bookName ?? "") : "";
+    return bookName || decodeURIComponent(
+        String(rawPath ?? "").split("/").filter(Boolean).at(-1)?.replace(/\.sy$/, "") ?? "");
 }
 
 /** 推式「入槽」菜单数据（progtree □1 树形版）：writing 且未完稿的书（最近活跃
@@ -790,6 +816,14 @@ export function nextOfOrderedIDs(ids: string[], current: string): string {
     if (ids.length === 0) return "";
     const i = ids.indexOf(current);
     return ids[(i + 1) % ids.length];
+}
+
+/** need-0924-03 入槽入口按需出现探测：存在在写的注册书（未忽略未归档）即 true。
+ *  与 orderedWritingBooks 同口径防两处漂移；全链 storage 内存读零 SQL（微任务级
+ *  返回，浮条渲染沿可高频跑）。完稿书不在此滤——「全完稿仍显示、点开菜单空态
+ *  toast 兜底」是有意取舍：精确滤要每书两发查询，换不来对等的边缘价值 */
+export async function hasActiveWritingBooks(): Promise<boolean> {
+    return (await orderedWritingBooks()).length > 0;
 }
 
 /** 期A 滚筒分派判定（纯函数，TDD 见 tests/unit/writingBook.test.ts）：素材优先、

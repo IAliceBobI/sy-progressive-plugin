@@ -231,8 +231,11 @@
         confirm("⚠️", tomatoI18n.删除素材确认(selected.length), () => void (async () => {
             try {
                 const ids = [...selected];
-                const n = await removeMaterialDocs(ids);
-                await siyuan.pushMsg(tomatoI18n.已删除N篇素材(n));
+                // □3：批内最后线索（同源无胶囊）的出处名单进 toast，其余照旧
+                const { n, lastSources } = await removeMaterialDocs(ids);
+                await siyuan.pushMsg(lastSources.length > 0
+                    ? tomatoI18n.已删除N篇素材M篇最后线索(n, lastSources)
+                    : tomatoI18n.已删除N篇素材(n));
                 flat = flat.filter(m => !ids.includes(m.id));
                 selected = [];
             } catch (e) {
