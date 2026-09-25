@@ -9,6 +9,7 @@ import pluginJson from "../plugin.json";
 import { openHelpMenu } from "../../sy-tomato-plugin/src/libs/helpMenu";
 import { buildSettingsHeader } from "../../sy-tomato-plugin/src/libs/settingsHeader";
 import { migrateLegacyHotkeys } from "../../sy-tomato-plugin/src/libs/hotkeyCap";
+import { startClaimHeartbeat } from "../../sy-tomato-plugin/src/libs/claimLease";
 import { ICONS } from "./icons";
 import { prog, progSettingsOpenHK } from "./Progressive";
 import { EventType, events } from "../../sy-tomato-plugin/src/libs/Events";
@@ -323,6 +324,8 @@ export default class ThePlugin extends BaseTomatoPlugin {
 
         // 浮条 DOM 直挂 document.body（tomato loadFloatingBall 先例：自挂 DOM 不进 onload 链）
         initProgFloatBtns();
+        // 订单号信任制租约心跳（2026-09-25，tomato index 同款）
+        startClaimHeartbeat("progressive");
     }
 
     /** siyuan383 □3 多端热更：覆盖即自管（未覆盖=内核对他端每条 petal 写入自动整重载）。
