@@ -43,4 +43,8 @@ export enum HtmlCBType {
     nop = 20,
     // delswap □1（650189 鸟反馈）：删本片+滚筒轮转下一本书——满额时也可用的换书出口
     deleteAndSwap = 21,
+    // need-0925-01（鸟反馈）：片尾手动「建下一片」——读满档位被闸拦停的绕行：
+    // 只建文档不打开不跳转，不经闸不记账；建出=预建片性质（树里手动直达不经闸，
+    // 插件出片链该拦照拦），明天轮转 createPiece 内 findPieceDoc 命中即复用不重复建
+    createNext = 22,
 }

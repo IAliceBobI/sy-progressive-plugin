@@ -97,4 +97,7 @@ export const PROG_FLOAT_ICONS = `
 <!-- floatbar □2 家族统一②：子排复访创建钮=时钟+右上加号角标（CardAdd/WriteAdd 加号家族；
      官方 iconHistory 退出本家族——✧/调度维持圆时钟 iconProgSched，官方 Clock/History 不再混入） -->
 <symbol id="iconProgSchedAdd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="13" r="7.5"/><path d="M11 8.5V13l3 1.5"/><path d="M18.5 2.3v4.4"/><path d="M16.3 4.5h4.4"/></symbol>
+<!-- need-0925-01 建下一片：片（iconProgPiece）+右上加号角标（CardAdd/WriteAdd/AddBook/SchedAdd
+     的「基础物+加号=新建该物」角标家族）；片缩左上让位角标，缩放组 stroke-width 等比补偿（1.8/.78） -->
+<symbol id="iconProgPieceAdd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(-.8 -.6) scale(.78)" stroke-width="2.3"><rect x="4" y="3" width="11" height="13" rx="2"/><path d="M9 20h7a2 2 0 0 0 2-2V8"/></g><path d="M18 2.8v4.4"/><path d="M15.8 5h4.4"/></symbol>
 `;

@@ -12,6 +12,7 @@ import { Menu, getAllEditor } from "siyuan";
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { PDIGEST_CTIME, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
+import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { PdigestReviewKey, ReviewKey } from "./reviewQueue";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { parseBookIDFromCtime, escapeHtml } from "./progData";
@@ -24,6 +25,11 @@ import { digestStateOf, digestStateIcon } from "./digestState";
 import { openDigestReviewMenu } from "./reviewMenu";
 import { digestBadgeInputOf, cardIDSetOf, invalidateDigestBadge } from "./digestBadgeStore";
 import { digestBadgeOf, fmtDueDate, DigestBadge } from "./digestBadge";
+import { srcReachOf, SrcReach } from "./revSrcGuard";
+// prog=模块单例（Progressive.ts:2218）。循环依赖 Progressive→ProgressiveBtn→digestMarker
+// →Progressive 与 helper/tailCardRender →Progressive 既有循环同构：prog 只在事件
+// handler 内消费，模块顶层不求值，CJS 打包安全。
+import { prog } from "./Progressive";
 
 const MARK_CLASS = "prog-digest-mark";
 const CACHE_TTL_MS = 60_000;
@@ -186,10 +192,21 @@ async function openDigestListMenu(ev: MouseEvent, ids: string[]) {
     }), 0);
 }
 
+/** 来源胶囊 hover tip 文案（need-0925-02）：三态拼装——可达带名=来源行；关闭笔记本
+ *  =专属小字提示（revSrcGuard 长条撤除后的承接面）；硬失败/可达无名=不可达兜底。
+ *  消费层 i18n 拼装（stateBadgeLabel 同惯例）。 */
+export function digestTagTipOf(label: string, r: SrcReach): string {
+    if (r.reason === "ok" && r.title) return `${label}\n${tomatoI18n.摘抄来源提示(r.title)}`;
+    if (r.reason === "closed") return `${label}\n${tomatoI18n.来源在关闭的笔记本}`;
+    return `${label}\n${tomatoI18n.来源不可达}`;
+}
+
 /**
  * 摘抄文档标题区身份徽章（progpolish □4）：摘抄文档出场时在 .protyle-title 注入
- * 「✒ 摘抄」胶囊，点击弹复访节奏菜单（openDigestReviewMenu 直查 IAL 自动组配两态：
- * 未设复访=首设直列，已设=复访中+改档），顺带治未设 review 的摘抄文档零入口。
+ * 「✒ 摘抄」胶囊，点击跳回摘抄来源（need-0925-03：openOriginFromDigest 四级链
+ * ——选中块带 progref 直跳原文块→parentID 是片则回片→片已删按序号重建→书兜底，
+ * 浮条路径胶囊/「回原书」钮同款入口）；复访菜单入口不丢——浮条 ✧ 钮（case
+ * "revisit"）与复访态类型胶囊（attachStateBadge st-click）仍开 openDigestReviewMenu。
  * 纯 DOM 注入零落盘；出场链五事件反复调用，幂等清旧重挂（markDigests 同哲学），
  * title 重渲染丢注入由下次出场事件补挂。
  * 安全性：本函数只动 title 区（.protyle-title__input 的兄弟节点），不碰 wysiwyg
@@ -225,15 +242,14 @@ export function markDigestTag(protyle: any) {
     tag.setAttribute("contenteditable", "false");
     tag.innerHTML = `<svg><use xlink:href="#iconProgQuill"></use></svg>${label}`;
     // hover 来源提示：aria-label 驱动 #prog-float-tip 单例（自建元素对思源 tip 生态隐身，
-    // □10/□1 坑）；来源名异步补，未就绪时 hover 无 tip 功能不受损（floatTip 语义）
+    // □10/□1 坑）；来源名异步补，未就绪时 hover 无 tip 功能不受损（floatTip 语义）。
+    // need-0925-02：判定收编 srcReachOf 两态（原只看 getBlockInfo null——刚关的笔记本
+    // blocktree 未清时 code 0 照常返回，胶囊会误显来源名如无其事）；closed 态显
+    // 「来源在关闭的笔记本」小字。tip 随本挂点同链同权：日常打开/复习界面不分场景。
     const parentID = wys.getAttribute("custom-pdigest-parent-id");
     if (parentID) {
-        siyuan.getBlockInfo(parentID).then((info: any) => {
-            // revsrcguard 同批：失败态（null=源在关闭笔记本/已删）也提示——hover 有解释
-            // 优于静默无 tip（call 层 code!=0 返 null 不走 catch，失败分支须在 then 内判）
-            tag.setAttribute("aria-label", info?.rootTitle
-                ? `${label}\n${tomatoI18n.摘抄来源提示(info.rootTitle)}`
-                : `${label}\n${tomatoI18n.来源不可达}`);
+        srcReachOf(parentID).then((r) => {
+            tag.setAttribute("aria-label", digestTagTipOf(label, r));
         }).catch(() => { });
         tag.addEventListener("mouseenter", () => showFloatTip(tag));
         tag.addEventListener("mouseleave", hideFloatTip);
@@ -241,7 +257,14 @@ export function markDigestTag(protyle: any) {
     tag.addEventListener("click", (ev) => {
         ev.stopPropagation();
         ev.preventDefault();
-        openDigestReviewMenu(protyle?.block?.rootID ?? "", ev);
+        // need-0925-03：点击=跳回摘抄来源（prog.openOriginFromDigest 四级链，浮条
+        // 路径胶囊同款）。选区从摘抄文档自身 protyle 取（selectedDivsSync 内部按
+        // wysiwyg element 收集，分屏下不误取他文档）；空选区传空数组走文档级兜底
+        // （openOriginFromDigest 按文档序取首个 progref 落原文位置）。
+        void prog.openOriginFromDigest(
+            protyle?.block?.rootID ?? "",
+            events.selectedDivsSync(protyle)?.ids ?? [],
+        );
     });
     const input = title.querySelector(".protyle-title__input");
     if (input) title.insertBefore(tag, input.nextSibling);

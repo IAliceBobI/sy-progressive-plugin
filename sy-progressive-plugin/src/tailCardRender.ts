@@ -66,6 +66,14 @@ const pieceActions = (): TailAction[] => [
         run: d => prog.htmlBlockReadNextPeice(d.bookID, d.docID, HtmlCBType.next, d.point),
     },
     {
+        // need-0925-01（鸟反馈）：建下一片——读满档位被闸拦停的绕行。只建文档不打开
+        // 不计读（满额时本钮照常可用）；建出=预建片性质，文档树手动直达不经闸，
+        // 明天轮转自动认这片不重复建
+        act: "createNext", icon: "iconProgPieceAdd",
+        label: () => tomatoI18n.建下一片, tip: () => tomatoI18n.路线片建下一片,
+        run: d => prog.htmlBlockReadNextPeice(d.bookID, d.docID, HtmlCBType.createNext, d.point),
+    },
+    {
         act: "delBack", icon: "iconProgDelBack",
         label: () => tomatoI18n.上片删,
         run: d => prog.htmlBlockReadNextPeice(d.bookID, d.docID, HtmlCBType.deleteAndBack, d.point),

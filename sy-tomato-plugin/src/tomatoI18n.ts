@@ -4421,40 +4421,13 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
-    /** 复习界面源不可达提示条主文案（revsrcguard，650189 09-23 帖） */
-    public get 背诵卡源不可达() {
+    /** 来源胶囊 hover 小字提示：源在已关闭的笔记本（need-0925-02，revsrcguard 长条撤除后承接） */
+    public get 来源在关闭的笔记本() {
         switch (this.lang) {
-            case "zh_CN": return "这张背诵卡的来源在已关闭的笔记本中";
-            case "zh_CHT": return "這張背誦卡的來源在已關閉的筆記本中";
+            case "zh_CN": return "来源在关闭的笔记本";
+            case "zh_CHT": return "來源在關閉的筆記本";
             case "en_US":
-            default: return "This card's source is in a closed notebook";
-        }
-    }
-
-    public get 跳过这张() {
-        switch (this.lang) {
-            case "zh_CN": return "跳过这张";
-            case "zh_CHT": return "跳過這張";
-            case "en_US":
-            default: return "Skip";
-        }
-    }
-
-    public get 移除背诵卡() {
-        switch (this.lang) {
-            case "zh_CN": return "移除背诵卡";
-            case "zh_CHT": return "移除背誦卡";
-            case "en_US":
-            default: return "Remove card";
-        }
-    }
-
-    public get 已移除背诵卡() {
-        switch (this.lang) {
-            case "zh_CN": return "已移除这张背诵卡";
-            case "zh_CHT": return "已移除這張背誦卡";
-            case "en_US":
-            default: return "Recitation card removed";
+            default: return "Source is in a closed notebook";
         }
     }
 
@@ -8151,6 +8124,47 @@ export class TomatoI18n extends TomatoI18nABC {
             case "zh_CHT": return "下一個分片：翻頁不刪，片留作草稿，同樣計數";
             case "en_US":
             default: return "Page on: keep this piece as draft, also counts";
+        }
+    }
+    // need-0925-01 片尾「建下一片」（读满档位闸拦停的绕行）按钮族：label+tip+两 toast
+    public get 建下一片() {
+        switch (this.lang) {
+            case "zh_CN": return "建下一片";
+            case "zh_CHT": return "建下一片";
+            case "en_US":
+            default: return "Pre-build next";
+        }
+    }
+    public get 路线片建下一片() {
+        switch (this.lang) {
+            case "zh_CN": return "建下一片：只建文档不打开不计读，读满被拦时可从文档树手动直达；明天轮转自动接上这篇";
+            case "zh_CHT": return "建下一片：只建文檔不打開不計讀，讀滿被攔時可從文檔樹手動直達；明天輪轉自動接上這篇";
+            case "en_US":
+            default: return "Pre-build next piece: create only, no open, no count — reach it from the doc tree when gated; rotation picks it up tomorrow";
+        }
+    }
+    public get 已建好下一片() {
+        switch (this.lang) {
+            case "zh_CN": return "已建好下一片，可从文档树打开";
+            case "zh_CHT": return "已建好下一片，可從文檔樹打開";
+            case "en_US":
+            default: return "Next piece created — open it from the doc tree";
+        }
+    }
+    public get 已是最后一片() {
+        switch (this.lang) {
+            case "zh_CN": return "已是最后一片";
+            case "zh_CHT": return "已是最後一片";
+            case "en_US":
+            default: return "Already the last piece";
+        }
+    }
+    public get 下一片暂未就绪() {
+        switch (this.lang) {
+            case "zh_CN": return "下一片暂未就绪，稍后再点";
+            case "zh_CHT": return "下一片暫未就緒，稍後再點";
+            case "en_US":
+            default: return "Next piece not ready yet, try again later";
         }
     }
     public get 路线组留点什么() {

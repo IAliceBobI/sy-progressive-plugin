@@ -30,7 +30,6 @@ import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadC
 import { openReadCardMenu } from "./readCardMenu";
 import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCore";
 import { disposeRevCardUI, revCardOnAppear } from "./readCurveCardUI";
-import { disposeRevSrcGuard, revSrcGuardOnAppear } from "./revSrcGuard";
 import { HtmlCBType } from "./constants";
 import { lockWithLease, type LockLeaseResult } from "./lockLease";
 import { leasedThenSweep } from "./flipSweep";
@@ -98,7 +97,6 @@ class Progressive {
         this.observer = null;
         disposeReadCurve();
         disposeRevCardUI();
-        disposeRevSrcGuard();
         // 件4：批量整理摘抄 Dialog 热重载善后（destroy→destroyCallback 闭包拆本代组件树）
         this.batchPoolDialog?.destroy();
         this.batchPoolDialog = null;
@@ -322,9 +320,6 @@ class Progressive {
                 // 阅读曲线期2：阅读卡换皮「下一张」主钮+徽标——四事件全挂（翻卡=loaded
                 // /switch、点击=click；复习容器判定在 revCardOnAppear 内做，普通文档自短路）
                 revCardOnAppear((detail.protyle as any)?.element as HTMLElement | undefined);
-                // revsrcguard（650189 09-23 帖）：背诵卡源不可达守卫——digest 卡查
-                // custom-pdigest-parent-id 可达性，不可达挂「跳过/移除背诵卡」提示条
-                revSrcGuardOnAppear((detail.protyle as any)?.element as HTMLElement | undefined);
                 // 阅读曲线：官方复习界面翻卡触发对账（容器判定=CardBox 同款 card__block；
                 // 普通编辑器点击不触发——全量巡查太重。纯键盘空格流无此事件=期2 主钮补）
                 if (eventType == EventType.click_editorcontent) {
@@ -1332,6 +1327,25 @@ class Progressive {
                     showCardAnswer();
                     pressSkip()
                 }
+                break;
+            }
+            // need-0925-01（鸟反馈）：读满档位闸拦停的绕行——手动「建下一片」。只建文档
+            // 不打开不跳转、不问闸不记账不出片（上面 next 的满额拦停分支与本钮并存=
+            // 「做=」口径，档位维持硬目标、无软闸/确认续读）。建出=预建片性质（同
+            // createAllPieces 产物：文档树手动直达不经闸，插件出片链该拦照拦）；明天
+            // 轮转认已有片不重复建（createPiece 内 findPieceDoc 命中即复用+文件树
+            // 直查兜底，连点幂等）。断点/档位/当日账全不触碰。
+            case HtmlCBType.createNext: {
+                const info = await progStorage.booksInfo(bookID);
+                const bookIndex = await progStorage.loadBookIndexIfNeeded(bookID);
+                const target = point + 1;
+                if (target > bookIndex.length - 1) {
+                    await siyuan.pushMsg(tomatoI18n.已是最后一片, 3000);
+                    break;
+                }
+                const nextID = await help.createPiece(info, bookIndex, target);
+                if (nextID) await siyuan.pushMsg(tomatoI18n.已建好下一片, 3000);
+                else await siyuan.pushMsg(tomatoI18n.下一片暂未就绪, 3000); // 索引未就绪/空片窗口
                 break;
             }
             case HtmlCBType.deleteAndExit:
