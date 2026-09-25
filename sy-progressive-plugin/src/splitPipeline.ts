@@ -21,6 +21,24 @@ const BLOCK_REF_RE = /\(\([0-9]{14}-[a-z0-9]+\s+"[^"\n]*"(?:\s+"[a-z]{1,2}")?\)\
 // sup 整体 vault（用户真上标通常短引用无句号，误锁=该区间少切，零损失）。
 const SUP_RE = /<sup[^>]*>[\s\S]*?<\/sup>/g;
 const PLACEHOLDER_RE = /\u0000(\d+)\u0000/g;
+// HTML 开标签（含属性串）/闭标签+行内 IAL 整段 vault（need-0925-04，鸟飞书定稿）：
+// 外观预设双声明 style 的 cssText 序列化声明间隔恰为「; 」——tag 属性串与 IAL 后缀
+// 里的 "; " 被 splitBy("; ") 当英文断句符，从属性串中间下刀腰斩 HTML 标签 → 截断
+// 开标签扫描不到 → 孤立闭标签命中孤儿判据 → 整批放弃线 → 序列化源码字面泄漏
+// （轻症「样式消失」与重症「源码泄漏」同根因）。标签原子与 HTML_TAG_RE 同款引号
+// 感知（属性值内的 > 不误断）；字面 <字母（如数学 i<n）误锁=该区间少切零损失，
+// mathGuard 同族保守哲学。在 mathGuard 之后跑（sup 已整段锁，不被拆成两个标签）。
+const TAG_OR_IAL_RE = /<\/?[a-zA-Z][a-zA-Z0-9]*(?:(?:"[^"]*"|'[^']*'|[^"'>])*)>|\{:[^}]*\}/g;
+const TAG_PLACEHOLDER_RE = /\u0000t(\d+)\u0000/g;
+
+function tagGuard(ps: string[]): { guarded: string[]; restore: (out: string[]) => string[] } {
+    const vault: string[] = [];
+    // 占位符带 t 前缀与 mathGuard 纯数字占位区分，两阶段 restore 各取各的互不误碰
+    const stash = (m: string) => `\u0000t${vault.push(m) - 1}\u0000`;
+    const guarded = ps.map(s => s.replace(TAG_OR_IAL_RE, stash));
+    const restore = (out: string[]) => out.map(s => s.replace(TAG_PLACEHOLDER_RE, (_, i) => vault[i]));
+    return { guarded, restore };
+}
 
 function mathGuard(ps: string[]): { guarded: string[]; restore: (out: string[]) => string[] } {
     const vault: string[] = [];
@@ -35,13 +53,17 @@ function mathGuard(ps: string[]): { guarded: string[]; restore: (out: string[]) 
 
 export function splitLines(ps: string[]) {
     const { guarded, restore } = mathGuard(ps);
-    ps = guarded;
+    const tg = tagGuard(guarded);
+    ps = tg.guarded;
     for (const s of "\n。！？；：") ps = splitBy(ps, s);
     ps = splitBy(ps, "……");
     ps = splitBy(ps, "! ");
     ps = splitBy(ps, "? ");
     ps = splitBy(ps, "; ");
     ps = splitBySentencePeriod(ps);
+    // 两阶段 restore（need-0925-04）：先还原标签/IAL——closeInlineMarks 要扫真标签
+    // 跨片配对+收集 IAL 映射；公式/链接仍占位防补全期误扫，补全完再还原。
+    ps = tg.restore(ps);
     ps = closeInlineMarks(ps);
     return restore(ps);
 }
