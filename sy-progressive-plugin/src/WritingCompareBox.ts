@@ -1,28 +1,24 @@
 import { IProtyle, Plugin } from "siyuan";
-import { add_href, attrNewLine, cloneCleanDiv, getAttribute, ial2str, isValidNumber, parseIAL, removeAttribute, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
-import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece } from "./helper";
+import { getAttribute, isValidNumber, parseIAL, setAttribute, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece, pieceFilterSQL } from "./helper";
 import { fetchWritingPieces } from "./writeBook";
 import { progStorage } from "./ProgressiveStorage";
 import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
-import { MarkKey, PROG_ORIGIN_TEXT } from "../../sy-tomato-plugin/src/libs/gconst";
+import { DATA_NODE_ID, PARAGRAPH_INDEX, PROG_ORIGIN_TEXT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { windowOpenStyle, extractAllNoBacktraceLink } from "../../sy-tomato-plugin/src/libs/stores";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
-import { DomSuperBlockBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
+import { DomParaBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { into } from "stonev5-utils";
 import { lockWithLease } from "./lockLease";
-
-type BlockContent = {
-    ial?: AttrType, id?: string, markdown?: string, content?: string,
-}
-
-function b2c(row: Block): BlockContent {
-    return { ial: parseIAL(row.ial), id: row.id, markdown: row.markdown, content: row.content };
-}
+import {
+    buildNoteUnits, childrenToStream, cloneStream, filterStream, pickPieceNotes,
+    DOC_NOTES_KEY, StreamBlock,
+} from "./noteAssembly";
 
 export const WC提取所有分片的笔记 = winHotkey("⌘F4", "提取所有分片的笔记", "iconCopy", () => tomatoI18n.提取所有分片的笔记, true) // □14 收费门恢复（提取整理族，Pro）
 export const WC提取笔记到底部 = winHotkey("shift+alt+r", "提取笔记到底部", "iconCopy", () => tomatoI18n.提取笔记到底部, true) // □14 收费门恢复（提取整理族，Pro）
@@ -137,30 +133,30 @@ class WritingCompareBox {
 
     // v5 □7：提取/整理族入口收进浮条 [+] 高级功能 + 命令面板（右键菜单退役），方法转 public 供浮条调用
 
+    /** 提取笔记到底部（⇧⌥R）need-0926-01 新装配：一笔记一单元（无序列表）+条间空段+
+     *  星号行尾；产物=list+空段交替序列，全部挂 custom-doc-notes（删旧=删所有带标记块，
+     *  旧格式 sb 同判据通吃）。尾卡/空段/previous 块随统一净化滤除（旧版漏滤 previous
+     *  顺手修正——片首复述辅助块不是笔记）。 */
     async extractNotes2bottom(protyle: IProtyle) {
         siyuan.pushMsg(tomatoI18n.提取笔记到底部, 1000);
         const docInfo = events.getInfo(protyle);
-        const { root } = await getDocBlocks(docInfo.docID, docInfo.name, true, false, 1);
+        // emptyContent=true：root.children 兼任删旧清单——新格式条间空段带 custom-doc-notes
+        // 标记但 content 空，走空内容丢弃闸（fillChildren !emptyContent 分支）会被跳过→每轮
+        // 重提取漏删旧空段累积（need-0926-01 □4 e2e 揪出）；装配流自身由 filterStream 滤空段
+        const { root } = await getDocBlocks(docInfo.docID, docInfo.name, true, true, 1);
         const lastID = await siyuan.getDocLastID(docInfo.docID)
-        const su = new DomSuperBlockBuilder();
+        const stream = cloneStream(filterStream(childrenToStream(root.children), { noteOnly: true }));
+        const units = buildNoteUnits(stream, { withHref: true, markAttr: [DOC_NOTES_KEY, "1"] });
+        const ops = units.length > 0
+            ? siyuan.transInsertBlocksBefore(units.map(u => u.outerHTML), lastID)
+            : [];
         root.children
-            .filter(c => !getAttribute(c.div, "custom-prog-origin-text"))
-            .filter(c => !getAttribute(c.div, "custom-progmark"))
-            .filter(c => !getAttribute(c.div, "custom-doc-notes"))
-            .forEach(c => {
-                const d = cloneCleanDiv(c.div, true);
-                removeAttribute(d.div, "custom-prog-key-note")
-                removeAttribute(d.div, "custom-progref")
-                add_href(d.div, d.new2old.get(d.newID), "* ", false)
-                su.append(d.div);
-            });
-        su.setAttr("custom-doc-notes", "1");
-        const ops = siyuan.transInsertBlocksBefore([su.build().outerHTML], lastID)
-        root.children
-            .filter(c => getAttribute(c.div, "custom-doc-notes"))
+            .filter(c => getAttribute(c.div, DOC_NOTES_KEY))
             .forEach(c => ops.push(...siyuan.transDeleteBlocks([c.id])));
         await siyuan.transactions(ops);
-        OpenSyFile2(this.plugin, su.id);
+        // 定位首单元（list 容器预挂合规 id，事务通道保留）；无产物（片内无笔记）退回文档
+        const firstID = units[0]?.getAttribute(DATA_NODE_ID) ?? docInfo.docID;
+        OpenSyFile2(this.plugin, firstID);
     }
 
     async noColor(protyle: IProtyle, rm = true) {
@@ -181,21 +177,20 @@ class WritingCompareBox {
         await siyuan.batchSetBlockAttrs(param);
     }
 
+    /** 提取所有分片的笔记（⌘F4）need-0926-01 新装配：per 片 pickPieceNotes（需求 5
+     *  底部产物优先——有提取到底的片取底部版本含用户补充）→统一装配落 collection
+     *  文档；星号受 □2 开关门控（默认带=旧行为）；尾卡滤除=JSON 游标泄漏修复。 */
     async extractAllNotes(protyle: IProtyle, markKey: string) {
         siyuan.pushMsg(tomatoI18n.提取所有分片的笔记)
         const docInfo = events.getInfo(protyle);
 
         const { pieceIDs, bookID } = await getAllPieces(markKey);
-        const blocks = await getAllBlocks(pieceIDs, true, true, true);
-        const sup = new DomSuperBlockBuilder();
-        blocks.forEach(b => {
-            removeAttribute(b.div, "custom-progmark");
-            removeAttribute(b.div, "custom-in-book-index");
-            removeAttribute(b.div, "custom-paragraph-index");
-            removeAttribute(b.div, "custom-progref");
-            sup.append(b.div);
+        const docs = await Promise.all(pieceIDs.map(id => getDocBlocks(id, "", true, false, 1)));
+        const stream = docs.flatMap(doc => {
+            const picked = pickPieceNotes(childrenToStream(doc?.root?.children ?? []), { noteOnly: true });
+            return cloneStream(picked.stream);
         });
-        const div = sup.build();
+        const units = buildNoteUnits(stream, { withHref: !extractAllNoBacktraceLink.get() });
 
         let keysDocID = await findAllInOneKeyDoc(bookID);
         if (!keysDocID) {
@@ -206,7 +201,7 @@ class WritingCompareBox {
         }
         if (!keysDocID) return;
         await siyuan.clearAll(keysDocID);
-        await siyuan.insertBlocksAsChildOf([div.outerHTML], keysDocID);
+        await siyuan.insertBlocksAsChildOf(units.map(u => u.outerHTML), keysDocID);
         OpenSyFile2(this.plugin, keysDocID, windowOpenStyle.get() as any);
     }
 
@@ -221,10 +216,19 @@ class WritingCompareBox {
         const gotIDs = got.pieceIDs;
         const realBookID = direct ? direct.bookID : got.bookID;
         if (!gotIDs || gotIDs.length === 0) return;
-        const blocks = await getAllBlocks(gotIDs, false, true, false);
-        const sup = new DomSuperBlockBuilder();
-        blocks.forEach(b => sup.append(b.div));
-        const div = sup.build();
+
+        // need-0926-01 新装配：全量合并（原文块 passthrough 直通平铺、笔记块单元化）
+        // +片间空行+留言（无 pidx）挂该片最后笔记单元；星号保持旧行为不带；尾卡滤除
+        const docs = await Promise.all(gotIDs.map(id => getDocBlocks(id, "", true, false, 1)));
+        const out: HTMLElement[] = [];
+        docs.forEach((doc, i) => {
+            if (i > 0) out.push(new DomParaBuilder().build());
+            const stream = cloneStream(filterStream(childrenToStream(doc?.root?.children ?? [])));
+            out.push(...buildNoteUnits(stream, {
+                withHref: false,
+                passthrough: d => !!getAttribute(d, PROG_ORIGIN_TEXT),
+            }));
+        });
 
         let newBookID = await findNewBookDoc(realBookID);
         if (!newBookID) {
@@ -236,7 +240,7 @@ class WritingCompareBox {
         if (!newBookID) return;
 
         await siyuan.clearAll(newBookID);
-        await siyuan.insertBlocksAsChildOf([div.outerHTML], newBookID);
+        await siyuan.insertBlocksAsChildOf(out.map(d => d.outerHTML), newBookID);
         OpenSyFile2(this.plugin, newBookID, windowOpenStyle.get() as any);
     }
 
@@ -267,6 +271,11 @@ class WritingCompareBox {
         });
     }
 
+    /** 提取笔记（⌘F5→keys 文档）need-0926-01 新装配：取数走 pickPieceNotes（底部产物
+     *  优先=修「提取到底的笔记被再次提取」重复面；尾卡滤除）；keys 文档已有内容保全
+     *  （noteMap 语义迁新形态：pidx 块=旧笔记丢弃重提取、其后无 pidx 散块=用户补充
+     *  clone 后挂回对应笔记单元——DOM 通道保格式，旧版 SQL content 列纯文本丢格式顺
+     *  手修正）；星号行尾恒带（陆杰帖文点名）；key-note 样式标记挂笔记块。 */
     async extractNotes(pieceID: string, notebookId: string, markKey: string) {
         if (!pieceID || !notebookId || !markKey) return;
         siyuan.pushMsg("extract notes")
@@ -285,60 +294,43 @@ class WritingCompareBox {
         }
         if (!keysDocID) return;
 
-        const taskMap = siyuan.getChildBlocks(keysDocID)
-            .then(bs => bs.map(b => b.id))
-            .then(ids => siyuan.getRows(ids, "content,ial", true))
-            .then(rows => rows.map(b2c))
-            .then(contents => {
-                let idx: string;
-                const m = new Map<string, BlockContent[]>();
-                for (const c of contents) {
-                    const pidx = c.ial["custom-paragraph-index"];
-                    if (pidx) {
-                        idx = pidx
-                    }
-                    if (idx && !pidx) {
-                        const arr = m.get(idx) ?? []
-                        arr.push(c)
-                        m.set(idx, arr);
-                    }
-                }
-                return m;
-            })
+        // 片取数（需求 5：底部产物优先）+克隆净化
+        const pieceDoc = await getDocBlocks(pieceID, "", true, false, 1);
+        const picked = pickPieceNotes(childrenToStream(pieceDoc?.root?.children ?? []), { noteOnly: true });
+        const stream = cloneStream(picked.stream);
 
-        const { contents, noteMap } = await (async () => {
-            const cs = await siyuan.getChildBlocks(pieceID);
-            const ids = cs.map(b => b.id);
-            const rows = await siyuan.getRows(ids,
-                "content,ial,markdown", true, [
-                `ial not like "%${PROG_ORIGIN_TEXT}%"`,
-                `ial not like "%${MarkKey}%"`,
-                "content IS NOT NULL",
-                "LENGTH(content) > 0",
-            ]);
-            const contents = rows.map(b2c);
-            return { contents, noteMap: await taskMap };
-        })();
-
-        const mdList: string[] = [];
-        let lastIdx: string;
-        for (const { ial, content, markdown } of contents) {
-            if (!content) continue;
-            delete ial.id;
-            delete ial.updated;
-            const thisIdx = ial["custom-paragraph-index"];
-            if (thisIdx != lastIdx) {
-                if (lastIdx != null) mdList.push(attrNewLine());
-                lastIdx = thisIdx;
+        // keys 文档散块保全：pidx 块=旧笔记（丢弃，由重提取产物替换），其后无 pidx
+        // 块=用户补充（clone 后 splice 回流中对应笔记之后——装配分组挂进同单元）
+        const keysDoc = await getDocBlocks(keysDocID, "", true, false, 1);
+        const extras = new Map<string, HTMLElement[]>();
+        let curIdx = "";
+        for (const c of keysDoc?.root?.children ?? []) {
+            const pidx = getAttribute(c.div, PARAGRAPH_INDEX);
+            if (pidx) {
+                curIdx = pidx;
+                continue;
             }
-            ial["custom-prog-key-note"] = "1";
-            mdList.push(`${markdown}\n${ial2str(ial)}`);
-            noteMap.get(thisIdx)?.forEach(note => {
-                mdList.push(note.content);
-            })
+            if (!curIdx) continue; // 首笔记前的散块（旧 noteMap 同语义丢弃）
+            const arr = extras.get(curIdx) ?? [];
+            arr.push(cloneStream([{ div: c.div, srcID: "" }])[0].div);
+            extras.set(curIdx, arr);
         }
+        const merged: StreamBlock[] = [];
+        for (const b of stream) {
+            merged.push(b);
+            const pidx = getAttribute(b.div, PARAGRAPH_INDEX);
+            if (pidx) {
+                for (const div of extras.get(pidx) ?? []) merged.push({ div, srcID: "" });
+            }
+        }
+        // keys 笔记样式标记（index.scss 消费）：pidx 块=笔记本体
+        merged.forEach(b => {
+            if (getAttribute(b.div, PARAGRAPH_INDEX)) setAttribute(b.div, "custom-prog-key-note", "1");
+        });
+
+        const units = buildNoteUnits(merged, { withHref: true });
         await siyuan.clearAll(keysDocID);
-        await siyuan.insertBlockAsChildOf(mdList.join("\n"), keysDocID);
+        await siyuan.insertBlocksAsChildOf(units.map(u => u.outerHTML), keysDocID);
         OpenSyFile2(this.plugin, keysDocID, "front");
     }
 }
@@ -349,7 +341,10 @@ async function getAllPieces(markKey: string) {
     // 插件管理勿改managedByPluginDoNotModify#20240130152919-exlnqci,7
     const [pmPreffix, pieceIdx] = markKey.split(",")
     const [_T, bookID] = pmPreffix.split("#")
-    const pieceIDs = await siyuan.sql(`select id,ial from blocks where type='d' and ial like '%${pmPreffix},%' limit 100000000`)
+    // need-0926-01 □4：where 换 pieceFilterSQL（MarkKey=" 前缀锚定）——原裸 like
+    // '%pmPreffix,%' 会命中 keysDoc（IAL=keysDoc#…#bookID,1 含子串）→ keys 产物单元
+    // 混进提取全部/合并流（vision P0 嵌套重复+裸 JSON 的根因，存量 bug 新格式显形）
+    const pieceIDs = await siyuan.sql(`select id,ial from blocks where ${pieceFilterSQL(bookID)} limit 100000000`)
         .then(rows => {
             rows = rows
                 .map(r => r.attrs = parseIAL(r.ial))
@@ -361,32 +356,5 @@ async function getAllPieces(markKey: string) {
             return rows.map(r => r.id);
         });
     return { pieceIDs, pmPreffix, pieceIdx, bookID }
-}
-
-async function getAllBlocks(pieceIDs: string[], noteOnly = false, clone = true, addHref = false) {
-    const docs = await Promise.all(pieceIDs.map(id => getDocBlocks(id, "", true, false, 1)))
-    let blocks = docs.map(doc => doc?.root?.children ?? []).flat();
-    blocks = blocks.filter(block => {
-        const m1 = getAttribute(block.div, "custom-progmark");
-        const m2 = getAttribute(block.div, "custom-doc-notes");
-        const m3 = getAttribute(block.div, "custom-prog-piece-previous");
-        return !m1 && !m2 && !m3;
-    });
-    if (noteOnly) {
-        blocks = blocks.filter(block => {
-            const o = getAttribute(block.div, "custom-prog-origin-text")
-            return !o
-        });
-    }
-    if (clone) {
-        blocks.forEach(b => {
-            const { id, div } = cloneCleanDiv(b.div);
-            b.div = div;
-            if (addHref) {
-                add_href(div, id, "  *  ", true);
-            }
-        });
-    }
-    return blocks;
 }
 

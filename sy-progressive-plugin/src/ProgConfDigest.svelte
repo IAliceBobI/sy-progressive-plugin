@@ -10,6 +10,7 @@
     import {
         digestLanding,
         digestNoBacktraceLink,
+        extractAllNoBacktraceLink,
         markOriginTextBG,
         materialCapsuleBorder,
         writingPoolUnderBook,
@@ -61,6 +62,17 @@
             bind:checked={$digestNoBacktraceLink}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置摘抄回溯}>{tomatoI18n.摘抄不加入回溯链接}</span>
+    </div>
+
+    <!-- need-0926-01 □2 提取全部回链开关：同族第三枚，唯一差异=默认关（=带链接，
+         现状行为零迁移）；□3 接线 extractAllNotes 装配 withHref 读它 -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$extractAllNoBacktraceLink}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置提取回溯}>{tomatoI18n.提取全部不加入回溯链接}</span>
     </div>
 
     <div>

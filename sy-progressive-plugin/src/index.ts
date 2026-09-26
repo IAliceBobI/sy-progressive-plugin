@@ -22,7 +22,7 @@ import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, flashcardShowPath, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, floatbarSlotEntryShow, readCurveSweepMins, readCurveTakeover, pieceAutoCard, readCurveReadingPoint, readCurvePlainDocs,
-    readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+    readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, extractAllNoBacktraceLink, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, userID, userToken, licenseCloudSynced, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
@@ -114,6 +114,7 @@ function loadStore(plugin: BaseTomatoPlugin) {
     flashcardNotebook.load(plugin);
     digestNoBacktraceLink.load(plugin);
     pieceNoBacktraceLink.load(plugin);
+    extractAllNoBacktraceLink.load(plugin);
     markOriginTextBG.load(plugin);
     // □12 摘抄背景渲染态总开关：body 类即 CSS 总闸（index.scss div:has(> .prog-digest-mark)），
     // 订阅在 load 后挂——subscribe 立即同步一次，之后设置面板改值实时生效

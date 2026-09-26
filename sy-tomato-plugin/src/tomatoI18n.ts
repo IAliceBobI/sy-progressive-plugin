@@ -9475,6 +9475,14 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Digest cards no longer get a \"digested from\" backtrace ref line";
         }
     }
+    public get tip设置提取回溯() {
+        switch (this.lang) {
+            case "zh_CN": return "开启后「提取所有分片的笔记」产物不再附跳转原文的星号链接";
+            case "zh_CHT": return "開啟後「提取所有分片的筆記」產物不再附跳轉原文的星號鏈接";
+            case "en_US":
+            default: return "Extract-all results no longer get the asterisk links jumping back to source blocks";
+        }
+    }
     public get tip设置dailycard() {
         switch (this.lang) {
             case "zh_CN": return "摘抄落进当天日记的 dailycard 目录，默认落 prog-data 书摘抄夹";

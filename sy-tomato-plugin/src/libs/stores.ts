@@ -974,6 +974,9 @@ export const flashcardAddOriginRef = settingFactory("flashcardAddOriginRef", tru
 export const flashcardMultipleLnks = settingFactory("flashcardMultipleLnks", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const digestNoBacktraceLink = settingFactory("digestNoBacktraceLink", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const pieceNoBacktraceLink = settingFactory("pieceNoBacktraceLink", true, STORAGE_Prog_SETTINGS, null as TSK);
+// need-0926-01 □2 提取全部回链开关：同族第三枚但默认 false=带链接（现状 addHref=true
+// 行为零迁移）；□3 接线 extractAllNotes 读它门控装配 withHref
+export const extractAllNoBacktraceLink = settingFactory("extractAllNoBacktraceLink", false, STORAGE_Prog_SETTINGS, null as TSK);
 export const ProgressiveStart2learn = settingFactory("ProgressiveStart2learn", true, STORAGE_Prog_SETTINGS, null as TSK);
 export const ProgressiveJumpMenu = settingFactory("ProgressiveJumpMenu", false, STORAGE_Prog_SETTINGS, null as TSK);
 // □8期4 移动端选块三钮开关（2026-09-09 发版前 P1 拍板补）：默认开；关=Progressive.ts

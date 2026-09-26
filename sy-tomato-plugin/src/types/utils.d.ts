@@ -203,6 +203,7 @@ type TomatoSettings = {
     revTraceScope: string,
     pieceNoBacktraceLink: boolean,
     digestNoBacktraceLink: boolean,
+    extractAllNoBacktraceLink: boolean,
     flashcardNotebook: string,
     windowOpenStyle: string,
     flashcardMultipleLnks: boolean,
