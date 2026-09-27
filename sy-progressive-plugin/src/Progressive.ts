@@ -25,6 +25,7 @@ import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
 import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, gateFallbackPoint, rollerTodayGate, rollerTodaysFullIDs, activeFullIDs, manualFirstExcerptGuide } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { pieceHasChildDocs } from "./pieceGuard";
+import { DOC_NOTES_KEY } from "./noteAssembly";
 import { notifyFleetChanged } from "./fleetNotify";
 import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadCurve, guardUndoReadCard, initReadCurveTriggers, removeFromReadingCurve, resolveReadMenuTarget, retirePieceCard, sweepReadCurve } from "./readCurve";
 import { openReadCardMenu } from "./readCardMenu";
@@ -49,6 +50,7 @@ import { fetchWritingPieces, pickWritingDispatch, listWritingSlotTargets, insert
 import { parseEngineProgressLine, type PoolBatchMode, type PoolBatchOutcome } from "./digestBatchPool";
 import { fetchWritingTreeSlots } from "./writeTree";
 import { escapeHtml } from "./progData";
+import { slotTreePanelItem } from "./slotTreeMenu";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
 import { pieceRowsNoneInsertable, pieceUnbuildable } from "./pieceEmpty";
@@ -477,6 +479,11 @@ class Progressive {
             elements
                 .filter(e => e.getAttribute && e.querySelectorAll)
                 .filter((e: HTMLElement) => !e.getAttribute(RefIDKey))
+                // need-0926-02：底部提取产物（custom-doc-notes 标记的 list/空段）不补挂
+                // progref——此前产物插入被当"片内新写块"继承邻近 ref+pidx，用户按帮助
+                // 文档改「分片笔记」CSS 会连提取产物一起染（0926 陆杰反馈：改分片笔记色
+                // 实际染的是提取笔记）。产物本就该保持默认色（cloneStream 剥 progref）。
+                .filter((e: HTMLElement) => !e.getAttribute(DOC_NOTES_KEY))
                 .filter((e: HTMLElement) => {
                     const a = e.getAttribute(DATA_TYPE);
                     return a == BlockNodeEnum.NODE_PARAGRAPH
@@ -936,8 +943,10 @@ class Progressive {
     }
 
     /** □4④ 本书槽列表（浮条「本书槽」格；progtree □1 树形版）：fetchWritingTreeSlots
-     *  全槽（含定稿、嵌套子槽缩进+树序号）→ Menu 行点击直达（同 gotoWritingSlotPage
-     *  语义：setActivePoint+开文档，纯导航不计数）。槽名=用户文档标题须转义 */
+     *  全槽（含定稿、嵌套子槽+树序号）→ Menu 行点击直达（同 gotoWritingSlotPage
+     *  语义：setActivePoint+开文档，纯导航不计数）。槽名=用户文档标题须转义。
+     *  need-0926-06：全槽平铺 → 槽树面板（默认只开第一层/折叠按书记忆/一键收回/
+     *  顶部搜索过滤，三处同构构造器 slotTreeMenu.slotTreePanelItem） */
     async openWritingSlotList(ev: { clientX: number; clientY: number }, bookID: string, currentDocID?: string) {
         const pieces = await fetchWritingPieces(bookID);
         if (pieces.length === 0) {
@@ -949,26 +958,27 @@ class Progressive {
         const menu = new Menu("progWritingSlotList");
         menu.addItem({ label: `<span style="font-weight:600">${escapeHtml(tomatoI18n.本书N槽M定稿(pieces.length, doneSet.size))}</span>` });
         menu.addSeparator();
-        for (const s of slots) {
-            const cur = s.docID === currentDocID;
-            menu.addItem({
-                label: escapeHtml(`${"　".repeat(s.depth)}#${s.point + 1} ${slotNameFromTitle(s.title)}`)
-                    + (doneSet.has(s.docID) ? ` · ${tomatoI18n.已定稿槽}` : "")
-                    + (cur ? ` · ${tomatoI18n.当前槽}` : ""),
-                click: () => {
-                    void (async () => {
-                        debugLog("wnav", `slotlist book=${bookID} -> point#${s.point} depth=${s.depth} doc=${s.docID}`, "progressive");
-                        await progStorage.setActivePoint(bookID, s.point);
-                        events.setDocID(s.docID);
-                        await OpenSyFile2(this.plugin, s.docID);
-                    })();
-                },
-            });
-        }
-        setTimeout(() => menu.open({
-            x: ev.clientX > 0 ? ev.clientX : innerWidth / 2,
-            y: ev.clientY > 0 ? ev.clientY : innerHeight / 2,
-        }), 0);
+        menu.addItem(slotTreePanelItem({
+            bookID,
+            slots: slots.map(s => ({ point: s.point, docID: s.docID, title: slotNameFromTitle(s.title), depth: s.depth, parentID: s.parentID })),
+            showIndex: true,
+            rowBadge: s => (doneSet.has(s.docID) ? ` · ${escapeHtml(tomatoI18n.已定稿槽)}` : "")
+                + (s.docID === currentDocID ? ` · ${escapeHtml(tomatoI18n.当前槽)}` : ""),
+            onPick: s => {
+                void (async () => {
+                    debugLog("wnav", `slotlist book=${bookID} -> point#${s.point} depth=${s.depth} doc=${s.docID}`, "progressive");
+                    await progStorage.setActivePoint(bookID, s.point);
+                    events.setDocID(s.docID);
+                    await OpenSyFile2(this.plugin, s.docID);
+                })();
+            },
+            closeMenu: () => menu.close(),
+        }));
+        // 视口边界 clamp（openBatchSlotMenu 同款——内核 Menu.open 无边界处理；浮条常驻屏底 y 大，槽多书面板高会溢出裁切）
+        const estH = Math.min(Math.max(160, slots.length * 28 + 76), Math.round(innerHeight * 0.7));
+        const sx = Math.min(Math.max(8, ev.clientX > 0 ? ev.clientX : innerWidth / 2), innerWidth - 240);
+        const sy = Math.min(Math.max(8, ev.clientY > 0 ? ev.clientY : innerHeight / 2), innerHeight - estH - 8);
+        setTimeout(() => menu.open({ x: sx, y: sy }), 0);
     }
 
     /** ⏸/⚠ 书的统一处理：闭笔记本=提示开箱恢复（书可能只是暂不可见，绝不清理）；
@@ -2059,10 +2069,12 @@ class Progressive {
         for (const t of targets) {
             menu.addItem({
                 label: escapeHtml(t.name),
-                submenu: t.slots.map(s => ({
-                    // progtree □1 树形：子槽按 depth 全角空格缩进（平铺展开序=树序）
-                    label: escapeHtml("　".repeat(s.depth) + s.title),
-                    click: async () => {
+                // need-0926-06：全槽平铺 → 槽树面板（与 openSlotMenuCommon/openWritingSlotList
+                // 同构，折叠/搜索/记忆/收回共用）；无槽空书 submenu 空序（原同）
+                submenu: t.slots.length === 0 ? [] : [slotTreePanelItem({
+                    bookID: t.bookID,
+                    slots: t.slots,
+                    onPick: async s => {
                         // Menu click 自带兜底纪律（openSlotMenuCommon 同款：内核不接 promise）
                         settledByClick = true;
                         try {
@@ -2092,7 +2104,8 @@ class Progressive {
                             settle(null);
                         }
                     },
-                })),
+                    closeMenu: () => menu.close(),
+                })],
             });
         }
         menu.open({ x: bx, y: by });
@@ -2152,10 +2165,13 @@ class Progressive {
             }));
             menu.addItem({
                 label: escapeHtml(t.name),
-                submenu: [...poolMenu, ...t.slots.map(s => ({
-                    // progtree □1 树形：子槽按 depth 全角空格缩进（平铺展开序=树序）
-                    label: escapeHtml("　".repeat(s.depth) + s.title),
-                    click: async () => {
+                // need-0926-06：槽列表平铺 → 槽树面板（与 openBatchSlotMenu/
+                // openWritingSlotList 同构：折叠按书记忆+一键收回+搜索过滤）；池项仍为
+                // 原生 submenu 项（自关菜单语义不变），面板挂其后；无槽空书=池项独占
+                submenu: [...poolMenu, ...(t.slots.length === 0 ? [] : [slotTreePanelItem({
+                    bookID: t.bookID,
+                    slots: t.slots,
+                    onPick: async s => {
                         // 思源 Menu click 既不 catch 也不接 promise——入槽动作自带
                         // 兜底（reasoning P1-1：内核 Menu.ts 丢弃 async click 的
                         // rejection，胶囊链失败=零 toast 静默）
@@ -2169,7 +2185,8 @@ class Progressive {
                             await siyuan.pushMsg(tomatoI18n.插入素材失败请重试, 2500);
                         }
                     },
-                }))],
+                    closeMenu: () => menu.close(),
+                })])],
             });
         }
         menu.open({ x: mx, y: my });

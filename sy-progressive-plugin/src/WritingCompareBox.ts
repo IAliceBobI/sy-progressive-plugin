@@ -1,5 +1,5 @@
 import { IProtyle, Plugin } from "siyuan";
-import { getAttribute, isValidNumber, parseIAL, setAttribute, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
+import { getAttribute, isValidNumber, parseIAL, siyuan, } from "../../sy-tomato-plugin/src/libs/utils";
 import { findAllInOneKeyDoc, findKeysDoc, findNewBookDoc, getAllInOneKeyDoc, getHPathByDocID, getKeysDoc, getNewBookDoc, isProtylePiece, pieceFilterSQL } from "./helper";
 import { fetchWritingPieces } from "./writeBook";
 import { progStorage } from "./ProgressiveStorage";
@@ -16,8 +16,9 @@ import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { into } from "stonev5-utils";
 import { lockWithLease } from "./lockLease";
 import {
-    buildNoteUnits, childrenToStream, cloneStream, filterStream, pickPieceNotes,
-    DOC_NOTES_KEY, StreamBlock,
+    buildNoteUnits, childrenToStream, cloneStream, deepContentBlocks, filterStream,
+    flattenProductChildren, isEmptyPara, isVisitNoteBlock, pickPieceNotes,
+    DOC_NOTES_KEY, KEY_NOTE_KEY, StreamBlock,
 } from "./noteAssembly";
 
 export const WC提取所有分片的笔记 = winHotkey("⌘F4", "提取所有分片的笔记", "iconCopy", () => tomatoI18n.提取所有分片的笔记, true) // □14 收费门恢复（提取整理族，Pro）
@@ -146,7 +147,9 @@ class WritingCompareBox {
         const { root } = await getDocBlocks(docInfo.docID, docInfo.name, true, true, 1);
         const lastID = await siyuan.getDocLastID(docInfo.docID)
         const stream = cloneStream(filterStream(childrenToStream(root.children), { noteOnly: true }));
-        const units = buildNoteUnits(stream, { withHref: true, markAttr: [DOC_NOTES_KEY, "1"] });
+        // noteHeadAttr（need-0926-02）：底部产物同挂 key-note——「提取的笔记」CSS 对三路
+        // 提取产物（keys/底部/提取全部）统一生效，不再是 keys 独享
+        const units = buildNoteUnits(stream, { withHref: true, markAttr: [DOC_NOTES_KEY, "1"], noteHeadAttr: [KEY_NOTE_KEY, "1"] });
         const ops = units.length > 0
             ? siyuan.transInsertBlocksBefore(units.map(u => u.outerHTML), lastID)
             : [];
@@ -190,7 +193,7 @@ class WritingCompareBox {
             const picked = pickPieceNotes(childrenToStream(doc?.root?.children ?? []), { noteOnly: true });
             return cloneStream(picked.stream);
         });
-        const units = buildNoteUnits(stream, { withHref: !extractAllNoBacktraceLink.get() });
+        const units = buildNoteUnits(stream, { withHref: !extractAllNoBacktraceLink.get(), noteHeadAttr: [KEY_NOTE_KEY, "1"] });
 
         let keysDocID = await findAllInOneKeyDoc(bookID);
         if (!keysDocID) {
@@ -299,36 +302,64 @@ class WritingCompareBox {
         const picked = pickPieceNotes(childrenToStream(pieceDoc?.root?.children ?? []), { noteOnly: true });
         const stream = cloneStream(picked.stream);
 
-        // keys 文档散块保全：pidx 块=旧笔记（丢弃，由重提取产物替换），其后无 pidx
-        // 块=用户补充（clone 后 splice 回流中对应笔记之后——装配分组挂进同单元）
+        // keys 文档散块保全：pidx 块=旧笔记/片内续写补充（一律丢弃——片流每轮自带，
+        // 旧版 noteMap 同语义），visit-note 留言=片源 custom 块（片流自带）同跳过；
+        // 无 pidx 普通块=用户补充（clone 后挂回流对应笔记单元）。
+        // 0926 尾巴修复：顶层 List（v3.30.0 起产物=list 单元，容器无 pidx）不展开则
+        // extras 恒空=二轮提取用户补充全丢（dev 实测）——flattenProductChildren 统一
+        // 展开（旧平级/v3.30.0 list/嵌套子列表三形态归一）；反之展开后若把片源克隆
+        // （带 pidx/留言）也回收，与片流叠加逐轮翻倍（dev 两轮实测），故双刀跳过。
+        // need-0926-05 留言排上方：产物里用户补充物理序在笔记**前**（li 子列表置前/
+        // 直出裸平铺前置），curIdx 尚空（首笔记前）时先攒缓冲挂到下一个 pidx——
+        // 旧 !curIdx continue 会把前置补充整体丢掉（首单元补充二轮全丢）
         const keysDoc = await getDocBlocks(keysDocID, "", true, false, 1);
         const extras = new Map<string, HTMLElement[]>();
         let curIdx = "";
+        let pendings: HTMLElement[] = [];
         for (const c of keysDoc?.root?.children ?? []) {
-            const pidx = getAttribute(c.div, PARAGRAPH_INDEX);
-            if (pidx) {
-                curIdx = pidx;
-                continue;
+            for (const block of flattenProductChildren(c.div)) {
+                // 深展开到内容块叶子：装配层写入的留言子列表容器无 pidx，整容器
+                // 回收会连其内片源克隆（pidx/visit-note 刀滤不到容器内部）一起
+                // 回流=与片流叠加逐轮翻倍（dev 三轮实测）
+                for (const div of deepContentBlocks(block)) {
+                    if (isEmptyPara(div)) continue;
+                    const pidx = getAttribute(div, PARAGRAPH_INDEX);
+                    if (pidx) {
+                        curIdx = pidx;
+                        if (pendings.length > 0) {
+                            const arr = extras.get(pidx) ?? [];
+                            arr.push(...pendings);
+                            pendings = [];
+                            extras.set(pidx, arr);
+                        }
+                        continue;
+                    }
+                    if (isVisitNoteBlock(div)) continue;
+                    const cloned = cloneStream([{ div, srcID: "" }])[0].div;
+                    if (!curIdx) { pendings.push(cloned); continue; } // 首笔记前散块=前置补充形态
+                    const arr = extras.get(curIdx) ?? [];
+                    arr.push(cloned);
+                    extras.set(curIdx, arr);
+                }
             }
-            if (!curIdx) continue; // 首笔记前的散块（旧 noteMap 同语义丢弃）
-            const arr = extras.get(curIdx) ?? [];
-            arr.push(cloneStream([{ div: c.div, srcID: "" }])[0].div);
-            extras.set(curIdx, arr);
         }
+        // extras 回流：每 pidx 段只插一次（首现**前**）——同 pidx 连续块（片内续写
+        // 补充）会逐块触发插装，旧产物补充被复制多份（dev 验收实测）；pidx 交替=
+        // 就近挂首段。插在笔记前=留言/补充排上方形态（need-0926-05），装配层分组
+        // 前向归属挂该笔记单元（产物往返不动点）
         const merged: StreamBlock[] = [];
+        const consumed = new Set<string>();
         for (const b of stream) {
-            merged.push(b);
             const pidx = getAttribute(b.div, PARAGRAPH_INDEX);
-            if (pidx) {
+            if (pidx && !consumed.has(pidx)) {
+                consumed.add(pidx);
                 for (const div of extras.get(pidx) ?? []) merged.push({ div, srcID: "" });
             }
+            merged.push(b);
         }
-        // keys 笔记样式标记（index.scss 消费）：pidx 块=笔记本体
-        merged.forEach(b => {
-            if (getAttribute(b.div, PARAGRAPH_INDEX)) setAttribute(b.div, "custom-prog-key-note", "1");
-        });
-
-        const units = buildNoteUnits(merged, { withHref: true });
+        // keys 笔记样式标记收进装配层（noteHeadAttr）：首块=笔记本体、续写补充不挂，
+        // 分组判据单一事实源；need-0926-02 起提取到底/提取全部同款挂（见 noteAssembly）
+        const units = buildNoteUnits(merged, { withHref: true, noteHeadAttr: [KEY_NOTE_KEY, "1"] });
         await siyuan.clearAll(keysDocID);
         await siyuan.insertBlocksAsChildOf(units.map(u => u.outerHTML), keysDocID);
         OpenSyFile2(this.plugin, keysDocID, "front");

@@ -18,23 +18,16 @@ body.prog-card-path-on .protyle-wysiwyg div[custom-ref-hpath]:not([custom-origin
   padding-left: 15px;
 }
 
-// note in pieces / key note
-// 政策：笔记染色必须用官方 b3 变量——明暗两主题各自适配（daylight #8a4f00 / midnight
-// rgb(255,213,153) 实测），第三方主题覆盖 b3 变量即自动跟随；勿改硬编码色值。
-// 原文块保持无色彩修饰（□11.1 双色已退役）。
-.protyle-wysiwyg div[custom-progref][custom-paragraph-index]:not([custom-prog-origin-text]):not([custom-prog-key-note]):not([custom-prog-key-no-color]) {
-  color: var(--b3-font-color2);
-}
-
 // □11.1「片内双色」已于 2026-08-30 随用户实测反馈退役：原文块灰显（--b3-font-color2 在
 // daylight 实渲为棕色）+ 原文块尾打字继承 custom-prog-origin-text 跟着变色 → 笔记与原文
 // 同色没法分清。用户拍板回归「原文不做任何色彩修饰」的老形态（.prog-piece-live 类与
 // ProgressiveBtn 挂类逻辑一并移除，git 历史可寻回）。
 
-// key note
-.protyle-wysiwyg div[custom-prog-key-note]:not([custom-prog-key-no-color]) {
-  color: var(--b3-font-color2);
-}
+// need-0926-02：片内笔记（custom-progref+paragraph-index）与提取笔记（custom-prog-key-note）
+// 的**默认染色一并退役**——此前两条 color:var(--b3-font-color2) 规则与帮助文档「v3.0.0 起
+// 片内不做任何色彩修饰、原文与手写笔记同为默认色」直接矛盾（用户没自定义 CSS 笔记也变色，
+// 0926 陆杰反馈实锤）。属性选择器保留给用户 CSS 片段（帮助文档「用 CSS 自定义笔记颜色」），
+// 默认零注入=默认全默认色；key-no-color 语义不变（套了 CSS 后个别块退出染色）。
 
 // last block of the previous piece
 .protyle-wysiwyg div[custom-prog-piece-previous] {
@@ -2393,6 +2386,96 @@ button.prog-tailcard__chip:hover {
 .prog-slot-menu.b3-menu:not(.b3-menu--sheet):not(.b3-menu--fullscreen) .b3-menu__item.b3-menu__item--current:not(.b3-menu__item--readonly),
 .prog-slot-menu.b3-menu:not(.b3-menu--sheet):not(.b3-menu--fullscreen) .b3-menu__item.b3-menu__item--show {
     background-color: var(--b3-list-hover);
+}
+
+/* need-0926-06 槽树面板（三处同构：本书槽菜单/批量入槽/入槽菜单——顶搜索框+收回钮+
+   折叠树行）。type:"empty" item 容器是裸 div，全部自管样式；宿主皮肤（prog-slot-menu/
+   commonMenu）下以主题变量取色，暗色随主题自动（3.8.3 暗色判据在 html 变量层，无需分叉） */
+.prog-slot-tree {
+    padding: 4px 4px 6px;
+    min-width: 260px;
+    max-width: 420px;
+}
+.prog-slot-tree__bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 2px 6px;
+}
+.prog-slot-tree__search {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 26px;
+    margin: 0;
+    padding: 0 6px;
+    font-size: 12px;
+}
+/* 自管收回钮（b3-button 基类默认主色实心——两态控件坑，弱化态自画：surface 底+主色字） */
+.prog-slot-tree__reset {
+    flex: 0 0 auto;
+    padding: 0 8px;
+    height: 26px;
+    line-height: 24px;
+    font-size: 12px;
+    border-radius: var(--b3-border-radius-b, 4px);
+    border: 1px solid var(--b3-border-color);
+    background-color: var(--b3-theme-surface);
+    color: var(--b3-theme-on-surface);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.prog-slot-tree__reset:hover {
+    background-color: var(--b3-list-hover);
+}
+.prog-slot-tree__rows {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.prog-slot-tree__row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding-right: 8px;
+    border-radius: var(--b3-border-radius-b, 4px);
+    cursor: pointer;
+    box-sizing: border-box;
+}
+.prog-slot-tree__row:hover {
+    background-color: var(--b3-list-hover);
+}
+.prog-slot-tree__toggle {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--b3-theme-on-surface);
+}
+.prog-slot-tree__arrow {
+    width: 10px;
+    height: 10px;
+    color: var(--b3-theme-on-surface);
+    opacity: 0.6;
+    transition: transform 0.1s ease-out;
+}
+.prog-slot-tree__toggle[aria-expanded="true"] .prog-slot-tree__arrow {
+    transform: rotate(90deg);
+}
+/* 叶槽占位（对齐缩进恒定，箭头区留白不响应） */
+.prog-slot-tree__toggle--leaf {
+    pointer-events: none;
+}
+.prog-slot-tree__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 26px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 // ============================================================

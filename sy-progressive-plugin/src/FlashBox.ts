@@ -5,7 +5,7 @@ import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import * as gconst from "../../sy-tomato-plugin/src/libs/gconst";
 import { getCardsDoc, getHPathByDocID } from "./helper";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
-import { domNewLine, DomSuperBlockBuilder, getSpans } from "../../sy-tomato-plugin/src/libs/sydom";
+import { domNewLine, DomSuperBlockBuilder, getSpans, wrapOrphanListItems } from "../../sy-tomato-plugin/src/libs/sydom";
 import { getDocTracer, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { cardLanding, cardContextMenu, flashcardAddOriginRef, flashcardAddRefs, flashcardNotebook, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
@@ -343,6 +343,10 @@ class FlashBox {
             div.removeAttribute("custom-prog-words")
             div.removeAttribute("custom-ai-response")
         }
+        // need-0926-04：fine 拖蓝部分覆盖列表会收出裸 NodeListItem——直接进 sb=内核
+        // 结构校验拒（TxErrCodeReloadUI 整页刷新，段落+列表混选制卡三入口必现闪退，
+        // 6807 实测拒因行 in档）。清属性后包壳（壳内 li 已清完，顺序不可换）
+        divs = wrapOrphanListItems(divs);
 
         const builder = new DomSuperBlockBuilder();
         builder.setAttr("custom-super-card-box", "1");
