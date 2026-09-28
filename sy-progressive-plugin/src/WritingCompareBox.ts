@@ -7,7 +7,7 @@ import { getBookIDByBlock } from "../../sy-tomato-plugin/src/libs/progressive";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { DATA_NODE_ID, PARAGRAPH_INDEX, PROG_ORIGIN_TEXT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { getDocBlocks, OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { windowOpenStyle, extractAllNoBacktraceLink } from "../../sy-tomato-plugin/src/libs/stores";
+import { windowOpenStyle, extractAllNoBacktraceLink, extractNoteNoBacktraceLink, extractNoteNoBlankLine } from "../../sy-tomato-plugin/src/libs/stores";
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { DomParaBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
@@ -134,10 +134,10 @@ class WritingCompareBox {
 
     // v5 □7：提取/整理族入口收进浮条 [+] 高级功能 + 命令面板（右键菜单退役），方法转 public 供浮条调用
 
-    /** 提取笔记到底部（⇧⌥R）need-0926-01 新装配：一笔记一单元（无序列表）+条间空段+
-     *  星号行尾；产物=list+空段交替序列，全部挂 custom-doc-notes（删旧=删所有带标记块，
-     *  旧格式 sb 同判据通吃）。尾卡/空段/previous 块随统一净化滤除（旧版漏滤 previous
-     *  顺手修正——片首复述辅助块不是笔记）。 */
+    /** 提取笔记到底部（⇧⌥R）need-0926-01 新装配：一笔记一单元；**need-0927-04 全块型
+     *  原样直出**——单元每块独立挂 custom-doc-notes（删旧=删所有带标记块，旧格式 sb/list
+     *  同判据通吃），条间空段同标记（blankLine 开关可关）。尾卡/空段/previous 块随统一
+     *  净化滤除（旧版漏滤 previous 顺手修正——片首复述辅助块不是笔记）。 */
     async extractNotes2bottom(protyle: IProtyle) {
         siyuan.pushMsg(tomatoI18n.提取笔记到底部, 1000);
         const docInfo = events.getInfo(protyle);
@@ -148,8 +148,14 @@ class WritingCompareBox {
         const lastID = await siyuan.getDocLastID(docInfo.docID)
         const stream = cloneStream(filterStream(childrenToStream(root.children), { noteOnly: true }));
         // noteHeadAttr（need-0926-02）：底部产物同挂 key-note——「提取的笔记」CSS 对三路
-        // 提取产物（keys/底部/提取全部）统一生效，不再是 keys 独享
-        const units = buildNoteUnits(stream, { withHref: true, markAttr: [DOC_NOTES_KEY, "1"], noteHeadAttr: [KEY_NOTE_KEY, "1"] });
+        // 提取产物（keys/底部/提取全部）统一生效，不再是 keys 独享；need-0927-04：全块型
+        // 原样直出（装配层内聚），星号/条间空行走楼20 拍板两开关，标记随每块挂
+        const units = buildNoteUnits(stream, {
+            withHref: !extractNoteNoBacktraceLink.get(),
+            markAttr: [DOC_NOTES_KEY, "1"],
+            noteHeadAttr: [KEY_NOTE_KEY, "1"],
+            blankLine: !extractNoteNoBlankLine.get(),
+        });
         const ops = units.length > 0
             ? siyuan.transInsertBlocksBefore(units.map(u => u.outerHTML), lastID)
             : [];
@@ -193,7 +199,13 @@ class WritingCompareBox {
             const picked = pickPieceNotes(childrenToStream(doc?.root?.children ?? []), { noteOnly: true });
             return cloneStream(picked.stream);
         });
-        const units = buildNoteUnits(stream, { withHref: !extractAllNoBacktraceLink.get(), noteHeadAttr: [KEY_NOTE_KEY, "1"] });
+        // need-0927-04 全块型直出（装配层内聚）；星号沿用本链路自有开关（need-0926-01
+        // □2），条间空行走楼20 拍板新开关
+        const units = buildNoteUnits(stream, {
+            withHref: !extractAllNoBacktraceLink.get(),
+            noteHeadAttr: [KEY_NOTE_KEY, "1"],
+            blankLine: !extractNoteNoBlankLine.get(),
+        });
 
         let keysDocID = await findAllInOneKeyDoc(bookID);
         if (!keysDocID) {
@@ -226,11 +238,12 @@ class WritingCompareBox {
         const out: HTMLElement[] = [];
         docs.forEach((doc, i) => {
             if (i > 0) out.push(new DomParaBuilder().build());
-            const stream = cloneStream(filterStream(childrenToStream(doc?.root?.children ?? [])));
-            out.push(...buildNoteUnits(stream, {
-                withHref: false,
-                passthrough: d => !!getAttribute(d, PROG_ORIGIN_TEXT),
-            }));
+        const stream = cloneStream(filterStream(childrenToStream(doc?.root?.children ?? [])));
+        out.push(...buildNoteUnits(stream, {
+            withHref: false,
+            passthrough: d => !!getAttribute(d, PROG_ORIGIN_TEXT),
+            blankLine: !extractNoteNoBlankLine.get(),
+        }));
         });
 
         let newBookID = await findNewBookDoc(realBookID);
@@ -278,7 +291,8 @@ class WritingCompareBox {
      *  优先=修「提取到底的笔记被再次提取」重复面；尾卡滤除）；keys 文档已有内容保全
      *  （noteMap 语义迁新形态：pidx 块=旧笔记丢弃重提取、其后无 pidx 散块=用户补充
      *  clone 后挂回对应笔记单元——DOM 通道保格式，旧版 SQL content 列纯文本丢格式顺
-     *  手修正）；星号行尾恒带（陆杰帖文点名）；key-note 样式标记挂笔记块。 */
+     *  手修正）；**need-0927-04 全块型原样直出**（留言独立块+载荷去重+标记随每块挂）；
+     *  星号行尾默认带（陆杰帖文点名，楼20 起开关可关）；key-note 样式标记随每块挂。 */
     async extractNotes(pieceID: string, notebookId: string, markKey: string) {
         if (!pieceID || !notebookId || !markKey) return;
         siyuan.pushMsg("extract notes")
@@ -357,9 +371,13 @@ class WritingCompareBox {
             }
             merged.push(b);
         }
-        // keys 笔记样式标记收进装配层（noteHeadAttr）：首块=笔记本体、续写补充不挂，
-        // 分组判据单一事实源；need-0926-02 起提取到底/提取全部同款挂（见 noteAssembly）
-        const units = buildNoteUnits(merged, { withHref: true, noteHeadAttr: [KEY_NOTE_KEY, "1"] });
+        // keys 笔记样式标记收进装配层（noteHeadAttr）：need-0927-04 起随单元每块挂
+        // （颜色均匀命中），分组判据单一事实源；全块型原样直出+星号/条间空行开关在装配层
+        const units = buildNoteUnits(merged, {
+            withHref: !extractNoteNoBacktraceLink.get(),
+            noteHeadAttr: [KEY_NOTE_KEY, "1"],
+            blankLine: !extractNoteNoBlankLine.get(),
+        });
         await siyuan.clearAll(keysDocID);
         await siyuan.insertBlocksAsChildOf(units.map(u => u.outerHTML), keysDocID);
         OpenSyFile2(this.plugin, keysDocID, "front");

@@ -11,6 +11,8 @@
         digestLanding,
         digestNoBacktraceLink,
         extractAllNoBacktraceLink,
+        extractNoteNoBacktraceLink,
+        extractNoteNoBlankLine,
         markOriginTextBG,
         materialCapsuleBorder,
         writingPoolUnderBook,
@@ -73,6 +75,28 @@
             bind:checked={$extractAllNoBacktraceLink}
         />
         <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置提取回溯}>{tomatoI18n.提取全部不加入回溯链接}</span>
+    </div>
+
+    <!-- need-0927-04 楼20 拍板①星号回链开关化：提取到底（⇧⌥R）/提取笔记（⌘F5）两链路
+         此前硬编码恒带，现读 extractNoteNoBacktraceLink 自由选择（默认关=星号在零迁移；
+         提取全部走上面自己的开关） -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$extractNoteNoBacktraceLink}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置笔记回溯}>{tomatoI18n.提取笔记不加入回溯链接}</span>
+    </div>
+
+    <!-- need-0927-04 楼20 拍板②条间空行开关：默认关=条间加空行（现状零迁移）；开=紧凑 -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$extractNoteNoBlankLine}
+        />
+        <span class="b3-tooltips b3-tooltips__n" aria-label={tomatoI18n.tip设置条间空行}>{tomatoI18n.提取笔记条间不空行}</span>
     </div>
 
     <div>
