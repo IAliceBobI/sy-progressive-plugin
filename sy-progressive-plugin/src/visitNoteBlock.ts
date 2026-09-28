@@ -8,10 +8,21 @@
 export const VISIT_NOTE_BLOCK_TYPE = "visit-note";
 export const VISIT_NOTE_FENCE = ";;;sy-progressive-plugin/visit-note";
 
-export interface VisitNoteData { v: 1; text: string; ts: number; }
+export interface VisitNoteData {
+    v: 1; text: string;
+    /** 留言落块时刻，**毫秒**（生产侧唯一入口 appendVisitNote 默认 Date.now()；渲染层
+     *  对 <1e12 的秒语义外部值容错 ×1000——1e12=2001-09-09 毫秒界，秒/毫秒完美分界） */
+    ts: number;
+}
 
 export function buildVisitNoteBlockMD(text: string, ts: number): string {
     return `${VISIT_NOTE_FENCE}\n${JSON.stringify({ v: 1, text, ts })}`;
+}
+
+/** ts 归一（毫秒）：生产链恒 Date.now()；外部写入/历史夹具的秒语义（<1e12）×1000，
+ *  0/负值原样透传（渲染层显占位）。归一化进纯函数层=排序/渲染双消费面共用一个口径 */
+export function normalizeVisitNoteTs(ts: number): number {
+    return ts > 0 && ts < 1e12 ? ts * 1000 : ts;
 }
 
 /** 容错解析：坏 JSON/版本不符/字段类型缺失 → null（渲染层显占位）；ts 缺损洗 0 */

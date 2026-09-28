@@ -11,6 +11,7 @@ import { windowOpenStyle, extractAllNoBacktraceLink, extractNoteNoBacktraceLink,
 import { events } from "../../sy-tomato-plugin/src/libs/Events";
 import { DomParaBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { into } from "stonev5-utils";
@@ -212,9 +213,17 @@ class WritingCompareBox {
             const hpath = await getHPathByDocID(bookID, "collection");
             if (hpath) {
                 keysDocID = await getAllInOneKeyDoc(bookID, docInfo.notebookId, hpath);
+            } else {
+                // need-0927 姊妹队列 □6（低频疑案观察项）：hpath 瞬态空疑=链上 SQL 读的
+                // 索引窗空（e2e 首跑静默无产物、二跑正常）——留痕供 Loki 定位，复现可查
+                debugLog("prog.extractAll", `hpath empty book=${bookID} (index-window suspect)`, "progressive");
             }
         }
-        if (!keysDocID) return;
+        // 静默 return → 可读提示（need-0927 □6）：瞬态空重触发即成功；持续失败按 Loki 线索排查
+        if (!keysDocID) {
+            siyuan.pushMsg(tomatoI18n.提取产物定位失败);
+            return;
+        }
         await siyuan.clearAll(keysDocID);
         await siyuan.insertBlocksAsChildOf(units.map(u => u.outerHTML), keysDocID);
         OpenSyFile2(this.plugin, keysDocID, windowOpenStyle.get() as any);

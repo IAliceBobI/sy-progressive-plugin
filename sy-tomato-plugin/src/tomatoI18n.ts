@@ -9511,6 +9511,18 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Extract-all results no longer get the asterisk links jumping back to source blocks";
         }
     }
+    // need-0927 □6（姊妹队列观察项）：提取全部定位失败可读提示（原静默 return 无产物无提示）
+    public get 提取产物定位失败() {
+        switch (this.lang) {
+            case "zh_CN": return "提取产物定位失败，请重试一次；持续失败请反馈";
+            case "zh_CHT": return "提取產物定位失敗，請重試一次；持續失敗請反饋";
+            case "es_ES": return "No se pudo localizar el destino de extracción: reintente; si persiste, repórtelo";
+            case "fr_FR": return "Impossible de localiser la cible d'extraction : réessayez ; si cela persiste, signalez-le";
+            case "ja_JP": return "抽出先の特定に失敗しました。もう一度お試しください。続く場合はご報告ください";
+            case "en_US":
+            default: return "Could not locate the extraction target; please retry once, and report if it persists";
+        }
+    }
     // need-0927-04 楼20 拍板①：提取到底（⇧⌥R）/提取笔记（⌘F5）的星号回链开关 tip
     public get tip设置笔记回溯() {
         switch (this.lang) {

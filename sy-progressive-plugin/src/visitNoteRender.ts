@@ -6,7 +6,7 @@ import { icon } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import type { CustomBlockPlugin } from "./tailCardRender";
-import { VISIT_NOTE_BLOCK_TYPE, parseVisitNoteContent } from "./visitNoteBlock";
+import { VISIT_NOTE_BLOCK_TYPE, parseVisitNoteContent, normalizeVisitNoteTs } from "./visitNoteBlock";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -23,7 +23,7 @@ export function registerVisitNoteRender(plugin: CustomBlockPlugin): void {
                 element.append(card);
                 return;
             }
-            const date = new Date(d.ts);
+            const date = d.ts > 0 ? new Date(normalizeVisitNoteTs(d.ts)) : null;
             const head = document.createElement("div");
             head.className = "prog-vnote__head";
             const label = document.createElement("span");
@@ -34,8 +34,11 @@ export function registerVisitNoteRender(plugin: CustomBlockPlugin): void {
             label.append(document.createTextNode(tomatoI18n.留言()));
             const ds = document.createElement("span");
             ds.className = "prog-vnote__date";
-            // □12 vision P1：倒排（新在上）靠日期读序——只到日则同日卡零区分度，补时分
-            ds.textContent = `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+            // □12 vision P1：倒排（新在上）靠日期读序——只到日则同日卡零区分度，补时分；
+            // ts=0（字段缺损洗值）无时刻语义，显「—」占位——1970-01-01 误导性渲染永不出现（□7）
+            ds.textContent = date
+                ? `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+                : "—";
             head.append(label, ds);
             const body = document.createElement("div");
             body.className = "prog-vnote__text";
