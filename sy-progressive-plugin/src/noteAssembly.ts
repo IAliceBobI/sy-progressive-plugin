@@ -30,7 +30,7 @@
 // data-type="NodeCustomBlock" + data-info=围栏名，2026-09-26）。
 
 import {
-    DATA_TYPE, BlockNodeEnum, CONTENT_EDITABLE, PARAGRAPH_INDEX, WEB_ZERO_SPACE,
+    DATA_TYPE, DATA_NODE_ID, BlockNodeEnum, CONTENT_EDITABLE, PARAGRAPH_INDEX, WEB_ZERO_SPACE,
 } from "../../sy-tomato-plugin/src/libs/gconst";
 import { DomParaBuilder } from "../../sy-tomato-plugin/src/libs/sydom";
 import { add_href, cloneCleanDiv, removeAttribute } from "../../sy-tomato-plugin/src/libs/utils";
@@ -397,14 +397,18 @@ export function childrenToStream(children: Block[]): StreamBlock[] {
 /** 流克隆净化：每块 cloneCleanDiv 换新 id+剥插件标记（pidx 保留=分组依据；
  *  stripAttrs 默认剥 progmark/in-book-index/progref/key-note——进产物无语义，
  *  key-note 由装配层按需重新挂）。顶层 custom 块就地净化（need-0927-04 全直出后
- *  留言/补充都是顶层独立块，无嵌套搬运路径）。 */
+ *  留言/补充都是顶层独立块，无嵌套搬运路径）。need-0929-01 起剥属性下沉到嵌套子块
+ *  （div[data-node-id] 全层）：片内全挂通道（Progressive 块根+后代 div 挂
+ *  progref/pidx）使列表/超级块内层携带溯源属性，只剥顶层=随整树进产物（用户 CSS
+ *  旧配方对残留属性意外部分命中+产物语义污染，陆杰 09-28 复测实锤）。 */
 export function cloneStream(
     stream: StreamBlock[],
     stripAttrs: string[] = ["custom-progmark", "custom-in-book-index", "custom-progref", KEY_NOTE_KEY],
 ): StreamBlock[] {
     return stream.map(b => {
         const { div } = cloneCleanDiv(b.div);
-        stripAttrs.forEach(a => removeAttribute(div, a as AttrKey));
+        [div, ...Array.from(div.querySelectorAll(`div[${DATA_NODE_ID}]`))]
+            .forEach(t => stripAttrs.forEach(a => removeAttribute(t, a as AttrKey)));
         if (isCustomBlock(div)) sanitizeCustomBlock(div);
         return { div, srcID: b.srcID };
     });

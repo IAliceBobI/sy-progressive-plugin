@@ -130,10 +130,7 @@ v3.0.0 起片内不做任何色彩修饰——原文与手写笔记同为默认�
 改变分片笔记的颜色：
 
 ```CSS
-.protyle-wysiwyg div[custom-progref][custom-paragraph-index]
-:not([custom-prog-origin-text])
-:not([custom-prog-key-note])
-:not([custom-prog-key-no-color]) {
+.protyle-wysiwyg div[custom-progref][custom-paragraph-index]:not([custom-prog-origin-text]):not([custom-prog-key-note]):not([custom-prog-key-no-color]) {
     color: rgb(156, 15, 178) !important;
 }
 ```
@@ -141,13 +138,12 @@ v3.0.0 起片内不做任何色彩修饰——原文与手写笔记同为默认�
 给分片笔记加高亮底色（比竖线更好认自己写的笔记，色值改成喜欢的高亮色即可）：
 
 ```CSS
-.protyle-wysiwyg div[custom-progref][custom-paragraph-index]
-:not([custom-prog-origin-text])
-:not([custom-prog-key-note])
-:not([custom-prog-key-no-color]) {
+.protyle-wysiwyg div[custom-progref][custom-paragraph-index]:not([custom-prog-origin-text]):not([custom-prog-key-note]):not([custom-prog-key-no-color]) {
     background-color: rgba(156, 15, 178, 0.15) !important;
 }
 ```
+
+> 写法注意：`:not(...)` 要和前面的块选择器**写在同一层**（如上，可以长一点没关系）——直接命中笔记块本身，颜色继承给块内全部文字，段落、列表、引述、超级块都生效。不要把 `:not(...)` 换行拆到下一行去——CSS 里换行=「找后代」，那种写法只有层级嵌套深的列表能命中，段落这类平铺块染不上。
 
 改变提取的笔记的颜色：
 
