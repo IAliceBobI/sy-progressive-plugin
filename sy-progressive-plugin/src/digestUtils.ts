@@ -449,6 +449,21 @@ export async function queryDigestTree(bookID: string): Promise<DigestTreeData> {
     return { bookName, roots, flat };
 }
 
+/** need-0930-01 摘抄/素材导航首尾循环（纯函数，TDD 见 tests/unit/digestNav.test.ts）：
+ *  digest 态 prev/next 的环绕目标选择——flat=ctime 降序（flat[0]=最新，queryDigestTree
+ *  同源）；step=1（next 更新方向）→ i-1、step=-1（prev 更早方向）→ i+1；边界环绕
+ *  （用户650189 拍板直接跳）：next 到头→最早（末位）、prev 到头→最新（首位），双向
+ *  对称环。单条书环绕目标=自身（target=flat[i]）——调用方判 target 即当前条时不跳、
+ *  只提示「已是最新/最早一条」（保持原行为）。空池/越界返 null 不环绕（调用方已先行
+ *  未找到提示）。 */
+export function digestNeighborWithWrap<T>(flat: T[], i: number, step: 1 | -1): { target: T | null; wrapped: boolean } {
+    const n = flat.length;
+    if (n === 0 || i < 0 || i >= n) return { target: null, wrapped: false };
+    const j = i - step;
+    if (j >= 0 && j < n) return { target: flat[j], wrapped: false };
+    return { target: flat[(j + n) % n], wrapped: true };
+}
+
 // □5 起批注属性模型切换：旧双键退役，改查 custom-tomato-annotations（JSON 数组，
 // 选区=条目有 sel）；行→条目与净化语义在 digestComments.ts 纯函数层（单测锁定）
 export type { BookCommentItem } from "./digestComments";

@@ -25,7 +25,7 @@
     import { progPaid } from "./theme";
     import { collapseFloatBar, expandFloatBar, floatSwapBook, freeFloatOff, progressiveBtnFloating } from "./ProgressiveBtn";
     import { digestProgressiveBox, initDi, digestWholeDoc } from "./DigestProgressiveBox";
-    import { queryDigestTree } from "./digestUtils";
+    import { queryDigestTree, digestNeighborWithWrap } from "./digestUtils";
     import { openFloatPopover, closeFloatPopover } from "./overlays";
     import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
     import { mount, onMount } from "svelte";
@@ -745,7 +745,9 @@
     /** □6 摘抄顺序遍历（digest 态 prev/next，bear 拍板双向纯浏览不删）：同书摘抄
      *  ctime 序线性走，与「全摘抄树」（tree 钮=跳转）互补=池内逐条走。flat 为
      *  ctime 降序（flat[0]=最新，startToLearn 同源）：next=更新的相邻 i-1、
-     *  prev=更早的相邻 i+1；边界 toast 不弹跳。跳转同树钮 jumpTo 通道。 */
+     *  prev=更早的相邻 i+1；need-0930-01 边界改环绕（用户650189 拍板直接跳）：
+     *  到头跳对端+toast 告知去向，单条书环绕目标=自身不跳只提示。跳转同树钮
+     *  jumpTo 通道。 */
     async function jumpDigestNeighbor(step: 1 | -1) {
         const tree = await queryDigestTree($bookID);
         const i = tree.flat.findIndex(n => n.id === $noteID);
@@ -753,13 +755,19 @@
             await siyuan.pushMsg(isMaterialDoc ? tomatoI18n.未找到本条素材 : tomatoI18n.未找到本条摘抄);
             return;
         }
-        const target = tree.flat[i - step];
-        if (!target) {
+        const { target, wrapped } = digestNeighborWithWrap(tree.flat, i, step);
+        if (!target || target.id === $noteID) {
             // matflow □1 素材文档语境：边界 toast 同池两套口径
             await siyuan.pushMsg(step > 0
                 ? (isMaterialDoc ? tomatoI18n.已是最新一条素材 : tomatoI18n.已是最新一条摘抄)
                 : (isMaterialDoc ? tomatoI18n.已是最早一条素材 : tomatoI18n.已是最早一条摘抄));
             return;
+        }
+        if (wrapped) {
+            // 环绕告知去向（need-0930-01）：素材语境同池分叉两套口径
+            await siyuan.pushMsg(step > 0
+                ? (isMaterialDoc ? tomatoI18n.已到最新一条转入最早一条素材 : tomatoI18n.已到最新一条转入最早一条摘抄)
+                : (isMaterialDoc ? tomatoI18n.已到最早一条转入最新一条素材 : tomatoI18n.已到最早一条转入最新一条摘抄));
         }
         void prog.jumpTo(target.id);
     }
@@ -796,6 +804,7 @@
             component: DigestTreePopover,
             props: {
                 bookID: $bookID,
+                currentID: $noteID, // need-0930-02 当前摘抄行高亮
                 onJump: (id: string) => {
                     closeFloatPopover();
                     void prog.jumpTo(id);

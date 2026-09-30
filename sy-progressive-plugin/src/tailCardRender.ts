@@ -160,6 +160,7 @@ const digestActions = (): TailAction[] => [
                     component: DigestTreePopover,
                     props: {
                         bookID,
+                        currentID: d.docID, // need-0930-02 当前摘抄行高亮
                         onJump: (id: string) => {
                             closeFloatPopover();
                             void prog.jumpTo(id);
