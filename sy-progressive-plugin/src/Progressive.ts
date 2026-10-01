@@ -27,6 +27,11 @@ import { invalidateTailToday } from "./tailCardAppend";
 import { pieceHasChildDocs } from "./pieceGuard";
 import { DOC_NOTES_KEY } from "./noteAssembly";
 import { notifyFleetChanged } from "./fleetNotify";
+// need-1001-02：digestDueState（到期摘抄计数 store）——fleet 基座层数据，移动端
+// initFleet 无条件跑（30s 轮活着），开菜单时 get 实时值。fleet 设计上不 import 本模块
+// （防循环依赖），本侧反向单边取数（ts 链无环，BFS 已核；svelte 链环与 Progressive↔组件
+// 既有环同类，均为运行期消费无顶层求值）
+import { digestDueState } from "./fleet";
 import { addToReadingCurve, buildReadingCard, deferSkippedReadCard, disposeReadCurve, guardUndoReadCard, initReadCurveTriggers, removeFromReadingCurve, resolveReadMenuTarget, retirePieceCard, sweepReadCurve } from "./readCurve";
 import { openReadCardMenu } from "./readCardMenu";
 import { cadenceDays, cadenceOpts, plusDays, READCARD_KEY } from "./readCurveCore";
@@ -40,7 +45,7 @@ import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { dailyQuota, mobileSelectBtns, readCurveCadMaterial, readCurveMaterial, readCurveTakeover, pieceAutoCard } from "../../sy-tomato-plugin/src/libs/stores";
 import { addClickEvent, progressiveBtnFloating, yieldFloatbarForMenu, restoreFloatbarAfterMenu } from "./ProgressiveBtn";
-import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { blockIconMenu, cardLanding, flashcardNotebook, piecesmenu, ProgressiveDueMenu, ProgressiveJumpMenu, ProgressiveStart2learn, storeNoteBox_selectedNotebook, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
 import { getDailyCardDocID, getDailyPath } from "./FlashBox";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
 import { findPieceByCandidates, resolveBookID } from "./contentsJump";
@@ -55,6 +60,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from "./bookStatus";
 import { pieceRowsNoneInsertable, pieceUnbuildable } from "./pieceEmpty";
 import { mount, unmount } from "svelte";
+import { get } from "svelte/store";
 import { fullfilContent } from "./helper";
 import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
 import { pressSkip, showCardAnswer } from "../../sy-tomato-plugin/src/libs/cardUtils";
@@ -73,6 +79,12 @@ export const Progressive添加当前文档到渐进阅读分片模式 = winHotke
 // 初选 ⌥⌘O 撞 recite 练靶实锤后弃）、⇧⌥ 仅剩 S 且有 AIBox 关态暗雷（keymap 扫描盲区在案），
 // 落 ⌥;——纯 ⌥ 符号键全 keymap 无占用、无 macOS 系统冲突，与 ⌥-（开始阅读）同族单修饰风格
 export const Progressive直接入槽 = winHotkey("⌥;", "直接入槽", "iconProgMaterial", () => tomatoI18n.直接入槽)
+
+/** need-1001-02：移动端菜单「到期复访」label 拼装——N>0 尾追加 " (N)"，0 条纯词条
+ *  （入口仍显示；DueBell 0 条灰淡常驻同哲学）。纯函数，单测 dueMenuEntry.test 在档 */
+export function dueMenuLabel(n: number): string {
+    return n > 0 ? `${tomatoI18n.到期复访} (${n})` : tomatoI18n.到期复访;
+}
 
 class Progressive {
     plugin: Plugin;
@@ -568,8 +580,9 @@ class Progressive {
         }
     }
 
-    /** 移动端顶栏全屏菜单：加书 + 跳到分片 + 开始学习（□11 盘点：开始学习桌面归火苗，
-     *  移动端无火苗 hover 生态故保留常驻入口；桌面同款能力走右键块菜单+浮条+命令面板） */
+    /** 移动端顶栏全屏菜单：加书 + 跳到分片 + 开始学习 + 到期复访（□11 盘点：开始学习桌面
+     *  归火苗，移动端无火苗 hover 生态故保留常驻入口；桌面同款能力走右键块菜单+浮条+命令
+     *  面板；need-1001-02 增到期复访项——移动端无状态栏，桌面走 ✧ 角标） */
     private addMenu() {
         const menu = new Menu("progressiveMenu");
         menu.addItem({
@@ -595,6 +608,21 @@ class Progressive {
                 accelerator: Progressive开始学习.m,
                 click: () => {
                     this.startToLearnWithLock();
+                }
+            });
+        }
+        // need-1001-02 移动端复访入口：桌面=状态栏 ✧ 角标（DueBell→DueCardFlow），移动端
+        // 无状态栏两入口皆不可达——渐进菜单加项（DueCardFlow Dialog 已 92vw 适配，缺的
+        // 只是入口，用户刘璐 10-01 反馈）；默认开，ProgressiveDueMenu 可关（bear 追加约束）。
+        // 计数=digestDueState（开菜单时 get 实时到期数），0 条不带数字仍显示该项
+        //（DueBell 0 条灰淡常驻同哲学）；click 复用 ThePlugin.openDueCardFlow（FleetActions
+        // .openDueFlow 同款动作面，this.plugin 静态类型是 Plugin 故 as any）
+        if (ProgressiveDueMenu.get()) {
+            menu.addItem({
+                icon: "iconProgSched",
+                label: dueMenuLabel(get(digestDueState)),
+                click: () => {
+                    (this.plugin as any).openDueCardFlow();
                 }
             });
         }

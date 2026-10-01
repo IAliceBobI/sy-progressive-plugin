@@ -12,6 +12,7 @@
         reviewSchedMenu,
         revisitRhythmMenu,
         ProgressiveStart2learn,
+        ProgressiveDueMenu,
         ProgressiveJumpMenu,
         mobileSelectBtns,
     } from "../../sy-tomato-plugin/src/libs/stores";
@@ -118,6 +119,18 @@
         {tomatoI18n.移动端菜单显示开始学习}:
         {Progressive开始学习.langText()}
         <HotkeyCap hk={Progressive开始学习} pluginName="sy-progressive-plugin"></HotkeyCap>
+    </div>
+
+    <!-- need-1001-02：移动端渐进菜单「到期复访」项（桌面入口=状态栏 ✧ 角标，移动端无
+         状态栏两入口皆不可达故菜单补项；默认开。计数 N>0 时随 label 显示） -->
+    <div>
+        <input
+            type="checkbox"
+            class="b3-switch"
+            bind:checked={$ProgressiveDueMenu}
+        />
+        {tomatoI18n.移动端菜单显示到期复访}:
+        {tomatoI18n.到期复访}
     </div>
 
     <!-- □8期4 移动端选块三钮（2026-09-09 发版前 P1 拍板补）：编辑器顶栏 breadcrumb 行的

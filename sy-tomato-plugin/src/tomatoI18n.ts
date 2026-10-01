@@ -8012,6 +8012,15 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Mobile menu shows";
         }
     }
+    // need-1001-02 移动端复访入口：渐进菜单「到期复访」项开关行（照上条开始学习形式）
+    public get 移动端菜单显示到期复访() {
+        switch (this.lang) {
+            case "zh_CN": return "移动端菜单显示";
+            case "zh_CHT": return "行動端選單顯示";
+            case "en_US":
+            default: return "Mobile menu shows";
+        }
+    }
     public get 移动端选块按钮() {
         switch (this.lang) {
             case "zh_CN": return "移动端选块按钮";
