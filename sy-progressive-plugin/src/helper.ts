@@ -13,6 +13,7 @@ import { prog } from "./Progressive";
 import { pieceDocName, pieceAlias, getDocIalWords, getDocIalPieces, parseReachability } from "./progData";
 import { locatePiece, pieceTreeLookup } from "./volIndex";
 import { appendTailCard } from "./tailCardAppend";
+import { listDocsByPathQuiet } from "./listDocsQuiet";
 
 // getDocIalWords 定义已挪 progData.ts（v5 words 进 prog-data，ProgressiveStorage 也要用，避免循环 import）
 export { getDocIalWords };
@@ -169,8 +170,9 @@ export async function bookReachability(bookID: string): Promise<"ok" | "indexing
 
 /** 文件树直查：片名 [NNNNN] 前缀+卷/书壳目录决策（纯逻辑核=pieceTreeLookup）。
  *  候选逐个 IAL 复核（getBlockAttrs 直读不吃索引窗；review P2-1：同目录用户复制的
- *  同名前缀文档不算片，存量双片时取真正在册的那张）。listDocsByPath 走 siyuan.call
- *  直调传 maxListCount:0（tomato 封装无此参；默认 512 用户可改小=巨书越窗静默 miss）。 */
+ *  同名前缀文档不算片，存量双片时取真正在册的那张）。listDocsByPath 走
+ *  listDocsByPathQuiet 容错直调传 maxListCount:0（tomato 封装无此参；默认 512 用户
+ *  可改小=巨书越窗静默 miss；code=-1 空目录=空层不打 p5，need-1001-03）。 */
 async function findPieceDocByTree(info: BookInfo, point: number): Promise<string> {
     try {
         const shell = await siyuan.getBlockInfo(info.bookID).catch(() => null);
@@ -178,7 +180,7 @@ async function findPieceDocByTree(info: BookInfo, point: number): Promise<string
         const shellPath = String((shell as any).path ?? "").replace(/\.sy$/, "");
         const vols = info.dirMode ? await progStorage.loadVolTable(info.bookID) : null;
         const cands = await pieceTreeLookup(shell.box, shellPath, vols, point,
-            (box, path) => siyuan.call("/api/filetree/listDocsByPath", { notebook: box, path, maxListCount: 0 })
+            (box, path) => listDocsByPathQuiet(box, path, { maxListCount: 0 })
                 .then(r => (((r as any)?.files ?? r) as { id: string; name: string }[] | null))
                 .catch(() => null));
         const want = getDocIalPieces(info.bookID, point);

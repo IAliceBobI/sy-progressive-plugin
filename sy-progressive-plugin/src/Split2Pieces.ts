@@ -48,6 +48,7 @@ export async function computePieceIndexVols(
 
 import { progStorage } from "./ProgressiveStorage";
 import { createPiece } from "./helper";
+import { listDocsByPathQuiet } from "./listDocsQuiet";
 import { MarkKey } from "../../sy-tomato-plugin/src/libs/gconst";
 
 // 端到端编排：给定书 + point，跑完整分片流程，返回 noteID。
@@ -75,9 +76,7 @@ export async function listVolIDs(bookID: string): Promise<string[]> {
     const row = await siyuan.sqlOne(`select box,path from blocks where type='d' and id='${bookID}'`);
     if (!row?.box || !row?.path) return [];
     const dir = row.path.endsWith(".sy") ? row.path.slice(0, -3) : row.path;
-    const r = await siyuan.call("/api/filetree/listDocsByPath", {
-        notebook: row.box, path: dir, sort: 15, maxListCount: 0, ignoreMaxListHint: true,
-    });
+    const r = await listDocsByPathQuiet(row.box, dir, { sort: 15, maxListCount: 0, ignoreMaxListHint: true });
     const ids = (((r as any)?.files ?? []).map((f: any) => f?.id).filter(Boolean)) as string[];
     if (ids.length === 0) return [];
     const rows = await siyuan.getRows(ids, "id", false,

@@ -11,6 +11,7 @@ import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { getDocIalPieces, getDocIalDigestDir, getDocIalDigestDirUnder, getDocIalDigestDirHub, getDocIalWords, getDocIalNewBookKey, getDocIalAllInOneKey, getDocIalComposeDoc, freshCreatedIDFor } from "./progData";
 import { parseWritingPieceRows } from "./writeBook";
+import { listDocsByPathQuiet } from "./listDocsQuiet";
 
 /** listDocsByPath 行子集（树拉取只认这四个字段，防响应形态耦合） */
 export interface TreeDocRow {
@@ -98,11 +99,12 @@ export async function writingTreeExcludedIDs(bookID: string): Promise<Set<string
 }
 
 /** listDocsByPath 一层（磁盘直读无索引窗；maxListCount:0=全量防内核默认截断；
- *  path=id 目录形态）。响应兜底两种形态（files 数组/裸数组），失败返 [] */
+ *  path=id 目录形态）。响应兜底两种形态（files 数组/裸数组）；空目录 code=-1=空层
+ *  []（need-1001-03 语义化，不再打 p5），失败返 null */
 export async function fetchDocLayer(box: string, dirPath: string): Promise<TreeDocRow[] | null> {
-    // P1-2：失败（call 吞错返 null/undefined）与空层必须可区分——返回 null 上抛传播，
-    // 防瞬时故障被当「树真不含」误剥标/空槽列表进缓存
-    const resp = await siyuan.call("/api/filetree/listDocsByPath", { notebook: box, path: dirPath, maxListCount: 0 }).catch(() => null);
+    // P1-2：失败与空层必须可区分——返回 null 上抛传播，防瞬时故障被当「树真不含」
+    // 误剥标/空槽列表进缓存
+    const resp = await listDocsByPathQuiet(box, dirPath, { maxListCount: 0 }).catch(() => null);
     if (resp == null) return null;
     const files = ((resp as any)?.files ?? (resp as any) ?? []) as any[];
     return (Array.isArray(files) ? files : [])
