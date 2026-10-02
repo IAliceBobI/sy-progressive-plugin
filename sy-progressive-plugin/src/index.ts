@@ -22,7 +22,7 @@ import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, flashcardShowPath, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, floatbarSlotEntryShow, readCurveSweepMins, readCurveTakeover, pieceAutoCard, readCurveReadingPoint, readCurvePlainDocs,
-    readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, extractAllNoBacktraceLink, extractNoteNoBacktraceLink, extractNoteNoBlankLine, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveDueMenu, userID, userToken, licenseCloudSynced, windowOpenStyle, slotTreeExpanded } from "../../sy-tomato-plugin/src/libs/stores";
+    readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, extractAllNoBacktraceLink, extractNoteNoBacktraceLink, extractNoteNoBlankLine, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveDueMenu, userID, userToken, licenseCloudSynced, claimActive, windowOpenStyle, slotTreeExpanded } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
@@ -73,6 +73,7 @@ function loadStore(plugin: BaseTomatoPlugin) {
     userToken.load(plugin);
     userID.load(plugin);
     licenseCloudSynced.load(plugin);
+    claimActive.load(plugin);
     dailyQuota.load(plugin);
     digestAddReadingpoint.load(plugin);
     digestGlobalSigle.load(plugin);
@@ -271,6 +272,10 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 };
             }
             loadStore(this);
+            // 订单号信任制租约心跳（2026-09-25，tomato index 同款；2026-10-02 降频一天一查）。
+            // 必须在 loadStore 之后——store 未灌值时启动会被「本地无码」守卫误拦（同步段启动
+            // 的旧位即此竞态）
+            startClaimHeartbeat("progressive");
             setGlobal(ProgressivePluginConfig, this.settingCfg)
             return this.settingCfg;
         });
@@ -331,8 +336,6 @@ export default class ThePlugin extends BaseTomatoPlugin {
 
         // 浮条 DOM 直挂 document.body（tomato loadFloatingBall 先例：自挂 DOM 不进 onload 链）
         initProgFloatBtns();
-        // 订单号信任制租约心跳（2026-09-25，tomato index 同款）
-        startClaimHeartbeat("progressive");
     }
 
     /** siyuan383 □3 多端热更：覆盖即自管（未覆盖=内核对他端每条 petal 写入自动整重载）。
