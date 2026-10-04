@@ -413,6 +413,10 @@ const MARK_KEY = "custom-progmark";
 export interface SplitVolsDeps {
     getDocRow(id: string): Promise<{ box: string; path: string; hpath: string; content: string } | null>;
     createDocWithMd(notebook: string, hpath: string, md: string, attr?: Record<string, string>): Promise<string>;
+    /** 磁盘真相通道（/api/filetree/listDocsByPath，无 SQL 索引延迟）：列 notebook 下
+     *  dir 目录一层子文档 id。null=API 失败（调用方按落点失配处理——保守拒，原文
+     *  未动优先于误清空）。□1 卷落点校验专用 */
+    listDocIDs(notebook: string, dir: string): Promise<string[] | null>;
     /** 文件树钉序（全量新序数组提交——新文档默认插顶，不钉则卷序颠倒） */
     sortDocs(notebook: string, paths: string[]): Promise<void>;
     removeDoc(id: string): Promise<void>;
@@ -422,6 +426,10 @@ export interface SplitVolsDeps {
     recheckChildBlocks(id: string): Promise<number>;
     log(msg: string): void;
 }
+
+/** 卷落点失配错误前缀（稳定契约——前端 SplitVolsDialog 依此识别并推 i18n 指引
+ *  toast；kernel 侧原样透出给 MCP 调用方） */
+export const VOL_LANDING_MISMATCH = "splitvols: vol landing mismatch";
 
 /** 切分执行：plan=确认后的卷计划，blockIDs=枚举期原文档顶层块序（清空原料，markdown
  *  拼接的原料），blocksMd=原文全文（备份文档正文）。
@@ -438,8 +446,20 @@ export async function runSplitVols(bookID: string, plan: VolPlan[], blockIDs: st
         volIDs.push(id);
         deps.log(`vol created ${i + 1}/${plan.length} name=${name} id=${id}`);
     }
-    // 新文档默认插顶部：按建卷序钉文件树序（读序=文件树序，颠倒=倒着读）
+    // □1 卷落点校验（数据丢失防线，飞书 2026-10 实锚）：书壳 hpath 首段与内核块树
+    // 失配时 createDocsByHPath 不报错、从笔记本根新建同名「隐形壳」把卷全建进去——
+    // 插件侧建卷「成功」返回后继续清空原书=原文被清空+卷不可达。建完逐卷验落点：
+    // 任一 volID 为空串，或磁盘真相通道列不到该卷 → 立即中止（此时原书未动，零损
+    // 失；已建卷可能在笔记本根部同名文档下可手动移回）。listDocsByPath 直读磁盘无
+    // 索引窗，建卷返回即可见，无竞态。
     const dir = row.path.endsWith(".sy") ? row.path.slice(0, -3) : row.path;
+    const onDisk = await deps.listDocIDs(row.box, dir);
+    const missing = volIDs.filter(id => !id || !onDisk?.includes(id));
+    if (onDisk == null || missing.length > 0) {
+        throw new Error(`${VOL_LANDING_MISMATCH} (original untouched) book=${bookID} box=${row.box} dir=${dir} missing=${missing.join(",")}`);
+    }
+    deps.log(`vol landing verified vols=${volIDs.length} under=${dir}`);
+    // 新文档默认插顶部：按建卷序钉文件树序（读序=文件树序，颠倒=倒着读）
     await deps.sortDocs(row.box, volIDs.map(id => `${dir}/${id}.sy`));
     deps.log(`sort pinned vols=${volIDs.length}`);
     // 原文备份→立即删除=即时可恢复（-delete- 历史；备份带 MarkKey 挂书壳下不进卷枚举）

@@ -7,6 +7,7 @@ import type { SplitVolsDeps } from "./splitCore";
 // ============ 生产侧（真实 siyuan/storage） ============
 import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
+import { listDocsByPathQuiet } from "./listDocsQuiet";
 
 export function splitVolsDeps() {
     return {
@@ -18,6 +19,13 @@ export function splitVolsDeps() {
                 box: String(row.box ?? ""), path: String(row.path ?? ""),
                 hpath: String(row.hpath ?? ""), content: String(row.content ?? ""),
             };
+        },
+        listDocIDs: async (notebook: string, dir: string) => {
+            // 磁盘真相通道：code=-1（空/不存在目录）=files:[] → 不含卷 id=落点失配拦下；
+            // 其余失败 null=同失配（□1 卷落点校验契约，语义见 splitCore）
+            const resp = await listDocsByPathQuiet(notebook, dir, { maxListCount: 0, ignoreMaxListHint: true });
+            if (!resp) return null;
+            return (resp.files ?? []).map(f => String(f?.id ?? ""));
         },
         createDocWithMd: (notebook: string, hpath: string, md: string, attr?: Record<string, string>) =>
             siyuan.createDocWithMd(notebook, hpath, md, "", attr as any),

@@ -160,6 +160,17 @@ function kernelSplitDeps() {
             }
             return id ?? "";
         },
+        listDocIDs: async (notebook: string, dir: string) => {
+            // □1 卷落点校验通道（HTTP 版，前端 splitVolsDeps 同构）：api.listDocsByPath
+            // 已把空/不存在目录（code=-1）语义化为 []——不含卷 id=失配拦下；其余异常
+            // catch 归一 null=同失配（保守拒，原文未动优先）
+            try {
+                const files = await api.listDocsByPath(notebook, dir);
+                return (files ?? []).map(f => String(f?.id ?? ""));
+            } catch {
+                return null;
+            }
+        },
         sortDocs: (notebook: string, paths: string[]) => api.changeSort(notebook, paths),
         removeDoc: (id: string) => api.removeDocByID(id),
         deleteBlocks: async (ids: string[]) => {

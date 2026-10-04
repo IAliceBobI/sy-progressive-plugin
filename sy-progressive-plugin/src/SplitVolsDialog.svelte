@@ -8,6 +8,7 @@
     type VolBlockT = import("./splitVols").VolBlock;
     type VolPlanT = import("./splitVols").VolPlan;
     import { runSplitVols, splitVolsDeps } from "./splitVolsRun";
+    import { VOL_LANDING_MISMATCH } from "./splitCore";
     import { countHeadingLevels } from "./piecePreview";
     import { prog } from "./Progressive";
 
@@ -110,7 +111,12 @@
             await prog.addProgressiveReadingWithLock(docID, true);
         } catch (e) {
             console.error("SplitVols process failed", e);
-            await siyuan.pushMsg(tomatoI18n.加书失败请重试, 4000);
+            // □1 卷落点失配=数据丢失防线拦下（原文未动）：推具体行动指引而非通用失败
+            // （已建的卷可能在笔记本根部同名文档下可移回、建议重命名书再试）
+            const landingMismatch = String((e as Error)?.message ?? "").startsWith(VOL_LANDING_MISMATCH);
+            await siyuan.pushMsg(
+                landingMismatch ? tomatoI18n.卷落点异常已中止 : tomatoI18n.加书失败请重试,
+                landingMismatch ? 8000 : 4000);
         } finally { busy = false; }
     }
 </script>
