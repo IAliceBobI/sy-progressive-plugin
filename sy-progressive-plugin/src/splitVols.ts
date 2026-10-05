@@ -6,5 +6,6 @@
 // 本文件=re-export 壳保持旧 import 路径有效。行为锁定=tests/unit/splitVols.test.ts。
 export {
     childBlocksToVolBlocks, splitIntoVols, volDocBaseTitle, volDocTitle, volDocMarkdown,
+    sanitizeVolName,
     type VolBlock, type VolPlan,
 } from "./splitCore";

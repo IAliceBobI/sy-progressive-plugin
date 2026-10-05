@@ -383,12 +383,23 @@ export async function splitIntoVols(
     }));
 }
 
+/** 文档名路径元字符 sanitize：内核 createDocWithMd API 层先 path.Base/Dir 按 / 劈
+ *  baseName、再 regexp 剥 \t\r\n\u2028\u2029/、再 Join 重组（kernel/api/filetree.go
+ *  createDocWithMd）——名含 / 静默分层建两层文档且全程无报错（volslash □1「半切分
+ *  残局」根因：卷已建在错位中间层下+弹错、原文未动）。最小集=内核实际会动的字符：
+ *  / → 全角／（视觉语义保留），\t\r\n\u2028\u2029 → 空格；反斜杠 \ 实测无害
+ *  （Go path 只认 /、SQL 精确匹配不特殊）不过度处理。替换全 1:1，长度不变不扰截断。 */
+export function sanitizeVolName(name: string): string {
+    return name.replace(/[\t\r\n\u2028\u2029]/g, " ").replace(/\//g, "／");
+}
+
 /** 卷文档名主段（不含角标）：两位序号前缀保唯一+防重名；title 兜底截 24 字。展示层
- *  拆段渲染角标（Dialog 用 base+badge span 次要化），落盘名走 volDocTitle 纯文本拼接。 */
+ *  拆段渲染角标（Dialog 用 base+badge span 次要化），落盘名走 volDocTitle 纯文本拼接。
+ *  title 源=用户章节标题（planTitle）不可信——出口统一 sanitize 防内核静默分层。 */
 export function volDocBaseTitle(idx: number, plan: VolPlan): string {
     const raw = plan.title || "未命名";
     const t = raw.length > 24 ? raw.slice(0, 24) + "…" : raw;
-    return `卷${String(idx + 1).padStart(2, "0")}·${t}`;
+    return `卷${String(idx + 1).padStart(2, "0")}·${sanitizeVolName(t)}`;
 }
 
 /** 卷文档名（落盘/响应出口）：主段+□6 角标纯文本拼接（角标拼在 24 字截断之后永不被
@@ -463,9 +474,11 @@ export async function runSplitVols(bookID: string, plan: VolPlan[], blockIDs: st
     await deps.sortDocs(row.box, volIDs.map(id => `${dir}/${id}.sy`));
     deps.log(`sort pinned vols=${volIDs.length}`);
     // 原文备份→立即删除=即时可恢复（-delete- 历史；备份带 MarkKey 挂书壳下不进卷枚举）
+    // 书壳 content=用户标题含 / 同样触发内核静默分层，且分层后 removeDoc 只删叶子、
+    // 中间层残留——出口 sanitize（volslash □1）
     const backupMd = plan.reduce((md, p) => md + (md ? "\n\n" : "") + volDocMarkdown(p), "");
     const backupID = await deps.createDocWithMd(
-        row.box, `${row.hpath}/${row.content}·切分前备份`, backupMd, { [MARK_KEY]: "backup" });
+        row.box, `${row.hpath}/${sanitizeVolName(row.content)}·切分前备份`, backupMd, { [MARK_KEY]: "backup" });
     await deps.removeDoc(backupID);
     deps.log(`backup snapshotted+removed id=${backupID} chars=${backupMd.length}`);
     if (blockIDs.length > 0) {
