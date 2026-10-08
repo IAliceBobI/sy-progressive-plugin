@@ -56,6 +56,9 @@ export interface FleetActions {
     toggleHideBook(bookID: string, v: boolean): any;
     ignoreBook(bookID: string): any;
     archiveBook(bookID: string): any;
+    /** manualfin 件1：手动书「已读完」显式标记/取消（存储位 finishedManual；标后
+     *  滚筒 finishedIDs 直接收编，判据见 roller.manualFinished） */
+    setBookFinishedManual(bookID: string, v: boolean): any;
     /** □3 回访频率：书级档位（书 IAL+在册 grow 卡批量跟随，readCurve setBookVisitFreq；
      *  f="l"|"m"|"h"=VisitFreq 字面联合——fleet 基座层不反向依赖曲线模块，形状同源维护） */
     setVisitFreq(bookID: string, f: "l" | "m" | "h"): any;

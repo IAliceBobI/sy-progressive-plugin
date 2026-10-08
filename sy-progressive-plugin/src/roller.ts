@@ -135,6 +135,13 @@ export function manualFirstExcerptGuide(manualBookIDs: string[], unreadMap: Reco
     return manualBookIDs.length > 0 && manualBookIDs.every(id => unreadMap[id] === false);
 }
 
+/** 手动书 finished 判据（manualfin 件1，纯）：finishedManual 显式标记即读完（用户
+ *  判断显式化——手动书无 point>=len 可依，不论未锤摘抄）；未标/取消回落旧判据
+ *  （hasUnread=false 即 0 未锤摘抄=finished，首读走点击引导开原书摘抄） */
+export function manualFinished(info: { finishedManual?: boolean }, hasUnread: boolean): boolean {
+    return info.finishedManual === true || !hasUnread;
+}
+
 /** 达量集 ∩ 活跃书（未忽略/未归档/非写作/未删；review P1-1）——全满额提示判定专用：
  *  归档/忽略/已删书的当日 b 残留不该触发「明天再来」（它们明天也不会轮到，吞掉
  *  空书架引导）；nextBook 消费侧无需此过滤（那些书已被各自排除集并集剔除） */
@@ -387,10 +394,12 @@ function makeRollerDeps(): RollerDeps {
                 }
                 // □2 手动书进轮转（fbfeat，鸟 09-15）：片=摘抄，finished=0 未锤摘抄
                 // （判据与写作书素材同函数=语义统一）。today 无消费者给手动摘抄挂锤
-                // → 有摘抄即持续在池，退役=用户归档/忽略（手动书「读完」=用户判断，
-                // 无 point>=len 可依）；0 摘抄=finished（首读走点击引导开原书摘抄）
+                // → 有摘抄即持续在池；手动书「读完」=用户判断，无 point>=len 可依——
+                // manualfin 件1：finishedManual 显式标记即 finished 退役（不再只能
+                // 归档/忽略）；未标回落旧判据 0 摘抄=finished（首读走点击引导开原书
+                // 摘抄）
                 if (info.manualMode) {
-                    if (!(await hasUnreadMaterial(id))) s.add(id);
+                    if (manualFinished(info, await hasUnreadMaterial(id))) s.add(id);
                     continue;
                 }
                 const idx = await progStorage.loadBookIndexIfNeeded(id);

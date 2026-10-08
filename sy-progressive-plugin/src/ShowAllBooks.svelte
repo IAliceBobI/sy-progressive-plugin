@@ -197,8 +197,10 @@ import { fleetActionsRef } from "./fleet";
     const shownBooks = $derived(filterFleetBooks(sortedBooks, searchKw));
 
     /** □3/□9 书卡菜单书参（右键与长按共用）：与 FleetBook 派生位同口径——paused=
-     *  ignored、manual=manualMode、finished=total>0 且 point 达标（写作书素材终态位
-     *  不在此判定——rereadMenuEligible 本就排除写作/手动书） */
+     *  ignored、manual=manualMode、finished=手动书吃 finishedManual 显式标记
+     *  （manualfin 件2，与 buildFleetBooks 同口径——手动书 indexLens 恒 0，旧
+     *  total/point 口径恒 false）/其余 total>0 且 point 达标（写作书素材终态位
+     *  不在此判定——rereadMenuEligible 本就排除写作书） */
     function fleetBookOf(b: TaskType) {
         return {
             bookID: b.bookID,
@@ -207,10 +209,11 @@ import { fleetActionsRef } from "./fleet";
             paused: !!b.bookInfo.ignored,
             manual: !!b.bookInfo.manualMode,
             writing: !!b.bookInfo.writing,
-            finished:
-                !b.bookInfo.writing &&
-                totalOf(b) > 0 &&
-                (b.bookInfo.point ?? 0) >= totalOf(b),
+            finished: b.bookInfo.manualMode
+                ? b.bookInfo.finishedManual === true
+                : !b.bookInfo.writing &&
+                  totalOf(b) > 0 &&
+                  (b.bookInfo.point ?? 0) >= totalOf(b),
         };
     }
 

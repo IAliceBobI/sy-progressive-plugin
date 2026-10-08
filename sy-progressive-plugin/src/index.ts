@@ -663,6 +663,13 @@ export default class ThePlugin extends BaseTomatoPlugin {
                 notifyFleetChanged();
             },
             archiveBook: (bookID) => prog.archiveBookWithConfirm(bookID),
+            // manualfin 件1：手动书「已读完」标记/取消（写链=setBookFinishedManual
+            // updateBookInfo 白名单改内存+saveBookInfos 落盘；随发 notifyFleetChanged
+            // 刷总览——滚筒 finishedIDs 下轮取 finishedManual 即收编）
+            setBookFinishedManual: async (bookID, v) => {
+                await progStorage.setBookFinishedManual(bookID, v);
+                notifyFleetChanged();
+            },
             // □3 回访频率：书级改档（书 IAL+在册卡批量跟随+toast 均在 setBookVisitFreq 内）
             setVisitFreq: async (bookID, f) => {
                 await setBookVisitFreq(bookID, f);

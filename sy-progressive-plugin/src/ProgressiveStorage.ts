@@ -96,6 +96,13 @@ export class ProgressiveStorage {
         await this.updateBookInfo(bookID, { hidden: v } as any);
     }
 
+    /** manualfin 件1：手动书「已读完」显式标记/取消（写链=updateBookInfo 内存+落盘，
+     *  随后 index 侧 notifyFleetChanged 刷新总览）。不 toast——面板即时变化即反馈；
+     *  v=false 取消标记=回落旧判据（0 未锤摘抄） */
+    async setBookFinishedManual(bookID: string, v: boolean) {
+        await this.updateBookInfo(bookID, { finishedManual: v } as any);
+    }
+
     async setShowLastBlock(bookID: string, v: boolean) {
         await this.updateBookInfo(bookID, { showLastBlock: v } as any);
         if (v) {
@@ -228,6 +235,7 @@ export class ProgressiveStorage {
         if (typeof opt.hidden === "boolean") info.hidden = opt.hidden;
         if (typeof opt.dirMode === "boolean") info.dirMode = opt.dirMode;
         if (typeof opt.treeAligned === "boolean") info.treeAligned = opt.treeAligned;
+        if (typeof opt.finishedManual === "boolean") info.finishedManual = opt.finishedManual;
         if (utils.isValidNumber(opt.point)) info.point = opt.point;
         if (utils.isValidNumber(opt.activePoint)) info.activePoint = opt.activePoint;
 

@@ -3180,6 +3180,30 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Re-read (from Start)";
         }
     }
+    /** manualfin 件2：手动书右键「标记已读完」（存储位 finishedManual，标后退出轮转） */
+    public get 标记已读完() {
+        switch (this.lang) {
+            case "zh_CN": return "标记已读完";
+            case "zh_CHT": return "標記已讀完";
+            case "es_ES": return "Marcar como leído";
+            case "fr_FR": return "Marquer comme lu";
+            case "ja_JP": return "読み終えたとマーク";
+            case "en_US":
+            default: return "Mark as Finished";
+        }
+    }
+    /** manualfin 件2：标记成功 toast（退出轮转=滚筒 finishedIDs 收编，撤销走「重新阅读（从头）」） */
+    public get 已标记读完退出轮转() {
+        switch (this.lang) {
+            case "zh_CN": return "已标记读完，退出轮转";
+            case "zh_CHT": return "已標記讀完，退出輪轉";
+            case "es_ES": return "Marcado como leído, fuera de la rotación";
+            case "fr_FR": return "Marqué comme lu, hors rotation";
+            case "ja_JP": return "読了としてマークし、ローテーションから外れました";
+            case "en_US":
+            default: return "Marked as finished, removed from rotation";
+        }
+    }
     public get 从这里开始学() {
         switch (this.lang) {
             case "zh_CN": return "从这里开始学";

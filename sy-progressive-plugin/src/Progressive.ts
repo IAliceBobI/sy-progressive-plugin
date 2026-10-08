@@ -711,13 +711,23 @@ class Progressive {
     /** rollerquota □3 入口①：读完书重新阅读——point 归零（resetBookReadingPoint）+ 立即
      *  出片。分片索引（含手动调整）/摘抄/复习曲线/当日阅读账全不动：当天该书已读满时
      *  滚筒侧仍剔（todaysFullIDs 按当日账），手动直达可读（gateCheck 只拦「越过当日锚
-     *  开新片」，重置到早片恒不拦）——「新轮子当天可手动读、明天回轮转」。手动书/写作
-     *  书无 point 概念，入口侧已拦（rereadMenuEligible），此处再守卫一道防旁路调用 */
+     *  开新片」，重置到早片恒不拦）——「新轮子当天可手动读、明天回轮转」。写作书无
+     *  point 概念入口侧已拦（rereadMenuEligible），此处再守卫一道防旁路调用；
+     *  manualfin 件2 手动书分支：无 point 可归零——撤销=清 finishedManual 回轮转池
+     *  （摘抄/曲线/当日账全不动），「从头」=startToLearn 点击链直达最早摘抄 */
     async resetBookForReread(bookID: string) {
         // review P2：peek（同步、免自增注册）——booksInfo 单数版对未注册 id 会 defaultBookInfo
         // 落键+time=now，旁路调用不存在的书反而制造脏书键（正是 peekBookInfo 注释描述的危害）
         const info = progStorage.peekBookInfo(bookID);
-        if (!info || info.manualMode || info.writing) return;
+        if (!info || info.writing) return;
+        if (info.manualMode) {
+            // 守卫：只撤销显式标过的书（未标的手动书无可重置，旁路调用不该导航）
+            if (info.finishedManual !== true) return;
+            await progStorage.setBookFinishedManual(bookID, false);
+            notifyFleetChanged();
+            await this.startToLearnWithLock(bookID);
+            return;
+        }
         await progStorage.resetBookReadingPoint(bookID);
         notifyFleetChanged();
         await this.startToLearnWithLock(bookID);

@@ -169,7 +169,7 @@ export function totalReadOf(days: { read: number }[]): number {
  *  管理页仍是自己的三档——勿同步）。
  *  期2 写作书：point/total 语义=定稿片数/片数（doneLens 注入；进度=定稿占比） */
 export function buildFleetBooks(args: {
-    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean; writing?: boolean; pinned?: boolean; hidden?: boolean } };
+    infos: { [bookID: string]: { point?: number; ignored?: boolean; archived?: string | boolean; bookName?: string; manualMode?: boolean; writing?: boolean; pinned?: boolean; hidden?: boolean; finishedManual?: boolean } };
     order: string[];
     todayReads: { [bookID: string]: number };
     indexLens: { [bookID: string]: number };
@@ -213,8 +213,13 @@ export function buildFleetBooks(args: {
             writing: !!info.writing,
             pinned: !!info.pinned,
             paused: !!info.ignored,
-            // 期A：写作书全定稿仍要看池（未读素材在=书还活着）；非写作书 materialUnread 恒空不受影响
-            finished: total > 0 && point >= total && (info.writing ? (args.materialUnread?.get(bookID) ?? 0) === 0 : true),
+            // 期A：写作书全定稿仍要看池（未读素材在=书还活着）；非写作书 materialUnread 恒空不受影响。
+            // manualfin 件2：手动书 finished 位=finishedManual 显式标记（与滚筒
+            // manualFinished 显式分支同源；0 未锤摘抄的隐式 finished 不进面板位——
+            // 新册空书防误显「读完」，indexLens 恒 0 的旧 total 口径对手动书恒 false）
+            finished: info.manualMode
+                ? info.finishedManual === true
+                : total > 0 && point >= total && (info.writing ? (args.materialUnread?.get(bookID) ?? 0) === 0 : true),
         });
     }
     // □2 置顶组最优先（组内保滚筒序=不按 status 分层，📌 读完书天然豁免 □3 沉底）；
@@ -228,11 +233,20 @@ export function buildFleetBooks(args: {
     return books;
 }
 
-/** rollerquota □3 入口①：书卡右键「重新阅读（从头）」出现条件——只对读完的自动
- *  分片书曝光（在读书的「回到任意位置」由入口②③承担，提前曝光破坏性重置易误触）；
- *  手动书无 point 概念、写作书 finished 位=素材/槽终态语义，均不适用 */
+/** rollerquota □3 入口①：书卡右键「重新阅读（从头）」出现条件——只对读完的书曝光
+ *  （在读书的「回到任意位置」由入口②③承担，提前曝光破坏性重置易误触）。自动分片书
+ *  =point 归零重置；manualfin 件2 起手动书纳入——finished 位=finishedManual 显式
+ *  标记（撤销=清标记回轮转池，resetBookForReread 手动分支）；写作书仍排除（finished
+ *  位=素材/槽终态语义，无「重读」概念）。manual 保留在签名里：调用方三参同形传入 */
 export function rereadMenuEligible(b: Pick<FleetBook, "finished" | "manual" | "writing">): boolean {
-    return b.finished && !b.manual && !b.writing;
+    return b.finished && !b.writing;
+}
+
+/** manualfin 件2：书卡右键「标记已读完」出现条件（bookMenu 与 rereadMenuEligible 同区
+ *  纯函数纪律）——仅未读完的活跃手动书：暂停态不出（恢复走首项「继续阅读」）、已读完
+ *  不出（防重复标记，撤销走「重新阅读（从头）」）、自动/写作书无此语义 */
+export function markFinishedMenuEligible(b: Pick<FleetBook, "manual" | "paused" | "finished">): boolean {
+    return b.manual && !b.paused && !b.finished;
 }
 
 /** 书卡关键字过滤（舰队管理 □1 搜索框）：书名大小写不敏感包含匹配，

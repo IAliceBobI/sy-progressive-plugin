@@ -44,6 +44,11 @@ type BookInfo = {
     /** progtree □1 树即槽：存量书一次性整理（MarkKey 真值序 changeSort 钉齐）已
      *  完成=树序权威生效；新建书出生即置位。缺省 falsy=首次读取时整理 */
     treeAligned?: boolean,
+    /** manualfin 件1：手动书「已读完」用户显式标记——true=滚筒 finishedIDs 直接收编
+     *  （手动书无 point>=len 可依，旧判据=0 未锤摘抄对有摘抄书永难满足）；缺省/未标
+     *  =维持旧判据（0 摘抄=finished，首读走点击引导开原书摘抄）。旧数据无此字段
+     *  天然向后兼容 */
+    finishedManual?: boolean,
 };
 
 type BookInfos = { [key: string]: BookInfo };

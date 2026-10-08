@@ -439,14 +439,6 @@ export function addClickEvent(element: HTMLElement) {
     });
 }
 
-export function btn(btnID: HtmlCBType, icon: string, tips: string, bookID: string, noteID: string, point: number, show: boolean) {
-    if (!show) {
-        return "";
-    }
-    return `${icon}
-{: ${Prog_BUTTON}="${btnID}" memo="${tips}" ${Prog_BUTTON_NoteID}="${noteID}" ${Prog_BUTTON_BookID}="${bookID}" ${Prog_BUTTON_Point}="${point}"}`;
-}
-
 async function btnProcessor(ev: MouseEvent) {
     ev.stopPropagation();
     const e = getSyElement(ev.target as HTMLElement);

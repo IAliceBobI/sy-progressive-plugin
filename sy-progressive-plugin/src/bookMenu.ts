@@ -6,7 +6,7 @@
 import { Menu, showMessage } from "siyuan";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import type { FleetActions } from "./fleet";
-import { rereadMenuEligible } from "./fleetData";
+import { rereadMenuEligible, markFinishedMenuEligible } from "./fleetData";
 import { bookVisitFreq } from "./readCurve";
 
 /** 键盘触发（clientX/Y=0）时菜单落屏幕中间（reviewMenu menuPos 同款） */
@@ -41,6 +41,21 @@ export async function openBookMenu(
             icon: "iconProgRefresh",
             label: tomatoI18n.重新阅读从头,
             click: () => void actions.resetReadingPoint(book.bookID),
+        });
+    }
+    // manualfin 件2：手动书「标记已读完」——手动书无 point>=len 可依，「读完」是用户
+    // 判断（件1 存储位 finishedManual）。标记即滚筒 finishedIDs 收编退出轮转，面板
+    // finished 位同源刷新：本项自隐、「重新阅读（从头）」转曝光=撤销闭环。曝光条件=
+    // markFinishedMenuEligible（暂停态/已读完不出）；iconCheck 经 litheness icon.js
+    // 真相源核验存在（reviewMenu「本轮已完成」同款先例）
+    if (markFinishedMenuEligible({ manual: !!book.manual, paused: !!book.paused, finished: !!book.finished })) {
+        menu.addItem({
+            icon: "iconCheck",
+            label: tomatoI18n.标记已读完,
+            click: async () => {
+                await actions.setBookFinishedManual(book.bookID, true);
+                showMessage(tomatoI18n.已标记读完退出轮转, 2500);
+            },
         });
     }
     // vision P1-1：全项补图标（与 readCardMenu 全项带图标惯例对齐，图标名经
