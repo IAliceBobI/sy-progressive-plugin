@@ -6,6 +6,7 @@ import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { MarkBookKey, MarkKey, PROG_DONE_KEY, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { writingPoolUnderBook } from "../../sy-tomato-plugin/src/libs/stores";
+import { sanitizeName } from "../../sy-tomato-plugin/src/libs/siyuanApi";
 import { ProgressiveStorage, progStorage } from "./ProgressiveStorage";
 import { parseOutlineLines, planWritingPieces, planAppendPiece } from "./outline";
 import { pieceAlias, getDocIalPieces, doneCtime, parseBookIDFromCtime, findDocByIal, getDocIalDigestDir } from "./progData";
@@ -332,6 +333,17 @@ export function feedPoolTitle(firstKramdown: string): string {
     return "素材";
 }
 
+/** 直喂素材建档名（拼进 hpath 的名字）：[直] 前缀 + feedPoolTitle，出口过 sanitizeName。
+ *  标题源=首块 kramdown 的用户内容（书名/正文可含半角 / 与控制符）——拼进 hpath 后
+ *  内核 createDocWithMd 按 / 劈 hpath 层级静默分层（「[直]a/b」→ 中间层「[直]a」+
+ *  素材落其下）、\t\r\n\u2028\u2029 被剥除，全程无报错；出口级末段净化
+ *  （sanitizePathTail）切点落在名字内部，堵不住前半段照样分层，故名字净化后再拼。
+ *  先截断（feedPoolTitle 10 字）后净化，替换 1:1 不扰截断；/ → 全角／、控制符 → 空格，
+ *  幂等。展示层字符串（toast/菜单）不走此函数 */
+export function feedPoolDocTitle(firstKramdown: string): string {
+    return sanitizeName(`[直]${feedPoolTitle(firstKramdown)}`);
+}
+
 /** getBlockInfo 文件树直查 box+path（物理 path，无 SQL 索引延迟——digest 夹可能刚建），
  *  失败兜 SQL。moveDocs 是物理 path 域，两路取值都为它服务 */
 async function docBoxPath(docID: string): Promise<{ box: string; path: string }> {
@@ -373,7 +385,7 @@ export async function feedBlocksToPool(targetBookID: string, sourceDocID: string
     } as AttrType;
     // 重名防劫持（createDocWithMd 同名静默认领旧文档——docIDAtPath 预检纪律）：短时间
     // 二喂同一段文本撞标题时缀 ct 保唯一，首喂不带缀保持标题干净
-    let title = `[直]${feedPoolTitle(kds[0])}`;
+    let title = feedPoolDocTitle(kds[0]);
     if (await docIDAtPath(dir.box, `${dirHPath}/${title}`)) title = `${title}-${ct}`;
     const docID = await siyuan.createDocWithMd(dir.box, `${dirHPath}/${title}`, kds.map(stripMaterialBlock).join("\n\n"), "", attrs);
     if (!docID) throw new Error("feedPool: doc not created");

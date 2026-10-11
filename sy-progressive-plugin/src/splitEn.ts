@@ -6,6 +6,8 @@
 //   3. 句点前是单大写字母（J. K. / Albert I. 这类缩写链）→ 后随词是常见句首词才切
 //   4. 行首有序列表标记（1. / 23.）的句点 → 不切
 // 规则分层参考 wikimedia/sentencex（MIT）的设计，按本插件场景精简。
+// 句末引用编号组切口后移（飞书 10-11 用户650189）共享判定在 splitCite.ts。
+import { matchCiteHead } from "./splitCite";
 
 const ABBREVIATIONS = new Set([
     // 人名称谓
@@ -47,8 +49,23 @@ function splitLine(line: string): string[] {
     const parts: string[] = [];
     let start = 0;
     for (const c of cuts) {
-        parts.push(line.slice(start, c + 1));
-        start = c + 2;
+        if (c < start) continue; // 编号组吃句点的切口已吞掉本句界，再切=孤立「.」残渣片
+        // 句末引用编号组（飞书 10-11 用户650189）：句点后空白串接纯数字编号组时
+        // 切口后移到右中括号之后——编号组连同其前空格归前片，原文零损失。
+        const rest = line.slice(c + 1);
+        const ws = /^\s+/.exec(rest)?.[0] ?? "";
+        const cite = ws ? matchCiteHead(rest.slice(ws.length)) : null;
+        let end = c + 1;
+        let next = c + 2;
+        if (cite) {
+            end = c + 1 + ws.length + cite.length;
+            next = end;
+            // 编号组后紧跟句点（Ab. [21]. Next）：句点并入前片——否则后移终点恰落
+            // 在该句界 cut 上，下轮只剩孤立「.」残渣片（评审 P1-1）
+            if (line[end] === ".") { end += 1; next = end + 1; }
+        }
+        parts.push(line.slice(start, end));
+        start = next;
     }
     parts.push(line.slice(start));
     return parts.map(p => p.trim()).filter(p => p.length > 0);

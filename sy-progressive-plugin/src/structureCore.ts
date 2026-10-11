@@ -1,11 +1,14 @@
 // progtree □2 结构引擎纯函数核（TDD 锁行为）：现状×骨架×归位表 → 增量动作清单。
-// 零依赖纯模块——kernel 侧直接 import（splitCore 先例：单一事实源，前端单测同源锁定）。
+// 纯函数核零 IO 依赖（仅引纯核 splitCore 的 sanitizeVolName）——kernel 侧直接
+// import（splitCore 先例：单一事实源，前端单测同源锁定）。
 // 增量铁律（handoff □2 mini-spec）：零删除/零重排/零改名；reparent 仅非 sacred 非 done；
 // 新建槽钉父层尾（执行序语义）；同层同名=匹配（手动建的不分 AI/用户，plan 当既成事实）；
 // 跨层同名=全树唯一命中才认领（多同名歧义=按新建+报告）；骨架内同层同名二节点加序号；
 // 幂等=同方案二跑零变更动作（skips 回执不算变更）。
 // 匹配两级：①同层标题精确匹配（[N] 前缀剥后）②未命中→全树唯一未认领同名槽→matched+
 // reparent 候选（用户拖层后骨架仍指旧位的「改形」语义；sacred/done 拦下只报告）。
+import { sanitizeVolName } from "./splitCore";
+
 /** 槽现状行（kernel 树拉取产物平铺；形态照前端 WritingTreeSlot+□2 判定层扩展） */
 export interface StructSlot {
     docID: string;
@@ -43,7 +46,8 @@ export interface StructMaterial {
 /** 骨架节点（AI 产出） */
 export interface SkeletonNode { title: string; children?: SkeletonNode[] }
 
-/** 归位表行：slotPath="/“ 分隔标题路径（顶级=单段），按骨架原始 title 解析 */
+/** 归位表行：slotPath="/“ 分隔标题路径（顶级=单段），按骨架原始 title 拼写解析
+ *  （骨架入参侧已净化对齐——含 / 的槽名走整串净化回退，见 planStructureActions） */
 export interface Placement { materialID: string; slotPath: string }
 
 export interface StructureDiff {
@@ -107,7 +111,8 @@ export function planStructureActions(
     }
     const titleOf = new Map(slots.map(s => [s.docID, s.title]));
     const matched = new Set<string>();
-    /** 骨架路径（原始 title 拼接）→ 既有槽 docID（""=本轮将建）；validPaths=合法路径全集 */
+    /** 骨架路径（title 净化后拼接——与树上槽名同域）→ 既有槽 docID（""=本轮将建）；
+     *  validPaths=合法路径全集 */
     const pathToDoc = new Map<string, string>();
     const validPaths = new Set<string>();
     const ambiguousReported = new Set<string>();
@@ -127,7 +132,11 @@ export function planStructureActions(
         const layer = byParent.get(parentID) ?? [];
         const usedTitles = new Map<string, number>();
         for (const node of nodes) {
-            const name = String(node?.title ?? "").trim();
+            // 骨架名入参即净化（对齐树上槽名域）：内核建档名域天然无 / 与
+            // \t\r\n\u2028\u2029（createDocWithMd 按 / 劈层/剥控制符），不净化的骨架名
+            // 永远匹配不上首轮建出的净化名槽——二跑经物理撞名兜底增殖「净化名-时间戳」
+            // 怪名槽。sanitizeVolName 幂等：干净名逐位不变（下游路径键/序号形态同域）
+            const name = sanitizeVolName(String(node?.title ?? "").trim());
             if (!name) continue; // 空名节点静默跳过（AI 笔误防御）
             const path = parentPath ? `${parentPath}/${name}` : name;
             validPaths.add(path);
@@ -171,15 +180,20 @@ export function planStructureActions(
         if (m.location === "inSlot") { diff.skips.push({ ref: m.id, reason: "素材已在槽树内（既成事实，不自动处理）" }); continue; }
         const seg = String(p?.slotPath ?? "").split("/").map(s => s.trim()).filter(Boolean);
         const probe = seg.join("/");
-        if (!seg.length || !validPaths.has(probe)) {
+        // 净化回退（骨架入参侧净化的镜像）：AI 的 slotPath 按骨架原始 title 拼写，含 /
+        // 的槽名净化成全角／后与层级分隔符不再可分——精确未命中时整串再净化试一次
+        //（单节点「高潮/结局」→「高潮／结局」）；两态皆不中=真不存在
+        const hit = validPaths.has(probe) ? probe
+            : validPaths.has(sanitizeVolName(probe)) ? sanitizeVolName(probe) : "";
+        if (!seg.length || !hit) {
             diff.skips.push({ ref: m.id, reason: `目标槽路径「${p?.slotPath}」在骨架中不存在` });
             continue;
         }
-        const targetDoc = pathToDoc.get(probe) ?? "";
+        const targetDoc = pathToDoc.get(hit) ?? "";
         const targetSlot = targetDoc ? slots.find(s => s.docID === targetDoc) : undefined;
-        if (targetSlot?.sacred) { diff.skips.push({ ref: m.id, reason: `目标槽「${seg.at(-1)}」sacred（含手写内容=用户原创，保护）不入素材` }); continue; }
-        if (targetSlot?.done) { diff.skips.push({ ref: m.id, reason: `目标槽「${seg.at(-1)}」已定稿不入素材` }); continue; }
-        diff.placements.push({ materialID: m.id, slotPath: probe, targetTitle: seg.at(-1)!, targetDocID: targetDoc });
+        if (targetSlot?.sacred) { diff.skips.push({ ref: m.id, reason: `目标槽「${hit.split("/").at(-1)}」sacred（含手写内容=用户原创，保护）不入素材` }); continue; }
+        if (targetSlot?.done) { diff.skips.push({ ref: m.id, reason: `目标槽「${hit.split("/").at(-1)}」已定稿不入素材` }); continue; }
+        diff.placements.push({ materialID: m.id, slotPath: hit, targetTitle: hit.split("/").at(-1)!, targetDocID: targetDoc });
     }
     return diff;
 }
@@ -269,4 +283,14 @@ export function composeTitle(bookName: string, explicit: string | undefined, now
     const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
     // 缺省分支同消毒 bookName（书名带 / 会劈 hpath 层——与显式分支对称）
     return `成稿-${String(bookName ?? "").trim().replace(/[\\/]+/g, " ").trim() || "未命名"}-${stamp}`;
+}
+
+/** 槽文档建档 path 拼装（父 hpath + 槽名）：槽名先过 sanitizeVolName 再拼。槽名源=
+ *  骨架入参 title（AI 从书名/素材归纳，仅 trim 级清洗不可信）——含半角 / 会被内核
+ *  createDocWithMd 按 / 劈 hpath 层级静默分层、\t\r\n\u2028\u2029 被剥除，全程无
+ *  报错；出口级末段净化（sanitizePathTail 一类）切点落在名字内部，堵不住前半段
+ *  照样分层，故名字本身净化后再拼（/ → 全角／、控制符 → 空格，恒 1:1、幂等）。
+ *  父 hpath 前缀是调用方故意拼的层级，原样透传不动 */
+export function slotDocPath(parentHPath: string, title: string): string {
+    return `${parentHPath}/${sanitizeVolName(title)}`;
 }

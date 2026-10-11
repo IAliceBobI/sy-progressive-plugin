@@ -10,6 +10,7 @@
 // 主实例实测（2026-09-04）：113 个含 $ 段落块 0 命中公式内断句标点——本项为防御性
 // 修复（数学书用户面），与 □13 mergeMathLead（治「$$ 前导片段」症状）构成根因闭环。
 import { splitBySentencePeriod } from "./splitEn";
+import { endsWithSentenceEnd, matchCiteHead, SENTENCE_END_RE } from "./splitCite";
 
 const MATH_SPAN_RE = /\$\$[\s\S]*?\$\$|\$[^$\n]+?\$/g;
 const LINK_IMG_RE = /!?\[[^\]\n]*\]\([^)\n]*\)/g;
@@ -99,6 +100,21 @@ function movePunctuations(a: string, b: string) {
     while (shouldMove(b)) {
         a += b[0];
         b = b.slice(1);
+    }
+    // 句末引用编号组回粘（飞书 2026-10-11 用户650189）：片头纯数字编号组在前片
+    // 以句末标点收尾时整组粘回前片尾（切口落在右中括号之后）；旧切口处的空白/
+    // 换行剥掉不留片内。在 shouldMove 单字符回粘之后跑（”。[21] 先移引号再粘组）。
+    const head = b.replace(/^\s+/, "");
+    const cite = matchCiteHead(head);
+    if (cite && endsWithSentenceEnd(a)) {
+        a = a.replace(/\s+$/, "") + cite;
+        b = head.slice(cite.length);
+        // 编号组后紧跟句末标点（……。[21]. Next）：一并粘入——否则残根句点落在下片
+        // 头，被英文链 splitLine 当句界切出孤立「.」残渣片（评审 P1-1）
+        if (b && SENTENCE_END_RE.test(b[0])) {
+            a += b[0];
+            b = b.slice(1);
+        }
     }
     return [a, b];
 }

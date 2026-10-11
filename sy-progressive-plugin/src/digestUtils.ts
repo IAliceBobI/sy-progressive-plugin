@@ -19,6 +19,7 @@ import { parseBookIDFromCtime } from "./progData";
 import { isDigestHostDoc } from "./progFloatState";
 import { bookCommentsFromRows, type BookCommentItem, type BookCommentRow } from "./digestComments";
 import { ownEditableChildrenHTML, stripBlockIAL } from "./splitInPlaceCore";
+import { sanitizeVolName } from "./splitCore";
 
 // □12 摘抄标记零触碰统一（2026-08-30）：+ 链接（addPlusLnk）与写 style 背景（changeBG）
 // 两个动正文路径退役，原文痕迹唯一机制=digestMarker span 渲染态（digestMarker.ts），
@@ -253,7 +254,7 @@ export class DigestBuilder {
             if (!dirPath) return "";
         }
         // 「仿写」前缀仅仿写副本链路（□28）：整摘副本无仿写语义不加，用户靠前缀一眼认出练习文档
-        const title = `${forRecite ? "仿写" : ""}${question ? "❓" : ""}[${whole ? "整" : idx}]${this.allText.slice(0, 10)}`;
+        const title = digestDocTitle(this.allText, idx, whole, question, forRecite);
         const digestID = await siyuan.createDocWithMd(boxID, `${dirPath}/${title}`, md, "", attr);
         // 新摘抄即失效痕迹缓存：refMap 有 60s TTL，不失效则当前文档 ≤60s 内重出场不打新痕迹
         if (digestID) invalidateDigestMarker(this.bookID);
@@ -462,6 +463,16 @@ export function digestNeighborWithWrap<T>(flat: T[], i: number, step: 1 | -1): {
     const j = i - step;
     if (j >= 0 && j < n) return { target: flat[j], wrapped: false };
     return { target: flat[(j + n) % n], wrapped: true };
+}
+
+/** 摘抄文档标题拼装（纯函数，TDD 见 tests/unit/digestDocTitle.test.ts）：
+ *  模板=「仿写」「❓」前缀 + [整/序号] + 内容前 10 字——allText 是用户所摘内容，
+ *  直接拼进 hpath 时半角 / 会被内核 createDocWithMd 按 / 劈段静默分层（父壳+子文档，
+ *  内容落子文档且全程无报错），故内容段出口统一过 sanitizeVolName（/ → 全角／、
+ *  \t\r\n\u2028\u2029 → 空格，替换 1:1）。先 slice(0,10) 截断再净化——净化不占
+ *  截断预算，无斜杠文本与旧模板逐位一致。 */
+export function digestDocTitle(allText: string, idx: string, whole: boolean, question: boolean, forRecite: boolean): string {
+    return `${forRecite ? "仿写" : ""}${question ? "❓" : ""}[${whole ? "整" : idx}]${sanitizeVolName(allText.slice(0, 10))}`;
 }
 
 // □5 起批注属性模型切换：旧双键退役，改查 custom-tomato-annotations（JSON 数组，

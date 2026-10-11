@@ -9,7 +9,7 @@ import { readBooksInfos } from "./progData";
 import { runExclusive, readVolTable } from "./bookMapIo";
 import { volOffsets } from "../volIndex";
 import {
-    planStructureActions, slotNameFromTitle, deriveSlotGuard, blocksToSlotText, planSlotReadPage, composeTitle, BOOK_ROOT_ID,
+    planStructureActions, slotNameFromTitle, deriveSlotGuard, blocksToSlotText, planSlotReadPage, composeTitle, slotDocPath, BOOK_ROOT_ID,
     type StructSlot, type StructMaterial, type SkeletonNode, type Placement, type StructureDiff,
 } from "../structureCore";
 
@@ -185,11 +185,13 @@ function slotAttrs(bookID: string, bookName: string, title: string): Record<stri
 }
 
 /** 建子槽两步（HTTP createDocWithMd 传 custom- 不落 IAL——建后补 setBlockAttrs+复核读）。
- *  物理撞名兜底=缀时间戳（diff 层已消化骨架内同名；此处防树外意外文档劫持） */
+ *  物理撞名兜底=缀时间戳（diff 层已消化骨架内同名；此处防树外意外文档劫持）。
+ *  path 拼装走 slotDocPath（槽名先过 sanitizeVolName——骨架槽名内嵌 / 会被内核
+ *  createDocWithMd 静默分层，出口末段净化堵不住） */
 async function createSlotDoc(box: string, bookID: string, bookName: string, parentDocID: string, title: string): Promise<string> {
     const parentHPath = await api.getHPathByID(parentDocID, box);
     if (!parentHPath) throw new Error(`拿不到父槽可读路径（parent=${parentDocID}）`);
-    let path = `${parentHPath}/${title}`;
+    let path = slotDocPath(parentHPath, title);
     if ((await api.getIDsByHPath(box, path)).length > 0) path = `${path}-${Date.now()}`;
     const docID = await api.createDocWithMd(box, path, "");
     if (!docID) throw new Error(`建槽失败（path=${path}）`);
