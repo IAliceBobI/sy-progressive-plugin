@@ -12,7 +12,7 @@ import { verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/s
 import { kind, openDigestSubrank, show, toggleFreeFloat, digOpen, expanded, collapseFloatBar, freeFloatOff, cardHostProtyle, forceCardHostFloatBar, noteID, zIndexPlus } from "./ProgressiveBtn";
 import { cardModeFor, type DigestIntent } from "./digestCardMode";
 import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
-import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
+import { collectSelectedBlocks, coverItemsUnderRange } from "../../sy-tomato-plugin/src/libs/selection";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "iconProgScissors", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "iconProgScissors", () => tomatoI18n.执行摘抄)
@@ -283,6 +283,10 @@ export async function initDi(s: Awaited<ReturnType<typeof events.selectedDivs>>,
     di.boxID = s.boxID;
     di.plugin = digestProgressiveBox.plugin;
     di.otab = digestProgressiveBox.singleTab;
+    // 智能默认（2026-10-12）：拖蓝态（collectInfo 仅 range 级透传 range）把 fine blocks 按
+    // range 边界分「整盖/部分盖」，部分盖块走截句通道（digestUtils.getDigestMd covers）；
+    // 块选/光标态 range 恒 undefined → 整块摘现行为不变；digestWholeDoc 手拼 s 无 range 同不受影响
+    di.covers = s.range ? coverItemsUnderRange(s.range, s.selected) : undefined;
     await di.init();
     return di;
 }

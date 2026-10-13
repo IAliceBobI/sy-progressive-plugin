@@ -1,7 +1,9 @@
 import { IProtyle, Plugin } from "siyuan";
-import { BlockNodeEnum, DATA_NODE_ID, DATA_NODE_INDEX, DATA_TYPE, IN_BOOK_INDEX, MarkKey, PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_LAST_ID, PROG_ORIGIN_TEXT, RefIDKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
-import { cleanDiv, get_siyuan_lnk_md, parseIAL, replaceAll, addCardSetDueTime, siyuan, getBlockOwnEditableText, getBlocksOwnText } from "../../sy-tomato-plugin/src/libs/utils";
+import { BlockNodeEnum, CONTENT_EDITABLE, DATA_NODE_ID, DATA_NODE_INDEX, DATA_TYPE, IN_BOOK_INDEX, MarkKey, PARAGRAPH_INDEX, PDIGEST_CTIME, PDIGEST_LAST_ID, PROG_ORIGIN_TEXT, RefIDKey, TEMP_CONTENT } from "../../sy-tomato-plugin/src/libs/gconst";
+import { cleanDiv, get_siyuan_lnk_md, parseIAL, replaceAll, addCardSetDueTime, siyuan, getBlockOwnEditableText, cleanText } from "../../sy-tomato-plugin/src/libs/utils";
 import { getBookID } from "../../sy-tomato-plugin/src/libs/progressive";
+import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+import { type RangeCoverItem } from "../../sy-tomato-plugin/src/libs/selection";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { invalidateDigestMarker, markDigests, refreshDigestTagBadgeFor } from "./digestMarker";
 import { splitLines } from "./SplitSentence";
@@ -53,6 +55,11 @@ export class DigestBuilder {
      *  浮条子排「挂书侧/归总夹」两钮逐次指定，不落盘不改 digestLanding 全局档（同
      *  cardMode 覆盖模式：intent 决定去向，saveCardMode 都不调）；undefined=跟全局档 */
     landingOverride?: "source" | "central";
+    /** 智能默认（2026-10-12）：拖蓝 range 对 fine blocks 的整盖/部分盖分类（initDi 注入，
+     *  事实源=selection.coverItemsUnderRange）。部分盖块走截句通道（getDigestMd covers
+     *  参数——截选中文字按句切多块，行内样式保留+attrLine 带源块 custom-progref）；
+     *  undefined/全整盖=块选/光标/整圈拖蓝，整块摘现行为不变 */
+    covers?: RangeCoverItem[];
 
     /** 落点档求值唯一入口（□4 收口）：override 优先于全局设置——daily 档下显式点了
      *  落点变体钮也一样走指定侧（显式意志胜出），故三处读值点全走这里 */
@@ -75,7 +82,9 @@ export class DigestBuilder {
     }
 
     async init() {
-        this.allText = getBlocksOwnText(this.selected);
+        // 标题取文（review #5）：渲染码块走 data-content 源码（画布 CSS 垃圾不进标题），
+        // 其余块与 getBlocksOwnText 逐字节同款
+        this.allText = digestTitleTextOf(this.selected);
         this.ctime = this.element.getAttribute(PDIGEST_CTIME);
 
         const fallbackID = this.element.getAttribute(PDIGEST_LAST_ID);
@@ -286,7 +295,17 @@ export class DigestBuilder {
     }
 
     async digest(split = false, question = false, review = false) {
-        const { idx, md } = await getDigestMd(this.settings, this.selected, split, true, false);
+        // 智能默认截句 Pro 门禁（2026-10-12 ④）：部分圈住块按句切多块=断句产物，与 ⇧⌥X
+        // 「摘抄并断句」同款 lastVerifyResult——未激活 toast 引导不静默，也不整块降级
+        //（整块降级会把用户点选的那句偷换成整段，比拦下更反直觉）。门禁判据=截句候选
+        // 块型（isClippableBlock，与 getDigestMd cover 生效判据同源，review #4）：结构块
+        // （列表/表格/码块等）部分圈住本就回落整块摘=旧行为，免费用户照摘不拦（拦了=
+        // 弹「断句是 Pro」误导 toast 且无产物）
+        if (this.covers?.some(c => !c.full && isClippableBlock(c.block)) && !lastVerifyResult()) {
+            await siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500);
+            return;
+        }
+        const { idx, md } = await getDigestMd(this.settings, this.selected, split, true, false, this.covers);
         // 过滤空内容：移除空字符串、纯空白字符或仅包含属性行的条目（□16 抽出与整摘共用）
         const validMd = validDigestMd(md);
         if (validMd.length == 0) {
@@ -488,7 +507,106 @@ export async function queryBookComments(bookID: string): Promise<BookCommentItem
     return bookCommentsFromRows((rows ?? []) as BookCommentRow[]);
 }
 
-export async function getDigestMd(settings: TomatoSettings, selected: HTMLElement[], split: boolean, ref = true, checkbox = false) {
+/** 截句取文（智能默认 2026-10-12，TDD 见 tests/unit/digestClipMd.test.ts）：部分圈住块
+ *  的选中 HTML（coverItemsUnderRange clip.cloneContents 序列化——行内标记随选区克隆，
+ *  ①行内样式保留）→ 段落壳过 BlockDOM2Md 取存储形态 kramdown（同 09-22 □1 断句取文
+ *  通道，Lute 注入保纯函数可单测）；产物剥块尾 IAL（句子级 md 零块属性，attrLine 由
+ *  摘抄管线按源块另拼带 custom-progref ②）、摘抄痕迹 span 进壳前剥除（cleanDivOnly
+ *  同理——contenteditable=false 的它混进壳会污染正文层）。产物空（异构结构/空选区）
+ *  回退 clip 纯文本——宁丢样式不丢文本（ownEditableChildrenHTML 同款取舍）。 */
+export function clipEditMd(clipHTML: string, clipText: string, blockID: string, b2m: (dom: string) => string): string {
+    const shell = document.createElement("div");
+    shell.setAttribute(DATA_NODE_ID, blockID);
+    shell.setAttribute(DATA_TYPE, "NodeParagraph");
+    const editable = document.createElement("div");
+    editable.setAttribute(CONTENT_EDITABLE, "true");
+    editable.innerHTML = clipHTML;
+    editable.querySelectorAll(".prog-digest-mark").forEach(e => e.remove());
+    shell.append(editable);
+    const md = stripBlockIAL(b2m(shell.outerHTML).trim()).trim();
+    return md || (clipText ?? "");
+}
+
+/** Lute 静态反转义（内核注入 window.Lute.UnEscapeHTMLStr，思源官方前端同款静态用法）；
+ *  纯函数单测环境无此全局，恒等兜底——stripCodeRenderLayer 以参数注入真正实现 */
+const LuteUnEscapeHTMLStr = (s: string): string => (globalThis as any).Lute?.UnEscapeHTMLStr?.(s) ?? s;
+
+/** 渲染型代码块语言族（摘录污染修复 2026-10-12，TDD 见 tests/unit/digestRenderCode.test.ts）：
+ *  族清单与思源 kernel/av/value.go 同源——这些语言的代码块在编辑器里以「源码存块级
+ *  data-content、画布渲染进 [spin="1"] 容器（≤3.8.3 旧版渲染进 .hljs）」形态出现，
+ *  DOM 里没有可直读的纯文本源码；剥层后自然产出 ```lang 围栏，落摘抄文档思源自动重渲染 */
+export const RENDER_CODE_SUBTYPES = new Set(["abc", "echarts", "flowchart", "graphviz", "infographic", "mermaid", "mindmap", "plantuml"]);
+
+/** 是否渲染型代码块：NodeCodeBlock + 族语言（原生 NodeMindmap/普通 js 码块皆非） */
+export function isRenderedCodeBlock(el: Element | null | undefined): boolean {
+    return !!el
+        && el.getAttribute(DATA_TYPE) === BlockNodeEnum.NODE_CODE_BLOCK
+        && RENDER_CODE_SUBTYPES.has(el.getAttribute("data-subtype") ?? "");
+}
+
+/** 摘抄整块推送判据（渲染块防拆句）：断句模式下列表/渲染型代码块（导图按句拆=毁图，
+ *  走整块围栏）/多行结构块（isMultiLineElement：围栏/引用/公式块等）整块摘，其余
+ *  按句切。渲染块单独点名而非只赖 isMultiLineElement（其 md 恒 ``` 开头已覆盖）：
+ *  契约显式化，防未来 md 形态退化（空 data-content 破损块单行产物）漏进断句通道 */
+export function isWholeBlockDigest(split: boolean, dataType: string | null, renderCode: boolean, md: string): boolean {
+    return !split || dataType === BlockNodeEnum.NODE_LIST || renderCode || isMultiLineElement(md);
+}
+
+/** 截句候选块型（智能默认 2026-10-12，review #4 门禁与 getDigestMd cover 判据同源）：
+ *  截句对象=段落类叶子块（段落/标题；fine 下钻后块引用/列表项内层也是段落）——结构块
+ *  （列表容器/表格/代码块/渲染码块等）部分圈住回落整块摘（截碎片毁结构），也不进 Pro
+ *  门禁（门禁比截句通道宽=免费用户在本就保持旧行为的场景被「断句是 Pro」拦断主流程）。
+ *  取白名单而非黑名单：isMultiLineElement(m) 的 md 形态灰区（引用/公式/围栏，m 需 lute
+ *  产物）在 digest() 门禁时点不可预判，按块型放行——宁漏拦（免费截到句=小溢出）不误拦
+ *  （免费主流程断）；getDigestMd 侧保留 isMultiLineElement 兜灰区。 */
+export const CLIP_BLOCK_TYPES = new Set<string>([BlockNodeEnum.NODE_PARAGRAPH, BlockNodeEnum.NODE_HEADING]);
+export function isClippableBlock(el: Element | null | undefined): boolean {
+    return !!el && CLIP_BLOCK_TYPES.has(el.getAttribute(DATA_TYPE) ?? "");
+}
+
+/** 渲染码块源码取文（data-content，回填与标题取文共源）：块级优先、容器级
+ *  （.hljs[data-content]/[spin][data-content]）兜底、全缺失返 ""（破损块，调用方
+ *  各自回退：剥层安全不动 / 标题走旧取文通道） */
+function renderCodeSrc(el: Element): string {
+    return el.getAttribute("data-content")
+        ?? el.querySelector(".hljs[data-content], [spin][data-content]")?.getAttribute("data-content")
+        ?? "";
+}
+
+/** 剥渲染层：摘抄克隆整块后，画布 SVG（<use>/数字碎片/echarts·mermaid 提示文案）会被
+ *  BlockDOM2Md 当文字拍进围栏污染产物（<use> 标签/数字碎片即由此混入）——渲染容器
+ *  （[spin="1"] / 旧版 .hljs）回填 data-content 源码文本。回填而非删除：旧版 Lute
+ *  从容器内联文本取码（画布即由此混入），删容器产空围栏；新版 Lute 只读 data-content
+ *  （dev 6807 实测：内联文本被忽略），两代皆净。块级 data-content 缺失时回落容器级
+ *  （.hljs[data-content]）；全缺失（破损块）安全不动，维持现状行为。
+ *  unescape=反转义注入（真实链路=内核注入 window.Lute.UnEscapeHTMLStr，纯函数可测） */
+export function stripCodeRenderLayer(clone: HTMLElement, unescape: (s: string) => string): void {
+    const src = renderCodeSrc(clone);
+    if (!src) return;
+    const text = unescape(src);
+    // .hljs 先行：textContent 整体置换连带清掉其内嵌 [spin] 等渲染容器
+    clone.querySelectorAll(".hljs").forEach(e => { e.textContent = text; });
+    clone.querySelectorAll('[spin="1"]').forEach(e => {
+        if (e.closest(".hljs")) return; // 已随上方 .hljs 置换消解
+        e.textContent = text;
+    });
+}
+
+/** 摘抄标题取文（review #5）：getBlocksOwnText 同款逐块拼装（无渲染码块时逐字节等价
+ *  ——同走单块 getBlockOwnEditableText + filter + join("\n") + cleanText），唯渲染型
+ *  代码块改走 data-content 源码——getBlockOwnEditableText 对渲染块无「无 class 直子」
+ *  正文层，回退通道（getAllContentEditableText）抓 [spin] 画布里 contenteditable=false
+ *  容器的画布 CSS 垃圾进标题（6807 实测「[2]#mermaid20261012…{font-family:…}」，文档
+ *  树/页签直接可见；整摘 digestWhole 同链同源）。源码首行即语言语义，标题可读。破损块
+ *  （无 data-content）回退旧通道，宁脏不空（getBlockOwnEditableText 同哲学） */
+export function digestTitleTextOf(elements: Element[]): string {
+    return cleanText(elements.map(el => {
+        const src = isRenderedCodeBlock(el) ? renderCodeSrc(el) : "";
+        return src ? LuteUnEscapeHTMLStr(src) : getBlockOwnEditableText(el);
+    }).filter(t => !!t).join("\n"));
+}
+
+export async function getDigestMd(settings: TomatoSettings, selected: HTMLElement[], split: boolean, ref = true, checkbox = false, covers?: RangeCoverItem[]) {
     const md: string[] = [];
     if (selected == null || selected.length == 0) return { idx: "0", md };
     let idx: string;
@@ -510,6 +628,12 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
         if (!idx) idx = inBookIdx;
 
         const cloned = div.cloneNode(true) as HTMLDivElement;
+        // 渲染型代码块（mindmap/mermaid 等图语言）剥渲染层：画布不剥会被 BlockDOM2Md
+        // 当文字拍进摘抄产物；剥层后 Lute 只见 data-content 源码，自然产出 ```lang 围栏，
+        // 落摘抄文档后思源自动重渲染（导图即完整副本）。cleanDiv 是 tomato 共享函数
+        // （复制管线族共用），剥层在本管线 clone 后局部做，不动共享语义
+        const renderCode = isRenderedCodeBlock(cloned);
+        if (renderCode) stripCodeRenderLayer(cloned, LuteUnEscapeHTMLStr);
         // cloned.querySelectorAll(`div[${CONTENT_EDITABLE}="false"]`).forEach(e => e.setAttribute(CONTENT_EDITABLE, "true"));
         // const mOri = digestProgressiveBox.lute.BlockDOM2Md(cloned.outerHTML);
 
@@ -526,7 +650,16 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
         cloned.style.backgroundColor = "";
 
         const m = digestProgressiveBox.lute.BlockDOM2Md(cloned.outerHTML).trim();
-        if (!split || cloned.getAttribute(DATA_TYPE) === BlockNodeEnum.NODE_LIST || isMultiLineElement(m)) {
+        // 智能默认（2026-10-12）：部分圈住的块不整块复制，截选中文字按句切多块（④断句
+        // 组合）。covers 按引用对位源块；结构块（列表/表格/码块等多行 md）不截——截取
+        // 碎片会毁结构语义，回落整块摘现行为（截句对象=段落类叶子块，isClippableBlock
+        // 与 digest() Pro 门禁同源，review #4：两处判据漂移=门禁拦了实际整块摘的场景）
+        const cover = covers?.find(c => !c.full && c.clip
+            && c.block === div
+            && isClippableBlock(div)
+            && !renderCode // 渲染块不可截句/断句（导图拆句=毁图），走整块围栏
+            && !isMultiLineElement(m));
+        if (!cover && isWholeBlockDigest(split, cloned.getAttribute(DATA_TYPE), renderCode, m)) {
             md.push(m);
         } else {
             const parts = m.trim().split("\n");
@@ -536,23 +669,32 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
                 if (attrLine) parts.push(attrLine);
                 attrLine = '{: id=""}';
             }
-            // 09-22 □1 断句取文对齐就地断句 kramdown 通道：textContent 丢行内标记（样式/
-            // 引用进引擎前全丢）；正文容器按 09-15 结构判据收集（外来插件标注不混入），
-            // 套段落壳过 BlockDOM2Md 取存储形态 kramdown（**/span/==+IAL/块引用随句进
-            // 引擎）。判据失配（代码块等异构结构）回退旧 textContent 通道（宁丢样式不丢文本）。
-            const ownHTML = ownEditableChildrenHTML(cloned);
             let edit: string;
-            if (ownHTML !== null) {
-                const shell = document.createElement("div");
-                shell.setAttribute(DATA_NODE_ID, cloned.getAttribute(DATA_NODE_ID) ?? "");
-                shell.setAttribute(DATA_TYPE, "NodeParagraph");
-                shell.innerHTML = ownHTML;
-                edit = stripBlockIAL(digestProgressiveBox.lute.BlockDOM2Md(shell.outerHTML).trim());
+            if (cover) {
+                // 截句取文：clip 交集 range 的 HTML 过壳通道保行内样式，空产物回退纯文本
+                const frag = document.createElement("div");
+                frag.appendChild(cover.clip!.cloneContents());
+                edit = clipEditMd(frag.innerHTML, cover.clip!.toString(),
+                    cloned.getAttribute(DATA_NODE_ID) ?? "", d => digestProgressiveBox.lute.BlockDOM2Md(d));
             } else {
-                edit = getBlockOwnEditableText(cloned, "\n");
+                // 09-22 □1 断句取文对齐就地断句 kramdown 通道：textContent 丢行内标记（样式/
+                // 引用进引擎前全丢）；正文容器按 09-15 结构判据收集（外来插件标注不混入），
+                // 套段落壳过 BlockDOM2Md 取存储形态 kramdown（**/span/==+IAL/块引用随句进
+                // 引擎）。判据失配（代码块等异构结构）回退旧 textContent 通道（宁丢样式不丢文本）。
+                const ownHTML = ownEditableChildrenHTML(cloned);
+                if (ownHTML !== null) {
+                    const shell = document.createElement("div");
+                    shell.setAttribute(DATA_NODE_ID, cloned.getAttribute(DATA_NODE_ID) ?? "");
+                    shell.setAttribute(DATA_TYPE, "NodeParagraph");
+                    shell.innerHTML = ownHTML;
+                    edit = stripBlockIAL(digestProgressiveBox.lute.BlockDOM2Md(shell.outerHTML).trim());
+                } else {
+                    edit = getBlockOwnEditableText(cloned, "\n");
+                }
             }
             let ps = [edit];
-            ps = splitLines(ps);
+            // 截句产物遇多行（跨软换行/代码文本等异构截取）不盲切，整段一块保文本
+            ps = cover && isMultiLineElement(edit) ? ps : splitLines(ps);
             ps.map(p => replaceAll(p, "\u200b", "").trim())
                 .filter(p => !!p)
                 .filter(p => p != "@")

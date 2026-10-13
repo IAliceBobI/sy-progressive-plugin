@@ -286,6 +286,13 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // □3：cardHostExplicit=尾卡「再摘抄」钮的显式放行（forceCardHostFloatBar），
         // 两守卫都让路——守卫管自动出场，显式请求胜出
         if (events.isMobile || (hideBtnsInFlashCard.get() && !cardHostExplicit) || (freeSession && !cardHostExplicit)) {
+            // digest 胶囊先于浮条守卫（review 2026-10-12 #1/#2）：hideBtnsInFlashCard 只管
+            // 浮条不出场，title 区「✒ 身份 [状态] 📖回原书」胶囊=复习卡上唯一显式回原书
+            // 入口（hideBtnsInFlashCard 出厂默认 true，挂载留在守卫后=默认用户永远看不到）。
+            // markDigestTag 自带 digest 判据：digest 卡照挂；翻卡复用同一 Protyle（Title.render
+            // 只 setTitle 不清注入），普通卡/片卡在此剥掉上一张的胶囊残留（阴性也清）。
+            // isMobile 维持原守卫不挂（任务1「既有 isMobile 守卫不变」口径）
+            if (!events.isMobile) markDigestTag(protyle);
             show.set(false);
             return;
         }
@@ -367,6 +374,10 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // 语义不变：普通文档不出场（show=false 原样）。
         if (docID != null && nextKind == null) {
             markDigests(protyle, docID).catch(() => { });
+            // 摘抄胶囊残留清理（review 2026-10-12 #2）：同宿主 Protyle 切到普通文档
+            // （编辑器切页签/混合卡组翻到普通卡）时 Title.render 只 setTitle 不清注入，
+            // digest 胶囊残留成死钮——markDigestTag 阴性也清（头部清旧段先于 ctime 判定）
+            markDigestTag(protyle);
             // 期C 变形汇总：普通文档也可能被直送过入槽（血缘=源doc#块），同权补挂
             markMaterialTraces(protyle).catch(() => { });
             markMaterialTag(protyle).catch(() => { });
@@ -425,10 +436,10 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         markMaterials(protyle);
     }
     // 摘抄文档身份徽章（progpolish □4）：title 区注入「✒ 摘抄」胶囊（零落盘），
-    // 同出场链反复调用，markDigestTag 幂等清旧重挂；title 重渲染丢注入由下次事件补挂
-    if (nextKind === "digest") {
-        markDigestTag(protyle);
-    }
+    // 同出场链反复调用，markDigestTag 幂等清旧重挂；title 重渲染丢注入由下次事件补挂。
+    // 无条件调用（review 2026-10-12 #2）：非 digest 态（片/书/free）出场在此清同宿主
+    // 上一文档的胶囊残留（Title.render 切文档只 setTitle 不清注入；阴性也清=头部语义）
+    markDigestTag(protyle);
 }
 
 export function addClickEvent(element: HTMLElement) {

@@ -207,6 +207,12 @@ export function digestTagTipOf(label: string, r: SrcReach): string {
  * ——选中块带 progref 直跳原文块→parentID 是片则回片→片已删按序号重建→书兜底，
  * 浮条路径胶囊/「回原书」钮同款入口）；复访菜单入口不丢——浮条 ✧ 钮（case
  * "revisit"）与复访态类型胶囊（attachStateBadge st-click）仍开 openDigestReviewMenu。
+ * 「回原书」操作胶囊（复习卡需求）：同排并列第三颗——复习态浮条默认不出场
+ * （hideBtnsInFlashCard 出厂 true），官方复习卡宿主上胶囊=唯一显式回原书入口，点击同走
+ * 四级链；与状态胶囊（prog-digest-state）同随本函数挂载清理。⚠️挂载时序契约（review
+ * 2026-10-12 #1）：出场链对胶囊的调用必须先于 card__block 浮条守卫（ProgressiveBtn
+ * 卡宿主分支 return 前 + 尾部无条件调用）——hideBtnsInFlashCard 只管浮条，胶囊不随其
+ * 退场；挪回守卫后的 digest 分支=默认用户胶囊与浮条同生同灭，主场景落空。
  * 纯 DOM 注入零落盘；出场链五事件反复调用，幂等清旧重挂（markDigests 同哲学），
  * title 重渲染丢注入由下次出场事件补挂。
  * 安全性：本函数只动 title 区（.protyle-title__input 的兄弟节点），不碰 wysiwyg
@@ -269,6 +275,28 @@ export function markDigestTag(protyle: any) {
     const input = title.querySelector(".protyle-title__input");
     if (input) title.insertBefore(tag, input.nextSibling);
     else title.append(tag);
+    // 「回原书」操作胶囊（胶囊行并列）：点击与类型胶囊同款走 openOriginFromDigest
+    // 四级链——片摘自己的 progref 精确落原书原文位置，引用断了回落片→序号重切→书。
+    // 复习界面场景是本胶囊的存在理由：复习态浮条默认不出场（hideBtnsInFlashCard），
+    // 官方复习卡宿主与日常打开同一渲染链（revSrcGuard 头注「不做场景判别」），胶囊=
+    // 复习卡面上唯一显式回原书入口。挂 prog-digest-tag 主类=同排同款零新 CSS，头部
+    // 清旧段随之幂等；状态胶囊异步挂载锚类型胶囊右邻，终序稳定为 ✏️[状态]📖。
+    const origin = document.createElement("span");
+    origin.className = "prog-digest-tag prog-digest-origin";
+    origin.setAttribute("contenteditable", "false");
+    origin.innerHTML = `<svg><use xlink:href="#iconProgBook"></use></svg>${tomatoI18n.回原书}`;
+    origin.setAttribute("aria-label", `${tomatoI18n.回原书}\n${tomatoI18n.tip回原书}`);
+    origin.addEventListener("mouseenter", () => showFloatTip(origin));
+    origin.addEventListener("mouseleave", hideFloatTip);
+    origin.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        void prog.openOriginFromDigest(
+            protyle?.block?.rootID ?? "",
+            events.selectedDivsSync(protyle)?.ids ?? [],
+        );
+    });
+    title.insertBefore(origin, tag.nextSibling);
     // □1 类型胶囊（六态）：来源胶囊右邻，异步查询后代际守卫注入。清理已在本函数头部
     // 与来源胶囊同段做（阴性也清）；此处迟到查询只插不清——插入前按类再清一遍防
     // 出场链五事件并发双插（同文档同值，后到覆盖先到无害）
