@@ -3,10 +3,11 @@
     import { icon } from "../../sy-tomato-plugin/src/libs/utils";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import type { FloatDocKind } from "./progFloatState";
+    import { loadProgFloatBallPos, saveProgFloatBallPos } from "./progFloatBallStore";
 
     // v5 □5 悬浮球（收起态，docs/prog-v5-floatbar-design.md §2）：38px 中性壳 + 三态 glyph 微区分，
     // 无徽章无数字（到期数归浮条胶囊、欠债归状态栏火苗）；拖/点按位移 5px 区分；
-    // 位置记忆独立键（浮条展开态用共享 FloatBar 的 posKey，互不干扰）。
+    // 位置记忆独立档 progFloatBallPos（浮条展开态用共享 FloatBar 的 posKey，互不干扰）。
     interface PropsType {
         kind: FloatDocKind;
         title: string;
@@ -15,7 +16,6 @@
     }
     let { kind, title, point = 0, onExpand }: PropsType = $props();
 
-    const POS_KEY = "prog-floatball-pos";
     const GLYPH: Record<FloatDocKind, string> = {
         book: "iconProgBook",
         piece: "iconProgPiece",
@@ -25,17 +25,16 @@
 
     let ball: HTMLElement = $state();
     // □14 双浮条撞位：默认位与 recite 浮条 (200,200) 左上错开、落左下象限（渐进 v5 未发布
-    // 无存量负担，recite 侧不动）；拖过一次后各自 localStorage 位置记忆，默认位只服务首场
+    // 无存量负担，recite 侧不动）；拖过一次后各落 progFloatBallPos 工作空间档（lsfix
+    // 2026-10-13：桌面随机端口 origin 下 localStorage 跨重启必丢），默认位只服务首场
     let x = $state(200);
     let y = $state(Math.max(0, window.innerHeight - 200));
 
-    try {
-        const pos = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
-        if (pos?.x != null && pos?.y != null) {
-            x = pos.x;
-            y = pos.y;
-        }
-    } catch { /* 坏数据回默认位置 */ }
+    const saved = loadProgFloatBallPos();
+    if (saved) {
+        x = saved.x;
+        y = saved.y;
+    }
 
     function clamp() {
         if (!ball) return;
@@ -44,9 +43,7 @@
     }
 
     function save() {
-        try {
-            localStorage.setItem(POS_KEY, JSON.stringify({ x, y }));
-        } catch { /* 存储不可用静默 */ }
+        saveProgFloatBallPos({ x, y });
     }
 
     let dragging = false;

@@ -21,7 +21,7 @@ import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openBuyDialog } from "../../sy-tomato-plugin/src/BuyDialog";
 import { isObject, Siyuan, tryFixCfg } from "../../sy-tomato-plugin/src/libs/utils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, mobileSelectBtns, mobileTopBar, cardAppendTime, flashcardShowPath, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, floatbarSlotEntryShow, readCurveSweepMins, readCurveTakeover, pieceAutoCard, readCurveReadingPoint, readCurvePlainDocs,
+import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, progFloatBallPos, floatBarPos, mobileSelectBtns, mobileTopBar, cardAppendTime, flashcardShowPath, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, floatbarSlotEntryShow, readCurveSweepMins, readCurveTakeover, pieceAutoCard, readCurveReadingPoint, readCurvePlainDocs,
     readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, extractAllNoBacktraceLink, extractNoteNoBacktraceLink, extractNoteNoBlankLine, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveDueMenu, userID, userToken, licenseCloudSynced, claimActive, windowOpenStyle, slotTreeExpanded } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
 import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
@@ -191,6 +191,12 @@ function loadStore(plugin: BaseTomatoPlugin) {
     floatbarFlatManifest.load(plugin);
     digSubrankOpen.load(plugin);
     floatbarExpandPref.load(plugin);
+    // 渐进悬浮球（收起态）位置记忆（lsfix 2026-10-13 家族战役）：原 localStorage 桌面端
+    // 随机端口跨重启必丢——漏 load 则消费方 set/write 全部静默无效（settings.md 四步对账）
+    progFloatBallPos.load(plugin);
+    // 摘抄浮条位置记忆字典档（同战役）：消费方 libs/FloatBar.svelte 经 tomato 共享 barrel
+    // 进本插件 bundle，登记只能落渐进侧 loadStore（登记员漏网，收官对账补上）
+    floatBarPos.load(plugin);
 }
 
 export default class ThePlugin extends BaseTomatoPlugin {
