@@ -25,6 +25,7 @@ import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
 import { rollerNextBook, rollerMarkRead, rollerMarkWrite, rollerArchiveBook, gateBlocked, gateFallbackPoint, rollerTodayGate, rollerTodaysFullIDs, activeFullIDs, manualFirstExcerptGuide } from "./roller";
 import { invalidateTailToday } from "./tailCardAppend";
 import { pieceHasChildDocs } from "./pieceGuard";
+import { convertCurrentReviewCard, mountReadCardPanelSection, unmountReadCardPanelSection } from "./readCardPanel";
 import { DOC_NOTES_KEY } from "./noteAssembly";
 import { notifyFleetChanged } from "./fleetNotify";
 // need-1001-02：digestDueState（到期摘抄计数 store）——fleet 基座层数据，移动端
@@ -75,6 +76,7 @@ export const Progressive上一页 = winHotkey("ctrl+left", "上一页", "iconPro
 export const Progressive下一页 = winHotkey("ctrl+right", "下一页", "iconProgFFast", () => tomatoI18n.下一页)
 export const Progressive跳到分片或回到原文 = winHotkey("⇧⌥w", "跳到分片或回到原文", "iconProgSwap", () => tomatoI18n.跳到分片或回到原文)
 export const Progressive添加当前文档到渐进阅读分片模式 = winHotkey("⇧⌥m", "添加当前文档到渐进阅读(分片模式)", "iconProgAddBook", () => tomatoI18n.添加当前文档到渐进阅读分片模式)
+export const Progressive互转阅读推送 = winHotkey("⇧⌥C", "progReadCardConvert", "iconRiffCard", () => tomatoI18n.互转阅读推送)
 // □1-③ 直接入槽（鸟 09-08 反馈③）：dev 实测 keymap 全量扫描 ⌥⌘ 字母已全占（官方+四插件；
 // 初选 ⌥⌘O 撞 recite 练靶实锤后弃）、⇧⌥ 仅剩 S 且有 AIBox 关态暗雷（keymap 扫描盲区在案），
 // 落 ⌥;——纯 ⌥ 符号键全 keymap 无占用、无 macOS 系统冲突，与 ⌥-（开始阅读）同族单修饰风格
@@ -115,6 +117,7 @@ class Progressive {
         this.batchPoolDialog?.destroy();
         this.batchPoolDialog = null;
         delete (window as any).__progReadCurve;
+        unmountReadCardPanelSection();
     }
 
     async onload(plugin: Plugin, settings: TomatoSettings) {
@@ -174,6 +177,16 @@ class Progressive {
                 void this.directSlotCommand();
             }
         });
+        // 刘璐互转：复习界面当前卡一键互转（阅读卡→记忆卡 / 普通卡→加入推送，
+        // 判向同面板按钮 panelFaceOf；非复习界面 no-op）
+        this.plugin.addCommand({
+            langKey: Progressive互转阅读推送.langKey,
+            langText: Progressive互转阅读推送.langText(),
+            hotkey: Progressive互转阅读推送.m,
+            callback: () => {
+                void convertCurrentReviewCard();
+            },
+        });
         // □2 物理分卷：低频工具（一本书用一次）不占默认键，命令面板可触达
         this.plugin.addCommand({
             langKey: "progSplitVolsCurrent",
@@ -183,6 +196,9 @@ class Progressive {
                 void this.splitVolsDialogFromActive();
             }
         });
+        // 刘璐互转：闪卡工具面板「阅读推送」段注册（takeover 门控在段 render 内——
+        // 关闭即空段，翻卡即时反映；无需在此读开关）
+        mountReadCardPanelSection();
         // progpush □3：原生复习「跳过」→推迟明天（grow/sched 曲线卡 due=明天 00:00，曲线
         // 零消耗）。click-flashcard-action=内核卡动作广播（payload={type,card}，-3=跳过；
         // npm siyuan 类型包尚无此枚举，as any 绕过）。非曲线卡 defer 内判键零动作放行原生语义。

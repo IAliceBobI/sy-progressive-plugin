@@ -201,6 +201,29 @@ export function digestTagTipOf(label: string, r: SrcReach): string {
     return `${label}\n${tomatoI18n.来源不可达}`;
 }
 
+// 书名+可达性缓存（「回原书」胶囊带书名）：出场链五事件+翻卡反复幂等重挂，每次
+// 重挂重发 srcReachOf（getBlockInfo+lsNotebooks 两连）+ok 态 getBlockAttrs 取名会
+// 放大——60s TTL 防放大（refMapOf 同哲学，只增不清 reload 清零；不接
+// invalidateDigestMarker——那是摘抄落库钩子，书名/笔记本开关与它无关，TTL 过期兜底）。
+const bookReachCache = new Map<string, { reach: SrcReach; title: string; ts: number }>();
+
+/** 书可达性+书名：可达性走 srcReachOf（closed 软失败必须查 lsNotebooks——裸
+ *  getBlockAttrs 刚关笔记本照常返回会误显书名）；书名走 getBlockAttrs(bookID).title
+ *  （srcReachOf().title=getBlockInfo().rootTitle 是树根语义，书非顶层文档时非书名，
+ *  digestCrumbs 同款）。书名查询失败落空串（ok+空名走「来源不可达」兜底，
+ *  digestTagTipOf 既有语义）。 */
+async function bookReachOf(bookID: string): Promise<{ reach: SrcReach; title: string }> {
+    const hit = bookReachCache.get(bookID);
+    if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit;
+    const reach = await srcReachOf(bookID);
+    const title = reach.reason === "ok"
+        ? String((await siyuan.getBlockAttrs(bookID).catch(() => null))?.title ?? "")
+        : "";
+    const entry = { reach, title, ts: Date.now() };
+    bookReachCache.set(bookID, entry);
+    return entry;
+}
+
 /**
  * 摘抄文档标题区身份徽章（progpolish □4）：摘抄文档出场时在 .protyle-title 注入
  * 「✒ 摘抄」胶囊，点击跳回摘抄来源（need-0925-03：openOriginFromDigest 四级链
@@ -279,13 +302,21 @@ export function markDigestTag(protyle: any) {
     // 四级链——片摘自己的 progref 精确落原书原文位置，引用断了回落片→序号重切→书。
     // 复习界面场景是本胶囊的存在理由：复习态浮条默认不出场（hideBtnsInFlashCard），
     // 官方复习卡宿主与日常打开同一渲染链（revSrcGuard 头注「不做场景判别」），胶囊=
-    // 复习卡面上唯一显式回原书入口。挂 prog-digest-tag 主类=同排同款零新 CSS，头部
-    // 清旧段随之幂等；状态胶囊异步挂载锚类型胶囊右邻，终序稳定为 ✏️[状态]📖。
+    // 复习卡面上唯一显式回原书入口。挂 prog-digest-tag 主类=同排同款视觉（origin 仅
+    // 多一条换行覆写规则见 index.scss .prog-digest-origin），头部清旧段随之幂等；状态
+    // 胶囊异步挂载锚类型胶囊右邻，终序稳定为 ✏️[状态]📖。
     const origin = document.createElement("span");
     origin.className = "prog-digest-tag prog-digest-origin";
     origin.setAttribute("contenteditable", "false");
-    origin.innerHTML = `<svg><use xlink:href="#iconProgBook"></use></svg>${tomatoI18n.回原书}`;
-    origin.setAttribute("aria-label", `${tomatoI18n.回原书}\n${tomatoI18n.tip回原书}`);
+    // 基础文案按 kind 分叉：素材档语境词「回出处」（浮条 isMaterialDoc 同款——素材来源
+    // 不一定是书）；piece/book/free 统一「回原书」。free 不排除带名——书移出注册表的
+    // 存量卡 digestTagKind 落 free 但 ctime bookID 非空、书通常仍在库，复习场景照样要
+    // 扫一眼知道是哪本书；free-self（三链全空 bookID=发起普通文档）显「回原书：{发起
+    // 文档名}」与点击去向（parentDoc）一致，措辞偏差与现状 free 裸「回原书」同级。
+    const originLabel = kind === "material" ? tomatoI18n.回出处 : tomatoI18n.回原书;
+    const originTip = kind === "material" ? tomatoI18n.tip回出处 : tomatoI18n.tip回原书;
+    origin.innerHTML = `<svg><use xlink:href="#iconProgBook"></use></svg>${originLabel}`;
+    origin.setAttribute("aria-label", `${originLabel}\n${originTip}`);
     origin.addEventListener("mouseenter", () => showFloatTip(origin));
     origin.addEventListener("mouseleave", hideFloatTip);
     origin.addEventListener("click", (ev) => {
@@ -297,14 +328,37 @@ export function markDigestTag(protyle: any) {
         );
     });
     title.insertBefore(origin, tag.nextSibling);
+    // 书名异步补写：先挂基础文案占位再补（异步只改文本，不动 listener/锚点——出场链
+    // 五事件并发的清旧重挂契约见 markDigests 头注）。发起条件=bookID 非空（畸形/远古
+    // 档 ctime 首段空直接跳过零 API）。bookReachOf 60s TTL 判三态；代际守卫同
+    // digestBadgeInputOf（切文档/页签断连丢弃迟到结果）。ok 带名→innerHTML 整段重建
+    // （svg use 必须走 innerHTML 通道；书名 escapeHtml 防注入破胶囊结构）；closed/gone
+    // 只降级 aria-label 不动 innerHTML——按钮不摘不停（点击四级链 live 查询重开笔记本
+    // 即恢复；tip 文案 60s TTL 过期或 reload 后自愈，缓存只增不清）。
+    const ctime = wys.getAttribute(PDIGEST_CTIME) ?? "";
+    const bookID = parseBookIDFromCtime(ctime);
+    if (bookID) {
+        bookReachOf(bookID).then(({ reach, title: bookName }) => {
+            if (!origin.isConnected || !wys.isConnected || wys.getAttribute(PDIGEST_CTIME) !== ctime) return;
+            if (reach.reason === "ok" && bookName) {
+                const withName = kind === "material"
+                    ? tomatoI18n.回出处带名(bookName)
+                    : tomatoI18n.回原书带书名(bookName);
+                origin.innerHTML = `<svg><use xlink:href="#iconProgBook"></use></svg>${escapeHtml(withName)}`;
+                origin.setAttribute("aria-label", `${withName}\n${originTip}`);
+            } else if (reach.reason === "closed") {
+                origin.setAttribute("aria-label", `${originLabel}\n${tomatoI18n.来源在关闭的笔记本}`);
+            } else {
+                origin.setAttribute("aria-label", `${originLabel}\n${tomatoI18n.来源不可达}`);
+            }
+        }).catch(() => { });
+    }
     // □1 类型胶囊（六态）：来源胶囊右邻，异步查询后代际守卫注入。清理已在本函数头部
     // 与来源胶囊同段做（阴性也清）；此处迟到查询只插不清——插入前按类再清一遍防
     // 出场链五事件并发双插（同文档同值，后到覆盖先到无害）
-    const ctime = wys.getAttribute(PDIGEST_CTIME) ?? "";
     const docID = protyle?.block?.rootID ?? "";
     if (!docID) return;
     const titleText = (title.querySelector(".protyle-title__input")?.textContent ?? "").trim();
-    const bookID = parseBookIDFromCtime(ctime);
     digestBadgeInputOf(docID, titleText)
         .then((badgeInput) => {
             // 代际守卫：同 protyle 切文档（ctime 变）/页签关闭（断连）后丢弃迟到结果

@@ -2017,6 +2017,17 @@ html[data-theme-mode="dark"] .prog-digest-tag {
   background: transparent;
 }
 
+/* 「回原书」胶囊带书名：不截断、超长自然换行——显式 normal 防主类未来加 nowrap 连
+   带动；max-width 压住行宽上限（inline-flex shrink-to-fit 受可用宽度约束，中文可断）；
+   overflow-wrap 兜匿名 flex item min-width:auto 的长英文词溢出。独立覆写不动
+   .prog-digest-tag 主类=类型胶囊/已入N槽/dark 变体零波及，旧副本（seller 内嵌）对
+   新选择器免疫 */
+.prog-digest-tag.prog-digest-origin {
+  white-space: normal;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 /* floatbar □1 类型胶囊（来源胶囊右邻同款骨架）：六态类型色固定色板（明暗各一档，
    白底 4.5:1+ 达标）+ color-mix currentColor 底/描边（material-tag 配方，色随态走）；
    b3 语义变量仅两处——error（到期红）与 primary（仿写=主题色），跨主题自适应 */
@@ -2577,6 +2588,57 @@ html[data-theme-mode="dark"] .prog-material-tag {
 .prog-revcard .card__action:has(> button) .prog-revcard-next-el {
   display: none;
 }
+// 刘璐互转：tomato 闪卡工具面板「阅读推送」段（容器 .ext-section 归 tomato；
+// 体例对齐面板 .act-row 白底行——灰窗上白底块、hover 主蓝淡底）
+.prog-rcpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prog-rcpanel__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  // div 默认 content-box：min-height+padding 撑到 34px 高于 .act-row（button 天然
+  // border-box）28px 白底行体例——对齐面板必须显式 border-box（视觉评审 P 级发现）
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--b3-theme-on-surface);
+  background-color: var(--b3-theme-background);
+  overflow: hidden;
+}
+.prog-rcpanel__status svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+.prog-rcpanel__convert {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--b3-theme-on-surface);
+  background-color: var(--b3-theme-background);
+  cursor: pointer;
+}
+.prog-rcpanel__convert:hover {
+  background-color: var(--b3-theme-primary-lightest);
+  color: var(--b3-theme-primary);
+}
+.prog-rcpanel__convert svg {
+  width: 14px;
+  height: 14px;
+}
+
 // 常态白芯片：b3-button--white 同族（固定浅底 #fafbfc/主色字，明暗两态常态可见，
 // 同行「跳过」同款）。不挂 b3-button 类：官方 .card .card__action .b3-button (0,3,0)
 // 带 display:block+width:100%+padding:8px 0 会把直接子级徽标拉成全宽块。
