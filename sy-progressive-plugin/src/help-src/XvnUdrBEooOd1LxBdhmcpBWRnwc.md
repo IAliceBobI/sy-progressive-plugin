@@ -102,6 +102,7 @@
 | 制卡无引用 | Alt+S | 免费 |
 | 多行标记（多行合卡） | Shift+Alt+Enter | 免费 |
 | 移动到上一分片内 / 下一分片内（挪片） | Ctrl+Alt+U / Ctrl+Alt+I | 免费 |
+| 互转阅读推送（当前复习卡：转为记忆卡 / 加入推送） | Shift+Alt+C | 免费 |
 | 收集内容到文件 | Shift+Alt+O | Pro |
 | 提取所有分片的笔记 | Ctrl+F4 | Pro |
 | 提取笔记到底部 | Shift+Alt+R | Pro |
