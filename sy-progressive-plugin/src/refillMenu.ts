@@ -16,6 +16,10 @@ export type RefillMode = AsList | "no" | null;
 
 export const REFILL_MODES: readonly RefillMode[] = ["no", null, "p", "t", "i"];
 
+/** 摘抄重插档位（2026-10-18 群反馈 650189）：滤 null「按书的断句设置」档——摘抄无书级
+ *  auto 断句概念（fullfilContent 的 auto 分流读 BookInfo，摘抄侧不适用），只留直选四档 */
+export const DIGEST_REFILL_MODES: readonly RefillMode[] = ["no", "p", "t", "i"];
+
 /** 纯逻辑：档位标签（菜单项次序=REFILL_MODES 数组序） */
 export function refillModeLabel(stype: RefillMode): string {
     switch (stype) {
@@ -49,14 +53,26 @@ export function refillModeLocked(stype: RefillMode, paid: boolean): boolean {
     return !paid && (stype === "p" || stype === "t" || stype === "i");
 }
 
+/** 菜单变体覆盖（2026-10-18 摘抄重插）：confirm 文案覆盖（摘抄版专用警告——闪卡连坐/
+ *  截选整段恢复）+ 档位过滤（DIGEST_REFILL_MODES）。全可选缺省=分片行为零变化 */
+export interface RefillMenuOpts {
+    confirmTitle?: string;
+    confirmContent?: string;
+    modes?: readonly RefillMode[];
+}
+
 /** 菜单入口：选档 → confirm 清空警告 → runner(stype)。ev 坐标 0（键盘触发）落屏中 */
 export function openRefillMenu(
     ev: { clientX: number; clientY: number },
     runner: (stype: RefillMode) => void | Promise<void>,
+    opts?: RefillMenuOpts,
 ) {
     const paid = lastVerifyResult();
+    const modes = opts?.modes ?? REFILL_MODES;
+    const confirmTitle = opts?.confirmTitle ?? tomatoI18n.重插清空确认标题;
+    const confirmContent = opts?.confirmContent ?? tomatoI18n.重插清空确认内容;
     const menu = new (Menu as any)("progRefillMenu", undefined, true) as Menu;
-    for (const stype of REFILL_MODES) {
+    for (const stype of modes) {
         const locked = refillModeLocked(stype, paid);
         menu.addItem({
             ...refillModeIcon(stype, locked),
@@ -64,8 +80,8 @@ export function openRefillMenu(
             click: locked
                 ? () => void siyuan.pushMsg(tomatoI18n.断句Pro提示, 2500)
                 : () => confirm(
-                    tomatoI18n.重插清空确认标题,
-                    tomatoI18n.重插清空确认内容,
+                    confirmTitle,
+                    confirmContent,
                     () => { void runner(stype); },
                 ),
         });

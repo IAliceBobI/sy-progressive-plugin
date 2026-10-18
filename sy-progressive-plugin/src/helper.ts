@@ -406,8 +406,9 @@ export async function fullfilContent(point: number, bookID: string, piecePre: st
  * insertBlockAsChildOf(parentID) 是头插——新内容落在残留空块之前，产物尾部永久挂一个
  * 无 IAL 空块（首建同理：createNote 建空文档自带空块）。fullfilContent 收尾统一清掉：
  * 本轮插入块全带内容/IAL（上游 filter 过空 markdown），getChildBlocks 实时通道不吃 SQL
- * 索引延迟；文档此时已有内容，删空块不触发内核补块（dev 实验双验证 2026-09-01）。 */
-async function removePieceEmptyBlocks(noteID: string) {
+ * 索引延迟；文档此时已有内容，删空块不触发内核补块（dev 实验双验证 2026-09-01）。
+ * 2026-10-18 摘抄重插（digestRefill）同条件复用，export 供 Progressive 侧消费。 */
+export async function removePieceEmptyBlocks(noteID: string) {
     try {
         const blocks = await siyuan.getChildBlocks(noteID);
         const empty = (blocks ?? []).filter(b => b.type === "p" && !(b.content ?? "").trim());

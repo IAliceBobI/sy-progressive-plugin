@@ -330,7 +330,8 @@ export const FREE_ALL_MAIN_IDS = new Set(FREE_ALL_MAIN.map(b => b.id));
  * kind/icon 与既有各态同源同值（跨态同 id 必同 icon）：swap/continue/archive 沿 book 态
  * icon、card 族 5 项沿 EXTRA_MAIN；kind 档按 digest 语义——primary 唯一=recite〔未装时
  * origin〕故 continue/swap 均 normal，archive 退出语义 ghost，card 族 normal（本是 UI 层
- * ADV_GROUPS 高级组成员）。❌ 不补（bear 认过）：whole/contents/traceUp/移片提取重插翻片族。
+ * ADV_GROUPS 高级组成员）。❌ 不补（bear 认过）：whole/contents/traceUp/移片提取翻片族
+ * （重插族 2026-10-18 重开入池，见下 refill 行注）。
  * 片/书态专属动作（toPiece 等）不入池。
  */
 const DIGEST_ALL_MAIN: FloatButtonSpec[] = [
@@ -353,6 +354,10 @@ const DIGEST_ALL_MAIN: FloatButtonSpec[] = [
     { id: "cardDailyN", icon: "iconProgCardDailyN", kind: "normal", group: "scene" },
     { id: "multi", icon: "iconProgMulti", kind: "normal", group: "scene" },
     { id: "collect", icon: "iconProgCollect", kind: "normal", group: "scene" },
+    // 摘抄重插（2026-10-18 群反馈 650189）：重开 09-12「❌ 不补重插族」拍板——行块血缘
+    // （custom-progref）齐备，「整块原样摘抄改断句摘抄」免删卡→重选→重摘三步；与片态
+    // refill 同 id 同 icon（跨态同 id 必同 icon），digest 态分发走 digestRefill 行血缘重拉
+    { id: "refill", icon: "iconProgRefill", kind: "normal", group: "scene" },
 ];
 
 /** 摘抄态全量池 id 集（mainIds 载入/落盘过滤面，同 PIECE_ALL_MAIN_IDS 语义） */
@@ -451,8 +456,9 @@ export function buildFlatCells(kind: FloatDocKind, opts?: { mainIds?: string[]; 
                 .filter(id => !inMain.has(id) && !(id === "recite" && opts.reciteInstalled === false));
         }
         // digestpool 扩容 8 项垫尾（09-12）：固有分支=池-出厂首行 同构（freepool/book 态
-        // 先例），出厂平铺区从 1 格变 9 格（默认首行编排不变）
-        return ["map", "swap", "continue", "archive", "card", "cardHere", "cardDailyN", "multi", "collect"];
+        // 先例），出厂平铺区从 1 格变 9 格（默认首行编排不变）；refill 垫尾（2026-10-18
+        // 摘抄重插，同「池-出厂首行」同构）
+        return ["map", "swap", "continue", "archive", "card", "cardHere", "cardDailyN", "multi", "collect", "refill"];
     }
     // free（群反馈 650189）：书态基础入口——contents/traceUp 复用书态浮层（free 摘抄
     // ctime 自指 docID，清单浮层按 noteID 即查）；期2 ignore=不再推送（该源文档全部

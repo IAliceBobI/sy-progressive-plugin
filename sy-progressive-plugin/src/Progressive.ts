@@ -62,7 +62,8 @@ import { loadBookStatuses, invalidateBookStatusCache, type BookStatusInfo } from
 import { pieceRowsNoneInsertable, pieceUnbuildable } from "./pieceEmpty";
 import { mount, unmount } from "svelte";
 import { get } from "svelte/store";
-import { fullfilContent } from "./helper";
+import { fullfilContent, removePieceEmptyBlocks } from "./helper";
+import { collectDigestProgrefs, planDigestRefill } from "./digestRefillLogic";
 import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
 import { pressSkip, showCardAnswer } from "../../sy-tomato-plugin/src/libs/cardUtils";
 import { addSelectionMLButtons, disposeSelectionML, getSelectionML } from "../../sy-tomato-plugin/src/libs/selectionML";
@@ -1557,6 +1558,79 @@ class Progressive {
             }
             // revtrace「拆装不算修订」：重插=清空重建，新块 updated=插入时刻会整片
             // 误报「刚改」——推基线到操作后（新块≤基线全无色）+作废 updated 快照缓存
+            await progStorage.bumpRevTraceBaseline(noteID);
+            invalidateRevTrace(noteID);
+            await utils.sleep(constants.IndexTime2Wait);
+        });
+    }
+
+    /** 摘抄重插（群反馈 2026-10-18 用户650189）：与 refillPiece 同骨架——与
+     *  htmlBlockReadNextPeice 共锁防并发、先验源块存活再清空（clearAll 不可逆，防「清了
+     *  旧的插不回新的」）；id 来源换成行血缘 custom-progref（不走书索引）。刻意不复用
+     *  fullfilContent：它 updateBookInfoTime、按 showLastBlock 拉 piecePre 前块、给片尾插
+     *  tail card——三件对摘抄都不该发生；填充复用 splitAndInsert / fastCopyBlock /
+     *  removePieceEmptyBlocks 底层件。 */
+    async digestRefill(noteID: string, stype: AsList | "no"): Promise<void> {
+        await this.withProgLock(constants.HtmlBlockReadNextPeiceLock, async () => {
+            // 行收集：getChildBlocks 保文档序，行血缘从 SQL 侧 ial 解析（DOM 先例
+            // digestUtils.init 的爬链不取——重插面向数据面，不吃渲染窗口）
+            const children = await siyuan.getChildBlocks(noteID);
+            const rows = await siyuan.getRows((children ?? []).map(c => c.id), "ial");
+            const progrefs = collectDigestProgrefs(rows);
+            if (progrefs.length === 0) {
+                await siyuan.pushMsg(tomatoI18n.该摘抄没有可重插的内容);
+                return;
+            }
+            // 源块验活拿 markdown：已删块 getRows 不返回；全灭（悬空/空内容）中止
+            const sourceRows = await siyuan.getRows(progrefs, "id,markdown,type");
+            const plan = planDigestRefill(rows, sourceRows);
+            if (!plan.ok) {
+                await siyuan.pushMsg(tomatoI18n.该摘抄没有可重插的内容);
+                return;
+            }
+            // 断句 bookID：ctime 源书且仍注册才传（booksInfo 对未注册 id 会落鬼书记录+toast
+            // ——ProgressiveStorage.ts:249 起）；书已删/非书札记传空串，booksInfo("")={}
+            // 零副作用，仅少 addIndex2paragraph 的 [N] 前缀
+            const docAttrs = await siyuan.getBlockAttrs(noteID);
+            const ctimeBook = parseBookIDFromCtime(docAttrs?.[PDIGEST_CTIME] ?? "");
+            const bookID = ctimeBook && progStorage.isRegisteredBook(ctimeBook) ? ctimeBook : "";
+            await siyuan.clearAll(noteID);
+            try {
+                let splited = false;
+                if (stype !== "no") {
+                    // p/t/i 走断句（内含 Pro 门禁：未激活 pushMsg 后 return false 回落整块复制）
+                    splited = await help.splitAndInsert(bookID, noteID, stype, plan.ids);
+                }
+                if (!splited) {
+                    // 整块复制：attrs 全新两键（无 id/updated 可继承=清空语义）、progref=源块
+                    // id（fastCopyBlock 内写）、origin-text=1；idx 不传=不落分片式段落序号装饰。
+                    // IAL 有损面（评审记）：不 parseIAL 源块 ial——源块其余 custom 属性与摘抄行
+                    // 原有 custom-in-book-index（helper.findBack/findForward 序号重切回退链输入）
+                    // 一并不落；源块是书原文无渐进键、摘抄行已被 clearAll，影响仅限该回退链
+                    const rowMap = new Map(sourceRows.map(r => [r.id, r]));
+                    const allContent: string[] = [];
+                    for (const id of plan.ids) {
+                        const row = rowMap.get(id);
+                        const attrs = { "custom-prog-origin-text": "1" } as AttrType;
+                        allContent.push(await help.fastCopyBlock(0, {} as BookInfo, id, row?.markdown ?? "", row?.type ?? "p", attrs));
+                    }
+                    const content = allContent.filter(i => !!i);
+                    if (content.length > 0) {
+                        await siyuan.insertBlockAsChildOf(content.join("\n\n"), noteID);
+                    }
+                }
+                await removePieceEmptyBlocks(noteID);
+            } catch (e) {
+                // clearAll 不可逆（笔记已删），重插中途失败必须让用户知道可重试自愈
+                //（refillPiece 同款口径）
+                console.error("digestRefill failed", e);
+                await siyuan.pushMsg(tomatoI18n.重插失败提示, 4000);
+                return;
+            }
+            // revtrace「拆装不算修订」（bumpRevTraceBaseline 契约：重插/就地断句等删旧插新
+            // 须调，ProgressiveStorage.ts:549）：摘抄文档在 prog 档范围内（revTrace
+            // isProgDocBySignals 含 custom-pdigest-* 锚键），新块 updated=插入时刻会整篇
+            // 误报「刚改」——推基线到操作后+作废 updated 快照缓存；未 enroll 文档 bump 自动 no-op
             await progStorage.bumpRevTraceBaseline(noteID);
             invalidateRevTrace(noteID);
             await utils.sleep(constants.IndexTime2Wait);

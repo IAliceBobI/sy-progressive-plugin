@@ -50,7 +50,7 @@
     import { isProtylePiece } from "./helper";
     import { openReviewSchedMenu, openDigestReviewMenu, removeRevisitBySource } from "./reviewMenu";
     import { PdigestReviewKey, ReviewKey, parseReview, isDue } from "./reviewQueue";
-    import { openRefillMenu } from "./refillMenu";
+    import { openRefillMenu, DIGEST_REFILL_MODES } from "./refillMenu";
     import { splitInPlaceCommand } from "./splitInPlace";
 
     // v5 □5 浮条三态（docs/prog-v5-floatbar-design.md）：球（收起）↔ 浮条（展开）同屏只显示一个；
@@ -406,7 +406,10 @@
         toPiece: () => tip3(tomatoI18n.跳到分片, tomatoI18n.tip跳到分片, Progressive跳到分片或回到原文.w()), // book 态池钮（□2 就地跳片）
         archive: () => tip3(tomatoI18n.归档本书, isMaterialDoc ? tomatoI18n.tip归档写作书 : tomatoI18n.tip归档本书), // book 态池钮；素材语境 tip 点明归档对象=写作书（matflow □2，名实已符不改名）
         contents: () => tip3(tomatoI18n.打开目录, tomatoI18n.tip打开目录),
-        refill: () => tip3(tomatoI18n.重插, tomatoI18n.tip重插),
+        // refill 跨态异义（2026-10-18 摘抄重插）：digest 态=清空本篇摘抄按所选方式重插原文
+        //（闪卡一并清除）；片/书态=分片语境文案（清空本片含手写笔记）——next/prev/origin 同款 $kind 特判
+        refill: () => tip3(tomatoI18n.重插,
+            $kind === "digest" ? tomatoI18n.tip重插摘抄 : tomatoI18n.tip重插),
         clean: () => tip3(tomatoI18n.删原文, tomatoI18n.tip删原文),
         nextPure: () => tip3(tomatoI18n.下一个分片, tomatoI18n.tip下一个分片, Progressive下一页.w()),
         delBack: () => tip3(tomatoI18n.上片删, tomatoI18n.tip上片删),
@@ -1304,9 +1307,30 @@
                 })());
                 break;
             }
-            case "refill": // □22 重插翻新：断句选档菜单 → confirm 清空警告 → refillPiece
-                openRefillMenu(ev ?? { clientX: 0, clientY: 0 },
-                    stype => prog.refillPiece($bookID, $noteID, $point, stype));
+            case "refill": // □22 重插翻新：断句选档菜单 → confirm 清空警告 → refillPiece。
+                // 2026-10-18 群反馈 650189 摘抄版：digest 态按行血缘（custom-progref）重拉
+                // digestRefill——档位滤 null（摘抄无书级 auto）、confirm 换摘抄专用警告；
+                // 写作槽守卫（上方 isWritingPiece 拦截）不受影响，素材文档（digest 态）
+                // 照常可用、confirm 警告兜底
+                if ($kind === "digest") {
+                    // digestID 开菜单前捕获（P1-2 纪律，matDel/openSlotMenuForDigest 同款）：选档
+                    // 菜单+confirm 两层悬窗期切页签后 $noteID 漂到新文档，懒读会对错文档 clearAll
+                    const digestID = $noteID;
+                    openRefillMenu(ev ?? { clientX: 0, clientY: 0 },
+                        stype => prog.digestRefill(digestID, stype as AsList | "no"),
+                        {
+                            confirmTitle: tomatoI18n.摘抄重插确认标题,
+                            confirmContent: tomatoI18n.摘抄重插确认内容,
+                            modes: DIGEST_REFILL_MODES,
+                        });
+                    break;
+                }
+                { // 片态同款（low-1 一起修）：开菜单前捕获，防两层悬窗期漂到新文档/新书；
+                  // 块内 const $store 触发 svelte 订阅域限制，走 get() 同步快照（crumbs 竞态守卫同款）
+                    const curBookID = get(bookID), curNoteID = get(noteID), curPoint = get(point);
+                    openRefillMenu(ev ?? { clientX: 0, clientY: 0 },
+                        stype => prog.refillPiece(curBookID, curNoteID, curPoint, stype));
+                }
                 break;
             case "clean":
                 await prog.htmlBlockReadNextPeice($bookID, $noteID, HtmlCBType.cleanOriginText, $point);
