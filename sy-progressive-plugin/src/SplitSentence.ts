@@ -1,5 +1,6 @@
 import { PARAGRAPH_INDEX, PROG_ORIGIN_TEXT, RefIDKey } from "../../sy-tomato-plugin/src/libs/gconst";
 import { escapeLead, mergeMathLead } from "./escapeLead";
+import { splitQuoteMd } from "./splitQuote";
 import { NewNodeID, get_siyuan_lnk_md, siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { Plugin } from "siyuan";
 import { prog } from "./Progressive";
@@ -58,11 +59,30 @@ export class SplitSentence {
             if (!ref) ref = row.id;
             if (!idx) idx = String(i);
             if (row.type == "h" || isMultiLineElement(row.markdown)) {
-                const { newID, attrLine } = getAttrLineWithID(ref, idx);
-                this.textAreas.push({
-                    blocks: [{ text: row.markdown + `\n${attrLine}`, id: newID }],
-                    ref,
-                });
+                // 引述块断句（飞书 2026-10-20 用户650189）：SQL markdown 列形态（> 行族、IAL
+                // 在独立列）剥壳走 splitQuoteMd，结构句/单句回落下方整块现状。三档同一引述
+                // 形态（不套列表/任务壳、不加 [i] 索引——多行结构块既有待遇）；块尾 \n 是
+                // insert() 同 textArea join("") 拼接约定。attrLine 回调内嵌新 id，blocks.id
+                // 须同次生成（firstID 打开定位）——副作用收集按产物顺序对位
+                const ids: string[] = [];
+                const quote = row.markdown.startsWith("> ") ? splitQuoteMd(row.markdown, {
+                    attrLine: () => {
+                        const { newID, attrLine } = getAttrLineWithID(ref, idx);
+                        ids.push(newID);
+                        return attrLine;
+                    },
+                    backtrace: () => ` ${get_siyuan_lnk_md(ref, "  *  ", prog.settings.pieceNoBacktraceLink)}`,
+                    trailingNewline: true,
+                }) : null;
+                if (quote) {
+                    this.textAreas.push({ blocks: quote.map((text, k) => ({ text, id: ids[k] })), ref });
+                } else {
+                    const { newID, attrLine } = getAttrLineWithID(ref, idx);
+                    this.textAreas.push({
+                        blocks: [{ text: row.markdown + `\n${attrLine}`, id: newID }],
+                        ref,
+                    });
+                }
             } else {
                 // if (dontSplit(row.markdown)) {
                 //     row.markdown = getAllContentEditableText((await getBlockDiv(row.id))?.div, "");

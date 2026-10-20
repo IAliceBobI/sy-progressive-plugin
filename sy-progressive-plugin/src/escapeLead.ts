@@ -17,7 +17,8 @@
 // 字面节点。review P2-1 加固：名单补 type 1 延续 tag（script/style/pre/textarea）+
 // i flag（type 6 匹配本就大小写不敏感；3.8.4 实测大写 <DIV>/<?php 片首落段落无损，
 // 此为防内核升级行为漂移的零成本防线，正则其余分支无字母大小写敏感项）。
-const LEAD_ESCAPE_RE = /^(?:>|#{1,6}(?:\s|$)|[*+-](?:\s|$)|\d{1,9}[.)](?:\s|$)|```|~~~|<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|pre|script|section|source|style|summary|table|tbody|td|textarea|tfoot|th|thead|title|tr|track|ul)(?:[\s/>]|$)|<!--|[-*_]{3,})/i;
+// export 供 splitQuote 复用为引述壳内「结构行」判据（块级 tag 名单单一事实源，勿复制一份）
+export const LEAD_ESCAPE_RE = /^(?:>|#{1,6}(?:\s|$)|[*+-](?:\s|$)|\d{1,9}[.)](?:\s|$)|```|~~~|<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|pre|script|section|source|style|summary|table|tbody|td|textarea|tfoot|th|thead|title|tr|track|ul)(?:[\s/>]|$)|<!--|[-*_]{3,})/i;
 
 export function escapeLead(text: string): string {
     if (!LEAD_ESCAPE_RE.test(text)) return text;

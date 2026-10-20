@@ -21,6 +21,7 @@ import { parseBookIDFromCtime } from "./progData";
 import { isDigestHostDoc } from "./progFloatState";
 import { bookCommentsFromRows, type BookCommentItem, type BookCommentRow } from "./digestComments";
 import { ownEditableChildrenHTML, stripBlockIAL } from "./splitInPlaceCore";
+import { splitQuoteMd } from "./splitQuote";
 import { sanitizeVolName } from "./splitCore";
 
 // □12 摘抄标记零触碰统一（2026-08-30）：+ 链接（addPlusLnk）与写 style 背景（changeBG）
@@ -606,6 +607,14 @@ export function digestTitleTextOf(elements: Element[]): string {
     }).filter(t => !!t).join("\n"));
 }
 
+/** 引述块 md（BlockDOM2Md 产物）末行顶格 {: …}=块自身 IAL；非 "> " 形态或无尾 IAL 返 null
+ *  （引述断句据此回落整块——与 p 档 parts.pop 取法同源，但不接 {: id=""} 兜底） */
+function quoteTailIAL(m: string): string | null {
+    if (!m.startsWith("> ")) return null;
+    const last = m.slice(m.lastIndexOf("\n") + 1);
+    return last.startsWith("{:") ? last : null;
+}
+
 export async function getDigestMd(settings: TomatoSettings, selected: HTMLElement[], split: boolean, ref = true, checkbox = false, covers?: RangeCoverItem[]) {
     const md: string[] = [];
     if (selected == null || selected.length == 0) return { idx: "0", md };
@@ -660,7 +669,17 @@ export async function getDigestMd(settings: TomatoSettings, selected: HTMLElemen
             && !renderCode // 渲染块不可截句/断句（导图拆句=毁图），走整块围栏
             && !isMultiLineElement(m));
         if (!cover && isWholeBlockDigest(split, cloned.getAttribute(DATA_TYPE), renderCode, m)) {
-            md.push(m);
+            // 引述块断句（飞书 2026-10-20 用户650189）：isMultiLineElement 把 "> " 块拦进本分支
+            // 原样整摘——纯文本引述可拆，剥壳走 splitQuoteMd；结构句/单句回落整块。attrLine
+            // 恒用 m 自带尾 IAL（真 id，cloned 已 setAttribute 的 progref/index 随行；p 档
+            // 兜底占位符 {: id=""} 对引述句块不可沿用——空串实测毒化整行 IAL），无尾 IAL 不拆。
+            // 不套 checkbox（列表壳毁 > 形态）；cover 判据在上游已把引述排除（非 clippable）
+            const tailIAL = quoteTailIAL(m);
+            const quote = split && tailIAL ? splitQuoteMd(m, {
+                attrLine: () => tailIAL,
+                backtrace: () => ref ? get_siyuan_lnk_md(originID, "  *  ", digestProgressiveBox.settings.digestNoBacktraceLink) : "",
+            }) : null;
+            md.push(...(quote ?? [m]));
         } else {
             const parts = m.trim().split("\n");
             let attrLine = parts.pop();
