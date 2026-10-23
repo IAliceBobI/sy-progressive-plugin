@@ -29,7 +29,12 @@
     import { openFloatPopover, closeFloatPopover } from "./overlays";
     import { showDialog } from "../../sy-tomato-plugin/src/libs/DialogText";
     import { mount, onMount } from "svelte";
-    import { showFloatTip, hideFloatTip, destroyFloatTip } from "./floatTip";
+    import { showFloatTip, hideFloatTip, destroyFloatTip, tipCovers, tipContainsPoint } from "./floatTip";
+    // B1/B2 帮助直达：映射表 + 分篇弹窗（渐进 help.json 快照源，index.ts 设置头同款先例）
+    import { FLOATBAR_BTN_HELP, FLOATBAR_STATE_HELP } from "./floatbarHelpMap";
+    import helpDocs from "./help.json";
+    import { openHelpDialog } from "../../sy-tomato-plugin/src/libs/helpDialog";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
     import DigestTreePopover from "./DigestTreePopover.svelte";
     import BookCardsPopover from "./BookCardsPopover.svelte";
     import ContentsPopover from "./ContentsPopover.svelte";
@@ -1727,8 +1732,33 @@
         const t = ev.target as HTMLElement;
         const btn = t.closest?.(".prog-fb .prog-fbtip") as HTMLElement | null;
         if (!btn || btn === tipTarget) return; // 按钮内子元素间移动不重弹
+        // 被 tip 盖住的按钮不激活新 tip：鼠标移向「详细说明」详情行的路径穿越
+        // tip 覆盖区，pointer-events:none 使事件穿透命中背后按钮，不拦则 tip
+        // 换目标重弹、详情行永远点不到（2026-10-22 用户实测报告）
+        if (tipTarget && tipCovers(btn)) return;
         tipTarget = btn;
-        showFloatTip(btn);
+        // 同源换目标先无条件销账（B2 收口配套）：浮条按钮互移无 mouseleave（onFloatOut
+        // 豁免 body 内互移），不销账 A→B 会被 showFloatTip 的他源守卫拦住不换文案
+        hideFloatTip();
+        showFloatTip(btn, undefined, { detail: helpDetail(btn) });
+    }
+    // B1 帮助详情行：helpKey 命中的按钮 tip 末行挂「详细说明」直达分篇弹窗——id 三层
+    // DOM 标识（主排 data-fb-id / 平铺 data-fb-flat-id / 条件钮与子排 data-fb-help），
+    // 映射源 floatbarHelpMap.ts；url 拼法照 ConfHelpIcon（?from=from_copylink 尾参）
+    function helpDetail(btn: HTMLElement): { label: string; onClick: () => void } | undefined {
+        const id = btn.dataset.fbId ?? btn.dataset.fbFlatId ?? btn.dataset.fbHelp;
+        const token = id ? FLOATBAR_BTN_HELP[id] : undefined;
+        if (!token) return undefined;
+        return {
+            label: tomatoI18n.详细说明,
+            // 开弹窗即收摊 tip 并重置 tipTarget：floatTip 详情行 click 只 hideFloatTip
+            // 不清 tipTarget，弹窗遮住按钮期间浏览器不补发 mouseout，关弹窗后再 hover
+            // 同钮会撞 btn === tipTarget 早退不重弹（「藏后同钮不弹」的详情行变体）
+            onClick: () => {
+                hideTip();
+                openHelpDialog(`https://my.feishu.cn/docx/${token}?from=from_copylink`, helpDocs);
+            },
+        };
     }
     function onFloatOut(ev: MouseEvent) {
         if (!tipTarget) return;
@@ -1736,7 +1766,14 @@
         // 判据用 .floatbar-body 而非 .prog-fb（reasoning review P2-1）：head 标题区在
         // body 外且自带 b3-tooltips ✕ 钮——按根判会双气泡并存（我们的 tip 不隐 + ✕ 的
         // CSS 气泡起）；按钮区（主排/平铺/子排）全在 body 内，行内互移不隐。
-        if (!to?.closest?.(".floatbar-body")) hideTip();
+        // #prog-float-tip 豁免（B1 详情行模式）：鼠标从按钮移入 tip 不隐、移出 tip 才
+        // 隐——纯提示模式 pointer-events:none 事件穿透，此豁免永不命中、行为不变。
+        // B2 桥区豁免（tipContainsPoint 带 tipTarget 锚，含 tip↔按钮间的 gap 缝隙）：
+        // body 顶行锚钮上方豁免区只有 padding-top 4px，tip 底=anchor.top−5，指针从
+        // 按钮走向详情行必经 tip 盖住的 head/文档区——hit 目标不在 .floatbar-body 内，
+        // 不豁免则缓速移动每次 mouseout 都 hideTip、详情行永远到不了（2026-10-22）。
+        if (tipContainsPoint(ev.clientX, ev.clientY, tipTarget)) return;
+        if (!to?.closest?.(".floatbar-body, #prog-float-tip")) hideTip();
     }
     onMount(() => {
         // 条内滚动（.floatbar-body ov:auto）时按钮动而 fixed 气泡不动——capture 级滚动即隐。
@@ -1804,11 +1841,13 @@
         {#if isWritingPiece}
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                data-fb-help="insertMaterial"
                 aria-label={tip3(tomatoI18n.插入素材, tomatoI18n.tip插入素材)}
                 onclick={() => openMaterialPickerForPiece()}
             >{@html icon("iconProgMaterial", 16)}</button>
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                data-fb-help="splitPiece"
                 aria-label={tip3(tomatoI18n.拆为新片, tomatoI18n.tip拆为新片)}
                 onclick={() => openSplitPieceFromBar()}
             >{@html icon("iconProgSplit", 16)}</button>
@@ -1826,6 +1865,7 @@
             >{@html icon("iconDown", 16)}</button>
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                data-fb-help="pieceDone"
                 aria-label={tip3(pieceDone ? tomatoI18n.解除定稿 : tomatoI18n.定稿,
                     pieceDone ? tomatoI18n.tip解除定稿 : tomatoI18n.tip定稿)}
                 onclick={() => togglePieceDone()}
@@ -1833,6 +1873,7 @@
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
                 class:prog-fb-pro={$progPaid === false}
+                data-fb-help="compile"
                 aria-label={tip3(tomatoI18n.汇编成稿, tomatoI18n.tip汇编成稿)}
                 onclick={() => compileWritingFromBar()}
             >{@html icon("iconProgMerge", 16)}</button>
@@ -1840,6 +1881,7 @@
         {#if slotEntryOK && $kind === "digest"}
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                data-fb-help="slotIn"
                 aria-label={tip3(tomatoI18n.入槽, isMaterialDoc ? tomatoI18n.tip入槽素材 : tomatoI18n.tip入槽)}
                 onclick={(e) => openSlotMenuForDigest(e)}
             >{@html icon("iconProgPiece", 16)}</button>
@@ -1850,10 +1892,20 @@
         {#if slotEntryOK && ($kind === "piece" || $kind === "free" || $kind === "book") && !isWritingPiece}
             <button
                 class="prog-fb-btn prog-fb-btn--normal prog-fbtip"
+                data-fb-help="directSlot"
                 aria-label={tip3(tomatoI18n.直接入槽, tomatoI18n.tip直接入槽)}
                 onclick={(e) => openDirectSlotMenu(e)}
             >{@html icon("iconProgMaterial", 16)}</button>
         {/if}
+        <!-- B2 角落帮助直达：首行行尾（折叠钮左侧）iconHelp 按态直达分篇；ProgConfHelpIcon
+             的 token 是一次性 props（挂载即定死），{#key $kind} 态切换整棵重建换篇
+             （kind 空窗兜底 piece，mainStoreOf 同款）；内建 b3-tooltips CSS 气泡在
+             .floatbar-body 内会被裁切，样式压掉防双气泡，tooltip 走外层 prog-fbtip 自建单例 -->
+        {#key $kind}
+            <span class="prog-fb-help prog-fbtip" aria-label={tomatoI18n.帮助}>
+                <ProgConfHelpIcon token={FLOATBAR_STATE_HELP[$kind ?? "piece"]} />
+            </span>
+        {/key}
         {#if flatCells.length > 0 || writingCluster.length > 0 || materialCluster.length > 0 || flatView.adv.some(g => g.length > 0)}
             <!-- □14b 折叠钮：首行行尾，chevron 指向即动作方向（展开中显示⌃=收起） -->
             <button
@@ -1958,6 +2010,7 @@
             {#each digIds as id (id)}
                 <button
                     class="prog-fb-btn--sm prog-fbtip"
+                    data-fb-help={id}
                     aria-label={DIG_TIPS[id]?.() ?? id}
                     onclick={(e) => onDig(id, e)}
                 >{@html icon(DIG_ICONS[id], 14)}</button>
@@ -2030,6 +2083,23 @@
     .prog-fb-fold:hover {
         background: var(--b3-list-hover);
         opacity: 1;
+    }
+    /* B2 首行行尾帮助直达：包 ProgConfHelpIcon（iconHelp 内核 sprite）与折叠钮并排成行尾
+       角落。margin 归零交 row gap 统一（conf-help-icon 自带 6px 是设置面板分区标题语境）；
+       压掉内建 b3-tooltips CSS 气泡（.floatbar-body 内被裁切，见 tooltip 头注释）——
+       外层 prog-fbtip 已走自建 tip，不压会双气泡并存。伪元素选择器带两 类+容器
+       提特异性，稳赢内核 .b3-tooltips:hover::after（样式注入顺序不可控，平手不可靠） */
+    .prog-fb-help {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+    }
+    .prog-fb-help :global(.conf-help-icon.b3-tooltips) {
+        margin-left: 0;
+    }
+    .prog-fb-help :global(.conf-help-icon.b3-tooltips)::after {
+        content: none;
+        display: none;
     }
     /* □14c 拖拽反馈：源钮半透明（首行/平铺区通用）+ 首行插入指示 accent 竖条 +
        平铺区拖拽中的「移出目标」淡 accent 高亮（vision review P2） */

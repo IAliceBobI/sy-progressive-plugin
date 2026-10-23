@@ -13,7 +13,7 @@ import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { revTraceScope } from "../../sy-tomato-plugin/src/libs/stores";
 import { BOOK_WRITING, MarkKey, PDIGEST_CTIME, PDIGEST_INDEX, PDIGEST_LAST_ID, PDIGEST_PARENT_ID } from "../../sy-tomato-plugin/src/libs/gconst";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
-import { showFloatTip, hideFloatTip } from "./floatTip";
+import { showFloatTip, hideFloatTip, tipOwnedByOther } from "./floatTip";
 import { progStorage } from "./ProgressiveStorage";
 
 /** 生成本地时间 14 位内核同构时间戳（实现在 tomato timeUtil.kernelTimeNow；enrollment
@@ -239,10 +239,12 @@ export function clearRevTrace(welement: HTMLElement) {
         if (el.tagName === "SPAN") { el.remove(); return; }
         stripRevTraceClasses(el);
     });
-    // 剥染连带收 tip（清旧重打/关功能后悬停源已逝，靠下次 mouseover 重显）
+    // 剥染连带收 tip（清旧重打/关功能后悬停源已逝，靠下次 mouseover 重显）；
+    // B2 守卫：单例已被浮条顶走时只销账不藏（hide 会偷藏浮条 tip）
     if (tipOwner) {
+        const owner = tipOwner;
         tipOwner = null;
-        hideFloatTip();
+        if (!tipOwnedByOther(owner)) hideFloatTip(owner);
     }
 }
 
@@ -296,7 +298,7 @@ function stripRevTraceClasses(div: HTMLElement) {
     }
     if (tipOwner === div) {
         tipOwner = null;
-        hideFloatTip();
+        if (!tipOwnedByOther(div)) hideFloatTip(div); // B2 同守卫：不藏被浮条占着的单例
     }
 }
 
@@ -543,20 +545,25 @@ function ensureHoverDelegate(welement: HTMLElement) {
             }
         }
         if (tip && div) {
+            // tipOwnedByOther 守卫（B2）：浮条 tip 详情行模式下指针穿其覆盖区会穿透
+            // 命中染色块，不拦则偷换单例（协议见 floatTip.ts tipHost）
+            if (tipOwnedByOther(div)) return;
             tipOwner = div;
             showFloatTip(div, { text: tip.text, anchorRect: tip.anchor });
             return;
         }
         if (tipOwner) {
+            // 单例已被浮条顶走时只销账不藏（hide 会偷藏浮条 tip）
+            if (!tipOwnedByOther(tipOwner)) hideFloatTip(tipOwner);
             tipOwner = null;
-            hideFloatTip();
         }
     });
     welement.addEventListener("mouseout", (e: MouseEvent) => {
         // 移出整个编辑器（relatedTarget 在 wysiwyg 外/null）才收——块内/块间移动交给 mouseover 重判
         if (tipOwner && !welement.contains(e.relatedTarget as Node)) {
+            // 同 B2 守卫：被顶走只销账不藏，防偷藏浮条 tip
+            if (!tipOwnedByOther(tipOwner)) hideFloatTip(tipOwner);
             tipOwner = null;
-            hideFloatTip();
         }
     });
 }

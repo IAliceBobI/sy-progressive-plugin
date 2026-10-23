@@ -191,16 +191,32 @@ html[data-theme-mode="dark"] {
 // v5 □5 浮条系统（docs/prog-v5-floatbar-design.md §3/§4）：展开态按钮/胶囊/子排凹槽。
 // 三态色零占有（状态归火苗），全部 accent/strong/soft 三档编织层级。
 // ============================================================
-// 浮条 tooltip 自建单例（floatTip.ts）：复用思源 .tooltip 类观感，但纯提示勿拦指针
+// 浮条 tooltip 自建单例（floatTip.ts）：复用思源 .tooltip 类观感；纯提示模式勿拦指针
 // （原生 #tooltip 因同步悬浮要点链接而刻意可拦——会与按钮 hover 几何互扰，见
 // debugging/e2e/floatbar.md「平铺区按钮 tooltip 会被行容器裁切」□1 增量）。规则挂 id 常驻，show 里
-// removeAttribute("style") 清定位不误伤。
+// removeAttribute("style") 清定位不误伤。容器恒 pointer-events:none 勿拦指针（原生
+// 单例因同步悬浮要点链接而刻意可拦，我们无此需求）；detail 模式（--detail 类）也仅
+// 解锁「详细说明」详情行本身——northTipPos 北侧不足翻南侧时整盒 auto 的 tip 会压住
+// 平铺区按钮/浮条头部吞其 hover（vision评审），收窄到行后 tip 主体区照旧穿透。
 #prog-float-tip {
   pointer-events: none;
   /* □4⑤ review P1：盖过 prog-popover 浮窗族（z 1000）——写作现场分片浮窗常驻时
      hover 底栏火苗，欠债来源拆分等增量文案不再被浮窗截断（内核 .tooltip 同档 z
      恰被压住，自建单例提一档；Dialog 模态层更高但模态时火苗不可 hover 无冲突） */
   z-index: 1001;
+}
+/* 详情行（B1 帮助直达）：主体文案 textContent 折行之后独立成行，亮蓝示可点。
+   视觉评审 P1（2026-10-22）：勿用主题主色/primary-light——tip 恒深底（思源
+   --b3-tooltips-background：daylight #312f35 / midnight #030303），浅色主题主色
+   ≈#3571e6 落深底仅 2.93:1 不过 AA；primary-light 是 rgba 透明度变量（daylight
+   .54/midnight .72）混深底后更暗亦不可用。固定亮蓝 #8ab4f8 两主题同过 AA
+   （精算 6.26:1 / 9.78:1），小字号帮助直达入口可读性优先 */
+.prog-float-tip-detail {
+  display: block;
+  margin-top: 4px;
+  color: #8ab4f8;
+  cursor: pointer;
+  pointer-events: auto; // tip 容器恒 none，仅本行接指针（可点+可移入）
 }
 
 .prog-fb .prog-fb-btn {

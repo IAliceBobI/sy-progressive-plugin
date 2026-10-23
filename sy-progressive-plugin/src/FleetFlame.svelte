@@ -43,7 +43,7 @@
 <button
     class="prog-flame"
     onmouseenter={(e) => showFloatTip(e.currentTarget)}
-    onmouseleave={hideFloatTip}
+    onmouseleave={(e) => hideFloatTip(e.currentTarget)}
     data-state={state}
     aria-label={tooltip}
     onclick={() => onStart()}

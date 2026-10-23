@@ -10,7 +10,7 @@ import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { MATERIAL_KEY } from "./writeBook";
-import { showFloatTip, hideFloatTip } from "./floatTip";
+import { showFloatTip, hideFloatTip, tipOwnedByOther } from "./floatTip";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { escapeHtml } from "./progData";
 
@@ -156,8 +156,10 @@ export async function markMaterialTraces(protyle: any) {
         span.setAttribute("contenteditable", "false");
         // 自建元素对思源 tip 生态隐身——aria 须接 #prog-float-tip 单例（materialMarker
         // 同款，reasoning P2-2：3px 细条 hover 零提示=可发现性差）
-        span.addEventListener("mouseenter", () => showFloatTip(span));
-        span.addEventListener("mouseleave", () => hideFloatTip());
+        // tipOwnedByOther 守卫（B2）：浮条 tip 详情行模式下指针穿其覆盖区会穿透命中
+        // 本 span，不拦则偷换单例；leave 同守卫防反向偷藏（协议见 floatTip.ts tipHost）
+        span.addEventListener("mouseenter", () => { if (!tipOwnedByOther(span)) showFloatTip(span); });
+        span.addEventListener("mouseleave", () => { if (!tipOwnedByOther(span)) hideFloatTip(span); });
         span.addEventListener("click", (ev) => {
             ev.stopPropagation();
             ev.preventDefault();

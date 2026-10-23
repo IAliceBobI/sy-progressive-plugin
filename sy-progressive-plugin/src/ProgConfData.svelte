@@ -5,6 +5,7 @@
     import { onMount } from "svelte";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
     import { progStorage } from "./ProgressiveStorage";
     import { consolidateDigests, restoreDigests, findDocByIal, getDocIalDigestHub } from "./progData";
 
@@ -69,7 +70,7 @@
 </script>
 
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.数据管理}</div>
+    <div class="section-title">{tomatoI18n.数据管理}<ProgConfHelpIcon token="XvnUdrBEooOd1LxBdhmcpBWRnwc" /></div>
     <div class="settingBox dev-row">
         <span class="kbd">prog-data</span>
         <span>{progDataPath || tomatoI18n.progData未创建说明}</span>

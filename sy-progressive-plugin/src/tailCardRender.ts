@@ -17,7 +17,7 @@ import { prog } from "./Progressive";
 import { digestProgressiveBox } from "./DigestProgressiveBox";
 import { openRefillMenu } from "./refillMenu";
 import { openFloatPopover, closeFloatPopover } from "./overlays";
-import { showFloatTip, hideFloatTip } from "./floatTip";
+import { showFloatTip, hideFloatTip, tipOwnedByOther } from "./floatTip";
 import { openVisitNoteInput } from "./visitNoteInput";
 import DigestTreePopover from "./DigestTreePopover.svelte";
 import { formatDueCount } from "./progFloatState";
@@ -198,9 +198,10 @@ function mkBtn(a: TailAction, d: TailCardBlockData): HTMLButtonElement {
     const tip = a.tip?.() ?? a.label();
     // tooltip 走自建 #prog-float-tip 单例（浮条同款，AGENTS 军规：勿原生 title——长文案
     // 左缘裁剪坑）；aria-label=单例数据源+无障碍
+    // tipOwnedByOther 守卫（B2）：浮条 tip 占单例时指针穿透命中本钮不偷换/偷藏
     b.setAttribute("aria-label", tip);
-    b.addEventListener("mouseenter", () => showFloatTip(b));
-    b.addEventListener("mouseleave", hideFloatTip);
+    b.addEventListener("mouseenter", () => { if (!tipOwnedByOther(b)) showFloatTip(b); });
+    b.addEventListener("mouseleave", () => { if (!tipOwnedByOther(b)) hideFloatTip(b); });
     b.innerHTML = `${icon(a.icon, 13)}<span class="prog-tailcard__blabel">${a.label()}</span>`;
     // stopPropagation 双保险（btnProcessor 先例）：内核事件隔离外再挡一道冒泡
     b.addEventListener("click", ev => {
@@ -290,8 +291,9 @@ function renderCard(element: HTMLElement, content: string): void {
         cardsChip.className = "prog-tailcard__chip prog-tailcard__chip--cards";
         cardsChip.dataset.act = "cards";
         cardsChip.setAttribute("aria-label", tomatoI18n.附属卡);
-        cardsChip.addEventListener("mouseenter", () => showFloatTip(cardsChip));
-        cardsChip.addEventListener("mouseleave", hideFloatTip);
+        // tipOwnedByOther 守卫同上（B2，协议见 floatTip.ts tipHost）
+        cardsChip.addEventListener("mouseenter", () => { if (!tipOwnedByOther(cardsChip)) showFloatTip(cardsChip); });
+        cardsChip.addEventListener("mouseleave", () => { if (!tipOwnedByOther(cardsChip)) hideFloatTip(cardsChip); });
         cardsChip.textContent = tomatoI18n.附属卡;
         cardsChip.addEventListener("click", ev => {
             ev.stopPropagation();

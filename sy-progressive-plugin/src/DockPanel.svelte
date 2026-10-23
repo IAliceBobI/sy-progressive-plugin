@@ -45,7 +45,10 @@
     }
 
     // 手动书体验补课 □2：手动书 hover 书卡给行为说明（点击开原书、片=摘抄）。
-    // 复用浮条自建 tip 单例（aria-label 驱动，非手动书无 label 自动无 tip）
+    // 复用浮条自建 tip 单例（aria-label 驱动，非手动书无 label 自动无 tip）。
+    // B2 收口（2026-10-22）：书卡停浮条 tip 覆盖区（LeftBottom 舰队 dock 与浮条默认位
+    // 同域）——enter 偷换/leave 偷藏已由 floatTip 单例守卫拦下（showFloatTip 顶部拒
+    // 他源 show、leave 传 owner 拒他源藏），此处不再单独前置守卫
     function onCardEnter(ev: MouseEvent) {
         showFloatTip(ev.currentTarget as HTMLElement);
     }
@@ -276,7 +279,7 @@
                             class:manual={book.manual}
                             aria-label={book.manual ? tomatoI18n.手动书说明 : undefined}
                             onmouseenter={onCardEnter}
-                            onmouseleave={hideFloatTip}
+                            onmouseleave={(e) => hideFloatTip(e.currentTarget as HTMLElement)}
                             onclick={(e) => cardClick(e, book)}
                             oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); lpCancel(); openBookMenu(e, book, actions); }}
                             onpointerdown={(e) => lpStart(e)}

@@ -9,10 +9,11 @@
         pieceTailCard,
     } from "../../sy-tomato-plugin/src/libs/stores";
     import NotebookSelect from "../../sy-tomato-plugin/src/NotebookSelect.svelte";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
 </script>
 
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.基础设置}</div>
+    <div class="section-title">{tomatoI18n.基础设置}<ProgConfHelpIcon token="XvnUdrBEooOd1LxBdhmcpBWRnwc" /></div>
     <div>
         <!-- □2 选择化：原 0-6 裸数字输入改下拉，存量值原样兼容；脏值兜底失效占位 -->
         <select class="b3-select" bind:value={$windowOpenStyle}>

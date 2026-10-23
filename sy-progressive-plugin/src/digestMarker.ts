@@ -18,7 +18,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { parseBookIDFromCtime, escapeHtml } from "./progData";
 import { PIECE_IDX_KEY, digestTagKind } from "./originTrace";
 import { progStorage } from "./ProgressiveStorage";
-import { showFloatTip, hideFloatTip } from "./floatTip";
+import { showFloatTip, hideFloatTip, tipOwnedByOther } from "./floatTip";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { buildDigestMenuItems, digestJumpOf, groupDigestRows, mergeRefRows, DigestRow } from "./digestList";
 import { digestStateOf, digestStateIcon } from "./digestState";
@@ -280,8 +280,9 @@ export function markDigestTag(protyle: any) {
         srcReachOf(parentID).then((r) => {
             tag.setAttribute("aria-label", digestTagTipOf(label, r));
         }).catch(() => { });
-        tag.addEventListener("mouseenter", () => showFloatTip(tag));
-        tag.addEventListener("mouseleave", hideFloatTip);
+        // tipOwnedByOther 守卫（B2）：浮条 tip 占单例时指针穿透命中本胶囊不偷换/偷藏
+        tag.addEventListener("mouseenter", () => { if (!tipOwnedByOther(tag)) showFloatTip(tag); });
+        tag.addEventListener("mouseleave", () => { if (!tipOwnedByOther(tag)) hideFloatTip(tag); });
     }
     tag.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -317,8 +318,9 @@ export function markDigestTag(protyle: any) {
     const originTip = kind === "material" ? tomatoI18n.tip回出处 : tomatoI18n.tip回原书;
     origin.innerHTML = `<svg><use xlink:href="#iconProgBook"></use></svg>${originLabel}`;
     origin.setAttribute("aria-label", `${originLabel}\n${originTip}`);
-    origin.addEventListener("mouseenter", () => showFloatTip(origin));
-    origin.addEventListener("mouseleave", hideFloatTip);
+    // tipOwnedByOther 守卫同 tag（B2，协议见 floatTip.ts tipHost）
+    origin.addEventListener("mouseenter", () => { if (!tipOwnedByOther(origin)) showFloatTip(origin); });
+    origin.addEventListener("mouseleave", () => { if (!tipOwnedByOther(origin)) hideFloatTip(origin); });
     origin.addEventListener("click", (ev) => {
         ev.stopPropagation();
         ev.preventDefault();

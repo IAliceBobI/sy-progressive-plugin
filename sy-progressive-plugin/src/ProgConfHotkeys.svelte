@@ -3,6 +3,7 @@
     // 壳（Settings.svelte）负责导航双栏/单域渲染/搜索聚合，本组件只是「快捷键」域的卡片
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import HotkeyCap from "../../sy-tomato-plugin/src/HotkeyCap.svelte";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
     import {
         digest执行摘抄,
         digest执行摘抄并断句,
@@ -39,7 +40,7 @@
 </script>
 
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.快捷键如有冲突请调整}</div>
+    <div class="section-title">{tomatoI18n.快捷键如有冲突请调整}<ProgConfHelpIcon token="XvnUdrBEooOd1LxBdhmcpBWRnwc" /></div>
     <div>
         {progSettingsOpenHK.langText()}<HotkeyCap hk={progSettingsOpenHK} pluginName="sy-progressive-plugin"></HotkeyCap>
     </div>

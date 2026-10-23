@@ -8,6 +8,7 @@
     import { openUnlockDialog } from "../../sy-tomato-plugin/src/unlockDialog";
     import { siyuan } from "../../sy-tomato-plugin/src/libs/utils";
     import { devProPreview } from "../../sy-tomato-plugin/src/libs/devProPreview";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
     // v5 □8 皮肤系统：三维正交货架 + 参数微调（Pro=整个皮肤系统买断，锁绑激活态）
     import {
         PROG_THEMES, PROG_FLAMES, PROG_PANELS,
@@ -103,7 +104,7 @@
 <!-- 皮肤系统：三维正交货架（配色/火苗形态/容器材质）+ 参数微调。
      Pro=¥72 一个价（□9 终稿：皮肤系统+断句+生词 AI+收集/写作对比），免费默认款不退化；锁卡点击弹统一解锁框 -->
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.皮肤外观}</div>
+    <div class="section-title">{tomatoI18n.皮肤外观}<ProgConfHelpIcon token="U23idAY0UorKIkxmcOCc7Iwbnkf" /></div>
 
     <div class="prog-skins-sub">{tomatoI18n.配色主题}</div>
     <div class="prog-skins-row prog-skins-row--six">

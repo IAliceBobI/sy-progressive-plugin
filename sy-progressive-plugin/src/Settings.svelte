@@ -15,6 +15,9 @@
     import { saveRestorePagePosition } from "../../sy-tomato-plugin/src/libs/utils";
     import { searchSettings } from "../../sy-tomato-plugin/src/libs/ui";
     import { lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
+    // 渐进自家分篇帮助快照（2026-10-22）：McpPromo 的 helpToken 是渐进主篇 token，
+    // 须配渐进快照才命中秒开弹窗（缺省回落 tomato 快照会查空回落外链）
+    import helpDocs from "./help.json";
     import ProgConfDigest from "./ProgConfDigest.svelte";
     import ProgConfCard from "./ProgConfCard.svelte";
     import ProgConfFloatbar from "./ProgConfFloatbar.svelte";
@@ -240,7 +243,7 @@
                 {:else if id === "data"}
                     <ProgConfData></ProgConfData>
                 {:else if id === "mcp"}
-                    <McpPromo plugin="progressive"></McpPromo>
+                    <McpPromo plugin="progressive" helpToken="ZZr9dGoIno5pnVxn2vpch6BCn3f" {helpDocs}></McpPromo>
                 {/if}
             {/snippet}
             {#if searchKey}

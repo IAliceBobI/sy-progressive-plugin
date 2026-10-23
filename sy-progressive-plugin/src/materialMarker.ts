@@ -4,7 +4,7 @@
 // 零改动**（痕迹只由 span 承载）。幂等：出场链反复调用清旧重挂（protolyte 懒加载窗口
 // 丢标补挂）。
 import { OpenSyFile2 } from "../../sy-tomato-plugin/src/libs/docUtils";
-import { showFloatTip, hideFloatTip } from "./floatTip";
+import { showFloatTip, hideFloatTip, tipOwnedByOther } from "./floatTip";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { MATERIAL_KEY } from "./writeBook";
 
@@ -36,8 +36,10 @@ export function markMaterials(protyle: any) {
             ev.preventDefault();
             if (pluginRef) void OpenSyFile2(pluginRef, anchorID);
         });
-        span.addEventListener("mouseenter", () => showFloatTip(span));
-        span.addEventListener("mouseleave", () => hideFloatTip());
+        // tipOwnedByOther 守卫（B2，materialTrace 同款）：浮条 tip 占单例时指针穿透
+        // 命中本徽标不偷换/偷藏（协议见 floatTip.ts tipHost）
+        span.addEventListener("mouseenter", () => { if (!tipOwnedByOther(span)) showFloatTip(span); });
+        span.addEventListener("mouseleave", () => { if (!tipOwnedByOther(span)) hideFloatTip(span); });
         div.insertBefore(span, div.firstChild);
     });
 }

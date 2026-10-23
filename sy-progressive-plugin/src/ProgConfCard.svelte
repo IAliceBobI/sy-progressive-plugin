@@ -27,12 +27,13 @@
         readCurveCadReadingPoint,
         readCurveCadPlain,
     } from "../../sy-tomato-plugin/src/libs/stores";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
     import { SCHED_CHOICES } from "./readCurveCore";
 </script>
 
 <!-- 制卡（□23：术语型开关全部补 hover tip，语义见 tomatoI18n.tip设置* 家族） -->
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.制卡}</div>
+    <div class="section-title">{tomatoI18n.制卡}<ProgConfHelpIcon token="PaMudIknXoncs8xBwhUc5iKonNb" /></div>
     <!-- v5 □8 功能全免费：旧 VIP 三开关（相关概念/日记摘抄/摘抄轨迹）解锁 -->
     <div>
         <input

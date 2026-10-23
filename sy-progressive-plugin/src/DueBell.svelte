@@ -20,7 +20,7 @@
     class="prog-duebell"
     data-on={$due > 0}
     onmouseenter={(e) => showFloatTip(e.currentTarget)}
-    onmouseleave={hideFloatTip}
+    onmouseleave={(e) => hideFloatTip(e.currentTarget)}
     aria-label={tomatoI18n.到期复访N条($due)}
     onclick={() => onOpen()}
 >

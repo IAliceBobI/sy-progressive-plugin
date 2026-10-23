@@ -38,7 +38,7 @@
     <button
         class="prog-flame prog-wflame"
         onmouseenter={(e) => showFloatTip(e.currentTarget)}
-        onmouseleave={hideFloatTip}
+        onmouseleave={(e) => hideFloatTip(e.currentTarget)}
         data-state={state}
         aria-label={tooltip}
         onclick={() => onOpen()}

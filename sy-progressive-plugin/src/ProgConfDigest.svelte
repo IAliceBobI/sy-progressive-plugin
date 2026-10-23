@@ -20,6 +20,7 @@
         digestAddReadingpoint,
         digestGlobalSigle,
     } from "../../sy-tomato-plugin/src/libs/stores";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
 
     // need-0924-02 落点联动：改档即生效（与兄弟 select 同 .set() 语义，面板整体落盘），
     // central↔source 方向切换时二确认「存量摘抄要不要一起搬」（取消=不搬，数据与落点
@@ -55,7 +56,7 @@
 
 <!-- 摘抄（□23：术语型开关全部补 hover tip，语义见 tomatoI18n.tip设置* 家族） -->
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.摘抄}</div>
+    <div class="section-title">{tomatoI18n.摘抄}<ProgConfHelpIcon token="FgLKdkPlrojE82x5jbHcSSKpnfe" /></div>
 
     <div>
         <input

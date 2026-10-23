@@ -3,6 +3,7 @@
     // 本组件=「菜单入口」域的卡片
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
     import HotkeyCap from "../../sy-tomato-plugin/src/HotkeyCap.svelte";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
     import {
         piecesmenu,
         digestmenu,
@@ -28,7 +29,7 @@
 <!-- 菜单入口（v5 □7：右键显隐开关 20→4——制卡/收集/提取族收进浮条 [+] 高级功能，随开关退役。
      □11 标题宽化：区内还有块图标菜单（左键点块前小圆点）与移动端菜单，非全是右键，各条目自说明入口类型） -->
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.菜单入口}</div>
+    <div class="section-title">{tomatoI18n.菜单入口}<ProgConfHelpIcon token="XvnUdrBEooOd1LxBdhmcpBWRnwc" /></div>
     <div>{tomatoI18n.menu不显示菜单不影响快捷键的使用}</div>
     <div>
         <input

@@ -3,6 +3,7 @@
     // 本组件=「浮条」域的卡片（移动端顶栏形态 + 片态首行按钮池）
     import { mobileTopBar, floatbarSlotEntryShow } from "../../sy-tomato-plugin/src/libs/stores";
     import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
+    import ProgConfHelpIcon from "./ProgConfHelpIcon.svelte";
     import { PIECE_MAIN_POOL, PIECE_TRAY_POOL, PIECE_LOW_POOL, ADV_POOL } from "./progFloatState";
 
     // □14c 快照防覆盖状态由壳持有（2026-09-03 双栏改造提升）：单域渲染下切走本域即卸载
@@ -105,7 +106,7 @@
 
 <!-- 浮条（v5 □5 三态：移动端形态开关 + 片态首行按钮池） -->
 <div class="settingBox">
-    <div class="section-title">{tomatoI18n.浮条}</div>
+    <div class="section-title">{tomatoI18n.浮条}<ProgConfHelpIcon token="U23idAY0UorKIkxmcOCc7Iwbnkf" /></div>
     <div>
         <input
             type="checkbox"
