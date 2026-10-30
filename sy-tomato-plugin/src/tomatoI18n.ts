@@ -11963,6 +11963,20 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    /** addr-adapt B1 型1 处方文案骨架：建档穷尽双通道失败（DocCreateError）后统一用户提示 */
+    public get 文档创建失败请重试() {
+        switch (this.lang) {
+            case "zh_CN": return "文档创建失败，请重试";
+            case "zh_CHT": return "文檔建立失敗，請重試";
+            case "ja_JP": return "ドキュメントの作成に失敗しました。再試行してください";
+            case "es_ES": return "Error al crear el documento, reintenta";
+            case "fr_FR": return "Échec de création du document, réessayez";
+            case "it_IT": return "Creazione del documento non riuscita, riprova";
+            case "en_US":
+            default: return "Failed to create the document, please retry";
+        }
+    }
+
     public get 写作书名已存在() {
         switch (this.lang) {
             case "zh_CN": return "该笔记本下已有同名文档，请换个书名";
@@ -15621,6 +15635,18 @@ export class TomatoI18n extends TomatoI18nABC {
             case "ja_JP": return "このドキュメントとサブドキュメントを復習";
             case "en_US":
             default: return "Review this doc and subdocuments";
+        }
+    }
+    // issue #82：标题栏复习钮的设置项文案（按钮 tooltip 复用「复习此文档及子文档」）
+    public get 文档标题栏显示闪卡复习按钮() {
+        switch (this.lang) {
+            case "zh_CN": return "文档标题栏显示闪卡复习按钮";
+            case "zh_CHT": return "文檔標題欄顯示閃卡複習按鈕";
+            case "es_ES": return "Botón de repaso de tarjetas en la barra de título del documento";
+            case "fr_FR": return "Bouton de révision des cartes dans la barre de titre du document";
+            case "ja_JP": return "ドキュメントタイトルバーにフラッシュカード復習ボタンを表示";
+            case "en_US":
+            default: return "Show flashcard review button on document title bar";
         }
     }
     // confgather2 期3（2026-09-17 bear 拍板收折叠）：低频配置折叠区标题三键

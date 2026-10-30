@@ -479,6 +479,12 @@ export async function runSplitVols(bookID: string, plan: VolPlan[], blockIDs: st
     const backupMd = plan.reduce((md, p) => md + (md ? "\n\n" : "") + volDocMarkdown(p), "");
     const backupID = await deps.createDocWithMd(
         row.box, `${row.hpath}/${sanitizeVolName(row.content)}·切分前备份`, backupMd, { [MARK_KEY]: "backup" });
+    // addr-adapt（impl §3 清单 #10，全链最高危静默点）：建档穷尽失败 throw 已由 deps 实现方
+    // 承接（kernel 侧 throw 型、前端 tomato 双通道），但 data:null 索引窗仍可能返 ""——
+    // 备份空 id 时 removeDoc("") 空转即吞、随后 deleteBlocks 照常清空原书=「原文可恢复」
+    // 承诺静默失效。removeDoc 前置守卫（不依赖实现方语义）：宁中断勿清空原书，此时原文
+    // 未动零丢失、已建卷在手，用户可重试。
+    if (!backupID) throw new Error(`splitvols: backup doc not created (original untouched) book=${bookID}`);
     await deps.removeDoc(backupID);
     deps.log(`backup snapshotted+removed id=${backupID} chars=${backupMd.length}`);
     if (blockIDs.length > 0) {

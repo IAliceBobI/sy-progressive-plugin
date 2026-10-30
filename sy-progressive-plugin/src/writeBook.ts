@@ -19,12 +19,13 @@ export interface WritingBookResult {
     pieceIDs: string[];
 }
 
-/** 路径占位检查：createDocWithMd 内置 getIDsByHPath 兜底会把同名已有文档静默
- *  认领（返回旧 id）——重名建书=劫持用户普通文档挂书 IAL，故一切创建前显式预检。
- *  ⚠ 端点大小写敏感：getIDsByHPath（P 大写，kernel/api/router.go:188；小写 p=404 静默空） */
+/** 路径占位检查：createDocWithMd 内置兜底会把同名已有文档静默认领（返回旧 id）——
+ *  重名建书=劫持用户普通文档挂书 IAL，故一切创建前显式预检。
+ *  addr-adapt（思源 3.8.9）：旧端点 /api/filetree/getIDsByHPath 的 hPath 寻址被限制、
+ *  tomato call 吞错返 null=恒「无同名」预检失明——换 tomato 封装 docIDsByHPath（SQL
+ *  单通道，全版本可用；值内引号封内双写转义），防劫持预检恢复视力 */
 async function docIDAtPath(boxID: string, path: string): Promise<string> {
-    const ids = await siyuan.call("/api/filetree/getIDsByHPath", { notebook: boxID, path });
-    return Array.isArray(ids) ? (ids[0] ?? "") : "";
+    return (await siyuan.docIDsByHPath(boxID, path))[0] ?? "";
 }
 
 // ============ 期2 调度判定（纯函数，TDD 见 tests/unit/writingBook.test.ts） ============
@@ -1063,7 +1064,12 @@ export async function createWritingBook(boxID: string, bookNameRaw: string, outl
             pieceIDs.push(existing);
             continue;
         }
-        pieceIDs.push(await siyuan.createDocWithMd(boxID, path, "", "", p.attrs));
+        // addr-adapt（impl §3 清单 #17）：建片循环原无判空防线——建档穷尽失败 throw 已由
+        // tomato 封装承接，data:null 索引窗返 "" 仍可能到达；空 id 即中止（单片书静默返
+        // [""]、多片书下游「piece path missing」文案失真的唯一无防线点）
+        const pieceID = await siyuan.createDocWithMd(boxID, path, "", "", p.attrs);
+        if (!pieceID) throw new Error("createWritingBook: piece doc not created");
+        pieceIDs.push(pieceID);
     }
     // 建后按大纲序钉位（createDocWithMd 逐个默认插顶=物理倒序，一次 changeSort 钉正）
     if (pieceIDs.length > 1) {

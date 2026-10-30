@@ -193,7 +193,8 @@ async function createSlotDoc(box: string, bookID: string, bookName: string, pare
     if (!parentHPath) throw new Error(`拿不到父槽可读路径（parent=${parentDocID}）`);
     let path = slotDocPath(parentHPath, title);
     if ((await api.getIDsByHPath(box, path)).length > 0) path = `${path}-${Date.now()}`;
-    const docID = await api.createDocWithMd(box, path, "");
+    // addr-adapt B0（impl §3）：parentDocID 在手直传（C 档）跳过全段解析
+    const docID = await api.createDocWithMd(box, path, "", parentDocID);
     if (!docID) throw new Error(`建槽失败（path=${path}）`);
     const attrs = slotAttrs(bookID, bookName, title);
     await api.setBlockAttrs(docID, attrs);
@@ -582,7 +583,8 @@ export async function structureCompose(
         const title = composeTitle(guard.bookName, input.title, Date.now());
         let path = `${bookHPath}/${title}`;
         if ((await api.getIDsByHPath(box, path)).length > 0) path = `${path}-${Date.now()}`;
-        const docID = await api.createDocWithMd(box, path, markdown);
+        // addr-adapt B0（impl §3）：成稿挂书壳下，bookID 直传（C 档）跳过全段解析
+        const docID = await api.createDocWithMd(box, path, markdown, bookID);
         if (!docID) throw new Error(`建成稿失败（path=${path}）`);
         await api.setBlockAttrs(docID, { [MarkKey]: composeAnchor });
         const after = await attrsWithRetry(docID);

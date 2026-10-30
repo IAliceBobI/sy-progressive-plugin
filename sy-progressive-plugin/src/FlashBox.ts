@@ -448,8 +448,16 @@ export async function getDailyCardDocID(boxID: string, path: string) {
     const v = getDailyAttrValue();
     const attr = {};
     attr[`custom-dailycard-${v}`] = v;
-    const targetDocID = await utils.siyuanCache.createDocWithMdIfNotExists(5000, boxID, path, "", attr);
-    return targetDocID;
+    // addr-adapt B1 型1（impl §1.4）：建档穷尽失败 throw（tomato 封装双通道）→ catch 提示
+    // +return ""（每日闪卡文档是制卡用户动作面，原静默 "" 无防线=#28）；data:null 索引窗
+    // 返 "" 不 toast（假失败提示会误导重试建重复文档）
+    try {
+        return await utils.siyuanCache.createDocWithMdIfNotExists(5000, boxID, path, "", attr);
+    } catch (e) {
+        debugLog("addr", `daily card doc create failed: ${e}`, "progressive");
+        await siyuan.pushMsg(tomatoI18n.文档创建失败请重试);
+        return "";
+    }
 }
 
 // const appendDiv = (() => {

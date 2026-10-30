@@ -78,7 +78,9 @@ export async function ensureMapDoc(bookID: string): Promise<string> {
     const hpath = await api.getHPathByID(bookID, info.box);
     if (!hpath) throw new Error(`拿不到书壳可读路径（bookID=${bookID}）`);
     const emptyPool: BookMap = { v: 1, nodes: [], edges: [], views: [] };
-    const docID = await api.createDocWithMd(info.box, `${hpath}/${MAP_DOC_NAME}`, buildBookMapMD(emptyPool));
+    // addr-adapt B0（impl §3）：父 id 在手直传（C 档）——地图文档挂书壳下，parentID=bookID
+    // 跳过 A 档全段解析，绕开 hpath 标题链歧义敏感；不传时封装自动退化走 A 档
+    const docID = await api.createDocWithMd(info.box, `${hpath}/${MAP_DOC_NAME}`, buildBookMapMD(emptyPool), bookID);
     if (!docID) throw new Error(`建 ${MAP_DOC_NAME} 文档失败（bookID=${bookID}）`);
     await api.setBlockAttrs(docID, { [MarkKey]: mapDocIalValue(bookID) });
     const after = await api.getBlockAttrs(docID).catch(() => null);

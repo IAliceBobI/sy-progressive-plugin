@@ -10,6 +10,7 @@ import { splitLines } from "./SplitSentence";
 import { appendTailCard } from "./tailCardAppend";
 import { isMultiLineElement, SingleTab } from "../../sy-tomato-plugin/src/libs/docUtils";
 import { digestLanding, digestAddReadingpoint, digestGlobalSigle, windowOpenStyle } from "../../sy-tomato-plugin/src/libs/stores";
+import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { getDailyPath } from "./FlashBox";
 import { readingPointBox } from "../../sy-tomato-plugin/src/ReadingPointBox";
@@ -265,7 +266,17 @@ export class DigestBuilder {
         }
         // 「仿写」前缀仅仿写副本链路（□28）：整摘副本无仿写语义不加，用户靠前缀一眼认出练习文档
         const title = digestDocTitle(this.allText, idx, whole, question, forRecite);
-        const digestID = await siyuan.createDocWithMd(boxID, `${dirPath}/${title}`, md, "", attr);
+        // addr-adapt B1 型1（impl §1.4）：建档穷尽失败 throw（tomato 封装双通道）→ catch 提示
+        // +return ""（摘抄是用户动作面最高频建档点，静默=「点了没反应」#18）；data:null 索引窗
+        // 仍返 "" 走下方既有守卫（不 toast，索引窗假失败提示会误导重试建重复文档）
+        let digestID = "";
+        try {
+            digestID = await siyuan.createDocWithMd(boxID, `${dirPath}/${title}`, md, "", attr);
+        } catch (e) {
+            debugLog("addr", `digest doc create failed: ${e}`, "progressive");
+            await siyuan.pushMsg(tomatoI18n.文档创建失败请重试);
+            return "";
+        }
         // 新摘抄即失效痕迹缓存：refMap 有 60s TTL，不失效则当前文档 ≤60s 内重出场不打新痕迹
         if (digestID) invalidateDigestMarker(this.bookID);
         // □2 摘抄文档尾卡：新摘抄建时带卡（拍板；daily/central/source 各落点档统一——落点
