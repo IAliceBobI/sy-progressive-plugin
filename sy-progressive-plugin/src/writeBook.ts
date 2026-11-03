@@ -339,8 +339,9 @@ export function feedPoolTitle(firstKramdown: string): string {
  *  内核 createDocWithMd 按 / 劈 hpath 层级静默分层（「[直]a/b」→ 中间层「[直]a」+
  *  素材落其下）、\t\r\n\u2028\u2029 被剥除，全程无报错；出口级末段净化
  *  （sanitizePathTail）切点落在名字内部，堵不住前半段照样分层，故名字净化后再拼。
- *  先截断（feedPoolTitle 10 字）后净化，替换 1:1 不扰截断；/ → 全角／、控制符 → 空格，
- *  幂等。展示层字符串（toast/菜单）不走此函数 */
+ *  先截断（feedPoolTitle 10 字）后净化；/ → 全角／、控制符 → 空格、两端 trim
+ *  （invalidTitle 适配——截断点恰落空白时得到更短的无边缘空白标题，合法），幂等。
+ *  展示层字符串（toast/菜单）不走此函数 */
 export function feedPoolDocTitle(firstKramdown: string): string {
     return sanitizeName(`[直]${feedPoolTitle(firstKramdown)}`);
 }

@@ -388,9 +388,11 @@ export async function splitIntoVols(
  *  createDocWithMd）——名含 / 静默分层建两层文档且全程无报错（volslash □1「半切分
  *  残局」根因：卷已建在错位中间层下+弹错、原文未动）。最小集=内核实际会动的字符：
  *  / → 全角／（视觉语义保留），\t\r\n\u2028\u2029 → 空格；反斜杠 \ 实测无害
- *  （Go path 只认 /、SQL 精确匹配不特殊）不过度处理。替换全 1:1，长度不变不扰截断。 */
+ *  （Go path 只认 /、SQL 精确匹配不特殊）不过度处理。句中替换 1:1 不扰截断；两端
+ *  再 trim——3.8.9 createDocByParent 拒前导/尾随空白标题（invalidTitle，含全角
+ *  空格 U+3000；JS .trim() 按 Unicode WhiteSpace 已覆盖），句中空白无碍。 */
 export function sanitizeVolName(name: string): string {
-    return name.replace(/[\t\r\n\u2028\u2029]/g, " ").replace(/\//g, "／");
+    return name.replace(/[\t\r\n\u2028\u2029]/g, " ").replace(/\//g, "／").trim();
 }
 
 /** 卷文档名主段（不含角标）：两位序号前缀保唯一+防重名；title 兜底截 24 字。展示层

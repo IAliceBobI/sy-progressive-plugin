@@ -289,8 +289,8 @@ export function composeTitle(bookName: string, explicit: string | undefined, now
  *  骨架入参 title（AI 从书名/素材归纳，仅 trim 级清洗不可信）——含半角 / 会被内核
  *  createDocWithMd 按 / 劈 hpath 层级静默分层、\t\r\n\u2028\u2029 被剥除，全程无
  *  报错；出口级末段净化（sanitizePathTail 一类）切点落在名字内部，堵不住前半段
- *  照样分层，故名字本身净化后再拼（/ → 全角／、控制符 → 空格，恒 1:1、幂等）。
- *  父 hpath 前缀是调用方故意拼的层级，原样透传不动 */
+ *  照样分层，故名字本身净化后再拼（/ → 全角／、控制符 → 空格、两端 trim，幂等——
+ *  两端含可净化字符时结果可短于原文）。父 hpath 前缀是调用方故意拼的层级，原样透传不动 */
 export function slotDocPath(parentHPath: string, title: string): string {
     return `${parentHPath}/${sanitizeVolName(title)}`;
 }

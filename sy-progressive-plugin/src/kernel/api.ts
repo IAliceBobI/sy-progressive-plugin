@@ -232,20 +232,23 @@ export function newNodeID(): string {
 
 /** 建档 hpath 末段（文档名）元字符 sanitize（复刻 tomato siyuanApi.sanitizePathTail，kernel
  *  bundle 勿 import 前端文件——其依赖 window/fetch/Lute 全局）：只净化最后一段（前缀段是
- *  调用方故意拼的层级）；末段 / → 全角／、\t\r\n\u2028\u2029 → 空格、反斜杠原样。幂等。 */
+ *  调用方故意拼的层级）；末段 / → 全角／、\t\r\n\u2028\u2029 → 空格、反斜杠原样，再两端
+ *  trim——3.8.9 createDocByParent 拒前导/尾随空白标题（invalidTitle，含全角空格 U+3000），
+ *  tomato 层同语义。幂等。 */
 function sanitizePathTail(pathReadable: string): string {
   const idx = pathReadable.lastIndexOf("/");
   const head = idx < 0 ? "" : pathReadable.slice(0, idx + 1);
   const tail = (idx < 0 ? pathReadable : pathReadable.slice(idx + 1))
-    .replace(/[\t\r\n\u2028\u2029]/g, " ").replace(/\//g, "／");
+    .replace(/[\t\r\n\u2028\u2029]/g, " ").replace(/\//g, "／").trim();
   return head + tail;
 }
 
 /** 用户字符串级 sanitize（复刻 tomato siyuanApi.sanitizeName）：新建中间段名先过此函数——
  *  含 / 标题会污染整条 hpath 旧寻址链=亲手造脏数据（contract §10）。已存在段按原段名查
- *  （净化会查不中既有落盘名）。幂等。 */
+ *  （净化会查不中既有落盘名）。两端 trim 同 sanitizePathTail（新建中间段也走
+ *  createDocByParent 发标题，空白尾随同被 invalidTitle 拒）。幂等。 */
 function sanitizeName(name: string): string {
-  return name.replace(/[\t\r\n\u2028\u2029]/g, " ").replace(/\//g, "／");
+  return name.replace(/[\t\r\n\u2028\u2029]/g, " ").replace(/\//g, "／").trim();
 }
 
 /** 标题 512 rune 截断（对齐旧端点 filetree.go:958-963 静默截断语义，评审#7②：新端点
@@ -326,19 +329,27 @@ async function createByParentOnce(
   };
 }
 
+/** A 档段名净化（resolveParentChain 查询与补建同用——查建同名）：sanitizeName（/→全角／、
+ *  控制符→空格、两端 trim）+512 rune 截断+截断后再 trim（截断点可恰落空白——3.8.9
+ *  createDocByParent 拒尾随空白标题，同叶子 title 防线）。 */
+function segTitleForChain(seg: string): string {
+  return clampTitle512(sanitizeName(seg)).trim();
+}
+
 /** A 档全段解析+逐级补建（createDocSmart 新通道专用，3.8.9+）：resolveDocPath 逐级精确匹配
  *  标题（COLLATE BINARY）。resolved=全段命中（含末段）=**同名认领**——对齐旧端点 hpathBtMap
  *  复用语义（命中已有文档不建孪生，评审#7①）；ambiguous=取首候选+日志续解析余段（决策
  *  §4.5：中间层全是插件自管目录，不弹选择框）；missing=自 nextIndex（首个缺失段下标）起
  *  逐级补建**中间段**——叶子由调用方携真实 markdown 落。首个补建段带 missing 响应的
- *  nameConditions 乐观锁（并发改动链路内核报 planChanged，评审#7③）。已存在前缀按原段名查
- *  （不净化）；新建中间段先过 sanitizeName+512 rune 截断。 */
+ *  nameConditions 乐观锁（并发改动链路内核报 planChanged，评审#7③）。resolve 查询与补建
+ *  落盘同用 segTitleForChain 净化段名——原段名查、trim 名建会让带空白中间段首轮 miss
+ *  补建落盘 trim 名后，此后每次同 hpath 查询恒 miss→重复补建（思源允许同名兄弟）。 */
 async function resolveParentChain(
   notebook: string,
   segments: string[], // 全段（含末段叶子，均非空）
 ): Promise<{ claimID?: string; parentID: string | null; nameConditions?: DocNameCondition[] }> {
   let start: { kind: "root" } | { kind: "document"; id: string } = { kind: "root" };
-  let rest = segments;
+  let rest = segments.map(segTitleForChain);
   for (;;) {
     const resp = await callFull("/api/filetree/resolveDocPath", { notebook, start, segments: rest });
     if (resp.code !== 0) {
@@ -366,7 +377,7 @@ async function resolveParentChain(
     let parentID: string | null = d.resolved?.id ?? null;
     let conditions: DocNameCondition[] | undefined = Array.isArray(d.nameConditions) ? d.nameConditions : undefined;
     for (let i = from; i < rest.length - 1; i++) { // 只补中间段，叶子留给调用方
-      const segTitle = clampTitle512(sanitizeName(rest[i]));
+      const segTitle = segTitleForChain(rest[i]);
       if (!segTitle) throw new DocCreateError("invalidTitle", `empty segment #${i} in [${rest.join("/")}]`, "none");
       const nid = newNodeID();
       const r = await createByParentOnce(notebook, parentID, nid, segTitle, "", i === from ? conditions : undefined);
@@ -399,11 +410,16 @@ export async function createDocSmart(
   markdown: string,
   opts: { id?: string; parentID?: string } = {},
 ): Promise<string> {
-  // 出口末段净化（幂等）：两通道共用净化后 path（查建同源）；末段即新端点 title
+  // 出口末段净化（幂等）：两通道共用净化后 path（查建同源）；末段即新端点 title——clamp
+  // 截断后再两端 trim（截断可把句中空白截到边上=invalidTitle 最后一道防线）。末段先劈再
+  // 滤空：全空白末段经 sanitizePathTail trim 成 ""（「/书/  」→「/书/」）时若先 filter 滤
+  // 空段再 pop，拿到的是父层段名——「/书/  」被当「在 /书 下建『书』」静默错建（守卫只拦
+  // 得住整条路径无真实段的形态）
   const path = sanitizePathTail(hpath);
-  const segs = path.split("/").filter(s => s !== "");
-  const title = clampTitle512(segs.pop() ?? "");
+  const rawSegs = path.split("/");
+  const title = clampTitle512(rawSegs.pop() ?? "").trim();
   if (!title) throw new DocCreateError("invalidTitle", `empty document title in hpath "${path}"`, "none");
+  const segs = rawSegs.filter(s => s !== "");
   // ""（非法值，封内拒绝）与 undefined（不传=A 档全段解析）显式区分（评审2轮#6 同款语义）
   if (opts.parentID === "") throw new DocCreateError("parentUnavailable", "parentID: empty string is not a valid parent (use null or omit)", "none");
   const rejectKey = `${notebook}|${path}`;

@@ -500,8 +500,10 @@ export function digestNeighborWithWrap<T>(flat: T[], i: number, step: 1 | -1): {
  *  模板=「仿写」「❓」前缀 + [整/序号] + 内容前 10 字——allText 是用户所摘内容，
  *  直接拼进 hpath 时半角 / 会被内核 createDocWithMd 按 / 劈段静默分层（父壳+子文档，
  *  内容落子文档且全程无报错），故内容段出口统一过 sanitizeVolName（/ → 全角／、
- *  \t\r\n\u2028\u2029 → 空格，替换 1:1）。先 slice(0,10) 截断再净化——净化不占
- *  截断预算，无斜杠文本与旧模板逐位一致。 */
+ *  \t\r\n\u2028\u2029 → 空格、两端 trim）。次序=先 slice(0,10) 截断、再净化、后
+ *  trim：句中替换 1:1 不占截断预算；trim 剥掉的是切片恰落在空白上的首尾（3.8.9
+ *  createDocByParent 拒前导/尾随空白标题=invalidTitle，实锤=前 10 字末位恰为空格），
+ *  出口标题永不以空白结尾。 */
 export function digestDocTitle(allText: string, idx: string, whole: boolean, question: boolean, forRecite: boolean): string {
     return `${forRecite ? "仿写" : ""}${question ? "❓" : ""}[${whole ? "整" : idx}]${sanitizeVolName(allText.slice(0, 10))}`;
 }
