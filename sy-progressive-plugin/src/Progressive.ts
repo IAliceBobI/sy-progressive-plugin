@@ -1312,7 +1312,7 @@ class Progressive {
                 // boxID 与制卡侧同款分叉：闪卡专用笔记本优先，回落书所在笔记本
                 const boxID = flashcardNotebook.get(a => a || bookInfo.boxID);
                 const targetDocID = await getDailyCardDocID(boxID, getDailyPath());
-                OpenSyFile2(this.plugin, targetDocID, windowOpenStyle.get() as any);
+                if (targetDocID) OpenSyFile2(this.plugin, targetDocID, windowOpenStyle.get() as any); // #28：建档失败返空不跟开（提示已发）
             } else {
                 let hpath = "";
                 let docID: string;
@@ -1325,7 +1325,7 @@ class Progressive {
                 }
                 if (hpath && docID) {
                     const targetDocID = await help.getCardsDoc(docID, bookInfo.boxID, hpath);
-                    OpenSyFile2(this.plugin, targetDocID, windowOpenStyle.get() as any);
+                    if (targetDocID) OpenSyFile2(this.plugin, targetDocID, windowOpenStyle.get() as any); // #28：建档索引窗返空不跟开
                 }
             }
         }

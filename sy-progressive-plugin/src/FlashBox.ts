@@ -267,6 +267,10 @@ class FlashBox {
         const ops = []
         if (path) {
             const targetDocID = await getDailyCardDocID(boxID, path);
+            // #28 止血：建档失败/索引窗返空须中止插入——getDocLastID("")=undefined 会构造
+            // 三锚（parent/previous/next）全空的事务，内核报 insertion target block not
+            // found 并强制 UI 重载（失败提示已由 getDailyCardDocID catch 面发过）
+            if (!targetDocID) return;
             ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
         } else if (t == CardType.Here) {
             ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], lastSelectedID))
@@ -292,6 +296,7 @@ class FlashBox {
                 // □3 制卡统一归置（2026-09-01 拍板，三档化后默认档 dailycard）：制卡并入当日
                 // daily card 文档；cards 档回落 cards 夹旧路线（cardUnderPiece 分叉保持原语义）
                 const targetDocID = await getDailyCardDocID(boxID, getDailyPath());
+                if (!targetDocID) return; // #28 止血：空文档 ID 中止插入，防三锚全空事务强刷 UI
                 ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
             } else {
                 let hpath = "";
@@ -303,6 +308,9 @@ class FlashBox {
                 }
                 if (!hpath) return;
                 const targetDocID = await getCardsDoc(bookID, boxID, hpath);
+                // #28 止血同款：cards 夹建档索引窗返空 → 中止插入（建档穷尽失败在
+                // createDocSmart 已 throw 中断，不至此）
+                if (!targetDocID) return;
                 ops.push(...siyuan.transInsertBlocksAfter([domStr, domNewLine().outerHTML], await siyuan.getDocLastID(targetDocID)))
             }
         }
