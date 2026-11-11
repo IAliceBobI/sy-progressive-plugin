@@ -5,6 +5,10 @@
 // 片内块全数被删（书阅读中途被编辑，索引残留悬空 ID）症状完全同形。
 // 判定口径与 createNote 的 hasContent、fullfilContent 的 filter(!!markdown) 同一
 // 「markdown 判内容」（""/null/字段缺失三态皆空，空白串三处同为有内容）。
+// 判死前提=判死通道可信：书壳探针（bookReachability，getBlockInfo 三态）ok 才
+// 判——笔记本建索引窗口内 blocktree 未加载完，checkBlockExist（内核
+// ExistBlockTree 查 blocktree，非 SQL）同样查空（2026-11-11 群反馈 650189
+// 必现：连环误跳片、断点漂移），探针非 ok 一律 false 交重试等索引追赶。
 
 /** refill 守卫（review P1-3 口径）：存活行无一可插内容。混合悬空+空片时行数
  *  不足的「全数存活」判会漏放行——真正要防的不可逆终态是 clearAll 后插不回
@@ -13,13 +17,16 @@ export function pieceRowsNoneInsertable(rows: { markdown?: string | null }[]): b
     return rows.length > 0 && rows.every(r => !r.markdown);
 }
 
-/** 跳片判死（startToLearn □7 自愈）：存活行全无内容 且 缺行块全数经内核实时
- *  通道（checkBlockExist，不吃 SQL 索引延迟）确认已删 = 永久空片，跳点前进；
- *  缺行有活块（索引追赶窗口）→ false 交上层走原重试。rows=[] 全悬空时存活行
- *  空判定 vacuous true，结论全由死活旗标决定。 */
+/** 跳片判死（startToLearn □7 自愈）：书壳探针 ok 且 存活行全无内容 且 缺行块
+ *  全数经内核实时通道（checkBlockExist，不吃 SQL 索引延迟）确认已删 = 永久空片，
+ *  跳点前进；缺行有活块（索引追赶窗口）或探针非 ok（建索引窗口通道失明，
+ *  indexing/gone 两态皆然——-1 在窗口内与真不可达交替出现，判死一律不放行，
+ *  终态交循环层可达性通道）→ false 交上层走原重试。rows=[] 全悬空时存活行
+ *  空判定 vacuous true，结论全由死活旗标与探针决定。 */
 export function pieceUnbuildable(
     rows: { markdown?: string | null }[],
     missingDeadFlags: boolean[],
+    shellReach: "ok" | "indexing" | "gone",
 ): boolean {
-    return rows.every(r => !r.markdown) && missingDeadFlags.every(Boolean);
+    return shellReach === "ok" && rows.every(r => !r.markdown) && missingDeadFlags.every(Boolean);
 }

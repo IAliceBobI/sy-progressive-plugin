@@ -2,7 +2,7 @@ import { IEventBusMap, IProtyle, openTab, } from "siyuan";
 import { isVisible, siyuan, } from "./libs/utils";
 import "./index.scss";
 import { EventType, events } from "./libs/Events";
-import { getIDFromCard, pressSkip, removeDocCards, skipThenRemoveCards } from "./libs/cardUtils";
+import { addDocSuperCards, getIDFromCard, pressSkip, removeDocCards, skipThenRemoveCards } from "./libs/cardUtils";
 import { CardSettingsID } from "./libs/gconst";
 import { addFlashCard } from "./libs/listUtils";
 import { cardBoxAddConcepts, cardBoxCheckbox, cardBoxReviewDocMenu, cardBoxSettingsShow, cardBoxSuperCard, cardBoxCardtab, card_refresh_visible_only, writableWithGet } from "./libs/stores";
@@ -25,7 +25,11 @@ export const CardBox闪卡复习时打开闪卡设置 = winHotkey("⇧⌥U", "op
 export const CardBox删除内容块 = winHotkey("⌘⇧9", "del card block", "", () => tomatoI18n.删除内容块)
 export const CardBox复习时跳过当前闪卡 = winHotkey("shift+alt+8", "skipCard", "", () => tomatoI18n.复习时跳过当前闪卡)
 export const CardBox取消当前文档内所有闪卡 = winHotkey("F8", "remove cards in doc", "", () => tomatoI18n.取消当前文档内所有闪卡)
-export const CardBox清理所有失效的闪卡 = winHotkey("⌘⇧7", "clean invalid cards", "", () => tomatoI18n.清理所有失效的闪卡)
+// issue #83：与 F8「取消当前文档内所有闪卡」成对（F8 撤卡/⇧F8 补卡）；选键时四插件
+// 声明 grep 仅 F8/⇧F8/⌘⇧F8 三键互异，⇧F8 空闲
+export const CardBox当前文档内所有超级块制成闪卡 = winHotkey("⇧F8", "add cards in doc", "", () => tomatoI18n.当前文档内所有超级块制成闪卡)
+// 清理所有失效的闪卡（⌘⇧7）已下架（2026-11-10）：内核 3.8.x 起读侧过滤失效卡
+// （getRiffCards 不再返回）+写侧校验拦截删除（removeRiffCards code -1），工具双重失效
 export const CardBox定位闪卡 = winHotkey("⌘⌥J", "jump to card", "", () => tomatoI18n.定位闪卡)
 
 class CardBox {
@@ -61,6 +65,13 @@ class CardBox {
                 removeDocCards(events.docID);
             },
         });
+        gatedAddCommand(this.plugin, CardBox当前文档内所有超级块制成闪卡.langKey, {
+            langText: CardBox当前文档内所有超级块制成闪卡.langText(),
+            hotkey: CardBox当前文档内所有超级块制成闪卡.m,
+            callback: () => {
+                addDocSuperCards(events.docID);
+            },
+        });
         gatedAddCommand(this.plugin, CardBox复习时删除当前闪卡.langKey, {
             langText: CardBox复习时删除当前闪卡.langText(),
             hotkey: CardBox复习时删除当前闪卡.m,
@@ -89,13 +100,6 @@ class CardBox {
             langText: CardBox复习时跳过当前闪卡.langText(),
             hotkey: CardBox复习时跳过当前闪卡.m,
             callback: pressSkip,
-        });
-        gatedAddCommand(this.plugin, CardBox清理所有失效的闪卡.langKey, {
-            langText: CardBox清理所有失效的闪卡.langText(),
-            hotkey: CardBox清理所有失效的闪卡.m,
-            callback: () => {
-                siyuan.removeBrokenCards(tomatoI18n)
-            },
         });
         gatedAddCommand(this.plugin, CardBox定位闪卡.langKey, {
             langText: CardBox定位闪卡.langText(),

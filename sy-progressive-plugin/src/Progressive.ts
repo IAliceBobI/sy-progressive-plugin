@@ -1273,6 +1273,9 @@ class Progressive {
             // （books.json 每轮重读 point，重试循环下一轮自动在新 point 续建）；跳到
             // 索引尾则下一轮走「已经是最后一页」终态。缺行者用内核实时通道判死活：
             // SQL 行缺失在索引追赶窗口≠块已删，checkBlockExist 不吃索引延迟（P1-4）。
+            // 判死前置闸=书壳探针（□8，2026-11-11 群反馈 650189 必现）：建索引窗口
+            // 内 blocktree 未加载完，实时通道同样查空，判死三前提集体失明——探针
+            // 非 ok 不判死，交重试循环等索引追赶（同 point 续建，零漂移）。
             // 随机模式不跳（P1-1）：gotoBlock 会污染顺序断点 + 每轮重掷使跳点无界，
             // 重试=重新摇号已有界。已知边缘（review P2-6 备案）：deleteAndBack 的
             // 目标片恰为空片时跳点向前弹回当前片，net=「返回」no-op——无挂死无数据
@@ -1281,10 +1284,11 @@ class Progressive {
             if (!isRand && pBlocks.length > 0) {
                 const rows = await siyuan.getRows(pBlocks, "id,markdown");
                 if (!rows.some(r => r.markdown)) {
+                    const shellReach = await help.bookReachability(bookInfo.bookID);
                     const missing = pBlocks.filter(id => !rows.some(r => r.id === id));
                     const dead = await Promise.all(missing.map(id =>
                         siyuan.checkBlockExist(id).then(exist => !exist).catch(() => false)));
-                    if (pieceUnbuildable(rows, dead)) {
+                    if (pieceUnbuildable(rows, dead, shellReach)) {
                         await siyuan.pushMsg(tomatoI18n.分片无内容已跳过(`[${String(point).padStart(5, "0")}]`));
                         await progStorage.gotoBlock(bookID, point + 1);
                         return "skipped";
