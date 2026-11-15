@@ -94,8 +94,8 @@ export function neighborWritingSlot(
  *  平铺 index、树形/白名单/存量一次性整理在 writeTree.fetchWritingTreeSlots；
  *  done=PROG_DONE_KEY attributes 直查 join。索引恒空的设计共识保持——不维护预
  *  存索引。下游消费方（调度/滚筒/火苗/舰队/导航/菜单）接口零变化跟随树序） */
-export async function fetchWritingPieces(bookID: string): Promise<WritingPieceState[]> {
-    const slots = await fetchWritingTreeSlots(bookID);
+export async function fetchWritingPieces(bookID: string, opts?: { maxAgeMs?: number }): Promise<WritingPieceState[]> {
+    const slots = await fetchWritingTreeSlots(bookID, undefined, undefined, opts);
     if (slots.length === 0) return [];
     const rows = await siyuan.sql(
         `select block_id, value from attributes where name = '${PROG_DONE_KEY}'` +
@@ -798,11 +798,17 @@ export interface WritingFlameBook {
     materialUnread: number;
 }
 
+/** 火苗链树缓存档位：pickWritingFlameBook 是纯展示消费方（状态栏小图标数据），
+ *  每 120s 轮询对每本写作书实拉全树纯浪费（perf 战役实测：30s TTL 与 30s 轮询撞拍
+ *  =隔次过期，60s 一波全树 IO 风暴）——吃 10min 内陈旧快照足够；槽/片真变动走
+ *  写点显式 invalidate 或 notifyFleetChanged 动作路径全量，火苗照常即时准 */
+const FLAME_TREE_STALE_MS = 10 * 60_000;
+
 export async function pickWritingFlameBook(): Promise<WritingFlameBook | null> {
     const writing = await orderedWritingBooks();
     if (writing.length === 0) return null;
     for (const [bookID, info] of writing) {
-        const target = pickWritingTarget(await fetchWritingPieces(bookID), info.activePoint);
+        const target = pickWritingTarget(await fetchWritingPieces(bookID, { maxAgeMs: FLAME_TREE_STALE_MS }), info.activePoint);
         if (target) return { bookID, bookName: info.bookName || bookID, target, materialUnread: 0 };
     }
     for (const [bookID, info] of writing) {

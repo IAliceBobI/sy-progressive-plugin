@@ -260,6 +260,14 @@ function editingBlockID(welement: HTMLElement): string {
     return "";
 }
 
+/** 卡片宿主判定（出场链跳过口径，单一事实源）：思源闪卡复习/预览界面的卡片宿主
+ *  protyle（宿主 element=.card__block，openCard genCardHTML 的 data-type=render
+ *  容器，翻卡复用同一 Protyle 只换内容）。复习卡=渲染快照非阅读现场，出场链的
+ *  树判定/修订痕迹等重活对它一律跳过（翻卡高频，纯 IO 浪费）。 */
+export function isCardHost(protyle: any): boolean {
+    return !!protyle?.element?.classList?.contains?.("card__block");
+}
+
 /**
  * 出场链入口（ProgressiveBtn 四态路径调用）：取数→enroll 基线→按 updated 色层染色。
  * 幂等单块对账（revperf：稳定态出场零 DOM 变更，防高频出场的布局翻转迟顿）；懒加载双向窗口随出场五事件反复调用（digestMarker □15 同款）。
@@ -267,6 +275,11 @@ function editingBlockID(welement: HTMLElement): string {
  * RefreshUpdated 级联刷父链，不过滤会把容器染花。块级染色零属性落 DOM（⑦ 纪律）。
  */
 export async function revTraceOnAppear(protyle: any, docID: string) {
+    // 卡片宿主直接 return（不清不染）：复习卡是渲染快照非阅读现场，全文档 SQL+
+    // 全量块对账每卡必跑纯浪费（翻卡每张新 docID 无缓存可吃）；快照块 div 随翻卡
+    // 重建、宿主从未染过即无可清残留。Progressive.ts 五事件挂点与 ProgressiveBtn
+    // 四态挂点两路同时被这一入口覆盖
+    if (isCardHost(protyle)) return;
     const welement: HTMLElement = protyle?.wysiwyg?.element;
     if (!welement) return;
     const scope = revTraceScope.get();

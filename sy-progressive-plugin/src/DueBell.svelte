@@ -1,7 +1,7 @@
 <script lang="ts">
     // need-0924-01 状态栏 ✧ 到期复访角标（鸟「它来找你」拍板）：计数从火苗 tooltip 尾行
     // （悬停才见）升级为常驻可见+点击直达卡片流；0 条灰淡不隐藏——状态栏不抖、入口
-    // 稳定、「点一下确认没欠账」也是价值。计数=digestDueState（refreshFlame 30s+操作
+    // 稳定、「点一下确认没欠账」也是价值。计数=digestDueState（refreshFlame 轮询 120s+操作
     // 信号同链，think/pdigest 双源）；样式在 index.scss .prog-duebell（火苗同骨架）。
     import { onDestroy } from "svelte";
     import type { Writable } from "svelte/store";

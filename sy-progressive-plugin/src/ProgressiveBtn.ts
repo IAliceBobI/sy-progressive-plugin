@@ -16,7 +16,7 @@ import { formatDueCount } from "./progFloatState";
 import { markDigests, markDigestTag, clearDigestMarks } from "./digestMarker";
 import { detectWritingTreeDoc } from "./writeTree";
 import { getDocIalPieces } from "./progData";
-import { revTraceOnAppear } from "./revTrace";
+import { isCardHost, revTraceOnAppear } from "./revTrace";
 import { markMaterials } from "./materialMarker";
 import { markMaterialTraces, markMaterialTag } from "./materialTrace";
 import { fetchBookCardRows } from "./cardList";
@@ -265,7 +265,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         // app/src/protyle/util/destroy.ts，思源升级若改 destroy 语义需复核此处）。
         // 宿主 gate：noteID 只可能被编辑器或闪卡预览宿主写入，其它 protyle（块引浮窗/搜索
         // 预览/历史版本视图）销毁时宿主页签还开着，不收浮条。
-        const canHost = isEditor(protyle) || protyle.element.classList.contains("card__block");
+        const canHost = isEditor(protyle) || isCardHost(protyle);
         if (canHost && events.getInfo(protyle).docID == noteID.get()) {
             show.set(false)
         }
@@ -280,7 +280,7 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     let { attrs, docID, name } = events.getInfo(protyle)
     let attrsIsFinal = false;   // attrs 已直查内核（闪卡预览分支）——识别落空也无需兜底重查
     zIndexPlus.set(false);
-    if (protyle.element.classList.contains("card__block")) {
+    if (isCardHost(protyle)) {
         // 闪卡预览里显示的是分片：维持片态出场（hideBtnsInFlashCard 可关）；
         // □11 free 态不进闪卡预览（普通文档的卡预览弹 free 浮条违反直觉，review P2）
         // □3：cardHostExplicit=尾卡「再摘抄」钮的显式放行（forceCardHostFloatBar），
@@ -324,7 +324,10 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     // （volOwner）未就绪时的落空可能是卷文档而非普通文档，不进负缓存，下次出场重试。
     const bookOf = (id: string) => progStorage.docBookID(id);
     let id = detectFloatDoc(attrs, docID ?? "", bookOf);
-    if (!id && docID && !attrsIsFinal && !verifiedNormalDoc.has(docID)) {
+    // !isCardHost=结构性双保险：卡宿主守卫放行后 attrsIsFinal=true 本就跳过本块，显式
+    // 判定使「卡片宿主不进树判定」成为不变式（复习界面无手动槽懒补标场景——快照非
+    // 现场，全树拉取纯浪费），未来 attrsIsFinal 语义重构不破功
+    if (!id && docID && !attrsIsFinal && !isCardHost(protyle) && !verifiedNormalDoc.has(docID)) {
         id = detectFloatDoc(await siyuan.getBlockAttrs(docID), docID, bookOf);
         if (!id) {
             // progtree □1 树兜底：手动建的书下槽（无 MarkKey）立即生效——树判定命中
@@ -352,10 +355,16 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
     // MarkKey 降级（本次按普通文档走，下次出场 free；再拖回来懒补标闭环）。阅读
     // 书片不验（MarkKey 体系照旧）；ignored/archived 休眠书跳过（P1-1：验树 filter
     // 排除休眠书恒 null，照剥会把休眠书的槽全部降级=不对称且带写副作用）；"unknown"
-    // （拉取失败）同样跳过（P1-2：误剥比晚剥代价高）
+    // （拉取失败）同样跳过（P1-2：误剥比晚剥代价高）。卡片宿主（hideBtnsInFlashCard
+    // 关/再摘抄放行后的翻卡现场）同样跳过：复习卡是渲染快照非拖动现场，每张片卡对
+    // 每本写作书全树拉取纯浪费，且翻卡瞬间带写副作用（剥标）——真拖出的片由编辑器
+    // 出场补剥（本块对编辑器宿主照跑），降级最多延迟到用户真正打开该文档
     const bi1 = id ? progStorage.peekBookInfo(id.bookID) : undefined;
-    if (id?.kind === "piece" && docID && bi1?.writing && !bi1.ignored && !bi1.archived) {
-        const wBookID = await detectWritingTreeDoc(docID).catch(() => "unknown" as const);
+    if (id?.kind === "piece" && docID && bi1?.writing && !bi1.ignored && !bi1.archived && !isCardHost(protyle)) {
+        // cacheNegative：剥标验树吃新鲜缓存「不含」结论（免每击实拉；陈旧树晚剥 30s
+        // 同档可接受，误剥有再拖回来懒补标闭环兜底——对照懒补标通道不吃负结论的缘由
+        // 见 writeTree.detectWritingTreeDoc 头注）
+        const wBookID = await detectWritingTreeDoc(docID, { cacheNegative: true }).catch(() => "unknown" as const);
         if (wBookID === null) {
             await siyuan.setBlockAttrs(docID, { [MarkKey]: "" } as any).catch(() => { });
             debugLog("progtree", `unmark doc=${docID} book=${id.bookID}（拖出写作书，剥槽标）`);
@@ -425,8 +434,9 @@ export async function progressiveBtnFloating(protyle: IProtyle, closed = false) 
         markMaterialTraces(protyle).catch(() => { });
         markMaterialTag(protyle).catch(() => { });
     }
-    // revtrace 修订痕迹（□3）：四态出场全染（book/piece/digest/free，闪卡预览宿主同权
-    // ——digest 痕迹同款无特殊化）；纯视图零档案，enroll 基线+updated 色层实时算。
+    // revtrace 修订痕迹（□3）：四态出场全染（book/piece/digest/free；卡片宿主在
+    // revTraceOnAppear 入口直接 return——复习卡是渲染快照非阅读现场，翻卡高频不清不染，
+    // perf 战役定的 gate）；纯视图零档案，enroll 基线+updated 色层实时算。
     // 普通文档（自由态未上岗）的域外出场不在此链——Progressive.ts 五事件 listener 独立
     // 挂（□8 修：绑四态链时开新文档/懒加载新块永不染，A5 实锤）；两挂点幂等并存
     revTraceOnAppear(protyle, docID ?? "").catch(() => { });

@@ -1,7 +1,7 @@
 // v5 □6 状态栏火苗 + 左 Dock 舰队总览（视觉方案 docs/prog-v5-visual-design.md §2/§3）。
 // 挂载编排 + 刷新调度：动作经 FleetActions 注入（不 import Progressive，防循环依赖——
 // 数据侧反向只 import fleetNotify 发信号，本模块 initFleet 订阅后刷新，□7 拆信号与装载）。
-// 刷新时机：30s 定时 + fleetNotify 信号（读片/摘抄等数据变化点）+ 面板手动 ♻。
+// 刷新时机：120s 定时 + fleetNotify 信号（读片/摘抄等数据变化点）+ 面板手动 ♻。
 
 import { mount, unmount } from "svelte";
 import { writable } from "svelte/store";
@@ -117,6 +117,15 @@ let wflameApp: any = null;
 let dueBellApp: any = null;
 let quotaSubStop: (() => void) | null = null;
 let notifySubStop: (() => void) | null = null;
+/** 舰队面板挂载点（轮询瘦身信号）：思源收起/切走 dock 只 fn__none 或栏宽归零、
+ *  tab 不销毁（destroy 不回调），挂载布尔恒真不可用——改判 host 渲染宽>0 即「面板此刻
+ *  真可见」；reload 跨代同 _fleetActions 惯例，onunloadFleet 置 null 防悬挂 */
+let panelHost: HTMLElement | null = null;
+let panelResizeObs: ResizeObserver | null = null;
+function fleetPanelVisible(): boolean {
+    const host = panelHost;
+    return !!host && host.isConnected && host.offsetWidth > 0;
+}
 
 export async function refreshFlame() {
     try {
@@ -138,7 +147,7 @@ export async function refreshFlame() {
 }
 
 export async function refreshPanel() {
-    if (refreshing) return; // 并发去重（30s 定时与 notify 撞车时）
+    if (refreshing) return; // 并发去重（轮询与 notify 撞车时）
     refreshing = true;
     try {
         panelState.set(await loadFleetSummary());
@@ -269,12 +278,24 @@ export function initFleet(plugin: any, actions: FleetActions) {
             // 尺寸），中间层缺 flex 时 height:auto 被书卡内容撑开溢出挂载点、footer/主按钮
             // 沉入 dock 滚动区；配套 .prog-fleet-dock 样式（height:100%+子级 min-height:0）
             dock.element.innerHTML = `<div class="fn__flex fn__flex-column fn__flex-1 prog-fleet-dock"><div id="${eleID}" class="fn__flex-1"></div></div>`;
+            const pHost = dock.element.querySelector("#" + eleID) as HTMLElement;
+            panelHost = pHost; // 可见性信号登记（fleetPanelVisible 消费，轮询瘦身）
+            // 重开即刷：挂载点宽 0→>0 跳变（面板被展开）瞬间补一次全量——轮询降频
+            // 120s 后陈旧上限放大到 2min，重开面板的第一眼由此压回最新
+            panelResizeObs?.disconnect();
+            panelResizeObs = new ResizeObserver(() => {
+                if (fleetPanelVisible()) void refreshFleet();
+            });
+            panelResizeObs.observe(pHost);
             panel = mount(DockPanel, {
-                target: dock.element.querySelector("#" + eleID),
+                target: pHost,
                 props: { panel: panelState, actions, onQuota: setQuota, onRefresh: refreshFleet, writing: writingFlameState },
             }) as any;
         },
         destroy() {
+            panelHost = null; // tab 真销毁（拖出/移除）时回收信号
+            panelResizeObs?.disconnect();
+            panelResizeObs = null;
             if (panel) {
                 unmount(panel);
                 panel = null;
@@ -282,16 +303,33 @@ export function initFleet(plugin: any, actions: FleetActions) {
         },
     } as any);
 
-    // ---- 刷新调度：30s 全量 + 档位变化联动 + 数据侧信号（□7 拆 fleetNotify，
-    //      notifyFleetChanged 等信号在 initFleet 前到达=无订阅者丢弃，等价旧空刷） ----
+    // ---- 刷新调度：120s 定时（面板可见才全量，瘦身+降频见回调内注释）+ 档位变化联动 +
+    //      数据侧信号（□7 拆 fleetNotify，notifyFleetChanged 等信号在 initFleet 前到达=
+    //      无订阅者丢弃，等价旧空刷） ----
     notifySubStop = onFleetChanged(() => refreshFleet());
     refreshFleet();
-    refreshTimer = setInterval(refreshFleet, 30 * 1000);
+    // 轮询瘦身：refreshPanel 走 loadFleetSummary 全库扫（attributes 全量 SQL+全库 join+写作书
+    // 全树递归），静置时每 30s 一波 IO 风暴撞翻卡——面板不可见只刷火苗链（refreshFlame+
+    // refreshWritingFlame 不动），面板在场照常全量；notifyFleetChanged/setQuota/手动 ♻ 等
+    // 用户动作路径仍走 refreshFleet 全量，刚操作始终看最新数据。
+    // 轮询降频 30s→120s（perf 战役二轮）：火苗链静置数据不变化（变化必经动作路径即时
+    // 刷新），高频轮询无受益者——翻卡撞波概率随频率降；DueBell 角标/火苗最迟 2min 校准。
+    // 重开即刷（ResizeObserver 挂载点登记处，mount 回调内）
+    refreshTimer = setInterval(() => {
+        if (fleetPanelVisible()) {
+            void refreshFleet();
+        } else {
+            void Promise.all([refreshFlame(), refreshWritingFlame()]);
+        }
+    }, 120 * 1000);
     quotaSubStop = dailyQuota.subscribe(() => refreshFlame());
 }
 
 export function onunloadFleet() {
     _fleetActions = null;
+    panelHost = null; // 跨代清理：dock destroy 不保证随 unload 回调，防旧 host 悬挂误判可见
+    panelResizeObs?.disconnect();
+    panelResizeObs = null;
     if (refreshTimer) {
         clearInterval(refreshTimer);
         refreshTimer = null;

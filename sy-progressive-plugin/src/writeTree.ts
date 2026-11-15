@@ -139,7 +139,7 @@ async function realStorage(): Promise<TreeStorage> {
     return progStorage as any;
 }
 
-/** 树缓存（30s TTL）：舰队 30s 刷新/菜单/调度同窗口共享一次拉取。写点（split/
+/** 树缓存（30s TTL）：舰队轮询/菜单/调度同窗口共享一次拉取。写点（split/
  *  merge/append/align）显式 invalidateWritingTreeCache；手动树变动（拖拽/手建）
  *  靠 TTL 过期+出场链 detectWritingTreeDoc 实拉双保险 */
 const treeCache = new Map<string, { at: number; slots: WritingTreeSlot[] }>();
@@ -198,14 +198,18 @@ async function alignTreeOrderOnce(bookID: string, box: string, storage: TreeStor
 }
 
 /** 拉写作书树形槽列表（树权威唯一读口）：缓存命中直返；未 align 的书先整理再拉。
- *  info/storage 生产调用可省（走 booksInfo/真 storage） */
-export async function fetchWritingTreeSlots(bookID: string, info?: any, storage?: TreeStorage): Promise<WritingTreeSlot[]> {
+ *  info/storage 生产调用可省（走 booksInfo/真 storage）。
+ *  opts.maxAgeMs=允许吃的缓存年龄上限（默认 TREE_TTL_MS 30s=出场链判定档）：
+ *  火苗链等纯展示消费方传长档（10min）——静置轮询零树实拉；写点显式 invalidate
+ *  不受档位影响（本端拆片/合并/追加仍即时失效重拉），仅手动拖拽/跨端变动最多
+ *  陈旧一个档位，出场链判定路径不传 opts 语义不动 */
+export async function fetchWritingTreeSlots(bookID: string, info?: any, storage?: TreeStorage, opts?: { maxAgeMs?: number }): Promise<WritingTreeSlot[]> {
     const st = storage ?? await realStorage();
     const bi = info ?? await st.booksInfo(bookID);
     const box = bi?.boxID ?? "";
     if (!box) return [];
     const hit = treeCache.get(bookID);
-    if (hit && Date.now() - hit.at < TREE_TTL_MS) return hit.slots;
+    if (hit && Date.now() - hit.at < (opts?.maxAgeMs ?? TREE_TTL_MS)) return hit.slots;
     if (!bi.treeAligned) await alignTreeOrderOnce(bookID, box, st);
     // P1-2：拉取失败（含闭笔记本外的瞬断）不写缓存返 []，下次重试——错误导致的
     // 空槽列表钉 30s 比现挂空档更糟
@@ -250,22 +254,31 @@ export async function appendDocToEnd(box: string, docID: string, parentDocID: st
 /** 出场树判定（懒补标/拖出剥标通道）：docID ∈ 某注册写作书的白名单外子树 → 返回
  *  bookID；全部书拉取失败 → 返回 "unknown"（调用方不下任何结论——P1-2：瞬时故障
  *  ≠树真不含，误剥标比晚剥标代价高）；确认不在 → null。
- *  P1-4：出场链对 click-editorcontent 每击都跑——先吃 30s 新鲜缓存的「包含」结论
- *  （快路径安全：陈旧树把拖出者多留 30s 与槽序本身的 staleness 同档），miss 或
- *  「不包含」才实拉下结论（破坏性判定必须新鲜证据） */
-export async function detectWritingTreeDoc(docID: string): Promise<string | null | "unknown"> {
+ *  P1-4：出场链对 click-editorcontent 每击都跑——30s 新鲜缓存的「包含」结论恒短路；
+ *  「不包含」默认不吃（复评 P1 实锤：陈旧树不含≠真不含——刚拖进槽的文档被误判 null
+ *  后，懒补标调用方的 verifiedNormalDoc 负缓存会把误判钉死到 reload，破坏性判定必须
+ *  实拉确证）。唯一例外=opts.cacheNegative（拖出剥标通道）：负结论也吃缓存——晚剥
+ *  30s 与槽序本身的 staleness 同档可接受，误剥有「再拖回来懒补标闭环」兜底 */
+export async function detectWritingTreeDoc(
+    docID: string,
+    opts?: { cacheNegative?: boolean },
+): Promise<string | null | "unknown"> {
     if (!docID) return null;
     const { progStorage } = await import("./ProgressiveStorage");
     const entries = Object.entries(progStorage.booksInfos()).filter(([id, info]) =>
         info.writing && !info.ignored && !info.archived && progStorage.isRegisteredBook(id) && info.boxID);
     let anyFailed = false;
     for (const [bookID, info] of entries) {
-        // 快路径：仅「新鲜缓存**包含**」才安全短路（复评 P1 实锤：不含必须 fall
-        // through 实拉下结论——continue 会把懒补标打残+开误剥标窗口）
+        // 快路径：新鲜缓存「含」恒短路（缓存树=写入时真树快照，含⟹曾真在树，后被拖
+        // 出由剥标通道纠正，多留 30s 同档）；「不含」仅 cacheNegative 通道吃（continue
+        // 验下一本，全书不含→null），默认不吃、落到下方实拉确证
         const hit = treeCache.get(bookID);
-        if (hit && Date.now() - hit.at < TREE_TTL_MS && hit.slots.some(sl => sl.docID === docID)) return bookID;
-        // 慢路径：缓存 miss/不含 → 实拉下结论（含回写缓存——出场链 ifAvailable 锁
-        // 下每击实拉会丢兄弟事件，实拉结论顺便惠及后续出场）
+        if (hit && Date.now() - hit.at < TREE_TTL_MS) {
+            if (hit.slots.some(sl => sl.docID === docID)) return bookID;
+            if (opts?.cacheNegative) continue;
+        }
+        // 慢路径：缓存 miss（或「不含」且未开 cacheNegative）→ 实拉下结论（含回写
+        // 缓存——出场链 ifAvailable 锁下每击实拉会丢兄弟事件，实拉结论顺便惠及后续出场）
         const nodes = await fetchWritingTree(info.boxID, bookID).catch(() => null);
         if (nodes === null) { anyFailed = true; continue; }
         const slots = flattenWritingTree(nodes, new Set(), bookID);

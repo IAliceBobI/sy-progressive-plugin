@@ -15649,6 +15649,30 @@ export class TomatoI18n extends TomatoI18nABC {
             default: return "Show flashcard review button on document title bar";
         }
     }
+    // issue #84：闪卡编号设置项文案（块左上角圆圈序号 + 标题栏闪卡块总数，一开关两处）
+    public get 显示闪卡编号() {
+        switch (this.lang) {
+            case "zh_CN": return "显示闪卡编号";
+            case "zh_CHT": return "顯示閃卡編號";
+            case "es_ES": return "Mostrar numeración de tarjetas";
+            case "fr_FR": return "Afficher la numérotation des cartes";
+            case "ja_JP": return "フラッシュカード番号を表示";
+            case "en_US":
+            default: return "Show flashcard numbers";
+        }
+    }
+    // issue #84：标题栏总数 tooltip（内核口径：含子文档、按张计数，与官方复习界面同款）
+    public 本文档闪卡共n张(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `本文档闪卡共 ${n} 张（含子文档，与复习界面同口径）`;
+            case "zh_CHT": return `此文檔閃卡共 ${n} 張（含子文檔，與複習界面同口徑）`;
+            case "es_ES": return `${n} tarjeta(s) de repaso en este documento (subdocumentos incluidos, mismo criterio que la interfaz de repaso)`;
+            case "fr_FR": return `${n} carte(s) dans ce document (sous-documents inclus, même comptage que l'interface de révision)`;
+            case "ja_JP": return `このドキュメントのフラッシュカード：全 ${n} 枚（子ドキュメントを含む、復習画面と同じ集計）`;
+            case "en_US":
+            default: return `${n} flashcard${n === 1 ? "" : "s"} in this doc (subdocs included, same count as the review UI)`;
+        }
+    }
     // confgather2 期3（2026-09-17 bear 拍板收折叠）：低频配置折叠区标题三键
     // A5+A6 反链域「静态反链与失效引用清理」维护工具合集折叠（命名对齐「数据库反链与引用修复」先例）
     public get 静态反链与失效引用清理() {
