@@ -13,7 +13,7 @@ import { verifyKeyProgressive } from "../../sy-tomato-plugin/src/libs/user";
 import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { collectSelectedBlocks } from "../../sy-tomato-plugin/src/libs/selection";
-import { cardBlocksForMake } from "./flashCardChannel";
+import { cardBlocksForMake, expandCardSelection } from "./flashCardChannel";
 import { parseBookIDFromCtime } from "./progData";
 import { shouldAddOriginRef } from "./flashCardRef";
 import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
@@ -146,17 +146,21 @@ class FlashBox {
         });
     }
 
-    /** 右键菜单制卡入口：右键目标块（或选中的多块）整块制卡，落点跟随设置 */
-    async makeCardFromBlocks(protyle: IProtyle, blocks: HTMLElement[], t: CardType = CardType.None) {
+    /** 块级整块制卡：右键菜单入口 + 单块智能扩块转投（2026-11-22 陆杰反馈）整块制卡，
+     *  落点跟随设置；path/noRef/landing 可选尾参透传 makeCard 同名参（既有调用点缺省不传） */
+    async makeCardFromBlocks(protyle: IProtyle, blocks: HTMLElement[], t: CardType = CardType.None, path?: string, noRef?: boolean, landing?: CardLanding) {
+        // 右键单选标题/列表项与 makeCard/blankSpaceCard 同病（单块进 sb → 答案位垫空段）
+        // ——入口统一扩块；blankSpaceCard 转投进来的已扩过（多块原样返回，幂等）
+        blocks = expandCardSelection(blocks);
         const divs: HTMLElement[] = [];
         const ids: string[] = [];
-        const setRef = shouldAddOriginRef(undefined, flashcardAddOriginRef.get());
+        const setRef = shouldAddOriginRef(noRef, flashcardAddOriginRef.get());
         for (const b of blocks) {
             const { id, div } = await this.cloneDiv(b as HTMLDivElement, setRef);
             ids.push(id);
             divs.push(div);
         }
-        if (ids.length > 0) await this.insertCard(protyle, divs, t, ids[ids.length - 1]);
+        if (ids.length > 0) await this.insertCard(protyle, divs, t, ids[ids.length - 1], path, landing);
     }
 
     async multilineMark(protyle: IProtyle) {
@@ -218,7 +222,10 @@ class FlashBox {
         debugLog("flashcard", `makeCard t=${t} doc=${protyle.block?.rootID ?? "-"} level=${chain?.level} blocks=${chain?.blocks?.length} multi=${cardBlocksForMake(chain)?.length} lastBlock=${events.lastBlockID} blank=${(live?.cloneContents?.()?.textContent ?? "").length}`, "prog");
         const multi = cardBlocksForMake(chain);
         if (multi?.length) {
-            const { ids, divs } = await this.cloneBlocksForCard(multi, noRef);
+            // 制卡智能扩块（2026-11-22 陆杰反馈，bear 拍板「智能扩块」）：单选标题/
+            // 列表项只有该块进 sb，下方内容（DOM 是后续兄弟）不进卡 → 答案位只有垫的
+            // 空段，复习翻面空白——标题扩到下一个任意级标题，列表项带同列表后续项
+            const { ids, divs } = await this.cloneBlocksForCard(expandCardSelection(multi), noRef);
             if (ids.length > 0) { // multilines
                 await this.insertCard(protyle, divs, t, ids[ids.length - 1], path, landing);
                 return;
@@ -429,6 +436,14 @@ class FlashBox {
         let tmpDiv: HTMLElement;
         const { dom } = getBlockDOM(range.endContainer.parentElement);
         if (!dom) return;
+        // 制卡智能扩块（2026-11-22 陆杰反馈，bear 拍板「智能扩块」）：光标放标题/
+        // 列表项里制卡走本兜底，只有该块进 sb → 答案位只有垫的空段，复习翻面空白
+        // ——扩出多块改走块级整块制卡（在划词判断之前：该场景划词挖空同样无意义）
+        const expanded = expandCardSelection([dom]);
+        if (expanded.length > 1) {
+            await this.makeCardFromBlocks(protyle, expanded, cardType, path, noRef, landing);
+            return;
+        }
         const ro = await events.isDocReadonly(protyle);
         const setRef = shouldAddOriginRef(noRef, flashcardAddOriginRef.get());
         if (selected) {

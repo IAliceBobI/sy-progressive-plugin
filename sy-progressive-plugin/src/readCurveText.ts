@@ -38,11 +38,19 @@ export function badgeSpec(readcard: string, material = false, matRemaining?: num
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-/** 到期距离尾巴：due≤now=已到期 / <24h=今天 / 否则 N 天后；null=无 due 无尾巴 */
+/** 沉底判定窗口（天）：due 距今超此值=FAR_DUE_DAYS 推远标记。取值两头依据——正常卡
+ *  最大 due 距离=低频档 grow 第 5 轮 48×1.5=72 天（freq 乘子只放大 grow/sched 间隔，
+ *  sched 预设封顶 30），沉底 99 天挂 19 天内查看必中（挂更久的陈年老卡退化显示天数，
+ *  也不再误导到 99）。2026-11-22 陆杰反馈：裸显「99 天后」被读成「99 天后才复习」 */
+const SUNK_TAIL_DAYS = 80;
+
+/** 到期距离尾巴：due≤now=已到期 / <24h=今天 / 沉底=暂不推送 / 否则 N 天后；null=无 due 无尾巴 */
 function dueRelOf(dueMs: number | null, nowMs: number): string {
     if (dueMs == null) return "";
     const diff = dueMs - nowMs;
-    const rel = diff <= 0 ? tomatoI18n.已到期 : diff < 86_400_000 ? tomatoI18n.计划今天 : tomatoI18n.计划N天后(Math.ceil(diff / 86_400_000));
+    const rel = diff <= 0 ? tomatoI18n.已到期
+        : diff >= SUNK_TAIL_DAYS * 86_400_000 ? tomatoI18n.暂不推送
+        : diff < 86_400_000 ? tomatoI18n.计划今天 : tomatoI18n.计划N天后(Math.ceil(diff / 86_400_000));
     return " · " + rel;
 }
 

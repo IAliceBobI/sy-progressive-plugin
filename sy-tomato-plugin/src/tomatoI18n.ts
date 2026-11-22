@@ -8218,6 +8218,17 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    /** 阅读卡沉底尾标（dueRelOf）：FAR_DUE_DAYS 推远的存量卡不再裸显「99 天后」
+     * （2026-11-22 陆杰反馈被误读为「99 天后才复习」），改显语义 */
+    public get 暂不推送() {
+        switch (this.lang) {
+            case "zh_CN": return "暂不推送";
+            case "zh_CHT": return "暫不推送";
+            case "en_US":
+            default: return "on hold";
+        }
+    }
+
     public get 没有匹配的摘抄() {
         switch (this.lang) {
             case "zh_CN": return "没有匹配的摘抄";
