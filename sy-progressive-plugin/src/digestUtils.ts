@@ -62,6 +62,12 @@ export class DigestBuilder {
      *  参数——截选中文字按句切多块，行内样式保留+attrLine 带源块 custom-progref）；
      *  undefined/全整盖=块选/光标/整圈拖蓝，整块摘现行为不变 */
     covers?: RangeCoverItem[];
+    /** 摘抄智能扩块时的标题取文块（缺省=selected 全部）：扩进来的下方内容不进标题——
+     *  digestTitleTextOf 逐块拼装、标题取前 10 字，扩块后不钉首块标题会拖上正文 */
+    titleEls?: Element[];
+    /** 摘抄后设点的锚（缺省=末选中块）：智能扩块时钉回光标所在块（阅读点不漂到扩
+     *  进来的末块——用户只把光标放在标题上，下面的内容未必读过） */
+    readingAnchor?: { id: string; el: HTMLElement };
 
     /** 落点档求值唯一入口（□4 收口）：override 优先于全局设置——daily 档下显式点了
      *  落点变体钮也一样走指定侧（显式意志胜出），故三处读值点全走这里 */
@@ -86,7 +92,7 @@ export class DigestBuilder {
     async init() {
         // 标题取文（review #5）：渲染码块走 data-content 源码（画布 CSS 垃圾不进标题），
         // 其余块与 getBlocksOwnText 逐字节同款
-        this.allText = digestTitleTextOf(this.selected);
+        this.allText = digestTitleTextOf(this.titleEls ?? this.selected);
         this.ctime = this.element.getAttribute(PDIGEST_CTIME);
 
         const fallbackID = this.element.getAttribute(PDIGEST_LAST_ID);
@@ -338,7 +344,8 @@ export class DigestBuilder {
         // 卡落库后重挂胶囊：open 触发的首次挂先于 1s 延迟加卡，误显「留档」无事件纠正（盲区③）
         refreshDigestTagBadgeFor(digestID);
         if (digestAddReadingpoint.get()) {
-            readingPointBox.addReadPointLock(this.ids[this.ids.length - 1], this.selected[this.selected.length - 1])
+            const anchor = this.readingAnchor ?? { id: this.ids[this.ids.length - 1], el: this.selected[this.selected.length - 1] };
+            readingPointBox.addReadPointLock(anchor.id, anchor.el);
         }
     }
 

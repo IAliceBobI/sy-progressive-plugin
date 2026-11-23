@@ -712,7 +712,7 @@ html[data-theme-mode="dark"] .prog-duebell[data-on="true"] {
 // ============================================================
 // v5 □6 状态栏火苗（docs/prog-v5-visual-design.md §2）：恒暖壳+可变芯光。
 // 三态 = data-state 注入 --prog-flame-core/glow + 形态冗余（黄瘦/红宽呼吸），
-// 色盲双通道可读；长驻无动画，仅红态 3s 慢辉光呼吸。
+// 色盲双通道可读；长驻无动画，仅红态且今日有缺口（data-breathe）时 3s 慢辉光呼吸。
 // ============================================================
 .prog-flame-host {
   display: flex;
@@ -781,12 +781,15 @@ html[data-theme-mode="dark"] .prog-wflame[data-state="goal"] .prog-flame-num {
 .prog-flame[data-state="over"] {
   --prog-flame-core: var(--prog-status-over);
 }
-/* 形态冗余：黄态瘦 15%、红态底座加宽 + 3s 慢辉光呼吸 */
+/* 形态冗余：黄态瘦 15%、红态底座加宽；呼吸只跟今日缺口走（2026-11-23 鸟反馈）——
+   只有历史欠债、今天已读满时红而不闪（多读还不掉旧债，闪着没有行动意义） */
 .prog-flame[data-state="warn"] .prog-flame-svg {
   transform: scaleY(0.85);
 }
 .prog-flame[data-state="over"] .prog-flame-svg {
   transform: scaleX(1.06);
+}
+.prog-flame[data-state="over"][data-breathe="true"] .prog-flame-svg {
   animation: prog-flame-breathe 3s ease-in-out infinite;
 }
 @keyframes prog-flame-breathe {
@@ -988,6 +991,16 @@ html[data-theme-mode="dark"] .prog-wflame[data-state="idle"] {
 .debt-pill[data-state="over"] {
   color: var(--prog-status-over);
   font-weight: 700;
+}
+/* 清零历史欠债（2026-11-23 鸟反馈）：有历史欠债时胶囊是按钮（点开确认菜单），外观同静态胶囊 */
+.debt-pill--btn {
+  border: none;
+  line-height: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.debt-pill--btn:hover {
+  background: color-mix(in srgb, var(--prog-flame-core) 28%, transparent);
 }
 /* 期2 全局 ✧ 待办胶囊：与书卡 ✧ 徽章同色系（warn）；无欠债 pill 时独自靠右 */
 .due-pill {

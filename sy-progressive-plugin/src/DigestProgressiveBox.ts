@@ -11,8 +11,9 @@ import { winHotkey } from "../../sy-tomato-plugin/src/libs/winHotkey";
 import { verifyKeyProgressive, lastVerifyResult } from "../../sy-tomato-plugin/src/libs/user";
 import { kind, openDigestSubrank, show, toggleFreeFloat, digOpen, expanded, collapseFloatBar, freeFloatOff, cardHostProtyle, forceCardHostFloatBar, noteID, zIndexPlus } from "./ProgressiveBtn";
 import { cardModeFor, type DigestIntent } from "./digestCardMode";
-import { PDIGEST_CTIME } from "../../sy-tomato-plugin/src/libs/gconst";
+import { PDIGEST_CTIME, DATA_NODE_ID } from "../../sy-tomato-plugin/src/libs/gconst";
 import { collectSelectedBlocks, coverItemsUnderRange } from "../../sy-tomato-plugin/src/libs/selection";
+import { expandDigestSelection } from "./flashCardChannel";
 
 export const digest渐进阅读摘抄模式 = winHotkey("⌥z", "渐进阅读摘抄模式", "iconProgScissors", () => tomatoI18n.渐进阅读摘抄模式)
 export const digest执行摘抄 = winHotkey("⇧⌥Z", "执行摘抄", "iconProgScissors", () => tomatoI18n.执行摘抄)
@@ -277,9 +278,19 @@ export async function initDi(s: Awaited<ReturnType<typeof events.selectedDivs>>,
     di.element = s.element;
     di.docID = s.docID;
     di.docName = s.docName;
+    // 摘抄智能扩块（2026-11-23 陆杰追评）：光标态单选标题/列表项时把下方内容一起摘
+    //（判型与制卡同源，见 expandDigestSelection；拖蓝/块选=用户已圈定范围，不扩）。
+    // 标题取文、摘抄后设点仍钉在光标所在块——扩进来的正文不进标题、阅读点不漂到末块
+    const origin = s.selected ?? [];
+    const expanded = s.cursorOnly && !s.range ? expandDigestSelection(origin) : origin;
+    const digested = expanded.length > 0 ? expanded : origin;
     di.anchorID = s.ids[s.ids.length - 1];
-    di.selected = s.selected;
-    di.ids = s.ids;
+    di.selected = digested;
+    di.ids = digested.map(el => el.getAttribute(DATA_NODE_ID));
+    if (digested !== origin) {
+        di.titleEls = origin;
+        di.readingAnchor = { id: di.anchorID, el: origin[origin.length - 1] };
+    }
     di.boxID = s.boxID;
     di.plugin = digestProgressiveBox.plugin;
     di.otab = digestProgressiveBox.singleTab;

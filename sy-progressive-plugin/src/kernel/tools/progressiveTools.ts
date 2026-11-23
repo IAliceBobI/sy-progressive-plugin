@@ -9,7 +9,7 @@ import {
   PDIGEST_CTIME, DEFAULT_QUOTA, DAY_MS,
   readBooksInfos, readReadingOrder, readBookIndex, bookEntries,
   bookOfDocFrom, digestCountsFrom, mergeMissingBooks, pickNextBook, isFinished,
-  summarizeDebt, loadAllDays, readDayData, todayStr, endOfISODate,
+  summarizeDebt, loadAllDays, readDayData, readDebtClearedBefore, todayStr, endOfISODate,
   type KBookInfo,
 } from "../progData";
 import {
@@ -173,7 +173,7 @@ async function getDue(input: Record<string, any>) {
     pieces.readToday = readToday;
     pieces.readByBook = dayData?.b ?? {};
     if (isToday) {
-      const summary = summarizeDebt(await loadAllDays(), dayStr, quotaToday);
+      const summary = summarizeDebt(await loadAllDays(), dayStr, quotaToday, await readDebtClearedBefore());
       pieces.debt = summary.debt;
       pieces.debtState = summary.state; // ok=无欠债/warn=欠债<2×档位/over=欠债≥2×档位
       const next = await simulateNextBooks(quotaToday - readToday, dayData, quotaToday);

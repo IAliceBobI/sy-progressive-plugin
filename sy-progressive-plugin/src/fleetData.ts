@@ -349,7 +349,7 @@ export async function loadFleetSummary(spanDays = 14): Promise<FleetSummary> {
     const quota = quotaNum();
     return {
         books,
-        debt: summarizeDebt(allDays, todayLocalStr(), quota),
+        debt: summarizeDebt(allDays, todayLocalStr(), quota, progStorage.loadDebtClearedBefore()),
         heat: buildHeat(allDays, todayLocalStr(), spanDays),
         quota,
         dueTotal: dueCountOf(thinkRows ?? [], now) + dueCountOf(pdigestRows ?? [], now),

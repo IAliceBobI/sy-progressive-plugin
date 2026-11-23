@@ -5618,6 +5618,57 @@ export class TomatoI18n extends TomatoI18nABC {
         }
     }
 
+    // 清零历史欠债（2026-11-23 鸟反馈）：档位一次调高没读完就永久挂债，此前没有出口。
+    // 入口=状态栏火苗右键 / 舰队面板欠债胶囊 / 命令面板，三处共用一个确认菜单
+    public get 清零历史欠债() {
+        switch (this.lang) {
+            case "zh_CN": return "清零历史欠债";
+            case "zh_CHT": return "清零歷史欠債";
+            case "en_US":
+            default: return "Clear earlier debt";
+        }
+    }
+    public 清零历史欠债N片(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `清零历史欠债（${n} 片）`;
+            case "zh_CHT": return `清零歷史欠債（${n} 片）`;
+            case "en_US":
+            default: return `Clear ${n} owed earlier`;
+        }
+    }
+    public 历史欠债N片点击清零(n: number) {
+        switch (this.lang) {
+            case "zh_CN": return `历史欠债 ${n} 片，点击清零`;
+            case "zh_CHT": return `歷史欠債 ${n} 片，點擊清零`;
+            case "en_US":
+            default: return `${n} owed earlier, click to clear`;
+        }
+    }
+    public get 右键火苗可清零历史欠债() {
+        switch (this.lang) {
+            case "zh_CN": return "右键火苗可清零历史欠债";
+            case "zh_CHT": return "右鍵火苗可清零歷史欠債";
+            case "en_US":
+            default: return "Right-click the flame to clear earlier debt";
+        }
+    }
+    public get 历史欠债已清零() {
+        switch (this.lang) {
+            case "zh_CN": return "历史欠债已清零";
+            case "zh_CHT": return "歷史欠債已清零";
+            case "en_US":
+            default: return "Earlier debt cleared";
+        }
+    }
+    public get 没有历史欠债() {
+        switch (this.lang) {
+            case "zh_CN": return "没有历史欠债";
+            case "zh_CHT": return "沒有歷史欠債";
+            case "en_US":
+            default: return "No earlier debt";
+        }
+    }
+
     // □5 写作小火焰（写作量独立显示+点击直达写作现场）
     public get 写作火苗标签() {
         switch (this.lang) {

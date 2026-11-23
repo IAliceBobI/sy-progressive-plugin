@@ -24,7 +24,7 @@ import { tomatoI18n } from "../../sy-tomato-plugin/src/tomatoI18n";
 import { blockIconMenu, card2dailycard, cardLanding, digSubrankOpen, floatbarExpandPref, floatbarMainBtns, floatbarFreeMainBtns, floatbarDigestMainBtns, floatbarBookMainBtns, floatbarFlatCollapsed, floatbarFlatManifest, progFloatBallPos, floatBarPos, mobileSelectBtns, mobileTopBar, cardAppendTime, flashcardShowPath, cardUnderPiece, dailyQuota, digest2dailycard, digestLanding, digestAddReadingpoint, digestGlobalSigle, digestmenu, wholeDigestMenu, cardContextMenu, reviewSchedMenu, revisitRhythmMenu, digestNoBacktraceLink, flashcardAddOriginRef, flashcardAddRefs, flashcardMultipleLnks, flashcardNotebook, hideBtnsInFlashCard, pieceTailCard, initProgFloatBtnsDisable, markOriginTextBG, materialCapsuleBorder, writingPoolUnderBook, floatbarSlotEntryShow, readCurveSweepMins, readCurveTakeover, pieceAutoCard, readCurveReadingPoint, readCurvePlainDocs,
     readCurvePiece, readCurveMaterial, readCurveDigest, readCurveCadMaterial, readCurveCadDigest, readCurveCadReadingPoint, readCurveCadPlain, writingQuota, revTraceEnabled, revTraceScope, revTraceScopeFromLegacy, openCardsOnOpenPiece, pieceNoBacktraceLink, extractAllNoBacktraceLink, extractNoteNoBacktraceLink, extractNoteNoBlankLine, piecesmenu, ProgressiveJumpMenu, ProgressiveStart2learn, ProgressiveDueMenu, userID, userToken, licenseCloudSynced, claimActive, windowOpenStyle, slotTreeExpanded } from "../../sy-tomato-plugin/src/libs/stores";
 import { STORAGE_Prog_SETTINGS } from "../../sy-tomato-plugin/src/constants";
-import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER } from "./constants";
+import { STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER, STORAGE_DEBT_CLEARED } from "./constants";
 import { BaseTomatoPlugin } from "../../sy-tomato-plugin/src/libs/BaseTomatoPlugin";
 import { installReadonlyHotkeyBridge, uninstallReadonlyHotkeyBridge } from "../../sy-tomato-plugin/src/libs/readonlyHotkey";
 import { DestroyManager } from "../../sy-tomato-plugin/src/libs/destroyer";
@@ -57,6 +57,7 @@ import { debugLog } from "../../sy-tomato-plugin/src/libs/logUtils";
 import { notifyFleetChanged } from "./fleetNotify";
 import { closeFloatPopover } from "./overlays";
 import { openDueReviewList } from "./reviewMenu";
+import { openDebtMenu } from "./debtMenu";
 import { buildContentBlocks, buildContentBlocksVols, computePieceIndex, computePieceIndexVols, listVolIDs, runSplit } from "./Split2Pieces";
 import { createPiece, deleteAllPieces, fullfilContent } from "./helper";
 import { ensureVolTableFresh, volRebuildDeps } from "./volRebuild";
@@ -354,9 +355,9 @@ export default class ThePlugin extends BaseTomatoPlugin {
             setGlobal(ProgressivePluginConfig, this.settingCfg);
             applyProgSkins(this.settingCfg);
         }
-        // 数据文件缓存刷新：ProgressiveStorage 直读 plugin.data（books/阅读顺序/分片数据），
-        // 整重载时代由重载兜底读新，自管后须显式 loadData 刷本端缓存
-        await Promise.all([STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER].map(f => this.loadData(f)));
+        // 数据文件缓存刷新：ProgressiveStorage 直读 plugin.data（books/阅读顺序/分片数据/
+        // 清零欠债标记），整重载时代由重载兜底读新，自管后须显式 loadData 刷本端缓存
+        await Promise.all([STORAGE_BOOKS, STORAGE_PROGDATA, STORAGE_READING_ORDER, STORAGE_DEBT_CLEARED].map(f => this.loadData(f)));
         // 结构性重载放最后（review P2-1）：热更动作全跑完再整重载，防 teardown 410 掐断
         // 上面 loadData 落进钩子 catch 再重载一轮（双重重载多闪一次）
         if (r.structural.length) await reloadSelfPlugin(this.name);
@@ -535,6 +536,14 @@ export default class ThePlugin extends BaseTomatoPlugin {
             },
         });
 
+        // 清零历史欠债（2026-11-23 鸟反馈）：命令面板可搜（无默认键位——免去 winHotkey
+        // 全仓比对）；键盘触发落屏幕中间，菜单项即确认步
+        this.addCommand({
+            langKey: "clearHistoricalDebt",
+            langText: tomatoI18n.清零历史欠债,
+            callback: () => { openDebtMenu({ clientX: 0, clientY: 0 }); },
+        });
+
         // revtrace-scope：修订痕迹开关命令保持二态开/关（与设置项 revTraceScope 同源；
         // 无默认键位——命令面板可搜，免去 winHotkey 全仓比对；实时生效走 loadStore 订阅）。
         // 开=回到上次范围档（记忆喂点=loadStore/订阅的非 off 值；从未有过值时开到 "prog"）
@@ -632,6 +641,7 @@ export default class ThePlugin extends BaseTomatoPlugin {
         await prog.onload(this, this.settingCfg);
         const fleetActions: FleetActions = {
             startReading: () => prog.startToLearnWithLock(),
+            openDebtMenu: (ev) => openDebtMenu(ev),
             freeDigest: () => toggleFreeFloat(),
             addFirstBook: () => prog.addProgressiveReadingWithLock(),
             continueReading: (bookID) => prog.startToLearnWithLock(bookID),

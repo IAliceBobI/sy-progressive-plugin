@@ -9,6 +9,8 @@ import * as api from "./api";
 
 export const STORAGE_BOOKS = "books.json";
 export const STORAGE_READING_ORDER = "reading-order.json";
+// 前端 constants.ts 同名：清零历史欠债标记 {before: "YYYY-MM-DD"}
+export const STORAGE_DEBT_CLEARED = "debt-cleared.json";
 const PLOG_DATE = "custom-proglog-date";
 const PLOG_DATA = "custom-proglog-data";
 /** 摘抄文档 ctime（值=bookID#ct，🔨 前缀=素材已推完） */
@@ -66,6 +68,19 @@ export async function readBooksInfos(): Promise<Record<string, KBookInfo>> {
 
 /** 滚筒书序（roller.ts ReadingOrder 同构；缺文件/残缺=空序） */
 export interface ReadingOrder { order: string[]; lastServed: string; }
+
+/** 清零历史欠债标记日（前端 ProgressiveStorage.loadDebtClearedBefore 同构；缺文件/
+ *  坏值=""=从未清零）。该日之前的历史天不算欠债 */
+export async function readDebtClearedBefore(): Promise<string> {
+  const text = await readStorageText(STORAGE_DEBT_CLEARED);
+  if (!text) return "";
+  try {
+    const d = JSON.parse(text);
+    return typeof d?.before === "string" ? d.before : "";
+  } catch {
+    return "";
+  }
+}
 
 export async function readReadingOrder(): Promise<ReadingOrder> {
   const text = await readStorageText(STORAGE_READING_ORDER);
@@ -158,17 +173,20 @@ export function isFinished(point: number, indexLength: number): boolean {
   return point >= indexLength;
 }
 
-/** 阅读欠债（roller.summarizeDebt 同源语义；quotaToday 由调用方定：当日账块 q 或默认档） */
+/** 阅读欠债（roller.summarizeDebt 同源语义；quotaToday 由调用方定：当日账块 q 或默认档；
+ *  clearedBefore=清零标记日，该日之前的历史天不算欠——改源头须同步此处） */
 export function summarizeDebt(
   days: { date: string; q: number; read: number }[],
   today: string,
   quotaToday: number,
+  clearedBefore = "",
 ): { readToday: number; quotaToday: number; debt: number; state: "ok" | "warn" | "over" } {
   let debt = 0;
   let readToday = 0;
   for (const d of days) {
     const q = d.date === today ? quotaToday : d.q;
     if (d.date === today) readToday = d.read;
+    if (d.date !== today && clearedBefore && d.date < clearedBefore) continue;
     debt += Math.max(0, q - d.read);
   }
   const state = debt === 0 ? "ok" : debt >= 2 * quotaToday ? "over" : "warn";

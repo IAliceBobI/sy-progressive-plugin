@@ -24,6 +24,9 @@ import { newID } from "stonev5-utils";
 export interface FleetActions {
     /** ▶ 开始今日阅读（滚筒下一片） */
     startReading(): any;
+    /** 清零历史欠债（2026-11-23 鸟反馈）：状态栏火苗右键/舰队面板欠债胶囊/命令面板
+     *  共用的确认菜单（见 debtMenu.ts） */
+    openDebtMenu(ev: { clientX: number; clientY: number }): any;
     /** □11 自由态上岗（状态栏 ✂ 钮：普通文档浮条到场；在场=生命周期 toggle，见 toggleFreeFloat □3） */
     freeDigest(): any;
     /** 空态主按钮=把当前文档加入渐进阅读 */
@@ -258,7 +261,7 @@ export function initFleet(plugin: any, actions: FleetActions) {
     host.className = "prog-flame-host";
     flameApp = mount(FleetFlame, {
         target: host,
-        props: { flame: flameState, onStart: actions.startReading },
+        props: { flame: flameState, onStart: actions.startReading, onDebtMenu: actions.openDebtMenu },
     }) as any;
     plugin.addStatusBar({ element: host, position: "left" });
 

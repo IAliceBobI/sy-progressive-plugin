@@ -39,7 +39,8 @@ export interface DebtSummary {
      *  「今日缺 N」vs「历史欠债 N」，治「读满还欠」的困惑）。今日无日志块时=全档位，
      *  但不入 debt（记账口径：无行不入债，块由首笔 markRead 落） */
     todayGap: number;
-    /** 历史欠债 = Σ 历史天 max(0, q−read)（当日结算恒定）。同日异常双块时取末行口径 */
+    /** 历史欠债 = Σ 历史天 max(0, q−read)（当日结算恒定；清零标记日之前的天不计，
+     *  见 summarizeDebt 的 clearedBefore）。同日异常双块时取末行口径 */
     histDebt: number;
     /** 累计已读 = Σ 各日 read（progpush □2 火苗 tooltip 尾行；含今天，超额原样） */
     totalRead: number;
@@ -174,10 +175,14 @@ export function incrementWriting(data: DayLogData, bookID: string): DayLogData {
     return { ...data, w: { ...(data.w ?? {}), [bookID]: ((data.w ?? {})[bookID] ?? 0) + 1 } };
 }
 
+/** @param clearedBefore 清零历史欠债标记日（YYYY-MM-DD）：该日之前的历史天不再算欠债
+ *  （2026-11-23 鸟反馈，bear 定「手动清零」——档位一次调高没读完就永久挂债、多读不抵扣
+ *  又无出口）。只跳过欠债累加：累计已读/当日账照常算，账面数据不动 */
 export function summarizeDebt(
     days: { date: string; q: number; read: number; write?: number }[],
     today: string,
     quotaToday: number,
+    clearedBefore = "",
 ): DebtSummary {
     let histDebt = 0;
     let readToday = 0;
@@ -194,6 +199,7 @@ export function summarizeDebt(
             readToday = d.read;
             todayGapInDebt = writingOnly ? 0 : Math.max(0, quotaToday - d.read);
         } else if (!writingOnly) {
+            if (clearedBefore && d.date < clearedBefore) continue; // 清零标记日之前：不算欠
             histDebt += Math.max(0, d.q - d.read);
         }
     }
@@ -498,7 +504,13 @@ export async function rollerArchiveBook(bookID: string): Promise<void> {
 
 /** 火苗/热力图数据（□6 状态栏与 Dock 面板消费） */
 export async function rollerDebtSummary(): Promise<DebtSummary> {
-    return summarizeDebt(await makeRollerDeps().loadAllDays(), todayStr(), Number(dailyQuota.get()) || 3);
+    return summarizeDebt(await makeRollerDeps().loadAllDays(), todayStr(), Number(dailyQuota.get()) || 3, progStorage.loadDebtClearedBefore());
+}
+
+/** 清零历史欠债（2026-11-23 鸟反馈，bear 定「手动清零」）：落「今日之前不算欠」标记。
+ *  只动标记不动账——阅读日志逐日数据原样保留（热力图/累计已读不受影响） */
+export async function rollerClearHistoricalDebt(): Promise<void> {
+    await progStorage.saveDebtClearedBefore(todayStr());
 }
 
 /** 今日待轮转书数（revsrcguard 同批 650189 09-23 帖）：readable 集合大小=「今天滚筒

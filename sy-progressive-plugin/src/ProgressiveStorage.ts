@@ -29,6 +29,8 @@ export class ProgressiveStorage {
         await this.plugin.loadData(constants.STORAGE_READING_ORDER);
         // revtrace enrollment 基线（加载即可用；写入走 enrollRevTrace 门闩）
         await this.plugin.loadData(constants.STORAGE_REVTRACE);
+        // 清零历史欠债标记（加载即可用；不读则重载后历史欠债复活）
+        await this.plugin.loadData(constants.STORAGE_DEBT_CLEARED);
         Object.entries(this.booksInfos()).forEach(([_k, v]) => {
             if (typeof v.autoCard === "string") {
                 if (v.autoCard === "yes") v.autoCard = true;
@@ -519,6 +521,21 @@ export class ProgressiveStorage {
         if (!this.storageReady) return; // □13 门闩：窗口内基于空默认重建的 order 会覆盖磁盘书序
         this.plugin.data[constants.STORAGE_READING_ORDER] = ro;
         await this.plugin.saveData(constants.STORAGE_READING_ORDER, ro);
+    }
+
+    // ============ 清零历史欠债（debt-cleared.json） ============
+
+    /** 清零标记日：该日之前的历史天不再算欠债；""=从未清零（坏值同） */
+    loadDebtClearedBefore(): string {
+        const d = this.plugin.data[constants.STORAGE_DEBT_CLEARED] as { before?: string } | undefined;
+        return typeof d?.before === "string" ? d.before : "";
+    }
+
+    async saveDebtClearedBefore(before: string) {
+        if (!this.storageReady) return; // □13 门闩同款
+        const d = { before };
+        this.plugin.data[constants.STORAGE_DEBT_CLEARED] = d;
+        await this.plugin.saveData(constants.STORAGE_DEBT_CLEARED, d);
     }
 
     // ============ 修订痕迹 enrollment（revtrace.json，revtrace □2）============

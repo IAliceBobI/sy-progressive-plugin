@@ -6,6 +6,9 @@ export const STORAGE_READING_ORDER = "reading-order.json";
 // revtrace 修订痕迹：enrollment 基线映射 {docID: 内核同构14位时间戳}——纯视图零档案的
 // 唯一持久化（首次纳入时刻=无色基线防满屏；无桶无快照，色层=f(updated 距今天数)实时算）
 export const STORAGE_REVTRACE = "revtrace.json";
+// 清零历史欠债（2026-11-23 鸟反馈）：{before: "YYYY-MM-DD"}——该日之前的历史天不再算欠债
+// （只动标记不动账：阅读日志逐日数据原样保留，热力图/累计已读不受影响）
+export const STORAGE_DEBT_CLEARED = "debt-cleared.json";
 // v5 阅读日志：prog-data「阅读日志」文档内每日一子块，块 IAL 双键（date 锚查询 / data 存 JSON 真源）
 export const PLOG_DATE = "custom-proglog-date";
 export const PLOG_DATA = "custom-proglog-data";

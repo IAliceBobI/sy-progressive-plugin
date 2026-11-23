@@ -139,7 +139,17 @@
                 <span class="big">{p.debt.readToday}</span>
                 <span class="total">/ {quota}</span>
                 {#if p.debt.debt > 0}
-                    <span class="debt-pill" data-state={debtState}>{tomatoI18n.欠N片(p.debt.debt)}</span>
+                    {#if p.debt.histDebt > 0}
+                        <!-- 清零历史欠债（2026-11-23 鸟反馈）：有历史欠债时胶囊可点，点开确认菜单 -->
+                        <button
+                            class="debt-pill debt-pill--btn"
+                            data-state={debtState}
+                            aria-label={tomatoI18n.历史欠债N片点击清零(p.debt.histDebt)}
+                            onclick={(e) => actions.openDebtMenu({ clientX: e.clientX, clientY: e.clientY })}
+                        >{tomatoI18n.欠N片(p.debt.debt)}</button>
+                    {:else}
+                        <span class="debt-pill" data-state={debtState}>{tomatoI18n.欠N片(p.debt.debt)}</span>
+                    {/if}
                 {/if}
                 {#if p.dueTotal > 0}
                     <!-- 期2 全局 ✧ 待办胶囊：think+pdigest 双源（含 free 源）——点击开全局清单 -->
